@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#121212"
     android:fillViewport="true">
 
     <LinearLayout
@@ -12,25 +13,126 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Screen Time (Last 7 Days)"
-            android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6"
-            android:layout_marginBottom="8dp"/>
-
-        <TextView
-            android:id="@+id/screenTimeText"
+        <!-- Time Watched Card -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            tools:text="Today: 2h 30m\nYesterday: 1h 15m"
-            android:layout_marginBottom="24dp"/>
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#1E1E1E"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Header -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Time watched"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <!-- Daily Average -->
+                <TextView
+                    android:id="@+id/dailyAverageText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textColor="#E0E0E0"
+                    android:textSize="18sp"
+                    tools:text="3 hr 37 min daily average" />
+
+                <!-- Week Change -->
+                <TextView
+                    android:id="@+id/weekChangeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="#9E9E9E"
+                    android:textSize="14sp"
+                    tools:text="↑ 49% from last week" />
+
+                <!-- Bar Chart -->
+                <com.github.andreyasadchy.xtra.ui.view.DailyBarChartView
+                    android:id="@+id/dailyBarChart"
+                    android:layout_width="match_parent"
+                    android:layout_height="200dp"
+                    android:layout_marginTop="16dp"
+                    app:barColor="#58A6FF"
+                    app:gridLineColor="#3D3D3D"
+                    app:labelColor="#9E9E9E" />
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="16dp"
+                    android:background="#2D2D2D" />
+
+                <!-- Today Stats Row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Today"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/todayTimeText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#9E9E9E"
+                        android:textSize="16sp"
+                        tools:text="18 min" />
+                </LinearLayout>
+
+                <!-- Last 7 Days Row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Last 7 days"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/weekTotalText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#9E9E9E"
+                        android:textSize="16sp"
+                        tools:text="25 hr 16 min" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Top Watched Channels Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Top Watched Channels"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6"
+            android:textColor="#FFFFFF"
             android:layout_marginBottom="8dp"/>
 
         <androidx.recyclerview.widget.RecyclerView
@@ -40,6 +142,13 @@
             android:nestedScrollingEnabled="false"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
             tools:listitem="@layout/item_stream_stat"/>
+
+        <!-- Hidden text view for backward compatibility -->
+        <TextView
+            android:id="@+id/screenTimeText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
