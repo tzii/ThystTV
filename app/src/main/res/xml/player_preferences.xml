@@ -45,6 +45,13 @@
         android:title="@string/player_defaultquality"
         app:iconSpaceReserved="false"
         app:singleLineTitle="false" />
+ 
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="player_data_saver"
+        android:title="@string/player_data_saver"
+        app:iconSpaceReserved="false"
+        app:singleLineTitle="false" />
 
     <SwitchPreferenceCompat
         android:defaultValue="false"

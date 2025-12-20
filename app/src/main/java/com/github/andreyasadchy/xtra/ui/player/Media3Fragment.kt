@@ -1009,6 +1009,13 @@ class Media3Fragment : PlayerFragment() {
 
     override fun onNetworkRestored() {
         if (isResumed) {
+            if (!viewModel.userHasChangedQuality) {
+                val currentQuality = viewModel.quality
+                setDefaultQuality()
+                if (viewModel.quality != currentQuality) {
+                    changeQuality(viewModel.quality)
+                }
+            }
             if (videoType == STREAM) {
                 restartPlayer()
             } else {

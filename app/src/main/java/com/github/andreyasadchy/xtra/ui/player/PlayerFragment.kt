@@ -79,6 +79,7 @@ import com.github.andreyasadchy.xtra.util.gone
 import com.github.andreyasadchy.xtra.util.hideKeyboard
 import com.github.andreyasadchy.xtra.util.isInPortraitOrientation
 import com.github.andreyasadchy.xtra.util.isKeyboardShown
+import com.github.andreyasadchy.xtra.util.isMeteredConnection
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.shortToast
 import com.github.andreyasadchy.xtra.util.toast
@@ -714,6 +715,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         } else {
                             changeQuality(AUDIO_ONLY_QUALITY)
                         }
+                        viewModel.userHasChangedQuality = true
                         changePlayerMode()
                     }
                 }
@@ -1491,6 +1493,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (!title.isNullOrBlank() && prefs.getBoolean(C.PLAYER_TITLE, true)) {
                 text = title.trim()
                 visible()
+                setOnClickListener {
+                    requireContext().toast(title.trim())
+                }
             } else {
                 text = null
                 gone()
@@ -1572,21 +1577,29 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     protected fun setDefaultQuality() {
         val defaultQuality = prefs.getString(C.PLAYER_DEFAULTQUALITY, "saved")?.substringBefore(" ")
-        viewModel.quality = when (defaultQuality) {
-            "saved" -> {
-                val savedQuality = prefs.getString(C.PLAYER_QUALITY, "720p60")?.substringBefore(" ")
-                when (savedQuality) {
-                    AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
-                    AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
-                    CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
-                    else -> findQuality(savedQuality)
+        val isDataSaver = prefs.getBoolean(C.PLAYER_DATA_SAVER, true)
+        val isMetered = requireContext().isMeteredConnection
+
+        viewModel.quality = if (isDataSaver && isMetered && !viewModel.userHasChangedQuality) {
+             requireContext().shortToast(R.string.data_saver_mode)
+             findQuality("480p") ?: findQuality("360p") ?: viewModel.qualities.entries.firstOrNull()?.key
+        } else {
+            when (defaultQuality) {
+                "saved" -> {
+                    val savedQuality = prefs.getString(C.PLAYER_QUALITY, "720p60")?.substringBefore(" ")
+                    when (savedQuality) {
+                        AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
+                        AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
+                        CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
+                        else -> findQuality(savedQuality)
+                    }
                 }
+                AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
+                "Source" -> viewModel.qualities.entries.find { it.key != AUTO_QUALITY }?.key
+                AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
+                CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
+                else -> findQuality(defaultQuality)
             }
-            AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
-            "Source" -> viewModel.qualities.entries.find { it.key != AUTO_QUALITY }?.key
-            AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
-            CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
-            else -> findQuality(defaultQuality)
         } ?: viewModel.qualities.entries.firstOrNull()?.key
     }
 
@@ -2305,6 +2318,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         when (requestCode) {
             REQUEST_CODE_QUALITY -> {
                 changeQuality(viewModel.qualities.keys.elementAtOrNull(index))
+                viewModel.userHasChangedQuality = true
                 changePlayerMode()
                 setQualityText()
             }

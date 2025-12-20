@@ -107,6 +107,7 @@ class PlayerViewModel @Inject constructor(
 
     var qualities: Map<String, Pair<String, String?>> = emptyMap()
     var quality: String? = null
+    var userHasChangedQuality = false
     var previousQuality: String? = null
     var playlistUrl: Uri? = null
     var updateQualities = false

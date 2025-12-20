@@ -29,6 +29,12 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+val Context.isMeteredConnection
+    get() = getConnectivityManager(this).let { connectivityManager ->
+        val networkCapabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+        networkCapabilities != null && !networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    }
+
 val Context.isNetworkAvailable
     get() = getConnectivityManager(this).let { connectivityManager ->
         val networkCapabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
