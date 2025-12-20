@@ -1,21 +1,33 @@
-# Xtra for Twitch
-
-<img src="https://github.com/AndreyAsadchy/Xtra/blob/197ba90cac879abd2a5645393ce361847f12fa0b/app/src/main/ic_launcher-web.png" align="left" width="100"/>
+# Xtra
 
 Xtra is a Twitch player and browser for Android.
 
-</br>
-</br>
+## New Features (v2.0)
 
-## Download
+### 1. Network-Aware Data Saver
+*   **Smart Quality Control**: Automatically detects when you are on a metered connection (Mobile Data) and caps the video quality to 480p to save your data plan.
+*   **User Override**: If you manually select a higher quality while on data, the app respects your choice for the rest of the session.
+*   **Settings Toggle**: Configurable via Player Settings > "Data saver".
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-      alt="Get it on F-Droid"
-      height="80">](https://f-droid.org/packages/com.github.andreyasadchy.xtra/)
+### 2. Stream Title Tooltip
+*   **Full Visibility**: Long stream titles that are truncated by the UI can now be viewed in full by simply tapping the title text in the player controls.
 
-You can find released APKs [here](https://github.com/crackededed/Xtra/releases/tag/latest).
+### 3. Gesture Controls
+*   **Intuitive Control**: Easily adjust volume and brightness without leaving the immersive full-screen player.
+*   **Volume**: Slide up/down on the **right** half of the screen.
+*   **Brightness**: Slide up/down on the **left** half of the screen.
+*   **Visual Feedback**: Displays a real-time slider overlay during adjustment.
 
-[Xtra subreddit](https://www.reddit.com/r/XtraForTwitch)
+## Fixes
+*   Fixed missing string resources causing build failures.
+*   Fixed  logic to correctly identify mobile networks.
 
-## License
-Xtra is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+## Architecture
+*   **MVVM**: Clean separation of concerns with ViewModels handling UI logic.
+*   **Media3/ExoPlayer**: Robust video playback engine.
+*   **Kotlin Coroutines**: Efficient background processing.
+
+## Building
+1.  Ensure you have Android SDK configured in `local.properties`.
+2.  Run `./gradlew assembleDebug`.
+

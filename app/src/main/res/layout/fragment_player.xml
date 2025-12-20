@@ -43,6 +43,13 @@
                 android:visibility="gone" />
 
             <include
+                android:id="@+id/gestureFeedback"
+                layout="@layout/player_volume"
+                android:layout_width="300dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+            <include
                 android:id="@+id/playerControls"
                 layout="@layout/player_layout" />
 

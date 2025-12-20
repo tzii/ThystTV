@@ -20,6 +20,14 @@ import android.text.format.DateFormat
 import android.text.format.DateUtils
 import android.util.TypedValue
 import android.view.GestureDetector
+import android.media.AudioManager
+import android.provider.Settings
+import android.view.WindowManager
+import android.os.Handler
+import android.os.Looper
+import android.widget.ImageView
+import android.widget.TextView
+import com.google.android.material.slider.Slider
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -100,6 +108,7 @@ import kotlin.math.max
 abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment.OnSortOptionChanged, IntegrityDialog.CallbackListener {
 
     private var _binding: FragmentPlayerBinding? = null
+    private val hideGestureRunnable = Runnable { binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.gone() }
     protected val binding get() = _binding!!
     protected val viewModel: PlayerViewModel by viewModels()
     protected var chatFragment: ChatFragment? = null
@@ -281,6 +290,75 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             val controllerTapDetector = GestureDetector(
                 requireContext(),
                 object : GestureDetector.SimpleOnGestureListener() {
+                    private var isVolume = false
+                    private var isBrightness = false
+                    private var startVolume = 0
+                    private var startBrightness = 0f
+
+                    override fun onDown(e: MotionEvent): Boolean {
+                        isVolume = false
+                        isBrightness = false
+                        return true
+                    }
+
+                    override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+                        if (e1 == null || isPortrait || !isMaximized) return false
+                        
+                        val width = resources.displayMetrics.widthPixels
+                        val height = resources.displayMetrics.heightPixels
+                        
+                        if (!isVolume && !isBrightness) {
+                             if (Math.abs(distanceY) > Math.abs(distanceX)) {
+                                 if (e1.x < width / 2) {
+                                     isBrightness = true
+                                     startBrightness = requireActivity().window.attributes.screenBrightness
+                                     if (startBrightness < 0) startBrightness = 0.5f // Default fallback
+                                 } else {
+                                     isVolume = true
+                                     val audioManager = requireContext().getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                                     startVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                 }
+                             }
+                        }
+
+                        val percent = (e1.y - e2.y) / height
+                        val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback)
+                        val icon = feedback.findViewById<ImageView>(R.id.volumeMute)
+                        val slider = feedback.findViewById<Slider>(R.id.volumeBar)
+                        val text = feedback.findViewById<TextView>(R.id.volumeText)
+
+                        if (isBrightness) {
+                            val newBrightness = (startBrightness + percent).coerceIn(0.01f, 1.0f)
+                            val lp = requireActivity().window.attributes
+                            lp.screenBrightness = newBrightness
+                            requireActivity().window.attributes = lp
+                            
+                            feedback.visible()
+                            feedback.removeCallbacks(hideGestureRunnable)
+                            feedback.postDelayed(hideGestureRunnable, 1000)
+                            
+                            slider.value = newBrightness * 100
+                            text.text = "%d".format((newBrightness * 100).toInt())
+                            return true
+                        }
+                        
+                        if (isVolume) {
+                            val audioManager = requireContext().getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                            val newVolume = (startVolume + (percent * maxVolume)).toInt().coerceIn(0, maxVolume)
+                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+                            
+                            feedback.visible()
+                            feedback.removeCallbacks(hideGestureRunnable)
+                            feedback.postDelayed(hideGestureRunnable, 1000)
+                            
+                            slider.value = (newVolume.toFloat() / maxVolume.toFloat()) * 100
+                            text.text = "%d".format((slider.value).toInt())
+                            return true
+                        }
+
+                        return false
+                    }
                     override fun onSingleTapUp(e: MotionEvent): Boolean {
                         return if (!doubleTap || isPortrait) {
                             val visible = playerControls.root.isVisible
