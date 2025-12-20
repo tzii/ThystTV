@@ -14,6 +14,7 @@ Xtra is a feature-rich, open-source Twitch player and browser for Android, desig
 *   **Daily Tracking**: Monitor your daily viewing time directly within the app.
 *   **Top Channels**: See a leaderboard of your most-watched channels and streamers.
 *   **Privacy First**: All stats are stored locally on your device and are never shared.
+*   **Easy Access**: Access your stats via the new "Stats" tab in the bottom navigation.
 
 ### 📉 Network-Aware Data Saver
 *   **Smart Quality Control**: Automatically detects when you are on a metered connection (Mobile Data) and caps the video quality to 480p to save your data plan.

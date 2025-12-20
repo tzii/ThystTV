@@ -235,7 +235,7 @@ object C {
     const val TOKEN_SUPPORTED_CODECS = "token_supported_codecs"
     const val TOKEN_SKIP_VIDEO_ACCESS_TOKEN = "token_skip_video_access_token"
     const val TOKEN_SKIP_CLIP_ACCESS_TOKEN = "token_skip_clip_access_token"
-    const val DEFAULT_NAVIGATION_TAB_LIST = "0:0:1,1:1:1,2:0:1,3:0:1"
+    const val DEFAULT_NAVIGATION_TAB_LIST = "0:0:1,1:1:1,2:0:1,3:0:1,4:0:1"
     const val DEFAULT_FOLLOWING_TABS = "0:0:1,1:1:1,2:0:1,3:0:1"
     const val DEFAULT_SAVED_TABS = "0:1:1,1:0:1,2:0:1"
     const val DEFAULT_CHANNEL_TABS = "4:0:1,0:0:1,1:1:1,2:0:1,3:0:1"

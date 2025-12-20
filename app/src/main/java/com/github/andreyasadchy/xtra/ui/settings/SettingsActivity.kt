@@ -621,6 +621,7 @@ class SettingsActivity : AppCompatActivity() {
                             "1" -> getString(R.string.popular)
                             "2" -> getString(R.string.following)
                             "3" -> getString(R.string.saved)
+                            "4" -> getString(R.string.stats)
                             else -> getString(R.string.popular)
                         },
                         default = split[1] != "0",

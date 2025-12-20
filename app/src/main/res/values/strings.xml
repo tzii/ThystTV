@@ -419,6 +419,7 @@
     <string name="vod_remove_ignore">Remove from ignore list</string>
     <string name="remove_bookmark">Remove bookmark</string>
     <string name="saved">Saved</string>
+    <string name="stats">Stats</string>
     <string name="refresh">Refresh</string>
     <string name="image_library">Image library</string>
     <string name="imageLibraryEntries1">Coil</string>

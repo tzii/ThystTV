@@ -801,6 +801,7 @@ class MainActivity : AppCompatActivity() {
                                     menu.add(Menu.NONE, R.id.savedMediaFragment, Menu.NONE, R.string.saved).setIcon(R.drawable.ic_file_download_black_24dp)
                                 }
                             }
+                            "4" -> menu.add(Menu.NONE, R.id.statsFragment, Menu.NONE, R.string.stats).setIcon(R.drawable.ic_assessment_black_24dp)
                         }
                     }
                 }

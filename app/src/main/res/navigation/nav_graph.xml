@@ -194,4 +194,7 @@
     <action
         android:id="@+id/action_global_teamFragment"
         app:destination="@id/teamFragment" />
+    <fragment
+        android:id="@+id/statsFragment"
+        android:name="com.github.andreyasadchy.xtra.ui.stats.StatsFragment" />
 </navigation>
