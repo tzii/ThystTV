@@ -20,6 +20,7 @@ import coil3.network.NetworkResponseBody
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.util.DebugLogger
 import com.github.andreyasadchy.xtra.util.C
+import android.os.StrictMode
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.coil.CacheControlCacheStrategy
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
@@ -49,6 +50,7 @@ class AmethytwApp : Application(), Configuration.Provider, SingletonImageLoader.
     override fun onCreate() {
         super.onCreate()
         INSTANCE = this
+        setupStrictMode()
     }
 
     @Inject
@@ -72,6 +74,33 @@ class AmethytwApp : Application(), Configuration.Provider, SingletonImageLoader.
 
     @Inject
     lateinit var okHttpClient: OkHttpClient
+
+    /**
+     * Configures StrictMode for debug builds to detect common issues like:
+     * - Disk reads/writes on main thread
+     * - Network operations on main thread
+     * - Resource leaks
+     */
+    private fun setupStrictMode() {
+        if (BuildConfig.DEBUG) {
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .detectNetwork()
+                    .penaltyLog()
+                    .build()
+            )
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectLeakedClosableObjects()
+                    .detectLeakedRegistrationObjects()
+                    .detectActivityLeaks()
+                    .penaltyLog()
+                    .build()
+            )
+        }
+    }
 
     @OptIn(ExperimentalCoilApi::class)
     override fun newImageLoader(context: PlatformContext): ImageLoader {

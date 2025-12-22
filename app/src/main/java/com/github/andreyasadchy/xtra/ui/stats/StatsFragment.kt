@@ -2,13 +2,18 @@ package com.github.andreyasadchy.xtra.ui.stats
 
 import android.os.Bundle
 import android.view.View
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.github.andreyasadchy.xtra.R
+import com.github.andreyasadchy.xtra.model.stats.CategoryWatchTime
+import com.github.andreyasadchy.xtra.model.stats.HourlyWatchTime
 import com.github.andreyasadchy.xtra.databinding.FragmentStatsBinding
+import com.github.andreyasadchy.xtra.model.stats.WatchStreak
 import com.github.andreyasadchy.xtra.ui.view.DailyBarChartView
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
@@ -29,6 +34,10 @@ class StatsFragment : Fragment(R.layout.fragment_stats) {
         val binding = FragmentStatsBinding.bind(view)
         this.binding = binding
 
+        val categoryLegendAdapter = CategoryLegendAdapter()
+        val loyaltyAdapter = StreamerLoyaltyAdapter()
+        binding.categoryLegendRecyclerView.adapter = categoryLegendAdapter
+        binding.loyaltyRecyclerView.adapter = loyaltyAdapter
         val adapter = StreamStatsAdapter()
         binding.topStreamsRecyclerView.adapter = adapter
 
@@ -42,6 +51,27 @@ class StatsFragment : Fragment(R.layout.fragment_stats) {
                 launch {
                     viewModel.topStreams.collectLatest { streams ->
                         adapter.submitList(streams)
+                    }
+                }
+                launch {
+                    viewModel.watchStreak.collectLatest { streak ->
+                        updateStreakDisplay(binding, streak)
+                    }
+                }
+                launch {
+                    viewModel.categoryBreakdown.collectLatest { categories ->
+                        updateCategoryChart(binding, categories, categoryLegendAdapter)
+                    }
+                }
+                launch {
+                    viewModel.hourlyBreakdown.collectLatest { hourly ->
+                        updateHeatmap(binding, hourly)
+                    }
+                }
+                launch {
+                    viewModel.streamerLoyalty.collectLatest { loyalty ->
+                        loyaltyAdapter.submitList(loyalty)
+                        binding.loyaltyRecyclerView.visibility = if (loyalty.isEmpty()) GONE else VISIBLE
                     }
                 }
             }
@@ -105,6 +135,33 @@ class StatsFragment : Fragment(R.layout.fragment_stats) {
         val weekHours = weekTotalSeconds / 3600
         val weekMinutes = (weekTotalSeconds % 3600) / 60
         binding.weekTotalText.text = formatTimeShort(weekHours, weekMinutes)
+    }
+    
+    private fun updateStreakDisplay(binding: FragmentStatsBinding, streak: WatchStreak?) {
+        if (streak != null) {
+            binding.streakCard.visibility = VISIBLE
+            binding.currentStreakText.text = "${streak.currentStreakDays} days"
+            binding.longestStreakText.text = "${streak.longestStreakDays} days"
+        } else {
+            binding.streakCard.visibility = GONE
+        }
+    }
+    
+    private fun updateCategoryChart(
+        binding: FragmentStatsBinding,
+        categories: List<CategoryWatchTime>,
+        legendAdapter: CategoryLegendAdapter
+    ) {
+        val chartData = categories.map { 
+            (it.gameName ?: "Unknown") to it.totalSeconds 
+        }
+        binding.categoryPieChart.setData(chartData)
+        legendAdapter.submitList(binding.categoryPieChart.getSlices())
+    }
+    
+    private fun updateHeatmap(binding: FragmentStatsBinding, hourly: List<HourlyWatchTime>) {
+        val heatmapData = hourly.map { it.hourOfDay to it.totalSeconds }
+        binding.hourlyHeatmap.setData(heatmapData)
     }
     
     private fun formatTime(hours: Long, minutes: Long, suffix: String): String {

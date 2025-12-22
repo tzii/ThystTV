@@ -38,9 +38,15 @@ captures/
 *.iml
 .idea
 
-# Keystore files
-# Uncomment the following line if you do not want to check your keystore files in.
-#*.jks
+# Keystore files - excluding from version control for security
+# Note: debug-keystore.jks is intentionally kept for build reproducibility
+# but production keystores should NEVER be committed
+*.keystore
+release-keystore.jks
+release.keystore
+
+# Signing configs
+keystore.properties
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

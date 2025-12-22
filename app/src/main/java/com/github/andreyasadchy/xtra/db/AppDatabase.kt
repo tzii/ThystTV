@@ -8,6 +8,8 @@ import com.github.andreyasadchy.xtra.model.VideoPosition
 import com.github.andreyasadchy.xtra.model.chat.RecentEmote
 import com.github.andreyasadchy.xtra.model.stats.ScreenTime
 import com.github.andreyasadchy.xtra.model.stats.StreamWatchStats
+import com.github.andreyasadchy.xtra.model.stats.WatchSession
+import com.github.andreyasadchy.xtra.model.stats.WatchStreak
 import com.github.andreyasadchy.xtra.model.ui.Bookmark
 import com.github.andreyasadchy.xtra.model.ui.LocalFollowChannel
 import com.github.andreyasadchy.xtra.model.ui.LocalFollowGame
@@ -20,8 +22,8 @@ import com.github.andreyasadchy.xtra.model.ui.TranslateAllMessagesUser
 import com.github.andreyasadchy.xtra.model.ui.VodBookmarkIgnoredUser
 
 @Database(
-    entities = [OfflineVideo::class, RecentEmote::class, VideoPosition::class, LocalFollowChannel::class, LocalFollowGame::class, Bookmark::class, VodBookmarkIgnoredUser::class, SortChannel::class, SortGame::class, ShownNotification::class, NotificationUser::class, TranslateAllMessagesUser::class, SavedFilter::class, RecentSearch::class, ScreenTime::class, StreamWatchStats::class],
-    version = 34
+    entities = [OfflineVideo::class, RecentEmote::class, VideoPosition::class, LocalFollowChannel::class, LocalFollowGame::class, Bookmark::class, VodBookmarkIgnoredUser::class, SortChannel::class, SortGame::class, ShownNotification::class, NotificationUser::class, TranslateAllMessagesUser::class, SavedFilter::class, RecentSearch::class, ScreenTime::class, StreamWatchStats::class, WatchSession::class, WatchStreak::class],
+    version = 35
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -41,4 +43,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun recentSearchDao(): RecentSearchDao
     abstract fun screenTimeDao(): ScreenTimeDao
     abstract fun streamWatchStatsDao(): StreamWatchStatsDao
+    abstract fun watchSessionDao(): WatchSessionDao
+    abstract fun watchStreakDao(): WatchStreakDao
 }

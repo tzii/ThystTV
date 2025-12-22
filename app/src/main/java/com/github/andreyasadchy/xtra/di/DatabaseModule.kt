@@ -18,6 +18,8 @@ import com.github.andreyasadchy.xtra.db.SortGameDao
 import com.github.andreyasadchy.xtra.db.TranslateAllMessagesUsersDao
 import com.github.andreyasadchy.xtra.db.VideoPositionsDao
 import com.github.andreyasadchy.xtra.db.VideosDao
+import com.github.andreyasadchy.xtra.db.WatchSessionDao
+import com.github.andreyasadchy.xtra.db.WatchStreakDao
 import com.github.andreyasadchy.xtra.db.VodBookmarkIgnoredUsersDao
 import com.github.andreyasadchy.xtra.repository.BookmarksRepository
 import com.github.andreyasadchy.xtra.repository.LocalFollowChannelRepository
@@ -154,6 +156,14 @@ class DatabaseModule {
     @Singleton
     @Provides
     fun providesStreamWatchStatsDao(database: AppDatabase): StreamWatchStatsDao = database.streamWatchStatsDao()
+
+    @Singleton
+    @Provides
+    fun providesWatchSessionDao(database: AppDatabase): WatchSessionDao = database.watchSessionDao()
+
+    @Singleton
+    @Provides
+    fun providesWatchStreakDao(database: AppDatabase): WatchStreakDao = database.watchStreakDao()
 
     @Singleton
     @Provides
@@ -355,6 +365,26 @@ class DatabaseModule {
                     override fun migrate(db: SupportSQLiteDatabase) {
                         db.execSQL("CREATE TABLE IF NOT EXISTS screen_time (date TEXT NOT NULL, totalSeconds INTEGER NOT NULL, PRIMARY KEY (date))")
                         db.execSQL("CREATE TABLE IF NOT EXISTS stream_watch_stats (channelId TEXT NOT NULL, channelName TEXT NOT NULL, totalSecondsWatched INTEGER NOT NULL, lastWatchedTimestamp INTEGER NOT NULL, PRIMARY KEY (channelId))")
+                    }
+                },
+                object : Migration(34, 35) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        // Create watch_sessions table for enhanced analytics
+                        db.execSQL("""
+                            CREATE TABLE IF NOT EXISTS watch_sessions (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                channelId TEXT, channelName TEXT, channelLogin TEXT,
+                                gameId TEXT, gameName TEXT,
+                                startTime INTEGER NOT NULL, endTime INTEGER NOT NULL, durationSeconds INTEGER NOT NULL,
+                                date TEXT NOT NULL, hourOfDay INTEGER NOT NULL
+                            )
+                        """)
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_watch_sessions_channelId ON watch_sessions (channelId)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_watch_sessions_gameId ON watch_sessions (gameId)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_watch_sessions_startTime ON watch_sessions (startTime)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_watch_sessions_date ON watch_sessions (date)")
+                        // Create watch_streak table
+                        db.execSQL("CREATE TABLE IF NOT EXISTS watch_streak (id INTEGER NOT NULL, currentStreakDays INTEGER NOT NULL, longestStreakDays INTEGER NOT NULL, lastWatchDate TEXT NOT NULL, streakStartDate TEXT, PRIMARY KEY (id))")
                     }
                 },
             )
