@@ -60,7 +60,6 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import dagger.Lazy
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.runBlocking
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import org.chromium.net.CronetEngine
@@ -656,12 +655,12 @@ class PlaybackService : MediaSessionService() {
         mediaSession?.player?.let { player ->
             if (!player.currentTracks.isEmpty && prefs().getBoolean(C.PLAYER_USE_VIDEOPOSITIONS, true)) {
                 videoId?.let {
-                    runBlocking {
+                    statsScope.launch {
                         playerRepository.saveVideoPosition(VideoPosition(it, player.currentPosition))
                     }
                 } ?:
                 offlineVideoId?.let {
-                    runBlocking {
+                    statsScope.launch {
                         offlineRepository.updateVideoPosition(it, player.currentPosition)
                     }
                 }
@@ -677,12 +676,12 @@ class PlaybackService : MediaSessionService() {
                 if (savedPosition == null || currentPosition - savedPosition !in 0..2000) {
                     lastSavedPosition = currentPosition
                     videoId?.let {
-                        runBlocking {
+                        statsScope.launch {
                             playerRepository.saveVideoPosition(VideoPosition(it, currentPosition))
                         }
                     } ?:
                     offlineVideoId?.let {
-                        runBlocking {
+                        statsScope.launch {
                             offlineRepository.updateVideoPosition(it, currentPosition)
                         }
                     }

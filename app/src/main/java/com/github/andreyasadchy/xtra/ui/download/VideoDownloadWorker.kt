@@ -51,7 +51,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -303,7 +303,7 @@ class VideoDownloadWorker @AssistedInject constructor(
                     })
                     fileUri
                 }
-                runBlocking {
+                coroutineScope {
                     remainingSegments.map {
                         launch {
                             requestSemaphore.withPermit {
@@ -517,7 +517,7 @@ class VideoDownloadWorker @AssistedInject constructor(
 
                         }
                     }
-                    runBlocking {
+                    coroutineScope {
                         remainingSegments.map {
                             launch {
                                 requestSemaphore.withPermit {
@@ -656,7 +656,7 @@ class VideoDownloadWorker @AssistedInject constructor(
                         val p = PlaylistUtils.parseMediaPlaylist(file.inputStream())
                         p.segments.forEach { downloadedTracks.add(it.uri.substringAfterLast("%2F").substringAfterLast("/")) }
                     }
-                    runBlocking {
+                    coroutineScope {
                         remainingSegments.map {
                             launch {
                                 requestSemaphore.withPermit {
@@ -714,7 +714,7 @@ class VideoDownloadWorker @AssistedInject constructor(
                     }
                 }
             }
-            val chatJob = runBlocking {
+            val chatJob = coroutineScope {
                 launch {
                     startChatJob(path)
                 }
@@ -750,7 +750,7 @@ class VideoDownloadWorker @AssistedInject constructor(
                 })
                 fileUri
             }
-            val jobs = runBlocking {
+            val jobs = coroutineScope {
                 launch {
                     if (offlineVideo.progress < offlineVideo.maxProgress) {
                         when {
@@ -808,7 +808,7 @@ class VideoDownloadWorker @AssistedInject constructor(
                     }
                 }
             }
-            val chatJob = runBlocking {
+            val chatJob = coroutineScope {
                 launch {
                     startChatJob(path)
                 }
@@ -1627,3 +1627,4 @@ class VideoDownloadWorker @AssistedInject constructor(
         const val KEY_VIDEO_ID = "KEY_VIDEO_ID"
     }
 }
+

@@ -46,7 +46,11 @@ import com.github.andreyasadchy.xtra.util.prefs
 import com.google.common.util.concurrent.FutureCallback
 import com.google.common.util.concurrent.Futures
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.util.Timer
 import javax.inject.Inject
 import kotlin.concurrent.schedule
@@ -61,6 +65,8 @@ class ExoPlayerService : Service() {
 
     @Inject
     lateinit var offlineRepository: OfflineRepository
+
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     var player: ExoPlayer? = null
     private var session: MediaSession? = null
@@ -549,12 +555,12 @@ class ExoPlayerService : Service() {
         player?.let { player ->
             if (!player.currentTracks.isEmpty && prefs().getBoolean(C.PLAYER_USE_VIDEOPOSITIONS, true)) {
                 videoId?.let {
-                    runBlocking {
+                    serviceScope.launch {
                         playerRepository.saveVideoPosition(VideoPosition(it, player.currentPosition))
                     }
                 } ?:
                 offlineVideoId?.let {
-                    runBlocking {
+                    serviceScope.launch {
                         offlineRepository.updateVideoPosition(it, player.currentPosition)
                     }
                 }
@@ -570,12 +576,12 @@ class ExoPlayerService : Service() {
                 if (savedPosition == null || currentPosition - savedPosition !in 0..2000) {
                     lastSavedPosition = currentPosition
                     videoId?.let {
-                        runBlocking {
+                        serviceScope.launch {
                             playerRepository.saveVideoPosition(VideoPosition(it, currentPosition))
                         }
                     } ?:
                     offlineVideoId?.let {
-                        runBlocking {
+                        serviceScope.launch {
                             offlineRepository.updateVideoPosition(it, currentPosition)
                         }
                     }
@@ -609,6 +615,7 @@ class ExoPlayerService : Service() {
     }
 
     override fun onDestroy() {
+        serviceScope.cancel()
         player?.release()
         session?.release()
         metadataBitmapCallback = null
@@ -631,3 +638,4 @@ class ExoPlayerService : Service() {
         private const val INTENT_FAST_FORWARD = "com.github.andreyasadchy.xtra.FAST_FORWARD"
     }
 }
+
