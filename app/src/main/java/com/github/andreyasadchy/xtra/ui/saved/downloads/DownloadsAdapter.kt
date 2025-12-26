@@ -106,7 +106,7 @@ class DownloadsAdapter(
                         (fragment.activity as MainActivity).startOfflineVideo(item)
                     }
                     root.setOnLongClickListener { deleteVideo(item); true }
-                    if (item.thumbnail?.toUri()?.scheme == ContentResolver.SCHEME_CONTENT) {
+                    
                     fragment.requireContext().imageLoader.enqueue(
                         ImageRequest.Builder(fragment.requireContext()).apply {
                             data(item.thumbnail)
@@ -115,6 +115,8 @@ class DownloadsAdapter(
                             target(thumbnail)
                         }.build()
                     )
+                    
+                    item.uploadDate?.let {
                         date.visible()
                         date.text = context.getString(R.string.uploaded_date, TwitchApiHelper.formatTime(context, it))
                     } ?: {
@@ -158,7 +160,7 @@ class DownloadsAdapter(
                         username.visible()
                         username.text = if (item.channelLogin != null && !item.channelLogin.equals(item.channelName, true)) {
                             when (context.prefs().getString(C.UI_NAME_DISPLAY, "0")) {
-                                "0" -> "${item.channelName}(${item.channelLogin})"
+                                "0" -> "()"
                                 "1" -> item.channelName
                                 else -> item.channelLogin
                             }

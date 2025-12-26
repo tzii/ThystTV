@@ -52,7 +52,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -434,7 +434,7 @@ class StreamDownloadWorker @AssistedInject constructor(
             urls.lastOrNull()?.let { lastUrl = it.uri }
             val streamStartTime = urls.firstOrNull()?.programDateTime
             if (offlineVideo.downloadChat && !streamStartTime.isNullOrBlank()) {
-                coroutineScope {
+                runBlocking {
                     launch {
                         startChatJob(channelLogin, path, downloadDate, streamStartTime)
                     }
@@ -534,7 +534,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                 initSegmentBytes?.let { bytes += it }
             })
             if (offlineVideo.name.isNullOrBlank()) {
-                coroutineScope {
+                runBlocking {
                     launch {
                         var attempt = 1
                         while (attempt <= 10) {
@@ -691,7 +691,7 @@ class StreamDownloadWorker @AssistedInject constructor(
         }.use { outputStream ->
             val firstMutexMap = mutableMapOf<Int, Mutex>()
             val firstCount = MutableStateFlow(0)
-            val firstJobs = coroutineScope {
+            val firstJobs = runBlocking {
                 firstUrls.map {
                     launch {
                         requestSemaphore.withPermit {
@@ -841,7 +841,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                     urls.lastOrNull()?.let { lastUrl = it }
                     val mutexMap = mutableMapOf<Int, Mutex>()
                     val count = MutableStateFlow(0)
-                    val jobs = coroutineScope {
+                    val jobs = runBlocking {
                         urls.map {
                             launch {
                                 requestSemaphore.withPermit {
@@ -1257,7 +1257,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                 }!!
                                                 val response = when {
                                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        coroutineScope {
+                                                        runBlocking {
                                                             val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
                                                                 httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                                             }
@@ -1270,7 +1270,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                             cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
                                                             request.future.get().responseBody as ByteArray
                                                         } else {
-                                                            coroutineScope {
+                                                            runBlocking {
                                                                 val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
                                                                     cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                                                 }
@@ -1307,7 +1307,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                 }!!
                                                 val response = when {
                                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        coroutineScope {
+                                                        runBlocking {
                                                             val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
                                                                 httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                                             }
@@ -1320,7 +1320,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                             cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
                                                             request.future.get().responseBody as ByteArray
                                                         } else {
-                                                            coroutineScope {
+                                                            runBlocking {
                                                                 val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
                                                                     cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                                                 }
@@ -1358,7 +1358,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                 }!!
                                                 val response = when {
                                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        coroutineScope {
+                                                        runBlocking {
                                                             val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
                                                                 httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                                             }
@@ -1371,7 +1371,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                             cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
                                                             request.future.get().responseBody as ByteArray
                                                         } else {
-                                                            coroutineScope {
+                                                            runBlocking {
                                                                 val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
                                                                     cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                                                 }
@@ -1410,7 +1410,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                 }!!
                                                 val response = when {
                                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        coroutineScope {
+                                                        runBlocking {
                                                             val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
                                                                 httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                                             }
@@ -1423,7 +1423,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                             cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
                                                             request.future.get().responseBody as ByteArray
                                                         } else {
-                                                            coroutineScope {
+                                                            runBlocking {
                                                                 val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
                                                                     cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                                                 }

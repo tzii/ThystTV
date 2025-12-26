@@ -95,7 +95,6 @@ class ImageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callback
         }
         with(binding) {
             val args = requireArguments()
-            val imageLibrary = requireContext().prefs().getString(C.CHAT_IMAGE_LIBRARY, "0")
             requireContext().imageLoader.enqueue(
                 ImageRequest.Builder(requireContext()).apply {
                     data(args.getString(IMAGE_URL))
@@ -109,12 +108,13 @@ class ImageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callback
                             val result = it.asDrawable(resources)
                             if (result is Animatable && args.getBoolean(IMAGE_ANIMATED) && requireContext().prefs().getBoolean(C.ANIMATED_EMOTES, true)) {
                                 (result as Animatable).start()
-                        )
+                            }
                             image.setImageDrawable(result)
-
+                        }
                     )
                 }.build()
             )
+            args.getString(IMAGE_NAME)?.let {
                 imageName.visible()
                 imageName.text = it
             }
@@ -144,7 +144,7 @@ class ImageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callback
                             if (emoteCard != null) {
                                 val name = if (emoteCard.channelLogin != null && !emoteCard.channelLogin.equals(emoteCard.channelName, true)) {
                                     when (requireContext().prefs().getString(C.UI_NAME_DISPLAY, "0")) {
-                                        "0" -> "${emoteCard.channelName}(${emoteCard.channelLogin})"
+                                        "0" -> "()"
                                         "1" -> emoteCard.channelName
                                         else -> emoteCard.channelLogin
                                     }

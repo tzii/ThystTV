@@ -57,32 +57,32 @@
      
      // Setters with timestamp tracking
      
-     fun setGlobalBadges(badges: List<TwitchBadge>) {
+    fun setGlobalBadges(badges: List<TwitchBadge>?) {
          _globalBadges.value = badges
          globalBadgesTimestamp = System.currentTimeMillis()
      }
      
-     fun setGlobalStvEmotes(emotes: List<Emote>) {
+    fun setGlobalStvEmotes(emotes: List<Emote>?) {
          _globalStvEmotes.value = emotes
          globalStvEmotesTimestamp = System.currentTimeMillis()
      }
      
-     fun setGlobalBttvEmotes(emotes: List<Emote>) {
+    fun setGlobalBttvEmotes(emotes: List<Emote>?) {
          _globalBttvEmotes.value = emotes
          globalBttvEmotesTimestamp = System.currentTimeMillis()
      }
      
-     fun setGlobalFfzEmotes(emotes: List<Emote>) {
+    fun setGlobalFfzEmotes(emotes: List<Emote>?) {
          _globalFfzEmotes.value = emotes
          globalFfzEmotesTimestamp = System.currentTimeMillis()
      }
      
-     fun setUserEmotes(emotes: List<TwitchEmote>) {
+    fun setUserEmotes(emotes: List<TwitchEmote>?) {
          _userEmotes.value = emotes
          userEmotesTimestamp = System.currentTimeMillis()
      }
      
-     fun setEmoteSets(sets: List<String>) {
+    fun setEmoteSets(sets: List<String>?) {
          _emoteSets.value = sets
      }
      

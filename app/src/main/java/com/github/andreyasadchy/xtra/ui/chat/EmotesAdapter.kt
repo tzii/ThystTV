@@ -42,7 +42,6 @@ class EmotesAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val emote = getItem(position)
-        if (imageLibrary == "0" || (imageLibrary == "1" && !emote.format.equals("webp", true))) {
         fragment.requireContext().imageLoader.enqueue(
             ImageRequest.Builder(fragment.requireContext()).apply {
                 data(
@@ -51,7 +50,7 @@ class EmotesAdapter(
                         "3" -> emote.url3x ?: emote.url2x ?: emote.url1x
                         "2" -> emote.url2x ?: emote.url1x
                         else -> emote.url1x
-                    crossfade(true)
+                    }
                 )
                 if (emote.thirdParty) {
                     httpHeaders(NetworkHeaders.Builder().apply {
@@ -62,5 +61,6 @@ class EmotesAdapter(
                 target(holder.itemView as ImageView)
             }.build()
         )
+        holder.itemView.setOnClickListener { clickListener(emote) }
     }
 }

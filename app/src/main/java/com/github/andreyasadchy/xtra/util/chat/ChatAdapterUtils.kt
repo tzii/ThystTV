@@ -748,6 +748,7 @@ object ChatAdapterUtils {
                     )
                 }.build()
             )
+        }
         images.forEach { image ->
             loadImage(imageLibrary, fragment, image, emoteQuality) { result ->
                 val imageSize = if (image.isEmote) {

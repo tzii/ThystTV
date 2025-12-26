@@ -2705,11 +2705,5 @@ class ChatViewModel @Inject constructor(
     companion object {
         private const val TAG = "ChatViewModel"
 
-        private var emoteCache.emoteSets.value: List<String>? = null
-        private var emoteCache.userEmotes.value: List<TwitchEmote>? = null
-        private var emoteCache.globalBadges.value: List<TwitchBadge>? = null
-        private var emoteCache.globalStvEmotes.value: List<Emote>? = null
-        private var emoteCache.globalBttvEmotes.value: List<Emote>? = null
-        private var emoteCache.globalFfzEmotes.value: List<Emote>? = null
-    }
+}
 }
