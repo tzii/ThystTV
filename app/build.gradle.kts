@@ -111,11 +111,6 @@ dependencies {
     implementation(libs.coil.gif)
     implementation(libs.coil.okhttp)
 
-    implementation(libs.glide)
-    ksp(libs.glide.ksp)
-    implementation(libs.glide.okhttp)
-    implementation(libs.glide.webpdecoder)
-
     implementation(libs.hilt)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.work)

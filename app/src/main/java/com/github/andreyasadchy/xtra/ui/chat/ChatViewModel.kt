@@ -28,6 +28,7 @@ import com.github.andreyasadchy.xtra.model.chat.TwitchBadge
 import com.github.andreyasadchy.xtra.model.chat.TwitchEmote
 import com.github.andreyasadchy.xtra.repository.GraphQLRepository
 import com.github.andreyasadchy.xtra.repository.HelixRepository
+import com.github.andreyasadchy.xtra.repository.EmoteCache
 import com.github.andreyasadchy.xtra.repository.PlayerRepository
 import com.github.andreyasadchy.xtra.repository.TranslateAllMessagesUsersRepository
 import com.github.andreyasadchy.xtra.util.C
@@ -80,6 +81,7 @@ class ChatViewModel @Inject constructor(
     private val graphQLRepository: GraphQLRepository,
     private val helixRepository: HelixRepository,
     private val playerRepository: PlayerRepository,
+    private val emoteCache: EmoteCache,
     private val okHttpClient: OkHttpClient,
     private val trustManager: X509TrustManager?,
     private val json: Json,
@@ -250,7 +252,7 @@ class ChatViewModel @Inject constructor(
         val animateGifs = applicationContext.prefs().getBoolean(C.ANIMATED_EMOTES, true)
         val useWebp = applicationContext.prefs().getBoolean(C.CHAT_USE_WEBP, true)
         val enableIntegrity = applicationContext.prefs().getBoolean(C.ENABLE_INTEGRITY, false)
-        savedGlobalBadges.also { saved ->
+        emoteCache.globalBadges.value.also { saved ->
             if (!saved.isNullOrEmpty()) {
                 _globalBadges.value = saved
                 if (!reloadMessages.value) {
@@ -261,7 +263,7 @@ class ChatViewModel @Inject constructor(
                     try {
                         playerRepository.loadGlobalBadges(networkLibrary, helixHeaders, gqlHeaders, emoteQuality, enableIntegrity).let { badges ->
                             if (badges.isNotEmpty()) {
-                                savedGlobalBadges = badges
+                                emoteCache.setGlobalBadges(badges)
                                 _globalBadges.value = badges
                                 if (!reloadMessages.value) {
                                     reloadMessages.value = true
@@ -278,7 +280,7 @@ class ChatViewModel @Inject constructor(
             }
         }
         if (applicationContext.prefs().getBoolean(C.CHAT_ENABLE_STV, true)) {
-            savedGlobalStvEmotes.also { saved ->
+            emoteCache.globalStvEmotes.value.also { saved ->
                 if (!saved.isNullOrEmpty()) {
                     addEmotes(saved)
                     _globalStvEmotes.value = saved
@@ -290,7 +292,7 @@ class ChatViewModel @Inject constructor(
                         try {
                             playerRepository.loadGlobalStvEmotes(networkLibrary, useWebp).let { emotes ->
                                 if (emotes.isNotEmpty()) {
-                                    savedGlobalStvEmotes = emotes
+                                    emoteCache.setGlobalStvEmotes(emotes)
                                     addEmotes(emotes)
                                     _globalStvEmotes.value = emotes
                                     if (!reloadMessages.value) {
@@ -324,7 +326,7 @@ class ChatViewModel @Inject constructor(
             }
         }
         if (applicationContext.prefs().getBoolean(C.CHAT_ENABLE_BTTV, true)) {
-            savedGlobalBttvEmotes.also { saved ->
+            emoteCache.globalBttvEmotes.value.also { saved ->
                 if (!saved.isNullOrEmpty()) {
                     addEmotes(saved)
                     _globalBttvEmotes.value = saved
@@ -336,7 +338,7 @@ class ChatViewModel @Inject constructor(
                         try {
                             playerRepository.loadGlobalBttvEmotes(networkLibrary, useWebp).let { emotes ->
                                 if (emotes.isNotEmpty()) {
-                                    savedGlobalBttvEmotes = emotes
+                                    emoteCache.setGlobalBttvEmotes(emotes)
                                     addEmotes(emotes)
                                     _globalBttvEmotes.value = emotes
                                     if (!reloadMessages.value) {
@@ -369,7 +371,7 @@ class ChatViewModel @Inject constructor(
             }
         }
         if (applicationContext.prefs().getBoolean(C.CHAT_ENABLE_FFZ, true)) {
-            savedGlobalFfzEmotes.also { saved ->
+            emoteCache.globalFfzEmotes.value.also { saved ->
                 if (!saved.isNullOrEmpty()) {
                     addEmotes(saved)
                     _globalFfzEmotes.value = saved
@@ -381,7 +383,7 @@ class ChatViewModel @Inject constructor(
                         try {
                             playerRepository.loadGlobalFfzEmotes(networkLibrary, useWebp).let { emotes ->
                                 if (emotes.isNotEmpty()) {
-                                    savedGlobalFfzEmotes = emotes
+                                    emoteCache.setGlobalFfzEmotes(emotes)
                                     addEmotes(emotes)
                                     _globalFfzEmotes.value = emotes
                                     if (!reloadMessages.value) {
@@ -452,7 +454,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun loadUserEmotes(channelId: String?) {
-        savedUserEmotes.also { saved ->
+        emoteCache.userEmotes.value.also { saved ->
             if (!saved.isNullOrEmpty()) {
                 addEmotes(
                     saved.map {
@@ -546,10 +548,10 @@ class ChatViewModel @Inject constructor(
     }
 
     fun reloadEmotes(channelId: String?, channelLogin: String?) {
-        savedGlobalBadges = null
-        savedGlobalStvEmotes = null
-        savedGlobalBttvEmotes = null
-        savedGlobalFfzEmotes = null
+        emoteCache.setGlobalBadges(null)
+        emoteCache.setGlobalStvEmotes(null)
+        emoteCache.setGlobalBttvEmotes(null)
+        emoteCache.setGlobalFfzEmotes(null)
         loadEmotes(channelId, channelLogin)
     }
 
@@ -1349,8 +1351,8 @@ class ChatViewModel @Inject constructor(
 
     private fun onUserState(message: String, channelId: String?) {
         val emoteSets = ChatUtils.parseEmoteSets(message)
-        if (emoteSets != null && savedEmoteSets != emoteSets) {
-            savedEmoteSets = emoteSets
+        if (emoteSets != null && emoteCache.emoteSets.value != emoteSets) {
+            emoteCache.setEmoteSets(emoteSets)
             if (!loadedUserEmotes) {
                 loadEmoteSets(channelId)
             }
@@ -1429,18 +1431,18 @@ class ChatViewModel @Inject constructor(
 
     private fun loadEmoteSets(channelId: String?) {
         val helixHeaders = TwitchApiHelper.getHelixHeaders(applicationContext)
-        if (!savedEmoteSets.isNullOrEmpty() && !helixHeaders[C.HEADER_CLIENT_ID].isNullOrBlank() && !helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
+        if (!emoteCache.emoteSets.value.isNullOrEmpty() && !helixHeaders[C.HEADER_CLIENT_ID].isNullOrBlank() && !helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
             viewModelScope.launch {
                 try {
                     val networkLibrary = applicationContext.prefs().getString(C.NETWORK_LIBRARY, "OkHttp")
                     val animateGifs =  applicationContext.prefs().getBoolean(C.ANIMATED_EMOTES, true)
                     val emotes = mutableListOf<TwitchEmote>()
-                    savedEmoteSets?.chunked(25)?.forEach { list ->
+                    emoteCache.emoteSets.value?.chunked(25)?.forEach { list ->
                         playerRepository.loadEmotesFromSet(networkLibrary, helixHeaders, list, animateGifs).let { emotes.addAll(it) }
                     }
                     if (emotes.isNotEmpty()) {
                         val sorted = emotes.sortedByDescending { it.setId }
-                        savedUserEmotes = sorted
+                        emoteCache.setUserEmotes(sorted)
                         addEmotes(
                             sorted.map {
                                 Emote(
@@ -2703,11 +2705,11 @@ class ChatViewModel @Inject constructor(
     companion object {
         private const val TAG = "ChatViewModel"
 
-        private var savedEmoteSets: List<String>? = null
-        private var savedUserEmotes: List<TwitchEmote>? = null
-        private var savedGlobalBadges: List<TwitchBadge>? = null
-        private var savedGlobalStvEmotes: List<Emote>? = null
-        private var savedGlobalBttvEmotes: List<Emote>? = null
-        private var savedGlobalFfzEmotes: List<Emote>? = null
+        private var emoteCache.emoteSets.value: List<String>? = null
+        private var emoteCache.userEmotes.value: List<TwitchEmote>? = null
+        private var emoteCache.globalBadges.value: List<TwitchBadge>? = null
+        private var emoteCache.globalStvEmotes.value: List<Emote>? = null
+        private var emoteCache.globalBttvEmotes.value: List<Emote>? = null
+        private var emoteCache.globalFfzEmotes.value: List<Emote>? = null
     }
 }

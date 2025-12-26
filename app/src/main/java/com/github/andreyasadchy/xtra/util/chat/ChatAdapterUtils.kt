@@ -22,10 +22,6 @@ import coil3.imageLoader
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
 import com.github.andreyasadchy.xtra.BuildConfig
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.model.chat.ChatMessage
@@ -703,103 +699,55 @@ object ChatAdapterUtils {
     fun loadImages(fragment: Fragment, itemView: View, bind: (SpannableStringBuilder) -> Unit, images: List<Image>, imagePaint: NamePaint?, userName: String?, userNameStartIndex: Int?, backgroundColor: Int, imageLibrary: String?, builder: SpannableStringBuilder, translated: Boolean, emoteSize: Int, badgeSize: Int, emoteQuality: String, animateGifs: Boolean, enableOverlayEmotes: Boolean, chatMessage: ChatMessage, savedColors: HashMap<String, Int>, useReadableColors: Boolean, isLightTheme: Boolean, showLanguageDownloadDialog: (ChatMessage, String) -> Unit, hideErrors: Boolean) {
         if (imagePaint != null) {
             if (imageLibrary == "0") {
-                fragment.requireContext().imageLoader.enqueue(
-                    ImageRequest.Builder(fragment.requireContext()).apply {
-                        data(imagePaint.imageUrl)
-                        httpHeaders(NetworkHeaders.Builder().apply {
-                            add("User-Agent", "Amethytw/" + BuildConfig.VERSION_NAME)
-                        }.build())
-                        target(
-                            onSuccess = {
-                                (it.asDrawable(fragment.resources)).let { result ->
-                                    if (result is Animatable && animateGifs) {
-                                        result.callback = object : Drawable.Callback {
-                                            override fun unscheduleDrawable(who: Drawable, what: Runnable) {
-                                                itemView.removeCallbacks(what)
-                                            }
-
-                                            override fun invalidateDrawable(who: Drawable) {
-                                                itemView.invalidate()
-                                            }
-
-                                            override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                                                itemView.postDelayed(what, `when`)
-                                            }
+            fragment.requireContext().imageLoader.enqueue(
+                ImageRequest.Builder(fragment.requireContext()).apply {
+                    data(imagePaint.imageUrl)
+                    httpHeaders(NetworkHeaders.Builder().apply {
+                        add("User-Agent", "Amethytw/" + BuildConfig.VERSION_NAME)
+                    }.build())
+                    target(
+                        onSuccess = {
+                            (it.asDrawable(fragment.resources)).let { result ->
+                                if (result is Animatable && animateGifs) {
+                                    result.callback = object : Drawable.Callback {
+                                        override fun unscheduleDrawable(who: Drawable, what: Runnable) {
+                                            itemView.removeCallbacks(what)
                                         }
-                                        (result as Animatable).start()
+
+                                        override fun invalidateDrawable(who: Drawable) {
+                                            itemView.invalidate()
+                                        }
+
+                                        override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
+                                            itemView.postDelayed(what, `when`)
+                                        }
                                     }
-                                    try {
-                                        builder.setSpan(
-                                            NamePaintImageSpan(
-                                                userName!!,
-                                                imagePaint.shadows,
-                                                (itemView.background as? ColorDrawable)?.color,
-                                                backgroundColor,
-                                                result
-                                            ),
-                                            userNameStartIndex!!,
-                                            userNameStartIndex + userName.length,
-                                            SPAN_EXCLUSIVE_EXCLUSIVE
-                                        )
-                                    } catch (e: IndexOutOfBoundsException) {
-                                    }
-                                    if (!translated && chatMessage.translatedMessage != null) {
-                                        addTranslation(chatMessage, builder, builder.length, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, hideErrors)
-                                    }
-                                    bind(builder)
+                                    (result as Animatable).start()
                                 }
-                            },
-                        )
-                    }.build()
-                )
-            } else {
-                Glide.with(fragment)
-                    .load(imagePaint.imageUrl)
-                    .diskCacheStrategy(DiskCacheStrategy.DATA)
-                    .into(object : CustomTarget<Drawable>() {
-                        override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
-                            if (resource is Animatable && animateGifs) {
-                                resource.callback = object : Drawable.Callback {
-                                    override fun unscheduleDrawable(who: Drawable, what: Runnable) {
-                                        itemView.removeCallbacks(what)
-                                    }
-
-                                    override fun invalidateDrawable(who: Drawable) {
-                                        itemView.invalidate()
-                                    }
-
-                                    override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                                        itemView.postDelayed(what, `when`)
-                                    }
+                                try {
+                                    builder.setSpan(
+                                        NamePaintImageSpan(
+                                            userName!!,
+                                            imagePaint.shadows,
+                                            (itemView.background as? ColorDrawable)?.color,
+                                            backgroundColor,
+                                            result
+                                        ),
+                                        userNameStartIndex!!,
+                                        userNameStartIndex + userName.length,
+                                        SPAN_EXCLUSIVE_EXCLUSIVE
+                                    )
+                                } catch (e: IndexOutOfBoundsException) {
                                 }
-                                (resource as Animatable).start()
+                                if (!translated && chatMessage.translatedMessage != null) {
+                                    addTranslation(chatMessage, builder, builder.length, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, hideErrors)
+                                }
+                                bind(builder)
                             }
-                            try {
-                                builder.setSpan(
-                                    NamePaintImageSpan(
-                                        userName!!,
-                                        imagePaint.shadows,
-                                        (itemView.background as? ColorDrawable)?.color,
-                                        backgroundColor,
-                                        resource
-                                    ),
-                                    userNameStartIndex!!,
-                                    userNameStartIndex + userName.length,
-                                    SPAN_EXCLUSIVE_EXCLUSIVE
-                                )
-                            } catch (e: IndexOutOfBoundsException) {
-                            }
-                            if (!translated && chatMessage.translatedMessage != null) {
-                                addTranslation(chatMessage, builder, builder.length, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, hideErrors)
-                            }
-                            bind(builder)
-                        }
-
-                        override fun onLoadCleared(placeholder: Drawable?) {
-                        }
-                    })
-            }
-        }
+                        },
+                    )
+                }.build()
+            )
         images.forEach { image ->
             loadImage(imageLibrary, fragment, image, emoteQuality) { result ->
                 val imageSize = if (image.isEmote) {
@@ -887,11 +835,7 @@ object ChatAdapterUtils {
     }
 
     private fun loadImage(imageLibrary: String?, fragment: Fragment, image: Image, emoteQuality: String, onLoaded: (Drawable) -> Unit) {
-        if (imageLibrary == "0" || (imageLibrary == "1" && !image.format.equals("webp", true))) {
-            loadCoil(fragment, image, emoteQuality, onLoaded)
-        } else {
-            loadGlide(fragment, image, emoteQuality, onLoaded)
-        }
+        loadCoil(fragment, image, emoteQuality, onLoaded)
     }
 
     private fun loadCoil(fragment: Fragment, image: Image, emoteQuality: String, onLoaded: (Drawable) -> Unit) {
@@ -915,24 +859,5 @@ object ChatAdapterUtils {
                 )
             }.build()
         )
-    }
-
-    private fun loadGlide(fragment: Fragment, image: Image, emoteQuality: String, onLoaded: (Drawable) -> Unit) {
-        Glide.with(fragment)
-            .load(image.localData ?: when (emoteQuality) {
-                "4" -> image.url4x ?: image.url3x ?: image.url2x ?: image.url1x
-                "3" -> image.url3x ?: image.url2x ?: image.url1x
-                "2" -> image.url2x ?: image.url1x
-                else -> image.url1x
-            })
-            .diskCacheStrategy(DiskCacheStrategy.DATA)
-            .into(object : CustomTarget<Drawable>() {
-                override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
-                    onLoaded(resource)
-                }
-
-                override fun onLoadCleared(placeholder: Drawable?) {
-                }
-            })
     }
 }

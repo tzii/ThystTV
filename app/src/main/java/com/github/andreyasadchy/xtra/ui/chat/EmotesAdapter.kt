@@ -13,9 +13,6 @@ import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.target
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.github.andreyasadchy.xtra.BuildConfig
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.model.chat.Emote
@@ -46,39 +43,24 @@ class EmotesAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val emote = getItem(position)
         if (imageLibrary == "0" || (imageLibrary == "1" && !emote.format.equals("webp", true))) {
-            fragment.requireContext().imageLoader.enqueue(
-                ImageRequest.Builder(fragment.requireContext()).apply {
-                    data(
-                        when (emoteQuality) {
-                            "4" -> emote.url4x ?: emote.url3x ?: emote.url2x ?: emote.url1x
-                            "3" -> emote.url3x ?: emote.url2x ?: emote.url1x
-                            "2" -> emote.url2x ?: emote.url1x
-                            else -> emote.url1x
-                        }
-                    )
-                    if (emote.thirdParty) {
-                        httpHeaders(NetworkHeaders.Builder().apply {
-                            add("User-Agent", "Amethytw/" + BuildConfig.VERSION_NAME)
-                        }.build())
-                    }
-                    crossfade(true)
-                    target(holder.itemView as ImageView)
-                }.build()
-            )
-        } else {
-            Glide.with(fragment)
-                .load(
+        fragment.requireContext().imageLoader.enqueue(
+            ImageRequest.Builder(fragment.requireContext()).apply {
+                data(
                     when (emoteQuality) {
                         "4" -> emote.url4x ?: emote.url3x ?: emote.url2x ?: emote.url1x
                         "3" -> emote.url3x ?: emote.url2x ?: emote.url1x
                         "2" -> emote.url2x ?: emote.url1x
                         else -> emote.url1x
-                    }
+                    crossfade(true)
                 )
-                .diskCacheStrategy(DiskCacheStrategy.DATA)
-                .transition(DrawableTransitionOptions.withCrossFade())
-                .into(holder.itemView as ImageView)
-        }
-        holder.itemView.setOnClickListener { clickListener(emote) }
+                if (emote.thirdParty) {
+                    httpHeaders(NetworkHeaders.Builder().apply {
+                        add("User-Agent", "Amethytw/" + BuildConfig.VERSION_NAME)
+                    }.build())
+                }
+                crossfade(true)
+                target(holder.itemView as ImageView)
+            }.build()
+        )
     }
 }
