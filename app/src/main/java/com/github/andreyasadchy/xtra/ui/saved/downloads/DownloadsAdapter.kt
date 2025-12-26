@@ -160,7 +160,7 @@ class DownloadsAdapter(
                         username.visible()
                         username.text = if (item.channelLogin != null && !item.channelLogin.equals(item.channelName, true)) {
                             when (context.prefs().getString(C.UI_NAME_DISPLAY, "0")) {
-                                "0" -> "()"
+                                "0" -> "${item.channelName}(${item.channelLogin})"
                                 "1" -> item.channelName
                                 else -> item.channelLogin
                             }

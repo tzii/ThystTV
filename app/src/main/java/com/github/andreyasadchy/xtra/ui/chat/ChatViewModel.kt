@@ -2704,6 +2704,5 @@ class ChatViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "ChatViewModel"
-
-}
+    }
 }
