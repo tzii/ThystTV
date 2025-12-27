@@ -27,6 +27,7 @@ paging = "3.3.6"
 preference = "1.2.1"
 recyclerview = "1.4.0"
 room = "2.8.4"
+security-crypto = "1.1.0-alpha06"
 serialization = "1.9.0"
 swiperefreshlayout = "1.2.0"
 viewpager2 = "1.1.0"
@@ -73,6 +74,7 @@ recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "r
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 room-paging = { module = "androidx.room:room-paging", version.ref = "room" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 swiperefreshlayout = { module = "androidx.swiperefreshlayout:swiperefreshlayout", version.ref = "swiperefreshlayout" }
 viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "viewpager2" }

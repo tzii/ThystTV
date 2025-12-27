@@ -39,8 +39,8 @@ captures/
 .idea
 
 # Keystore files - excluding from version control for security
-# Note: debug-keystore.jks is intentionally kept for build reproducibility
-# but production keystores should NEVER be committed
+# Production keystores should NEVER be committed
+debug-keystore.jks
 *.keystore
 release-keystore.jks
 release.keystore
