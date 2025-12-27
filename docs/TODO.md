@@ -19,6 +19,10 @@
  - [x] **Unit Tests Expanded** - Added `EmoteCacheTest.kt` (10 tests), `PlayerGestureHelperTest.kt` (9 tests)
  - [x] **PlayerGestureHelper** - Extracted gesture handling utilities from PlayerFragment for better testability
  
+ ### UI/UX Improvements (Completed)
+ 
+ - [x] **Popup Chat High Visibility** - Floating chat defaults to high contrast mode (commit `611a607b`)
+ 
  ---
  
  ## High Priority
@@ -107,6 +111,26 @@
  
  ---
  
+ ## Future Enhancements
+ 
+ ### 7. Picture-in-Picture Improvements
+ 
+ - Better PiP controls
+ - Maintain chat connection in PiP mode
+ 
+ ### 8. Offline Mode
+ 
+ - Cache followed channels list
+ - Show offline indicator on streams
+ 
+ ### 9. Accessibility
+ 
+ - TalkBack support for chat messages
+ - Better contrast options
+ - Screen reader descriptions for emotes
+ 
+ ---
+ 
  ## Notes
  
  - Build currently passes with JDK 21 toolchain
@@ -114,3 +138,4 @@
  - EmoteCache is injected but verify all usages are correct
  - CI workflow includes: lint (Detekt), test (unit tests), build-debug
  - LeakCanary 2.14 automatically detects memory leaks in debug builds
+ - Project renamed from Xtra → Amethytw → ThystTV

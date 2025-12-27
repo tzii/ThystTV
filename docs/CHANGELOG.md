@@ -43,6 +43,15 @@
  - **LeakCanary 2.14**: Added for automatic memory leak detection in debug builds
  - **Baseline Profile**: Added `baseline-prof.txt` with startup optimization rules for critical paths
  
+ ### Security
+ 
+ - **Encrypted Token Storage**: Migrated to `EncryptedSharedPreferences` for secure token storage
+ - **Debug Keystore Removed**: Removed debug keystore from repository tracking
+ 
+ ### UI/UX Improvements
+ 
+ - **Popup Chat High Visibility**: Floating/popup chat now defaults to high contrast mode for better readability
+ 
  ---
  
  ## Changes in `feature/code-quality-improvements` Branch
@@ -116,3 +125,8 @@
  5. `40ab1cc5` - Update README with new icon and branding
  6. `92b59d59` - Cleanup and fixes
  7. `951dd358` - Fix syntax errors - build now passes
+ 8. `5dfd004b` - Security: Add encrypted token storage and remove debug keystore from repo
+ 9. `611a607b` - Set popup chat high visibility mode as default
+ 10. `1899ab6b` - Rename project from Amethytw to ThystTV
+ 11. `cdf69f0b` - Add CI improvements, baseline profiles, and unit tests
+ 12. `dc97d70c` - Add app store images and update .gitignore
