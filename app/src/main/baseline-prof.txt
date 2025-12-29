@@ -1,53 +1,26 @@
- # Baseline Profile for ThystTV
- # This profile helps optimize app startup and commonly used code paths
- # Generated rules for critical startup paths
- 
- # Application class
- HSPLcom/github/andreyasadchy/xtra/AmethytwApp;-><init>()V
- HSPLcom/github/andreyasadchy/xtra/AmethytwApp;->onCreate()V
- 
- # Main Activity
- HSPLcom/github/andreyasadchy/xtra/ui/main/MainActivity;-><init>()V
- HSPLcom/github/andreyasadchy/xtra/ui/main/MainActivity;->onCreate(Landroid/os/Bundle;)V
- 
- # Navigation and core fragments
- HSPLcom/github/andreyasadchy/xtra/ui/main/MainFragment;-><init>()V
- HSPLcom/github/andreyasadchy/xtra/ui/main/MainFragment;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
- 
- # Player fragment (most used)
- HSPLcom/github/andreyasadchy/xtra/ui/player/PlayerFragment;-><init>()V
- HSPLcom/github/andreyasadchy/xtra/ui/player/PlayerFragment;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
- 
- # Chat components
- HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatFragment;-><init>()V
- HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatFragment;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
- HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatAdapter;-><init>(***)V
- HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatAdapter;->onCreateViewHolder(***)Landroidx/recyclerview/widget/RecyclerView$ViewHolder;
- HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatAdapter;->onBindViewHolder(***)V
- 
- # ViewModels
- HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatViewModel;-><init>(***)V
- HSPLcom/github/andreyasadchy/xtra/ui/player/PlayerViewModel;-><init>(***)V
- 
- # Repositories
- HSPLcom/github/andreyasadchy/xtra/repository/GraphQLRepository;-><init>(***)V
- HSPLcom/github/andreyasadchy/xtra/repository/HelixRepository;-><init>(***)V
- HSPLcom/github/andreyasadchy/xtra/repository/PlayerRepository;-><init>(***)V
- 
- # Hilt injection
- HSPLdagger/hilt/android/internal/managers/ActivityComponentManager;->generatedComponent()Ljava/lang/Object;
- HSPLdagger/hilt/android/internal/managers/FragmentComponentManager;->generatedComponent()Ljava/lang/Object;
- 
- # Room database
- HSPLcom/github/andreyasadchy/xtra/db/AppDatabase;-><init>(***)V
- 
- # OkHttp networking
- HSPLokhttp3/OkHttpClient;-><init>(***)V
- HSPLokhttp3/Request;-><init>(***)V
- 
- # Coil image loading
- HSPLcoil3/ImageLoader;->enqueue(***)Lcoil3/request/Disposable;
- 
- # ExoPlayer
- HSPLandroidx/media3/exoplayer/ExoPlayer;->prepare()V
- HSPLandroidx/media3/exoplayer/ExoPlayer;->setMediaSource(***)V
+HSPLcom/github/andreyasadchy/xtra/AmethytwApp;-><init>()V
+HSPLcom/github/andreyasadchy/xtra/AmethytwApp;->onCreate()V
+HSPLcom/github/andreyasadchy/xtra/ui/main/MainActivity;-><init>()V
+HSPLcom/github/andreyasadchy/xtra/ui/main/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLcom/github/andreyasadchy/xtra/ui/main/MainFragment;-><init>()V
+HSPLcom/github/andreyasadchy/xtra/ui/main/MainFragment;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
+HSPLcom/github/andreyasadchy/xtra/ui/player/PlayerFragment;-><init>()V
+HSPLcom/github/andreyasadchy/xtra/ui/player/PlayerFragment;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
+HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatFragment;-><init>()V
+HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatFragment;->onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V
+HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatAdapter;-><init>(***)V
+HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatAdapter;->onCreateViewHolder(***)Landroidx/recyclerview/widget/RecyclerView$ViewHolder;
+HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatAdapter;->onBindViewHolder(***)V
+HSPLcom/github/andreyasadchy/xtra/ui/chat/ChatViewModel;-><init>(***)V
+HSPLcom/github/andreyasadchy/xtra/ui/player/PlayerViewModel;-><init>(***)V
+HSPLcom/github/andreyasadchy/xtra/repository/GraphQLRepository;-><init>(***)V
+HSPLcom/github/andreyasadchy/xtra/repository/HelixRepository;-><init>(***)V
+HSPLcom/github/andreyasadchy/xtra/repository/PlayerRepository;-><init>(***)V
+HSPLdagger/hilt/android/internal/managers/ActivityComponentManager;->generatedComponent()Ljava/lang/Object;
+HSPLdagger/hilt/android/internal/managers/FragmentComponentManager;->generatedComponent()Ljava/lang/Object;
+HSPLcom/github/andreyasadchy/xtra/db/AppDatabase;-><init>(***)V
+HSPLokhttp3/OkHttpClient;-><init>(***)V
+HSPLokhttp3/Request;-><init>(***)V
+HSPLcoil3/ImageLoader;->enqueue(***)Lcoil3/request/Disposable;
+HSPLandroidx/media3/exoplayer/ExoPlayer;->prepare()V
+HSPLandroidx/media3/exoplayer/ExoPlayer;->setMediaSource(***)V
