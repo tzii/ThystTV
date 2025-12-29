@@ -23,6 +23,15 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
+    - name: Create debug keystore
+      run: |
+        keytool -genkey -v -keystore app/debug-keystore.jks \
+          -storepass 123456 -alias debug -keypass 123456 \
+          -keyalg RSA -keysize 2048 -validity 10000 \
+          -dname "CN=Debug, OU=Debug, O=Debug, L=Debug, ST=Debug, C=US" \
+          -storetype JKS
+      shell: bash
+
     - name: Run Unit Tests
       run: ./gradlew test
 
