@@ -26,7 +26,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.github.andreyasadchy.xtra"
+        applicationId = "com.tzii.thysttv"
         minSdk = 23
         targetSdk = 36
         versionCode = 121
