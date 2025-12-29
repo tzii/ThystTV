@@ -29,20 +29,11 @@ A fork of [Xtra](https://github.com/crackededed/Xtra) with additional features f
 *   **Privacy First**: All stats are stored locally on your device and are never shared.
 *   **Easy Access**: Access your stats via the new "Stats" tab in the bottom navigation.
 
-### 📉 Network-Aware Data Saver
-*   **Smart Quality Control**: Automatically detects when you are on a metered connection (Mobile Data) and caps the video quality to 480p to save your data plan.
-*   **Helpful Tooltip**: A non-intrusive tooltip notifies you when Data Saver is active, with a "Don't show again" option.
-*   **User Override**: If you manually select a higher quality while on data, the app respects your choice for the rest of the session.
-*   **Settings Toggle**: Enable or disable this behavior via Player Settings > "Data saver".
-
 ### 👆 Gesture Controls
 *   **Intuitive Control**: Easily adjust settings without blocking the view.
 *   **Volume**: Slide up/down on the **right** half of the screen.
 *   **Brightness**: Slide up/down on the **left** half of the screen.
 *   **Visual Feedback**: Real-time slider overlay during adjustment.
-
-### ℹ️ Stream Title Tooltip
-*   **Full Context**: Long stream titles that are usually truncated are now fully accessible. Simply tap the title text in the player controls to see the full description.
 
 ## Building
 
