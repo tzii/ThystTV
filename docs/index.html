@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThystTV - A Feature-Rich Twitch Client for Android</title>
+    <meta name="description" content="ThystTV is an open-source Android Twitch client with floating chat, gesture controls, viewing stats, and more.">
+    <style>
+        :root {
+            --primary: #9146FF;
+            --primary-dark: #772CE8;
+            --bg-dark: #0E0E10;
+            --bg-card: #18181B;
+            --text: #EFEFF1;
+            --text-muted: #ADADB8;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header */
+        header {
+            padding: 20px 0;
+            border-bottom: 1px solid #2F2F35;
+        }
+        
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--text);
+        }
+        
+        .logo img {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+        }
+        
+        .logo span {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 24px;
+        }
+        
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+        
+        /* Hero */
+        .hero {
+            padding: 80px 0;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--primary), #00D4AA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 8px 20px rgba(145, 70, 255, 0.4);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid #3F3F46;
+        }
+        
+        .btn-secondary:hover {
+            border-color: var(--primary);
+        }
+        
+        /* Features */
+        .features {
+            padding: 80px 0;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 60px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+        
+        .feature-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 32px;
+            border: 1px solid #2F2F35;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        
+        .feature-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-4px);
+        }
+        
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 12px;
+        }
+        
+        .feature-card p {
+            color: var(--text-muted);
+        }
+        
+        /* Tech Stack */
+        .tech-stack {
+            padding: 60px 0;
+            background: var(--bg-card);
+            border-top: 1px solid #2F2F35;
+            border-bottom: 1px solid #2F2F35;
+        }
+        
+        .tech-stack h2 {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .tech-badges {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .tech-badge {
+            background: var(--bg-dark);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            border: 1px solid #3F3F46;
+        }
+        
+        /* Download */
+        .download {
+            padding: 80px 0;
+            text-align: center;
+        }
+        
+        .download h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+        
+        .download p {
+            color: var(--text-muted);
+            margin-bottom: 40px;
+        }
+        
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            border-top: 1px solid #2F2F35;
+            text-align: center;
+            color: var(--text-muted);
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .hero p {
+                font-size: 1rem;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <a href="#" class="logo">
+                    <img src="images/icon.png" alt="ThystTV Logo">
+                    <span>ThystTV</span>
+                </a>
+                <div class="nav-links">
+                    <a href="#features">Features</a>
+                    <a href="#download">Download</a>
+                    <a href="https://github.com/tzii/ThystTV">GitHub</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>A Better Way to Watch Twitch</h1>
+            <p>ThystTV is a feature-rich, open-source Android client for Twitch with floating chat, gesture controls, viewing statistics, and more.</p>
+            <div class="cta-buttons">
+                <a href="https://github.com/tzii/ThystTV/releases/latest" class="btn btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13 5v6h1.17L12 13.17 9.83 11H11V5h2m2-2H9v6H5l7 7 7-7h-4V3zm4 15H5v2h14v-2z"/></svg>
+                    Download APK
+                </a>
+                <a href="https://github.com/tzii/ThystTV" class="btn btn-secondary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    View Source
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <div class="container">
+            <h2>Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">💬</div>
+                    <h3>Floating Chat</h3>
+                    <p>Keep up with chat while watching in fullscreen. Resize, move, and adjust opacity to your preference.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👆</div>
+                    <h3>Gesture Controls</h3>
+                    <p>Swipe up/down on the left for brightness, right for volume. Intuitive controls without blocking the view.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Viewing Stats</h3>
+                    <p>Track your daily watch time and see your most-watched channels. All data stored locally and private.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📉</div>
+                    <h3>Data Saver</h3>
+                    <p>Automatically caps quality to 480p on mobile data. Smart detection with manual override option.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Third-Party Emotes</h3>
+                    <p>Full support for 7TV, BTTV, and FFZ emotes. See all your favorite emotes in chat.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📥</div>
+                    <h3>VOD Downloads</h3>
+                    <p>Download VODs and clips for offline viewing. Watch your favorite content anywhere.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="tech-stack">
+        <div class="container">
+            <h2>Built With</h2>
+            <div class="tech-badges">
+                <span class="tech-badge">Kotlin</span>
+                <span class="tech-badge">Media3 ExoPlayer</span>
+                <span class="tech-badge">Jetpack Navigation</span>
+                <span class="tech-badge">Hilt</span>
+                <span class="tech-badge">Room Database</span>
+                <span class="tech-badge">Apollo GraphQL</span>
+                <span class="tech-badge">Coil</span>
+                <span class="tech-badge">Coroutines</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="download" id="download">
+        <div class="container">
+            <h2>Get ThystTV</h2>
+            <p>Download the latest release from GitHub. Requires Android 7.0 or higher.</p>
+            <a href="https://github.com/tzii/ThystTV/releases/latest" class="btn btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13 5v6h1.17L12 13.17 9.83 11H11V5h2m2-2H9v6H5l7 7 7-7h-4V3zm4 15H5v2h14v-2z"/></svg>
+                Download Latest Release
+            </a>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>ThystTV is a fork of <a href="https://github.com/crackededed/Xtra">Xtra</a>. Open source under the GPL-3.0 License.</p>
+            <p style="margin-top: 8px;">Made with ❤️ for the Twitch community</p>
+        </div>
+    </footer>
+</body>
+</html>
