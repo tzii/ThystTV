@@ -86,6 +86,8 @@ class PlayerViewModel @Inject constructor(
     val integrity = MutableStateFlow<String?>(null)
 
     val streamResult = MutableStateFlow<String?>(null)
+    val secondaryStreamResult = MutableStateFlow<String?>(null)
+    var secondaryStream: Stream? = null
     val stream = MutableStateFlow<Stream?>(null)
     private var streamJob: Job? = null
     var useCustomProxy = false
@@ -311,6 +313,21 @@ class PlayerViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun loadSecondaryStreamResult(networkLibrary: String?, gqlHeaders: Map<String, String>, channelLogin: String, randomDeviceId: Boolean?, xDeviceId: String?, playerType: String?, supportedCodecs: String?, proxyPlaybackAccessToken: Boolean, proxyHost: String?, proxyPort: Int?, proxyUser: String?, proxyPassword: String?, enableIntegrity: Boolean) {
+        viewModelScope.launch {
+            try {
+                secondaryStreamResult.value = playerRepository.loadStreamPlaylistUrl(networkLibrary, gqlHeaders, channelLogin, randomDeviceId, xDeviceId, playerType, supportedCodecs, proxyPlaybackAccessToken, proxyHost, proxyPort, proxyUser, proxyPassword, enableIntegrity)
+            } catch (e: Exception) {
+                secondaryStreamResult.value = null
+            }
+        }
+    }
+
+    fun clearSecondaryStream() {
+        secondaryStreamResult.value = null
+        secondaryStream = null
     }
 
     fun loadStream(channelId: String?, channelLogin: String?, viewerCount: Int?, loop: Boolean, networkLibrary: String?, helixHeaders: Map<String, String>, gqlHeaders: Map<String, String>, enableIntegrity: Boolean) {

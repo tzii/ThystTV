@@ -14,9 +14,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
-import coil.load
-import coil.transform.CircleCropTransformation
+import coil3.request.transformations
+import coil3.load
+import coil3.transform.CircleCropTransformation
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.DialogStreamPickerBinding
 import com.github.andreyasadchy.xtra.model.ui.Stream
@@ -156,20 +158,20 @@ class StreamPickerDialog : BottomSheetDialogFragment() {
                 channelName.text = stream.channelName ?: stream.channelLogin
                 streamTitle.text = stream.title
                 gameName.text = stream.gameName ?: ""
-                viewerCount.text = TwitchApiHelper.formatViewerCount(itemView.context, stream.viewerCount ?: 0)
+                viewerCount.text = TwitchApiHelper.formatCount(stream.viewerCount ?: 0, true)
 
                 // Load channel logo
                 stream.channelLogo?.let { url ->
                     channelLogo.load(url) {
                         transformations(CircleCropTransformation())
-                        placeholder(R.drawable.baseline_person_black_24)
+                        // Placeholder disabled due to Coil 3 type mismatch (requires Image, not Int)
                     }
                 }
 
                 // Load stream thumbnail
                 stream.thumbnail?.let { url ->
                     streamThumbnail.load(url) {
-                        placeholder(android.R.color.darker_gray)
+                        // Placeholder disabled due to Coil 3 type mismatch (requires Image, not Int)
                     }
                 }
 

@@ -21,7 +21,9 @@ import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import androidx.core.widget.NestedScrollView
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
@@ -55,9 +57,11 @@ import com.github.andreyasadchy.xtra.util.gone
 import com.github.andreyasadchy.xtra.util.isNetworkAvailable
 import com.github.andreyasadchy.xtra.util.shortToast
 import com.github.andreyasadchy.xtra.util.toast
+import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.visible
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import kotlin.math.floor
@@ -461,6 +465,9 @@ class ExoPlayerFragment : PlayerFragment() {
                     player?.let { player ->
                         setPipActions(player.playbackState != Player.STATE_ENDED && player.playbackState != Player.STATE_IDLE && player.playWhenReady)
                     }
+                    
+                    // Initialize multi-stream controller
+                    initializeMultiStreamController()
                 }
             }
 
@@ -1061,6 +1068,10 @@ class ExoPlayerFragment : PlayerFragment() {
         binding.playerControls.root.removeCallbacks(updateProgressAction)
         playerListener?.let { player?.removeListener(it) }
         playerListener = null
+        
+        // Pause secondary stream when stopping
+        playbackService?.getSecondaryPlayer()?.pause()
+        
         serviceConnection?.let { requireContext().unbindService(it) }
         serviceConnection = null
     }
@@ -1079,6 +1090,115 @@ class ExoPlayerFragment : PlayerFragment() {
         if (videoType != STREAM && isResumed) {
             player?.stop()
         }
+    }
+
+    // ==================== Multi-Stream Support ====================
+
+    /**
+     * Initialize the multi-stream controller when service is connected
+     */
+    private fun initializeMultiStreamController() {
+        if (videoType != STREAM) return // Only for live streams
+        
+        val service = playbackService ?: return
+        
+        multiStreamController = MultiStreamController(
+            fragment = this,
+            multiStreamContainer = binding.multiStreamContainer,
+            primaryAspectRatioFrame = binding.aspectRatioFrameLayout,
+            primarySurface = binding.playerSurface,
+            secondaryContainer = binding.secondaryPlayerContainer,
+            secondaryAspectRatioFrame = binding.secondaryAspectRatioFrameLayout,
+            secondarySurface = binding.secondaryPlayerSurface
+        ).apply {
+            bindService(service)
+            
+            onAudioSwitched = { slot ->
+                // Audio switched, update any UI if needed
+            }
+            
+            onSecondaryStreamClosed = {
+                viewModel.clearSecondaryStream()
+            }
+            
+            onLayoutModeChanged = { mode ->
+                // Layout mode changed
+            }
+        }
+        
+        // Observe secondary stream result
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.secondaryStreamResult.collectLatest { url ->
+                    if (url != null && viewModel.secondaryStream != null) {
+                        startSecondaryStream(url)
+                        viewModel.secondaryStreamResult.value = null
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Called when user selects a secondary stream from the picker
+     */
+    override fun onSecondaryStreamSelected(stream: Stream) {
+        if (multiStreamController == null) {
+            initializeMultiStreamController()
+        }
+        
+        // Store the stream info
+        viewModel.secondaryStream = stream
+        
+        // Load the stream URL
+        val channelLogin = stream.channelLogin ?: return
+        
+        viewModel.loadSecondaryStreamResult(
+            networkLibrary = prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+            gqlHeaders = TwitchApiHelper.getGQLHeaders(requireContext(), prefs.getBoolean(C.TOKEN_INCLUDE_TOKEN_STREAM, true)),
+            channelLogin = channelLogin,
+            randomDeviceId = prefs.getBoolean(C.TOKEN_RANDOM_DEVICEID, true).takeIf { it },
+            xDeviceId = prefs.getString(C.TOKEN_XDEVICEID, "twitch-web-wall-mason")?.takeIf { it.isNotBlank() },
+            playerType = prefs.getString(C.TOKEN_PLAYERTYPE, "site")?.takeIf { it.isNotBlank() },
+            supportedCodecs = prefs.getString(C.TOKEN_SUPPORTED_CODECS, "av1,h265,h264")?.takeIf { it.isNotBlank() },
+            proxyPlaybackAccessToken = prefs.getBoolean(C.PROXY_PLAYBACK_ACCESS_TOKEN, false),
+            proxyHost = prefs.getString(C.PROXY_HOST, null),
+            proxyPort = prefs.getString(C.PROXY_PORT, null)?.toIntOrNull(),
+            proxyUser = prefs.getString(C.PROXY_USER, null),
+            proxyPassword = prefs.getString(C.PROXY_PASSWORD, null),
+            enableIntegrity = prefs.getBoolean(C.ENABLE_INTEGRITY, false) && prefs.getBoolean(C.USE_WEBVIEW_INTEGRITY, true)
+        )
+    }
+
+    /**
+     * Start playing the secondary stream once URL is loaded
+     */
+    private fun startSecondaryStream(url: String) {
+        val stream = viewModel.secondaryStream ?: return
+        val controller = multiStreamController ?: return
+        
+        // Build media item
+        val mediaItem = MediaItem.Builder()
+            .setUri(url.toUri())
+            .setLiveConfiguration(
+                MediaItem.LiveConfiguration.Builder()
+                    .setMaxPlaybackSpeed(1.02f)
+                    .build()
+            )
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setArtist(stream.channelName)
+                    .setTitle(stream.title)
+                    .build()
+            )
+            .build()
+        
+        // Add secondary stream
+        controller.addSecondaryStream(
+            mediaItem = mediaItem,
+            channelName = stream.channelName ?: stream.channelLogin ?: "",
+            streamTitle = stream.title
+        )
     }
 
     companion object {

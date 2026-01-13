@@ -10,12 +10,11 @@
     android:gravity="center_vertical">
 
     <!-- Channel logo -->
-    <com.google.android.material.imageview.ShapeableImageView
+    <ImageView
         android:id="@+id/channelLogo"
+        style="@style/UserPicture"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:scaleType="centerCrop"
-        app:shapeAppearanceOverlay="@style/CircleImageView"
         tools:src="@drawable/baseline_person_black_24" />
 
     <!-- Stream info -->

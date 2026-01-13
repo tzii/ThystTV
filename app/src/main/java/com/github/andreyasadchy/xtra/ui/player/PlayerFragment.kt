@@ -155,6 +155,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var initialTouchY = 0f
     private var isResizing = false
 
+    // Multi-stream Properties
+    @androidx.media3.common.util.UnstableApi
+    protected var multiStreamController: MultiStreamController? = null
+    protected var isMultiStreamSupported: Boolean = true // Subclasses can disable
+
     protected lateinit var prefs: SharedPreferences
 
     private val backPressedCallback = object : OnBackPressedCallback(true) {
@@ -804,6 +809,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         changePlayerMode()
                     }
                 }
+                // Multi-stream button - only show for live streams
+                if (videoType == STREAM && isMultiStreamSupported && prefs.getBoolean(C.PLAYER_MULTI_STREAM_BUTTON, true)) {
+                    multiStream.visible()
+                    multiStream.setOnClickListener {
+                        showStreamPicker()
+                    }
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(C.PLAYER_AUDIO_COMPRESSOR_BUTTON, true)) {
                     audioCompressor.visible()
                     if (prefs.getBoolean(C.PLAYER_AUDIO_COMPRESSOR, false)) {
@@ -1429,6 +1441,30 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     fun showVolumeDialog() {
         PlayerVolumeDialog.newInstance(getCurrentVolume()).show(childFragmentManager, "closeOnPip")
+    }
+
+    /**
+     * Shows the stream picker dialog for multi-stream mode.
+     * When a stream is selected, it will be added as the secondary stream.
+     */
+    open fun showStreamPicker() {
+        val currentChannelId = requireArguments().getString(KEY_CHANNEL_ID)
+        
+        StreamPickerDialog.newInstance(
+            excludeChannelId = currentChannelId
+        ).apply {
+            setOnStreamSelectedListener { stream ->
+                onSecondaryStreamSelected(stream)
+            }
+        }.show(childFragmentManager, "StreamPicker")
+    }
+
+    /**
+     * Called when a secondary stream is selected from the picker.
+     * Subclasses should override this to handle the stream loading.
+     */
+    open fun onSecondaryStreamSelected(stream: Stream) {
+        // Override in ExoPlayerFragment to load the secondary stream
     }
 
     fun getTranslateAllMessages(): Boolean? {
@@ -2163,6 +2199,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
         with(binding) {
             if (isInPictureInPictureMode) {
+                // Hide secondary stream when entering PiP mode
+                multiStreamController?.let { controller ->
+                    if (controller.isMultiStreamActive()) {
+                        controller.layoutManager.setLayoutMode(MultiStreamLayoutManager.LayoutMode.SINGLE, animate = false)
+                    }
+                }
+                
                 if (!isMaximized) {
                     isMaximized = true
                     requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback)
@@ -2191,6 +2234,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 (chatFragment?.childFragmentManager?.findFragmentByTag("imageDialog") as? BottomSheetDialogFragment)?.dismiss()
             } else {
                 useController = true
+                
+                // Restore multi-stream layout when exiting PiP mode
+                multiStreamController?.let { controller ->
+                    if (controller.isMultiStreamActive()) {
+                        controller.layoutManager.setLayoutMode(MultiStreamLayoutManager.LayoutMode.SPLIT_HORIZONTAL)
+                    }
+                }
             }
         }
     }
@@ -2198,6 +2248,17 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override fun onStop() {
         super.onStop()
         binding.playerControls.root.removeCallbacks(controllerHideAction)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Save multi-stream state for rotation
+        multiStreamController?.let { controller ->
+            outState.putBoolean(KEY_MULTI_STREAM_ACTIVE, controller.isMultiStreamActive())
+            if (controller.isMultiStreamActive()) {
+                outState.putInt(KEY_MULTI_STREAM_LAYOUT_MODE, controller.layoutManager.getCurrentMode().ordinal)
+            }
+        }
     }
 
     protected fun savePosition() {
@@ -2672,6 +2733,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         protected const val KEY_GAME_ID = "gameId"
         protected const val KEY_GAME_SLUG = "gameSlug"
         protected const val KEY_GAME_NAME = "gameName"
+        
+        // Multi-stream state keys
+        private const val KEY_MULTI_STREAM_ACTIVE = "multiStreamActive"
+        private const val KEY_MULTI_STREAM_LAYOUT_MODE = "multiStreamLayoutMode"
     }
 
     private fun createChatFragment(isFloating: Boolean): ChatFragment? {

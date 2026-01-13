@@ -110,7 +110,7 @@ class StreamPickerViewModel @Inject constructor(
                             channelName = user.displayName,
                             gameId = stream.game?.id,
                             gameName = stream.game?.displayName,
-                            title = stream.title,
+                            title = stream.broadcaster?.broadcastSettings?.title,
                             viewerCount = stream.viewersCount,
                             thumbnailUrl = stream.previewImageURL,
                             profileImageUrl = user.profileImageURL
@@ -143,11 +143,11 @@ class StreamPickerViewModel @Inject constructor(
                                     channelId = user.id,
                                     channelLogin = user.login,
                                     channelName = user.displayName,
-                                    gameId = stream.game?.id,
-                                    gameName = stream.game?.displayName,
-                                    title = stream.title,
-                                    viewerCount = stream.viewersCount,
-                                    thumbnailUrl = stream.previewImageURL,
+                            gameId = stream.game?.id,
+                            gameName = stream.game?.displayName,
+                            title = stream.broadcaster?.broadcastSettings?.title,
+                            viewerCount = stream.viewersCount,
+                            thumbnailUrl = stream.previewImageURL,
                                     profileImageUrl = user.profileImageURL
                                 ))
                             }
@@ -160,15 +160,26 @@ class StreamPickerViewModel @Inject constructor(
                     val userId = applicationContext.tokenPrefs().getString(C.USER_ID, null)
                     if (!userId.isNullOrBlank()) {
                         val helixHeaders = TwitchApiHelper.getHelixHeaders(applicationContext)
-                        val response = helixRepository.loadFollowedStreams(
+                        val response = helixRepository.getFollowedStreams(
+                            "OkHttp", // Assuming network library is OkHttp or passed appropriately
                             helixHeaders,
                             userId,
-                            null,
-                            100
+                            100,
+                            null
                         )
-                        response.data?.forEach { stream ->
+                        response.data.forEach { stream ->
                             if (result.none { it.channelId == stream.channelId }) {
-                                result.add(stream)
+                                result.add(Stream(
+                                    id = stream.id,
+                                    channelId = stream.channelId,
+                                    channelLogin = stream.channelLogin,
+                                    channelName = stream.channelName,
+                                    gameId = stream.gameId,
+                                    gameName = stream.gameName,
+                                    title = stream.title,
+                                    viewerCount = stream.viewerCount,
+                                    thumbnailUrl = stream.thumbnailUrl
+                                ))
                             }
                         }
                     }

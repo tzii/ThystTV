@@ -108,7 +108,7 @@ class StreamSurfaceView @JvmOverloads constructor(
     /**
      * Set the resize mode
      */
-    fun setResizeMode(@AspectRatioFrameLayout.ResizeMode resizeMode: Int) {
+    fun setResizeMode(resizeMode: Int) {
         aspectRatioFrame.resizeMode = resizeMode
     }
 
