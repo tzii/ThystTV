@@ -2853,7 +2853,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             binding.dragHandleZone.alpha = if (binding.playerControls.root.isVisible) 1f else 0f
             restoreFloatingChatPosition()
             // Apply transparency to the container background, not the whole view
-            val transparency = prefs.getInt(C.FLOATING_CHAT_TRANSPARENCY, 100)
+            val transparency = prefs.getInt(C.FLOATING_CHAT_TRANSPARENCY, 0)
             val alpha = (transparency * 255 / 100).coerceIn(0, 255)
             binding.floatingChatContainer.setBackgroundColor(Color.argb(alpha, 0, 0, 0))
         } else {
