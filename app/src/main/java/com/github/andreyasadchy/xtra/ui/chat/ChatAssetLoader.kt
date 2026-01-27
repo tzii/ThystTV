@@ -58,6 +58,9 @@ class ChatAssetLoader @Inject constructor(
     var onIntegrityRequest: (() -> Unit)? = null
     var onReloadMessagesRequest: (() -> Unit)? = null
 
+    // Flag to prevent redundant loadEmoteSets calls
+    private var loadedUserEmotes = false
+
     // Helper to add emotes to the big list
     private fun addEmotes(list: List<Emote>) {
         // Simple synchronized addition or just main thread access if called from coroutines
@@ -313,7 +316,8 @@ class ChatAssetLoader @Inject constructor(
                                     )
                                 }
                                 // EmoteCache update could happen here if we want to save them
-                                emoteCache.setUserEmotes(sorted) 
+                                emoteCache.setUserEmotes(sorted)
+                                loadedUserEmotes = true 
                             }
                         }
                     } catch (e: Exception) {
@@ -328,6 +332,7 @@ class ChatAssetLoader @Inject constructor(
     }
 
     fun loadEmoteSets(scope: CoroutineScope, channelId: String?) {
+        if (loadedUserEmotes) return
         val helixHeaders = TwitchApiHelper.getHelixHeaders(context)
         if (!emoteCache.emoteSets.value.isNullOrEmpty() && !helixHeaders[C.HEADER_CLIENT_ID].isNullOrBlank() && !helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
             scope.launch {
@@ -387,6 +392,8 @@ class ChatAssetLoader @Inject constructor(
         _channelFfzEmotes.value = null
         _cheerEmotes.value = null
         _userEmotes.value = null
+        channelStvEmoteSetId = null
+        loadedUserEmotes = false
         synchronized(_allEmotes) {
             _allEmotes.clear()
         }
