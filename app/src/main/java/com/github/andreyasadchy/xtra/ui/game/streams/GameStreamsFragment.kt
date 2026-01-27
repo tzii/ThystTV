@@ -36,9 +36,7 @@ import com.github.andreyasadchy.xtra.ui.common.StreamsSortDialog.Companion.SORT_
 import com.github.andreyasadchy.xtra.ui.common.StreamsSortDialog.Companion.SORT_VIEWERS_ASC
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentArgs
 import com.github.andreyasadchy.xtra.util.C
-import com.github.andreyasadchy.xtra.util.gone
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.visible
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -83,9 +81,9 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
                     tags = args.tags ?: sortValues?.streamTags?.split(',')?.toTypedArray(),
                     languages = args.languages ?: sortValues?.streamLanguages?.split(',')?.toTypedArray(),
                 )
-                viewModel.sortText.value = requireContext().getString(
+                viewModel.sortText.value = getString(
                     R.string.sort_by,
-                    requireContext().getString(
+                    getString(
                         when (viewModel.sort) {
                             SORT_VIEWERS -> R.string.viewers_high
                             SORT_VIEWERS_ASC -> R.string.viewers_low
@@ -98,7 +96,7 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
                     buildString {
                         if (viewModel.tags.isNotEmpty()) {
                             append(
-                                requireContext().resources.getQuantityString(
+                                resources.getQuantityString(
                                     R.plurals.tags,
                                     viewModel.tags.size,
                                     viewModel.tags.joinToString()
@@ -110,7 +108,7 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
                                 append(". ")
                             }
                             append(
-                                requireContext().resources.getQuantityString(
+                                resources.getQuantityString(
                                     R.plurals.languages,
                                     viewModel.languages.size,
                                     viewModel.languages.joinToString()
@@ -130,7 +128,7 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
     }
 
     override fun setupSortBar(sortBar: SortBarBinding) {
-        sortBar.root.visible()
+        sortBar.root.visibility = View.VISIBLE
         sortBar.root.setOnClickListener {
             viewLifecycleOwner.lifecycleScope.launch {
                 StreamsSortDialog.newInstance(
@@ -152,10 +150,10 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.filtersText.collectLatest {
                     if (it != null) {
-                        sortBar.filtersText.visible()
+                        sortBar.filtersText.visibility = View.VISIBLE
                         sortBar.filtersText.text = it
                     } else {
-                        sortBar.filtersText.gone()
+                        sortBar.filtersText.visibility = View.GONE
                     }
                 }
             }
@@ -170,7 +168,7 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
             viewModel.filtersText.value = buildString {
                 if (viewModel.tags.isNotEmpty()) {
                     append(
-                        requireContext().resources.getQuantityString(
+                        resources.getQuantityString(
                             R.plurals.tags,
                             viewModel.tags.size,
                             viewModel.tags.joinToString()
@@ -182,7 +180,7 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
                         append(". ")
                     }
                     append(
-                        requireContext().resources.getQuantityString(
+                        resources.getQuantityString(
                             R.plurals.languages,
                             viewModel.languages.size,
                             viewModel.languages.joinToString()
@@ -199,12 +197,12 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
                 if (changed) {
                     pagingAdapter.submitData(PagingData.empty())
                     viewModel.setFilter(sort, tags, languages)
-                    viewModel.sortText.value = requireContext().getString(R.string.sort_by, sortText)
+                    viewModel.sortText.value = getString(R.string.sort_by, sortText)
                     viewModel.filtersText.value = if (viewModel.tags.isNotEmpty() || viewModel.languages.isNotEmpty()) {
                         buildString {
                             if (viewModel.tags.isNotEmpty()) {
                                 append(
-                                    requireContext().resources.getQuantityString(
+                                    resources.getQuantityString(
                                         R.plurals.tags,
                                         viewModel.tags.size,
                                         viewModel.tags.joinToString()
@@ -216,7 +214,7 @@ class GameStreamsFragment : PagedListFragment(), Scrollable, Sortable, StreamsSo
                                     append(". ")
                                 }
                                 append(
-                                    requireContext().resources.getQuantityString(
+                                    resources.getQuantityString(
                                         R.plurals.languages,
                                         viewModel.languages.size,
                                         viewModel.languages.joinToString()

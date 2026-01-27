@@ -33,9 +33,7 @@ import com.github.andreyasadchy.xtra.ui.common.VideosSortDialog
 import com.github.andreyasadchy.xtra.ui.download.DownloadDialog
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
-import com.github.andreyasadchy.xtra.util.gone
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.visible
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -100,16 +98,16 @@ class ChannelVideosFragment : PagedListFragment(), Scrollable, Sortable, VideosS
                     sort = sortValues?.videoSort,
                     type = sortValues?.videoType,
                 )
-                viewModel.sortText.value = requireContext().getString(
+                viewModel.sortText.value = getString(
                     R.string.sort_and_type,
-                    requireContext().getString(
+                    getString(
                         when (viewModel.sort) {
                             VideosSortDialog.SORT_TIME -> R.string.upload_date
                             VideosSortDialog.SORT_VIEWS -> R.string.view_count
                             else -> R.string.upload_date
                         }
                     ),
-                    requireContext().getString(
+                    getString(
                         when (viewModel.type) {
                             VideosSortDialog.VIDEO_TYPE_ARCHIVE -> R.string.video_type_archive
                             VideosSortDialog.VIDEO_TYPE_HIGHLIGHT -> R.string.video_type_highlight
@@ -145,7 +143,7 @@ class ChannelVideosFragment : PagedListFragment(), Scrollable, Sortable, VideosS
     }
 
     override fun setupSortBar(sortBar: SortBarBinding) {
-        sortBar.root.visible()
+        sortBar.root.visibility = View.VISIBLE
         sortBar.root.setOnClickListener {
             viewLifecycleOwner.lifecycleScope.launch {
                 VideosSortDialog.newInstance(
@@ -169,10 +167,10 @@ class ChannelVideosFragment : PagedListFragment(), Scrollable, Sortable, VideosS
         if ((parentFragment as? FragmentHost)?.currentFragment == this) {
             viewLifecycleOwner.lifecycleScope.launch {
                 if (changed) {
-                    binding.scrollTop.gone()
+                    binding.scrollTop.visibility = View.GONE
                     pagingAdapter.submitData(PagingData.empty())
                     viewModel.setFilter(sort, type)
-                    viewModel.sortText.value = requireContext().getString(R.string.sort_and_type, sortText, typeText)
+                    viewModel.sortText.value = getString(R.string.sort_and_type, sortText, typeText)
                 }
                 if (saveSort) {
                     args.channelId?.let { id ->

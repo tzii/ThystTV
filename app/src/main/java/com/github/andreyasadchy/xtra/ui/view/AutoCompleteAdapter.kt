@@ -13,13 +13,15 @@ import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.target
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.github.andreyasadchy.xtra.BuildConfig
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.model.chat.Chatter
 import com.github.andreyasadchy.xtra.model.chat.Emote
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.visible
 import java.util.Collections
 import java.util.regex.Pattern
 
@@ -43,10 +45,30 @@ class AutoCompleteAdapter<T>(
         when (item) {
             is Emote -> {
                 view.findViewById<ImageView>(R.id.image)?.let {
-                    it.visible()
-                    context.imageLoader.enqueue(
-                        ImageRequest.Builder(context).apply {
-                            data(
+                    it.visibility = View.VISIBLE
+                    if (imageLibrary == "0" || (imageLibrary == "1" && !item.format.equals("webp", true))) {
+                        context.imageLoader.enqueue(
+                            ImageRequest.Builder(context).apply {
+                                data(
+                                    when (emoteQuality) {
+                                        "4" -> item.url4x ?: item.url3x ?: item.url2x ?: item.url1x
+                                        "3" -> item.url3x ?: item.url2x ?: item.url1x
+                                        "2" -> item.url2x ?: item.url1x
+                                        else -> item.url1x
+                                    }
+                                )
+                                if (item.thirdParty) {
+                                    httpHeaders(NetworkHeaders.Builder().apply {
+                                        add("User-Agent", "Xtra/" + BuildConfig.VERSION_NAME)
+                                    }.build())
+                                }
+                                crossfade(true)
+                                target(it)
+                            }.build()
+                        )
+                    } else {
+                        Glide.with(context)
+                            .load(
                                 when (emoteQuality) {
                                     "4" -> item.url4x ?: item.url3x ?: item.url2x ?: item.url1x
                                     "3" -> item.url3x ?: item.url2x ?: item.url1x
@@ -54,15 +76,10 @@ class AutoCompleteAdapter<T>(
                                     else -> item.url1x
                                 }
                             )
-                            if (item.thirdParty) {
-                                httpHeaders(NetworkHeaders.Builder().apply {
-                                    add("User-Agent", "ThystTV/" + BuildConfig.VERSION_NAME)
-                                }.build())
-                            }
-                            crossfade(true)
-                            target(it)
-                        }.build()
-                    )
+                            .diskCacheStrategy(DiskCacheStrategy.DATA)
+                            .transition(DrawableTransitionOptions.withCrossFade())
+                            .into(it)
+                    }
                 }
                 view.findViewById<TextView>(R.id.name)?.text = item.name
             }

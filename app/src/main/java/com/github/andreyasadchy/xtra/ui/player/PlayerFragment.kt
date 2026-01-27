@@ -40,9 +40,11 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.ViewPropertyAnimator
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.trackPipAnimationHintView
 import androidx.annotation.OptIn
@@ -83,19 +85,11 @@ import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
-import com.github.andreyasadchy.xtra.util.disable
-import com.github.andreyasadchy.xtra.util.enable
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
-import com.github.andreyasadchy.xtra.util.gone
-import com.github.andreyasadchy.xtra.util.hideKeyboard
-import com.github.andreyasadchy.xtra.util.isInPortraitOrientation
 import com.github.andreyasadchy.xtra.util.isKeyboardShown
 import com.github.andreyasadchy.xtra.util.isMeteredConnection
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.shortToast
-import com.github.andreyasadchy.xtra.util.toast
 import com.github.andreyasadchy.xtra.util.tokenPrefs
-import com.github.andreyasadchy.xtra.util.visible
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.timepicker.MaterialTimePicker
@@ -195,7 +189,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         super.onCreate(savedInstanceState)
         val activity = requireActivity()
         prefs = activity.prefs()
-        isPortrait = activity.isInPortraitOrientation
+        isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         activity.onBackPressedDispatcher.addCallback(this, backPressedCallback)
         WindowCompat.getInsetsController(
             requireActivity().window,
@@ -739,7 +733,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     channelName
                 }
                 if (prefs.getBoolean(C.PLAYER_CHANNEL, true)) {
-                    channel.visible()
+                    channel.visibility = View.VISIBLE
                     channel.text = displayName
                     channel.setOnClickListener {
                         findNavController().navigate(
@@ -754,12 +748,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
                 val titleText = requireArguments().getString(KEY_TITLE)
                 if (!titleText.isNullOrBlank() && prefs.getBoolean(C.PLAYER_TITLE, true)) {
-                    title.visible()
+                    title.visibility = View.VISIBLE
                     title.text = titleText
                 }
                 val gameName = requireArguments().getString(KEY_GAME_NAME)
                 if (!gameName.isNullOrBlank() && prefs.getBoolean(C.PLAYER_CATEGORY, true)) {
-                    category.visible()
+                    category.visibility = View.VISIBLE
                     category.text = gameName
                     category.setOnClickListener {
                         findNavController().navigate(
@@ -781,19 +775,19 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
                 if (prefs.getBoolean(C.PLAYER_MINIMIZE, true)) {
-                    minimize.visible()
+                    minimize.visibility = View.VISIBLE
                     minimize.setOnClickListener { minimize() }
                 }
                 if (prefs.getBoolean(C.PLAYER_VOLUMEBUTTON, true)) {
-                    volume.visible()
+                    volume.visibility = View.VISIBLE
                     volume.setOnClickListener { showVolumeDialog() }
                 }
                 if (prefs.getBoolean(C.PLAYER_SETTINGS, true)) {
-                    quality.visible()
+                    quality.visibility = View.VISIBLE
                     quality.setOnClickListener { showQualityDialog() }
                 }
                 if (prefs.getBoolean(C.PLAYER_MODE, false)) {
-                    audioOnly.visible()
+                    audioOnly.visibility = View.VISIBLE
                     audioOnly.setOnClickListener {
                         if (viewModel.quality == AUDIO_ONLY_QUALITY) {
                             changeQuality(viewModel.previousQuality)
@@ -805,7 +799,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(C.PLAYER_AUDIO_COMPRESSOR_BUTTON, true)) {
-                    audioCompressor.visible()
+                    audioCompressor.visibility = View.VISIBLE
                     if (prefs.getBoolean(C.PLAYER_AUDIO_COMPRESSOR, false)) {
                         audioCompressor.setImageResource(R.drawable.baseline_audio_compressor_on_24dp)
                     } else {
@@ -816,7 +810,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
                 if (prefs.getBoolean(C.PLAYER_MENU, true)) {
-                    menu.visible()
+                    menu.visibility = View.VISIBLE
                     menu.setOnClickListener {
                         PlayerSettingsDialog.newInstance(
                             videoType = videoType,
@@ -844,7 +838,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 !TwitchApiHelper.getHelixHeaders(requireContext())[C.HEADER_TOKEN].isNullOrBlank())
                     ) {
                         if (prefs.getBoolean(C.PLAYER_CHATBARTOGGLE, false) && !prefs.getBoolean(C.CHAT_DISABLE, false)) {
-                            toggleChatInput.visible()
+                            toggleChatInput.visibility = View.VISIBLE
                             toggleChatInput.setOnClickListener { toggleChatBar() }
                         }
                         slidingLayout.viewTreeObserver.addOnGlobalLayoutListener {
@@ -902,11 +896,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         }
                     }
                     if (prefs.getBoolean(C.PLAYER_RESTART, true)) {
-                        restart.visible()
+                        restart.visibility = View.VISIBLE
                         restart.setOnClickListener { restartPlayer() }
                     }
                     if (prefs.getBoolean(C.PLAYER_SEEKLIVE, false)) {
-                        seekLive.visible()
+                        seekLive.visibility = View.VISIBLE
                         seekLive.setOnClickListener { seekToLivePosition() }
                     }
                     if (prefs.getBoolean(C.PLAYER_VIEWERLIST, false)) {
@@ -919,11 +913,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             }
                         }
                     }
-                    rewind.gone()
-                    fastForward.gone()
-                    position.gone()
-                    progressBar.gone()
-                    duration.gone()
+                    rewind.visibility = View.GONE
+                    fastForward.visibility = View.GONE
+                    position.visibility = View.GONE
+                    progressBar.visibility = View.GONE
+                    duration.visibility = View.GONE
                     updateStreamInfo(
                         requireArguments().getString(KEY_TITLE),
                         requireArguments().getString(KEY_GAME_ID),
@@ -933,7 +927,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     updateViewerCount(requireArguments().getInt(KEY_VIEWER_COUNT).takeIf { it != -1 })
                 } else {
                     if (prefs.getBoolean(C.PLAYER_SPEEDBUTTON, true)) {
-                        speed.visible()
+                        speed.visibility = View.VISIBLE
                         speed.setOnClickListener { showSpeedDialog() }
                     }
                 }
@@ -976,7 +970,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 viewModel.gamesList.collectLatest { list ->
                                     if (!list.isNullOrEmpty()) {
                                         if (prefs.getBoolean(C.PLAYER_GAMESBUTTON, true)) {
-                                            vodGames.visible()
+                                            vodGames.visibility = View.VISIBLE
                                             vodGames.setOnClickListener { showVodGames() }
                                         }
                                         (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setVodGames()
@@ -1006,7 +1000,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     filtered.forEach {
                                         val quality = it.key.first.let { quality ->
                                             val quality = if (quality == "source") {
-                                                requireContext().getString(R.string.source)
+                                                getString(R.string.source)
                                             } else {
                                                 quality
                                             }
@@ -1026,7 +1020,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                         }
                                         map[it.key.first] = Pair(quality, it.value)
                                     }
-                                    map.put(AUDIO_ONLY_QUALITY, Pair(requireContext().getString(R.string.audio_only), null))
+                                    map.put(AUDIO_ONLY_QUALITY, Pair(getString(R.string.audio_only), null))
                                     viewModel.qualities = map.toList()
                                         .sortedByDescending {
                                             it.first.substringAfter("p", "").takeWhile { it.isDigit() }.toIntOrNull()
@@ -1051,7 +1045,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                     val videoId = requireArguments().getString(KEY_VIDEO_ID)
                     if (!videoId.isNullOrBlank()) {
-                        binding.watchVideo.visible()
+                        binding.watchVideo.visibility = View.VISIBLE
                         binding.watchVideo.setOnClickListener {
                             viewLifecycleOwner.lifecycleScope.launch {
                                 val offset = requireArguments().getInt(KEY_VOD_OFFSET).takeIf { it != -1 }?.let {
@@ -1079,7 +1073,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 } else {
                     if (prefs.getBoolean(C.PLAYER_SLEEP, false)) {
-                        sleepTimer.visible()
+                        sleepTimer.visibility = View.VISIBLE
                         sleepTimer.setOnClickListener { showSleepTimerDialog() }
                     }
                 }
@@ -1090,8 +1084,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 if (it != null) {
                                     val url = requireArguments().getString(KEY_URL)
                                     viewModel.qualities = mapOf(
-                                        "source" to Pair(requireContext().getString(R.string.source), url),
-                                        AUDIO_ONLY_QUALITY to Pair(requireContext().getString(R.string.audio_only), null)
+                                        "source" to Pair(getString(R.string.source), url),
+                                        AUDIO_ONLY_QUALITY to Pair(getString(R.string.audio_only), null)
                                     )
                                     setDefaultQuality()
                                     changePlayerMode()
@@ -1102,33 +1096,39 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         }
                     }
                 } else {
-                    quality.disable()
-                    download.disable()
-                    audioOnly.disable()
+                    quality.isEnabled = false
+                    quality.setColorFilter(Color.GRAY)
+                    download.isEnabled = false
+                    download.setColorFilter(Color.GRAY)
+                    audioOnly.isEnabled = false
+                    audioOnly.setColorFilter(Color.GRAY)
                     viewLifecycleOwner.lifecycleScope.launch {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             viewModel.loaded.collectLatest {
                                 if (it) {
-                                    quality.enable()
-                                    download.enable()
-                                    audioOnly.enable()
+                                    quality.isEnabled = true
+                                    quality.setColorFilter(Color.WHITE)
+                                    download.isEnabled = true
+                                    download.setColorFilter(Color.WHITE)
+                                    audioOnly.isEnabled = true
+                                    audioOnly.setColorFilter(Color.WHITE)
                                     setQualityText()
                                 }
                             }
                         }
                     }
                     if (prefs.getBoolean(C.PLAYER_DOWNLOAD, false)) {
-                        download.visible()
+                        download.visibility = View.VISIBLE
                         download.setOnClickListener { showDownloadDialog() }
                     }
                     val setting = prefs.getString(C.UI_FOLLOW_BUTTON, "0")?.toIntOrNull() ?: 0
                     if (prefs.getBoolean(C.PLAYER_FOLLOW, false) && (setting == 0 || setting == 1)) {
-                        follow.visible()
+                        follow.visibility = View.VISIBLE
                         follow.setOnClickListener {
                             viewModel.isFollowing.value?.let {
                                 if (it) {
                                     requireContext().getAlertDialogBuilder()
-                                        .setMessage(requireContext().getString(R.string.unfollow_channel, displayName))
+                                        .setMessage(getString(R.string.unfollow_channel, displayName))
                                         .setNegativeButton(getString(R.string.no), null)
                                         .setPositiveButton(getString(R.string.yes)) { _, _ ->
                                             viewModel.deleteFollowChannel(
@@ -1177,12 +1177,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                         val following = pair.first
                                         val errorMessage = pair.second
                                         if (!errorMessage.isNullOrBlank()) {
-                                            requireContext().shortToast(errorMessage)
+                                            Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_SHORT).show()
                                         } else {
                                             if (following) {
-                                                requireContext().shortToast(requireContext().getString(R.string.now_following, displayName))
+                                                Toast.makeText(requireContext(), getString(R.string.now_following, displayName), Toast.LENGTH_SHORT).show()
                                             } else {
-                                                requireContext().shortToast(requireContext().getString(R.string.unfollowed, displayName))
+                                                Toast.makeText(requireContext(), getString(R.string.unfollowed, displayName), Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                         viewModel.follow.value = null
@@ -1230,9 +1230,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     gravity = Gravity.BOTTOM
                 }
                 if (isMaximized) {
-                    chatLayout.visible()
+                    chatLayout.visibility = View.VISIBLE
                 } else {
-                    chatLayout.gone()
+                    chatLayout.visibility = View.GONE
                     val (minimizedScaleX, minimizedScaleY) = getScaleValues()
                     slidingLayout.scaleX = minimizedScaleX
                     slidingLayout.scaleY = minimizedScaleY
@@ -1259,14 +1259,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 chatLayout.isPortrait = true
                 with(playerControls) {
                     if (prefs.getBoolean(C.PLAYER_FULLSCREEN, true)) {
-                        fullscreen.visible()
+                        fullscreen.visibility = View.VISIBLE
                         fullscreen.setImageResource(R.drawable.baseline_fullscreen_black_24)
                         fullscreen.setOnClickListener {
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                         }
                     }
-                    aspectRatio.gone()
-                    toggleChat.gone()
+                    aspectRatio.visibility = View.GONE
+                    toggleChat.visibility = View.GONE
                 }
             } else {
                 requireActivity().window.decorView.setOnSystemUiVisibilityChangeListener {
@@ -1288,14 +1288,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         gravity = Gravity.END
                     }
                     if (isChatOpen) {
-                        chatLayout.visible()
+                        chatLayout.visibility = View.VISIBLE
                         if (requireView().findViewById<Button>(R.id.btnDown)?.isVisible == false) {
                             requireView().findViewById<RecyclerView>(R.id.recyclerView)?.let { recyclerView ->
                                 recyclerView.adapter?.itemCount?.let { recyclerView.scrollToPosition(it - 1) }
                             }
                         }
                     } else {
-                        chatLayout.gone()
+                        chatLayout.visibility = View.GONE
                     }
                 } else {
                     showStatusBar()
@@ -1309,7 +1309,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         height = ViewGroup.LayoutParams.MATCH_PARENT
                         gravity = Gravity.END
                     }
-                    chatLayout.gone()
+                    chatLayout.visibility = View.GONE
                     val (minimizedScaleX, minimizedScaleY) = getScaleValues()
                     slidingLayout.scaleX = minimizedScaleX
                     slidingLayout.scaleY = minimizedScaleY
@@ -1336,7 +1336,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 chatLayout.isPortrait = false
                 with(playerControls) {
                     if (prefs.getBoolean(C.PLAYER_FULLSCREEN, true)) {
-                        fullscreen.visible()
+                        fullscreen.visibility = View.VISIBLE
                         fullscreen.setImageResource(R.drawable.baseline_fullscreen_exit_black_24)
                         fullscreen.setOnClickListener {
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -1344,11 +1344,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         }
                     }
                     if (prefs.getBoolean(C.PLAYER_ASPECT, true)) {
-                        aspectRatio.visible()
+                        aspectRatio.visibility = View.VISIBLE
                         aspectRatio.setOnClickListener { setResizeMode() }
                     }
                     if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true) && !prefs.getBoolean(C.CHAT_DISABLE, false)) {
-                        toggleChat.visible()
+                        toggleChat.visibility = View.VISIBLE
                         updateChatButtonIcon()
                         
                         toggleChat.setOnClickListener { 
@@ -1455,15 +1455,15 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         with(binding) {
             requireView().findViewById<LinearLayout>(R.id.messageView)?.let {
                 if (it.isVisible) {
-                    chatLayout.hideKeyboard()
+                    (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(chatLayout.windowToken, 0)
                     chatLayout.clearFocus()
                     if (videoType == STREAM && chatFragment?.emoteMenuIsVisible() == true) {
                         chatFragment?.toggleEmoteMenu(false)
                     }
-                    it.gone()
+                    it.visibility = View.GONE
                     prefs.edit { putBoolean(C.KEY_CHAT_BAR_VISIBLE, false) }
                 } else {
-                    it.visible()
+                    it.visibility = View.VISIBLE
                     prefs.edit { putBoolean(C.KEY_CHAT_BAR_VISIBLE, true) }
                 }
             }
@@ -1475,7 +1475,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         hideChatLayout()
         if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true)) {
             binding.playerControls.toggleChat.apply {
-                visible()
+                visibility = View.VISIBLE
                 updateChatButtonIcon()
             }
         }
@@ -1487,7 +1487,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         showChatLayout()
         if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true)) {
             binding.playerControls.toggleChat.apply {
-                visible()
+                visibility = View.VISIBLE
                 updateChatButtonIcon()
             }
         }
@@ -1506,9 +1506,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 height = ViewGroup.LayoutParams.MATCH_PARENT
                 marginEnd = 0
             }
-            chatLayout.hideKeyboard()
+            (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(chatLayout.windowToken, 0)
             chatLayout.clearFocus()
-            chatLayout.gone()
+            chatLayout.visibility = View.GONE
         }
     }
 
@@ -1524,7 +1524,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 height = ViewGroup.LayoutParams.MATCH_PARENT
                 gravity = Gravity.END
             }
-            chatLayout.visible()
+            chatLayout.visibility = View.VISIBLE
         }
     }
 
@@ -1539,11 +1539,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (viewerCount != null) {
                 viewersText.text = TwitchApiHelper.formatCount(viewerCount, requireContext().prefs().getBoolean(C.UI_TRUNCATEVIEWCOUNT, true))
                 if (prefs.getBoolean(C.PLAYER_VIEWERICON, true)) {
-                    viewersIcon.visible()
+                    viewersIcon.visibility = View.VISIBLE
                 }
             } else {
                 viewersText.text = null
-                viewersIcon.gone()
+                viewersIcon.visibility = View.GONE
             }
         }
     }
@@ -1561,16 +1561,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         with(binding.playerControls) {
             uptimeTimer.stop()
             if (uptimeMs != null && prefs.getBoolean(C.PLAYER_SHOW_UPTIME, true)) {
-                uptimeLayout.visible()
+                uptimeLayout.visibility = View.VISIBLE
                 uptimeTimer.base = SystemClock.elapsedRealtime() + uptimeMs - System.currentTimeMillis()
                 uptimeTimer.start()
                 if (prefs.getBoolean(C.PLAYER_VIEWERICON, true)) {
-                    uptimeIcon.visible()
+                    uptimeIcon.visibility = View.VISIBLE
                 } else {
-                    uptimeIcon.gone()
+                    uptimeIcon.visibility = View.GONE
                 }
             } else {
-                uptimeLayout.gone()
+                uptimeLayout.visibility = View.GONE
             }
         }
     }
@@ -1579,19 +1579,19 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         binding.playerControls.title.apply {
             if (!title.isNullOrBlank() && prefs.getBoolean(C.PLAYER_TITLE, true)) {
                 text = title.trim()
-                visible()
+                visibility = View.VISIBLE
                 setOnClickListener {
                     requireContext().toast(title.trim())
                 }
             } else {
                 text = null
-                gone()
+                visibility = View.GONE
             }
         }
         binding.playerControls.category.apply {
             if (!gameName.isNullOrBlank() && prefs.getBoolean(C.PLAYER_CATEGORY, true)) {
                 text = gameName
-                visible()
+                visibility = View.VISIBLE
                 setOnClickListener {
                     findNavController().navigate(
                         if (prefs.getBoolean(C.UI_GAMEPAGER, true)) {
@@ -1612,7 +1612,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
             } else {
                 text = null
-                gone()
+                visibility = View.GONE
             }
         }
     }
@@ -1743,7 +1743,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             override fun onAnimationStart(animation: Animator) {
                                 controllerIsAnimating = true
                                 if (view != null) {
-                                    binding.playerControls.root.visible()
+                                    binding.playerControls.root.visibility = View.VISIBLE
                                     updateChatButtonIcon()
                                 }
                             }
@@ -1774,7 +1774,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 controllerAnimation?.cancel()
                 binding.playerControls.root.removeCallbacks(controllerHideAction)
                 binding.playerControls.root.alpha = 1f
-                binding.playerControls.root.visible()
+                binding.playerControls.root.visibility = View.VISIBLE
                 updateChatButtonIcon()
                 // Also show floating chat controls if floating chat is active
                 if (isFloatingChatEnabled) {
@@ -1802,7 +1802,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             controllerIsAnimating = false
                             setListener(null)
                             if (view != null) {
-                                binding.playerControls.root.gone()
+                                binding.playerControls.root.visibility = View.GONE
                             }
                         }
                     }
@@ -1817,7 +1817,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (force) {
                 controllerAnimation?.cancel()
                 binding.playerControls.root.alpha = 0f
-                binding.playerControls.root.gone()
+                binding.playerControls.root.visibility = View.GONE
                 // Also hide floating chat controls if floating chat is active
                 if (isFloatingChatEnabled) {
                     binding.dragHandleZone.alpha = 0f
@@ -1924,8 +1924,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     setActions(listOf(
                         RemoteAction(
                             Icon.createWithResource(requireContext(), R.drawable.baseline_audiotrack_black_24),
-                            requireContext().getString(R.string.audio_only),
-                            requireContext().getString(R.string.audio_only),
+                            getString(R.string.audio_only),
+                            getString(R.string.audio_only),
                             PendingIntent.getBroadcast(
                                 requireContext(),
                                 REQUEST_CODE_AUDIO_ONLY,
@@ -1936,8 +1936,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         if (playing) {
                             RemoteAction(
                                 Icon.createWithResource(requireContext(), R.drawable.baseline_pause_black_48),
-                                requireContext().getString(R.string.pause),
-                                requireContext().getString(R.string.pause),
+                                getString(R.string.pause),
+                                getString(R.string.pause),
                                 PendingIntent.getBroadcast(
                                     requireContext(),
                                     REQUEST_CODE_PLAY_PAUSE,
@@ -1948,8 +1948,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         } else {
                             RemoteAction(
                                 Icon.createWithResource(requireContext(), R.drawable.baseline_play_arrow_black_48),
-                                requireContext().getString(R.string.resume),
-                                requireContext().getString(R.string.resume),
+                                getString(R.string.resume),
+                                getString(R.string.resume),
                                 PendingIntent.getBroadcast(
                                     requireContext(),
                                     REQUEST_CODE_PLAY_PAUSE,
@@ -1973,7 +1973,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
         if (isInPIPMode) {
             if (isPortrait) {
-                binding.chatLayout.gone()
+                binding.chatLayout.visibility = View.GONE
             } else {
                 hideChatLayout()
             }
@@ -2100,13 +2100,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 val map = mutableMapOf<String, Pair<String, String?>>()
                 qualityMap.forEach {
                     when (it.key) {
-                        "source" -> map[it.key] = Pair(requireContext().getString(R.string.source), it.value)
-                        "audio_only" -> map[it.key] = Pair(requireContext().getString(R.string.audio_only), it.value)
+                        "source" -> map[it.key] = Pair(getString(R.string.source), it.value)
+                        "audio_only" -> map[it.key] = Pair(getString(R.string.audio_only), it.value)
                         else -> map[it.key] = Pair(it.key, it.value)
                     }
                 }
                 map.put(AUDIO_ONLY_QUALITY, map.remove(AUDIO_ONLY_QUALITY) //move audio option to bottom
-                    ?: Pair(requireContext().getString(R.string.audio_only), null))
+                    ?: Pair(getString(R.string.audio_only), null))
                 val qualities = map.toList()
                     .sortedByDescending {
                         it.first.substringAfter("p", "").takeWhile { it.isDigit() }.toIntOrNull()
@@ -2152,7 +2152,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 else -> false
             }
             if (!isInPIPMode) {
-                chatLayout.hideKeyboard()
+                (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(chatLayout.windowToken, 0)
                 chatLayout.clearFocus()
                 initLayout()
             }
@@ -2175,14 +2175,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     slidingLayout.scaleY = 1f
                 }
                 if (isPortrait) {
-                    chatLayout.gone()
+                    chatLayout.visibility = View.GONE
                 } else {
                     hideChatLayout()
                 }
                 useController = false
                 controllerAnimation?.cancel()
                 binding.playerControls.root.alpha = 0f
-                binding.playerControls.root.gone()
+                binding.playerControls.root.visibility = View.GONE
                 // player dialog
                 (childFragmentManager.findFragmentByTag("closeOnPip") as? BottomSheetDialogFragment)?.dismiss()
                 // player chat message dialog
@@ -2275,7 +2275,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
             }
             if (isPortrait) {
-                chatLayout.gone()
+                chatLayout.visibility = View.GONE
                 slidingLayout.doOnLayout {
                     animate()
                 }
@@ -2307,7 +2307,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 updateProgress()
             }
             if (isPortrait) {
-                chatLayout.visible()
+                chatLayout.visibility = View.VISIBLE
             } else {
                 hideStatusBar()
                 // Show floating chat again if it was enabled
@@ -2397,7 +2397,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     fun onSleepTimerChanged(durationMs: Long, hours: Int, minutes: Int, lockScreen: Boolean) {
         if (durationMs > 0L) {
-            requireContext().toast(
+            Toast.makeText(
+                requireContext(),
                 when {
                     hours == 0 -> getString(
                         R.string.playback_will_stop,
@@ -2412,10 +2413,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         resources.getQuantityString(R.plurals.hours, hours, hours),
                         resources.getQuantityString(R.plurals.minutes, minutes, minutes)
                     )
-                }
-            )
+                },
+                Toast.LENGTH_LONG
+            ).show()
         } else if (((activity as? MainActivity)?.getSleepTimerTimeLeft() ?: 0) > 0L) {
-            requireContext().toast(R.string.timer_canceled)
+            Toast.makeText(requireContext(), R.string.timer_canceled, Toast.LENGTH_LONG).show()
         }
         if (lockScreen != prefs.getBoolean(C.SLEEP_TIMER_LOCK, false)) {
             prefs.edit { putBoolean(C.SLEEP_TIMER_LOCK, lockScreen) }
