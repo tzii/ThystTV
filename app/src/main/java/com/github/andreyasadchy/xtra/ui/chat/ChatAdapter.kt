@@ -67,7 +67,7 @@ class ChatAdapter(
     private val translateMessage: (ChatMessage, String?) -> Unit,
     private val showLanguageDownloadDialog: (ChatMessage, String) -> Unit,
     private val channelId: String?,
-    private val useHighVisibility: Boolean = false,
+    var useHighVisibility: Boolean = false,
 ) : RecyclerView.Adapter<ChatAdapter.ViewHolder>() {
 
     var messages: MutableList<ChatMessage>? = null
@@ -249,15 +249,18 @@ class ChatAdapter(
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
         val textView = itemView as TextView
+        private val defaultTextColors = textView.textColors
 
         fun bind(chatMessage: ChatMessage, formattedMessage: SpannableStringBuilder) {
             textView.apply {
                 text = formattedMessage
                 textSize = messageTextSize
                 if (useHighVisibility) {
+                    setTextColor(android.graphics.Color.WHITE)
                     setShadowLayer(6f, 2f, 2f, android.graphics.Color.BLACK)
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                 } else {
+                    setTextColor(defaultTextColors)
                     setShadowLayer(0f, 0f, 0f, 0)
                     typeface = android.graphics.Typeface.DEFAULT
                 }

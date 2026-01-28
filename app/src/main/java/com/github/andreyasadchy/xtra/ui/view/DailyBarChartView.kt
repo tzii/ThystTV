@@ -3,18 +3,20 @@ package com.github.andreyasadchy.xtra.ui.view
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import com.github.andreyasadchy.xtra.R
+import com.github.andreyasadchy.xtra.ui.stats.StatsDataHelper
 import kotlin.math.max
 
 /**
  * Custom bar chart view for displaying daily screen time.
  * Shows 7 days of data with animated bars, grid lines, and day labels.
+ * Automatically adapts to light/dark theme.
  */
 class DailyBarChartView @JvmOverloads constructor(
     context: Context,
@@ -31,46 +33,74 @@ class DailyBarChartView @JvmOverloads constructor(
     private var animationProgress = 1f
     private var maxSeconds: Long = 6 * 3600L  // Default max 6 hours
 
+    // Theme colors
+    private val primaryColor: Int
+    private val onSurfaceColor: Int
+    private val outlineColor: Int
+
     // Paints
     private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF58A6FF.toInt()  // Nice blue color
         style = Paint.Style.FILL
     }
 
     private val gridLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF3D3D3D.toInt()
         strokeWidth = 1f
         style = Paint.Style.STROKE
     }
 
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF9E9E9E.toInt()
         textSize = 32f
         textAlign = Paint.Align.CENTER
     }
 
     private val gridLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF6E6E6E.toInt()
         textSize = 28f
         textAlign = Paint.Align.RIGHT
     }
 
     private val barRect = RectF()
-    private val barCornerRadius = 8f
+    private val barCornerRadius = 12f
 
     // Margins and spacing
     private val leftMargin = 80f     // Space for grid labels
     private val rightMargin = 16f
     private val topMargin = 16f
     private val bottomMargin = 48f   // Space for day labels
-    private val barSpacing = 0.3f    // Spacing between bars as fraction of bar width
+    private val barSpacing = 0.25f   // Spacing between bars as fraction of bar width
 
     init {
+        // Get theme colors
+        val typedValue = TypedValue()
+        context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
+        primaryColor = typedValue.data
+
+        context.theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true)
+        val textColorSecondary = if (typedValue.resourceId != 0) {
+            context.getColor(typedValue.resourceId)
+        } else {
+            typedValue.data
+        }
+        onSurfaceColor = textColorSecondary
+
+        context.theme.resolveAttribute(com.google.android.material.R.attr.colorOutlineVariant, typedValue, true)
+        outlineColor = if (typedValue.resourceId != 0) {
+            context.getColor(typedValue.resourceId)
+        } else {
+            typedValue.data
+        }
+
+        // Apply theme colors (can be overridden by XML attrs)
+        barPaint.color = primaryColor
+        gridLinePaint.color = outlineColor
+        labelPaint.color = onSurfaceColor
+        gridLabelPaint.color = onSurfaceColor
+
+        // Apply XML attributes if provided
         context.theme.obtainStyledAttributes(attrs, R.styleable.DailyBarChartView, 0, 0).apply {
             try {
-                barPaint.color = getColor(R.styleable.DailyBarChartView_barColor, 0xFF58A6FF.toInt())
-                gridLinePaint.color = getColor(R.styleable.DailyBarChartView_gridLineColor, 0xFF3D3D3D.toInt())
-                labelPaint.color = getColor(R.styleable.DailyBarChartView_labelColor, 0xFF9E9E9E.toInt())
+                barPaint.color = getColor(R.styleable.DailyBarChartView_barColor, primaryColor)
+                gridLinePaint.color = getColor(R.styleable.DailyBarChartView_gridLineColor, outlineColor)
+                labelPaint.color = getColor(R.styleable.DailyBarChartView_labelColor, onSurfaceColor)
             } finally {
                 recycle()
             }
@@ -85,7 +115,7 @@ class DailyBarChartView @JvmOverloads constructor(
         if (animate) {
             animationProgress = 0f
             ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 600
+                duration = 800
                 interpolator = DecelerateInterpolator()
                 addUpdateListener {
                     animationProgress = it.animatedValue as Float
@@ -100,7 +130,7 @@ class DailyBarChartView @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredHeight = 280  // Default height in dp-ish
+        val desiredHeight = 280
         val heightMode = MeasureSpec.getMode(heightMeasureSpec)
         val heightSize = MeasureSpec.getSize(heightMeasureSpec)
 
@@ -120,7 +150,6 @@ class DailyBarChartView @JvmOverloads constructor(
 
         val chartWidth = width - leftMargin - rightMargin
         val chartHeight = height - topMargin - bottomMargin
-        val chartTop = topMargin
         val chartBottom = height - bottomMargin
 
         // Draw horizontal grid lines (at 3hr and 6hr marks)

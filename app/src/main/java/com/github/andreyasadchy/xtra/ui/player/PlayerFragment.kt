@@ -47,6 +47,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.trackPipAnimationHintView
 import androidx.annotation.OptIn
 import androidx.core.content.edit
+import androidx.core.graphics.ColorUtils
 import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -2732,10 +2733,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             // Start with drag handle hidden (synced with player controls)
             binding.dragHandleZone.alpha = if (binding.playerControls.root.isVisible) 1f else 0f
             restoreFloatingChatPosition()
-            // Apply transparency to the container background, not the whole view
+            // Apply transparency to the container background using theme-aware colors
             val transparency = prefs.getInt(C.FLOATING_CHAT_TRANSPARENCY, 0)
             val alpha = (transparency * 255 / 100).coerceIn(0, 255)
-            binding.floatingChatContainer.setBackgroundColor(Color.argb(alpha, 0, 0, 0))
+            val surfaceColor = MaterialColors.getColor(binding.floatingChatContainer, com.google.android.material.R.attr.colorSurface)
+            val themedColor = ColorUtils.setAlphaComponent(surfaceColor, alpha)
+            binding.floatingChatContainer.setBackgroundColor(themedColor)
         } else {
             // Hide with fade-out animation
             binding.floatingChatRoot.animate().alpha(0f).setDuration(200)
@@ -2766,6 +2769,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             currentParent.removeView(chatView)
             targetContainer.addView(chatView)
         }
+        // Update high visibility mode - should only apply to floating chat
+        chatFragment?.updateHighVisibility(toFloating)
     }
 
     private fun saveFloatingChatPosition() {

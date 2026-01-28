@@ -418,7 +418,7 @@
     <string name="vod_remove_ignore">Remove from ignore list</string>
     <string name="remove_bookmark">Remove bookmark</string>
     <string name="saved">Saved</string>
-    <string name="stats">Stats</string>
+    <string name="stats" translatable="false">Stats</string>
     <string name="refresh">Refresh</string>
     <string name="image_library">Image library</string>
     <string name="imageLibraryEntries1">Coil</string>
@@ -490,8 +490,8 @@
     <string name="stream_offline">%s is now offline</string>
     <string name="keep_screen_on_when_paused">Keep screen on when video is paused</string>
     <string name="stream_proxy">Stream proxy</string>
-    <string name="player_data_saver">Data saver</string>
-    <string name="data_saver_mode">Data saver mode enabled</string>
+    <string name="player_data_saver" translatable="false">Data saver</string>
+    <string name="data_saver_mode" translatable="false">Data saver mode enabled</string>
     <string name="stream_proxy_url">Custom proxy url</string>
     <string name="stream_proxy_url_desc">\"$channel\" will be replaced with channel login</string>
     <string name="proxy_error">Proxy error</string>
@@ -753,4 +753,17 @@
     <string name="default_cellular_quality">Default player quality on cellular network</string>
     <string name="player">Player</string>
     <string name="compact_number_formatting">Compact number formatting</string>
+
+    <!-- Stats Screen -->
+    <string name="screen_time" translatable="false">Screen Time</string>
+    <string name="daily_average" translatable="false">daily average</string>
+    <string name="last_7_days" translatable="false">Last 7 days</string>
+    <string name="current_streak" translatable="false">Current streak</string>
+    <string name="longest_streak" translatable="false">Longest streak</string>
+    <string name="categories_watched" translatable="false">Categories Watched</string>
+    <string name="peak_viewing_times" translatable="false">Peak Viewing Times</string>
+    <string name="last_30_days" translatable="false">Last 30 days</string>
+    <string name="streamer_loyalty" translatable="false">Streamer Loyalty</string>
+    <string name="top_watched_channels" translatable="false">Top Watched Channels</string>
+    <string name="days_streak" translatable="false">days</string>
 </resources>
