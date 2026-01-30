@@ -595,6 +595,8 @@ class Media3Fragment : PlayerFragment() {
 
     override fun getCurrentPosition() = player?.currentPosition
 
+    override fun getDuration() = player?.duration ?: 0L
+
     override fun getCurrentSpeed() = player?.playbackParameters?.speed
 
     override fun getCurrentVolume() = player?.volume

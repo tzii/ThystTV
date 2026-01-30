@@ -766,4 +766,9 @@
     <string name="streamer_loyalty" translatable="false">Streamer Loyalty</string>
     <string name="top_watched_channels" translatable="false">Top Watched Channels</string>
     <string name="days_streak" translatable="false">days</string>
+    <string name="speed_normal" translatable="false">Normal</string>
+    <string name="speed_decrease" translatable="false">Decrease speed</string>
+    <string name="speed_increase" translatable="false">Increase speed</string>
+    <string name="seek_forward" translatable="false">Fast Forward</string>
+    <string name="seek_backward" translatable="false">Rewind</string>
 </resources>

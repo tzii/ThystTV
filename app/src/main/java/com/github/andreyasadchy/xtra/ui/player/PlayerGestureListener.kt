@@ -7,10 +7,11 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
-import com.google.android.material.slider.Slider
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.util.gone
 import com.github.andreyasadchy.xtra.util.visible
+import com.google.android.material.progressindicator.LinearProgressIndicator
+import kotlin.math.abs
 
 interface PlayerGestureCallback {
     val isPortrait: Boolean
@@ -19,6 +20,7 @@ interface PlayerGestureCallback {
     val screenWidth: Int
     val screenHeight: Int
     val windowAttributes: android.view.WindowManager.LayoutParams
+    val isEdgeSwipe: Boolean
     
     fun setWindowAttributes(params: android.view.WindowManager.LayoutParams)
     fun showController()
@@ -28,6 +30,14 @@ interface PlayerGestureCallback {
     fun getGestureFeedbackView(): View
     fun getHideGestureRunnable(): Runnable
     fun isControllerHideOnTouch(): Boolean
+
+    // New methods for split-screen gestures
+    fun getPlayerVideoType(): String?
+    fun getCurrentPosition(): Long?
+    fun getDuration(): Long
+    fun seek(position: Long)
+    fun setPlaybackSpeed(speed: Float)
+    fun getCurrentSpeed(): Float?
 }
 
 class PlayerGestureListener(
@@ -36,27 +46,39 @@ class PlayerGestureListener(
     private val doubleTapEnabled: Boolean
 ) : GestureDetector.SimpleOnGestureListener() {
 
+    private val helper = PlayerGestureHelper(context)
     private var isVolume = false
     private var isBrightness = false
+    private var isSeek = false
+    private var isSpeed = false
     private var startVolume = 0
     private var startBrightness = 0f
+    private var startPosition = 0L
+    private var startSpeed = 1f
     private var gestureStartY = 0f
+    private var gestureStartX = 0f
+    private var duration = 0L
 
     override fun onDown(e: MotionEvent): Boolean {
         isVolume = false
         isBrightness = false
+        isSeek = false
+        isSpeed = false
         gestureStartY = e.y
+        gestureStartX = e.x
         return true
     }
 
     override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-        if (e1 == null || callback.isPortrait || !callback.isMaximized || callback.isControlsVisible) return false
+        // Block all gestures when touch started in edge zone (system gesture area)
+        if (e1 == null || callback.isPortrait || !callback.isMaximized || callback.isControlsVisible || callback.isEdgeSwipe) return false
         
         val width = callback.screenWidth.toFloat()
         val height = callback.screenHeight.toFloat()
         
-        if (!isVolume && !isBrightness) {
-             if (Math.abs(distanceY) > Math.abs(distanceX)) {
+        if (!isVolume && !isBrightness && !isSeek && !isSpeed) {
+             if (abs(distanceY) > abs(distanceX)) {
+                 // Vertical Swipes
                  if (e1.x < width / 2) {
                      isBrightness = true
                      startBrightness = callback.windowAttributes.screenBrightness
@@ -66,17 +88,33 @@ class PlayerGestureListener(
                      val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                      startVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                  }
+             } else {
+                 // Horizontal Swipes (VoD only)
+                 if (callback.getPlayerVideoType() != PlayerFragment.STREAM) {
+                     if (e1.y < height / 2) {
+                         // Top 50% -> Seek
+                         isSeek = true
+                         startPosition = callback.getCurrentPosition() ?: 0L
+                         duration = callback.getDuration()
+                     } else {
+                         // Bottom 50% -> Speed
+                         isSpeed = true
+                         startSpeed = callback.getCurrentSpeed() ?: 1f
+                     }
+                 }
              }
         }
 
-        val percent = (gestureStartY - e2.y) / height
+        val percentY = (gestureStartY - e2.y) / height
+        val percentX = (e2.x - gestureStartX) / width // Left to Right is positive
+        
         val feedback = callback.getGestureFeedbackView()
-        val icon = feedback.findViewById<ImageView>(R.id.volumeMute)
-        val slider = feedback.findViewById<Slider>(R.id.volumeBar)
-        val text = feedback.findViewById<TextView>(R.id.volumeText)
+        val icon = feedback.findViewById<ImageView>(R.id.feedbackIcon)
+        val progress = feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)
+        val text = feedback.findViewById<TextView>(R.id.feedbackText)
 
         if (isBrightness) {
-            val newBrightness = (startBrightness + percent).coerceIn(0.01f, 1.0f)
+            val newBrightness = (startBrightness + percentY).coerceIn(0.01f, 1.0f)
             val lp = callback.windowAttributes
             lp.screenBrightness = newBrightness
             callback.setWindowAttributes(lp)
@@ -84,26 +122,71 @@ class PlayerGestureListener(
             icon.setImageResource(R.drawable.ic_brightness_medium_black_24dp)
             feedback.visible()
             feedback.removeCallbacks(callback.getHideGestureRunnable())
-            feedback.postDelayed(callback.getHideGestureRunnable(), 1000)
+            feedback.postDelayed(callback.getHideGestureRunnable(), 800)
             
-            slider.value = newBrightness * 100
-            text.text = "%d".format((newBrightness * 100).toInt())
+            progress.progress = (newBrightness * 100).toInt()
+            text.text = "%d%%".format((newBrightness * 100).toInt())
             return true
         }
         
         if (isVolume) {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val newVolume = (startVolume + (percent * maxVolume)).toInt().coerceIn(0, maxVolume)
+            val newVolume = (startVolume + (percentY * maxVolume)).toInt().coerceIn(0, maxVolume)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
             
-            icon.setImageResource(R.drawable.baseline_volume_up_black_24)
+            icon.setImageResource(if (newVolume == 0) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24)
             feedback.visible()
             feedback.removeCallbacks(callback.getHideGestureRunnable())
-            feedback.postDelayed(callback.getHideGestureRunnable(), 1000)
+            feedback.postDelayed(callback.getHideGestureRunnable(), 800)
             
-            slider.value = (newVolume.toFloat() / maxVolume.toFloat()) * 100
-            text.text = "%d".format((slider.value).toInt())
+            progress.progress = ((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt()
+            text.text = "%d".format(((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt())
+            return true
+        }
+
+        if (isSeek) {
+            if (duration > 0) {
+                // Seek logic: 90 seconds per screen width swipe
+                val seekAmount = (percentX * 90000).toLong() 
+                val newPosition = (startPosition + seekAmount).coerceIn(0, duration)
+                callback.seek(newPosition)
+
+                icon.setImageResource(if (seekAmount > 0) R.drawable.baseline_add_black_24 else R.drawable.baseline_remove_black_24)
+                
+                feedback.visible()
+                feedback.removeCallbacks(callback.getHideGestureRunnable())
+                feedback.postDelayed(callback.getHideGestureRunnable(), 800)
+                
+                progress.progress = ((newPosition.toFloat() / duration.toFloat()) * 100).toInt()
+                text.text = "${helper.formatDuration(newPosition)} / ${helper.formatDuration(duration)}"
+                // Adjust text width for long duration strings if needed
+                text.layoutParams.width = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            return true
+        }
+
+        if (isSpeed) {
+            // Speed logic: 0.05x increments
+            // Swipe full width = 1.0x change?
+            val speedChange = (percentX * 2.0f) // Sensitivity
+            // Round to nearest 0.05
+            var newSpeed = startSpeed + speedChange
+            newSpeed = (Math.round(newSpeed * 20) / 20.0f).coerceIn(0.25f, 4.0f)
+            
+            if (newSpeed != callback.getCurrentSpeed()) {
+                callback.setPlaybackSpeed(newSpeed)
+            }
+
+            icon.setImageResource(R.drawable.baseline_speed_black_24)
+            feedback.visible()
+            feedback.removeCallbacks(callback.getHideGestureRunnable())
+            feedback.postDelayed(callback.getHideGestureRunnable(), 800)
+            
+            // Map 0.25-4.0 to 0-100 progress
+            val progressVal = ((newSpeed - 0.25f) / (4.0f - 0.25f) * 100).toInt()
+            progress.progress = progressVal
+            text.text = "%.2fx".format(newSpeed)
             return true
         }
 

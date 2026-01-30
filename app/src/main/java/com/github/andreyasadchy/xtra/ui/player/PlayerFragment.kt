@@ -134,6 +134,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var startTranslationX = 0f
     private var startTranslationY = 0f
     private var statusBarSwipe = false
+    override var isEdgeSwipe = false
+    private var gestureInsets: androidx.core.graphics.Insets? = null
     private var chatStatusBarSwipe = false
     private var isAnimating = false
     private var moveAnimation: ViewPropertyAnimator? = null
@@ -168,15 +170,17 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     open fun startVideo(url: String?, playbackPosition: Long?, multivariantPlaylist: Boolean) {}
     open fun startClip(url: String?) {}
     open fun startOfflineVideo(url: String?, position: Long) {}
-    open fun getCurrentPosition(): Long? = null
-    open fun getCurrentSpeed(): Float? = null
+    override fun getPlayerVideoType() = videoType
+    override fun getCurrentPosition(): Long? = null
+    override fun getDuration(): Long = 0L
+    override fun getCurrentSpeed(): Float? = null
     open fun getCurrentVolume(): Float? = null
     open fun playPause() {}
     open fun rewind() {}
     open fun fastForward() {}
-    open fun seek(position: Long) {}
+    override fun seek(position: Long) {}
     open fun seekToLivePosition() {}
-    open fun setPlaybackSpeed(speed: Float) {}
+    override fun setPlaybackSpeed(speed: Float) {}
     open fun changeVolume(volume: Float) {}
     override fun updateProgress() {}
     open fun toggleAudioCompressor() {}
@@ -262,6 +266,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
                 chatLayout.updatePadding(bottom = insets.bottom)
+                // Capture system gesture insets for edge detection
+                gestureInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures())
                 WindowInsetsCompat.CONSUMED
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && requireActivity().packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
@@ -295,6 +301,28 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 requireContext(),
                 PlayerGestureListener(requireContext(), this@PlayerFragment, doubleTap)
             )
+
+            // Edge zone detection for system gesture areas
+            val defaultEdgeThreshold = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 30f, resources.displayMetrics
+            ).toInt()
+            
+            fun isInEdgeZone(x: Float, y: Float): Boolean {
+                val width = playerLayout.width
+                val height = playerLayout.height
+                val insets = gestureInsets
+                
+                // Use system gesture insets if available, otherwise use fallback
+                val leftEdge = insets?.left?.takeIf { it > 0 } ?: defaultEdgeThreshold
+                val rightEdge = insets?.right?.takeIf { it > 0 } ?: defaultEdgeThreshold
+                val topEdge = insets?.top?.takeIf { it > 0 } ?: defaultEdgeThreshold
+                val bottomEdge = insets?.bottom?.takeIf { it > 0 } ?: defaultEdgeThreshold
+                
+                return x <= leftEdge || 
+                       x >= (width - rightEdge) || 
+                       y <= topEdge || 
+                       y >= (height - bottomEdge)
+            }
 
             fun downAction(event: MotionEvent) {
                 moveAnimation?.cancel()
@@ -449,6 +477,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             lastX = x * slidingLayout.scaleX
                             lastY = y * slidingLayout.scaleY
                             statusBarSwipe = !isPortrait && y <= 100
+                            isEdgeSwipe = !isPortrait && isInEdgeZone(x, y)
                             downAction(event)
                         }
                         MotionEvent.ACTION_POINTER_DOWN -> {
@@ -462,35 +491,42 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     lastX = x * slidingLayout.scaleX
                                     lastY = y * slidingLayout.scaleY
                                     statusBarSwipe = !isPortrait && y <= 100
+                                    isEdgeSwipe = !isPortrait && isInEdgeZone(x, y)
                                     downAction(event)
                                 }
                             }
                         }
                         MotionEvent.ACTION_MOVE -> {
                             if (isMaximized) {
-                                playerControls.root.dispatchTouchEvent(event)
-                                if (!playerControls.progressBar.isPressed && !statusBarSwipe && activePointerId != -1 && playerControls.root.isVisible) {
-                                    val pointerIndex = event.findPointerIndex(activePointerId)
-                                    if (pointerIndex != -1) {
-                                        val y = event.getY(pointerIndex)
-                                        val translationY = y - lastY
-                                        if (slidingLayout.translationY + translationY < 0) {
-                                            slidingLayout.translationY = 0f
-                                            lastY = y
-                                        } else {
-                                            slidingLayout.translationY += translationY
-                                            lastY = y - translationY
-                                        }
-                                        if (slidingLayout.translationY < touchSlop) {
-                                            if (!backgroundVisible) {
-                                                enableBackground()
+                                if (playerControls.root.isVisible) {
+                                    // Controls visible: dispatch to controls and handle minimize gesture
+                                    playerControls.root.dispatchTouchEvent(event)
+                                    if (!playerControls.progressBar.isPressed && !statusBarSwipe && activePointerId != -1) {
+                                        val pointerIndex = event.findPointerIndex(activePointerId)
+                                        if (pointerIndex != -1) {
+                                            val y = event.getY(pointerIndex)
+                                            val translationY = y - lastY
+                                            if (slidingLayout.translationY + translationY < 0) {
+                                                slidingLayout.translationY = 0f
+                                                lastY = y
+                                            } else {
+                                                slidingLayout.translationY += translationY
+                                                lastY = y - translationY
                                             }
-                                        } else {
-                                            if (backgroundVisible) {
-                                                disableBackground()
+                                            if (slidingLayout.translationY < touchSlop) {
+                                                if (!backgroundVisible) {
+                                                    enableBackground()
+                                                }
+                                            } else {
+                                                if (backgroundVisible) {
+                                                    disableBackground()
+                                                }
                                             }
                                         }
                                     }
+                                } else {
+                                    // Controls hidden: let gesture detector handle scroll gestures
+                                    controllerTapDetector.onTouchEvent(event)
                                 }
                             } else {
                                 if (activePointerId != -1) {
@@ -1296,15 +1332,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun showSpeedDialog() {
         val speed = getCurrentSpeed()
         if (speed != null) {
-            val speedList = prefs.getString(C.PLAYER_SPEED_LIST, "0.25\n0.5\n0.75\n1.0\n1.25\n1.5\n1.75\n2.0\n3.0\n4.0\n8.0")?.split("\n")
-            if (speedList != null) {
-                RadioButtonDialogFragment.newInstance(
-                    REQUEST_CODE_SPEED,
-                    speedList,
-                    null,
-                    speedList.indexOf(speed.toString())
-                ).show(childFragmentManager, "closeOnPip")
-            }
+            PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
         }
     }
 
