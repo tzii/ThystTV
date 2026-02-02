@@ -19,7 +19,7 @@ class GridRecyclerView : RecyclerView {
     private val prefs = context.prefs()
     private val material3 = prefs.getBoolean(C.UI_THEME_MATERIAL3, true)
     private val portraitColumns = prefs.getString(C.PORTRAIT_COLUMN_COUNT, "1")!!.toInt()
-    private val landscapeColumns = prefs.getString(C.LANDSCAPE_COLUMN_COUNT, "2")!!.toInt()
+    private val userLandscapeColumns = prefs.getString(C.LANDSCAPE_COLUMN_COUNT, "2")!!.toInt()
 
     private val gridLayoutManager: GridLayoutManager
 
@@ -44,7 +44,13 @@ class GridRecyclerView : RecyclerView {
         return if (configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
             portraitColumns
         } else {
-            landscapeColumns
+            // For landscape, ensure at least 2 columns for better use of space
+            // On tablets (sw600dp+), respect user setting or use at least 3
+            val smallestWidth = configuration.smallestScreenWidthDp
+            when {
+                smallestWidth >= 600 -> maxOf(userLandscapeColumns, 3) // Tablets: at least 3 columns
+                else -> maxOf(userLandscapeColumns, 2) // Phones: at least 2 columns in landscape
+            }
         }
     }
 

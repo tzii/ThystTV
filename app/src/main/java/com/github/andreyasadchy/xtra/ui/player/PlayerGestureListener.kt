@@ -57,6 +57,7 @@ class PlayerGestureListener(
     private var isSeek = false
     private var isSpeed = false
     private var hasNotifiedGestureStart = false
+    private var isScrolling = false  // Track if a scroll gesture is in progress
     private var startVolume = 0
     private var startBrightness = 0f
     private var startPosition = 0L
@@ -75,6 +76,7 @@ class PlayerGestureListener(
         isBrightness = false
         isSeek = false
         isSpeed = false
+        isScrolling = false  // Reset scrolling flag on new gesture
         gestureStartY = e.y
         gestureStartX = e.x
         return true
@@ -118,6 +120,7 @@ class PlayerGestureListener(
              }
              // Notify that we've claimed this gesture (prevents minimize gesture from triggering)
              if (isVolume || isBrightness || isSeek || isSpeed) {
+                 isScrolling = true  // Mark that we're in a scroll gesture
                  if (!hasNotifiedGestureStart) {
                      callback.onSwipeGestureStarted()
                      hasNotifiedGestureStart = true
@@ -222,6 +225,9 @@ class PlayerGestureListener(
     }
 
     override fun onSingleTapUp(e: MotionEvent): Boolean {
+        // Don't trigger tap if a scroll gesture occurred
+        if (isScrolling) return false
+        
         return if (!doubleTapEnabled || callback.isPortrait) {
             handleSingleTap()
             true
@@ -231,6 +237,9 @@ class PlayerGestureListener(
     }
 
     override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+        // Don't trigger tap if a scroll gesture occurred
+        if (isScrolling) return false
+        
         return if (doubleTapEnabled && !callback.isPortrait) {
             handleSingleTap()
             true
