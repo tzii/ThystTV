@@ -8,6 +8,25 @@ A fork of [Xtra](https://github.com/crackededed/Xtra) with additional features f
 
 > **Note:** This fork is experimental and mostly vibe coded. Features are tested manually but may have rough edges. Contributions and bug reports welcome!
 
+## Known Issues & TODO
+
+### Gesture System (In Progress)
+The gesture system is functional but has some edge cases that need refinement:
+
+- [ ] **Tap sensitivity after scroll**: Sometimes a tap immediately after a scroll gesture doesn't register
+- [ ] **Gesture zone boundaries**: The split between top/bottom zones for seek/speed could be more forgiving
+- [ ] **Minimize gesture conflicts**: While mostly fixed, there may still be edge cases where minimize interferes with other gestures
+- [ ] **Haptic feedback**: Add haptic feedback for gesture actions
+- [ ] **Settings integration**: Allow users to customize gesture sensitivity and zone sizes
+
+### Stats & Analytics
+- [ ] **Category breakdown**: Stats are now tracked but the UI doesn't show category breakdown yet
+- [ ] **Data visualization**: Add charts/graphs for watch time trends
+
+### General
+- [ ] **Testing coverage**: Add more automated tests for gesture handling
+- [ ] **Documentation**: Document gesture system architecture for contributors
+
 ## What's Different from Xtra?
 
 | Feature | Xtra | ThystTV |
@@ -33,7 +52,11 @@ A fork of [Xtra](https://github.com/crackededed/Xtra) with additional features f
 *   **Intuitive Control**: Easily adjust settings without blocking the view.
 *   **Volume**: Slide up/down on the **right** half of the screen.
 *   **Brightness**: Slide up/down on the **left** half of the screen.
+*   **Seek** (VoD only): Horizontal swipe on the **top half** of the screen.
+*   **Playback Speed** (VoD only): Horizontal swipe on the **bottom half** of the screen.
 *   **Visual Feedback**: Real-time slider overlay during adjustment.
+*   **Edge Protection**: Gestures are disabled in system gesture zones to prevent conflicts.
+*   **Double-Tap**: Cycle through chat display modes (overlay, side-by-side, hidden).
 
 ## Building
 
