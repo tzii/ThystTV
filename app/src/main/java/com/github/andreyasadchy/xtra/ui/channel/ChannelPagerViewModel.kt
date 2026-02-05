@@ -266,30 +266,32 @@ class ChannelPagerViewModel @Inject constructor(
         if (_isFollowing.value == null) {
             viewModelScope.launch {
                 try {
-                    if (setting == 0 && userId != channelId) {
-                        try {
-                            if (gqlHeaders[C.HEADER_TOKEN].isNullOrBlank()) throw Exception()
-                            val follower = graphQLRepository.loadQueryFollowingUser(
-                                networkLibrary = networkLibrary,
-                                headers = gqlHeaders,
-                                id = channelId,
-                                login = channelLogin.takeIf { channelId.isNullOrBlank() },
-                            ).data?.user?.self?.follower
-                            _isFollowing.value = follower?.followedAt != null
-                            _notificationsEnabled.value = follower?.notificationSettings?.isEnabled == true
-                        } catch (e: Exception) {
-                            val following = helixRepository.getUserFollows(
-                                networkLibrary = networkLibrary,
-                                headers = helixHeaders,
-                                userId = userId,
-                                targetId = channelId,
-                            ).data.firstOrNull()?.channelId == channelId
-                            _isFollowing.value = following
-                            _notificationsEnabled.value = channelId?.let { notificationUsersRepository.getByUserId(it) } != null
+                    if (!channelId.isNullOrBlank()) {
+                        if (setting == 0 && !userId.isNullOrBlank() && userId != channelId) {
+                            try {
+                                if (gqlHeaders[C.HEADER_TOKEN].isNullOrBlank()) throw Exception()
+                                val follower = graphQLRepository.loadQueryFollowingUser(
+                                    networkLibrary = networkLibrary,
+                                    headers = gqlHeaders,
+                                    id = channelId,
+                                    login = channelLogin.takeIf { channelId.isBlank() },
+                                ).data?.user?.self?.follower
+                                _isFollowing.value = follower?.followedAt != null
+                                _notificationsEnabled.value = follower?.notificationSettings?.isEnabled == true
+                            } catch (e: Exception) {
+                                val following = helixRepository.getUserFollows(
+                                    networkLibrary = networkLibrary,
+                                    headers = helixHeaders,
+                                    userId = userId,
+                                    targetId = channelId,
+                                ).data.firstOrNull()?.channelId == channelId
+                                _isFollowing.value = following
+                                _notificationsEnabled.value = notificationUsersRepository.getByUserId(channelId) != null
+                            }
+                        } else {
+                            _isFollowing.value = localFollowsChannel.getFollowByUserId(channelId) != null
+                            _notificationsEnabled.value = notificationUsersRepository.getByUserId(channelId) != null
                         }
-                    } else {
-                        _isFollowing.value = channelId?.let { localFollowsChannel.getFollowByUserId(it) } != null
-                        _notificationsEnabled.value = channelId?.let { notificationUsersRepository.getByUserId(it) } != null
                     }
                 } catch (e: Exception) {
 
