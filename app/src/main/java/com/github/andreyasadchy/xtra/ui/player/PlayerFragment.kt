@@ -88,7 +88,6 @@ import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.isKeyboardShown
-import com.github.andreyasadchy.xtra.util.isMeteredConnection
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -106,7 +105,7 @@ import kotlin.math.max
 abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment.OnSortOptionChanged, IntegrityDialog.CallbackListener, PlayerGestureCallback {
 
     private var _binding: FragmentPlayerBinding? = null
-    private val hideGestureRunnable = Runnable { binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.gone() }
+    private val hideGestureRunnable = Runnable { binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.apply { visibility = View.GONE } }
     protected val binding get() = _binding!!
     protected val viewModel: PlayerViewModel by viewModels()
     protected var chatFragment: ChatFragment? = null
@@ -1176,7 +1175,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 // Hide floating chat in portrait mode
                 if (isFloatingChatEnabled) {
                     isFloatingChatEnabled = false
-                    floatingChatRoot.gone()
+                    floatingChatRoot.visibility = View.GONE
                     // Reparent chat view back to sidebar (don't recreate fragment)
                     reparentChatView(toFloating = false)
                 }
@@ -1311,16 +1310,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         aspectRatio.setOnClickListener { setResizeMode() }
                     }
                     if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true) && !prefs.getBoolean(C.CHAT_DISABLE, false)) {
-                        toggleChat.visible()
+                        toggleChat.visibility = View.VISIBLE
                         updateChatButtonIcon()
                         
                         toggleChat.setOnClickListener { 
                             cycleChatMode()
                             updateChatButtonIcon()
                         }
-                    }
-                    // Separate floating chat button is now hidden as functionality is merged
-                    toggleFloatingChat.gone()
+                        }
+                        // Separate floating chat button is now hidden as functionality is merged
+                        toggleFloatingChat.visibility = View.GONE
                 }
             }
         }
@@ -1430,7 +1429,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         hideChatLayout()
         if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true)) {
             binding.playerControls.toggleChat.apply {
-                visible()
+                visibility = View.VISIBLE
                 updateChatButtonIcon()
             }
         }
@@ -1442,7 +1441,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         showChatLayout()
         if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true)) {
             binding.playerControls.toggleChat.apply {
-                visible()
+                visibility = View.VISIBLE
                 updateChatButtonIcon()
             }
         }
@@ -1534,9 +1533,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         binding.playerControls.title.apply {
             if (!title.isNullOrBlank() && prefs.getBoolean(C.PLAYER_TITLE, true)) {
                 text = title.trim()
-                visible()
+                visibility = View.VISIBLE
                 setOnClickListener {
-                    requireContext().toast(title.trim())
+                    Toast.makeText(requireContext(), title.trim(), Toast.LENGTH_SHORT).show()
                 }
             } else {
                 text = null
@@ -1618,30 +1617,29 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     protected fun setDefaultQuality() {
-        val defaultQuality = prefs.getString(C.PLAYER_DEFAULTQUALITY, "saved")?.substringBefore(" ")
-        val isDataSaver = prefs.getBoolean(C.PLAYER_DATA_SAVER, true)
-        val isMetered = requireContext().isMeteredConnection
-
-        viewModel.quality = if (isDataSaver && isMetered && !viewModel.userHasChangedQuality) {
-             requireContext().shortToast(R.string.data_saver_mode)
-             findQuality("480p") ?: findQuality("360p") ?: viewModel.qualities.entries.firstOrNull()?.key
+        val connectivityManager = requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networkCapabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+        val cellular = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+        val defaultQuality = if (cellular) {
+            prefs.getString(C.PLAYER_DEFAULT_CELLULAR_QUALITY, "saved")
         } else {
-            when (defaultQuality) {
-                "saved" -> {
-                    val savedQuality = prefs.getString(C.PLAYER_QUALITY, "720p60")?.substringBefore(" ")
-                    when (savedQuality) {
-                        AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
-                        AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
-                        CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
-                        else -> findQuality(savedQuality)
-                    }
+            prefs.getString(C.PLAYER_DEFAULTQUALITY, "saved")
+        }?.substringBefore(" ")
+        viewModel.quality = when (defaultQuality) {
+            "saved" -> {
+                val savedQuality = prefs.getString(C.PLAYER_QUALITY, "720p60")?.substringBefore(" ")
+                when (savedQuality) {
+                    AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
+                    AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
+                    CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
+                    else -> findQuality(savedQuality)
                 }
-                AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
-                "Source" -> viewModel.qualities.entries.find { it.key != AUTO_QUALITY }?.key
-                AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
-                CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
-                else -> findQuality(defaultQuality)
             }
+            AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
+            "Source" -> viewModel.qualities.entries.find { it.key != AUTO_QUALITY }?.key
+            AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
+            CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
+            else -> findQuality(defaultQuality)
         } ?: viewModel.qualities.entries.firstOrNull()?.key
     }
 
@@ -1700,7 +1698,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             override fun onAnimationStart(animation: Animator) {
                                 controllerIsAnimating = true
                                 if (view != null) {
-                                    binding.playerControls.root.visible()
+                                    binding.playerControls.root.visibility = View.VISIBLE
                                     updateChatButtonIcon()
                                 }
                             }
@@ -1731,7 +1729,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 controllerAnimation?.cancel()
                 binding.playerControls.root.removeCallbacks(controllerHideAction)
                 binding.playerControls.root.alpha = 1f
-                binding.playerControls.root.visible()
+                binding.playerControls.root.visibility = View.VISIBLE
                 updateChatButtonIcon()
                 // Also show floating chat controls if floating chat is active
                 if (isFloatingChatEnabled) {
@@ -1774,7 +1772,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (force) {
                 controllerAnimation?.cancel()
                 binding.playerControls.root.alpha = 0f
-                binding.playerControls.root.gone()
+                binding.playerControls.root.visibility = View.GONE
                 // Also hide floating chat controls if floating chat is active
                 if (isFloatingChatEnabled) {
                     binding.dragHandleZone.alpha = 0f
@@ -2190,7 +2188,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             restoreBrightness()
             // Hide floating chat when minimizing - it should only appear in fullscreen
             if (isFloatingChatEnabled) {
-                floatingChatRoot.gone()
+                floatingChatRoot.visibility = View.GONE
             }
             if (videoType == STREAM && chatFragment?.emoteMenuIsVisible() == true) {
                 chatFragment?.toggleBackPressedCallback(false)
@@ -2276,7 +2274,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 hideStatusBar()
                 // Show floating chat again if it was enabled
                 if (isFloatingChatEnabled) {
-                    floatingChatRoot.visible()
+                    floatingChatRoot.visibility = View.VISIBLE
                 } else if (isChatOpen) {
                     showChatLayout()
                 }
@@ -2790,7 +2788,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         } else {
             // Floating -> Hide chat completely
             isFloatingChatEnabled = false
-            binding.floatingChatRoot.gone()
+            binding.floatingChatRoot.visibility = View.GONE
             // Move chat view back to sidebar container (reparent, don't recreate)
             reparentChatView(toFloating = false)
             isChatOpen = false
@@ -2809,13 +2807,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
         if (isFloatingChatEnabled) {
             // Hide sidebar chat and reset player margin
-            binding.chatLayout.gone()
+            binding.chatLayout.visibility = View.GONE
             binding.playerLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                 marginEnd = 0
             }
             // Show with fade-in animation
             binding.floatingChatRoot.alpha = 0f
-            binding.floatingChatRoot.visible()
+            binding.floatingChatRoot.visibility = View.VISIBLE
             binding.floatingChatRoot.animate().alpha(1f).setDuration(200).start()
             // Start with drag handle hidden (synced with player controls)
             binding.dragHandleZone.alpha = if (binding.playerControls.root.isVisible) 1f else 0f
@@ -2829,7 +2827,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         } else {
             // Hide with fade-out animation
             binding.floatingChatRoot.animate().alpha(0f).setDuration(200)
-                .withEndAction { binding.floatingChatRoot.gone() }.start()
+                .withEndAction { binding.floatingChatRoot.visibility = View.GONE }.start()
             // Restore sidebar chat with proper layout
             isChatOpen = true
             showChatLayout()

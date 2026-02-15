@@ -313,7 +313,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         send.setOnClickListener { sendMessage() }
                         if (isFloatingMode ||
                             ((view.parent?.parent?.parent?.parent as? View)?.id == R.id.slidingLayout && !requireContext().prefs().getBoolean(C.KEY_CHAT_BAR_VISIBLE, true))) {
-                            messageView.gone()
+                            messageView.visibility = View.GONE
                         } else {
                             messageView.visibility = View.VISIBLE
                         }

@@ -9,8 +9,6 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import com.github.andreyasadchy.xtra.R
-import com.github.andreyasadchy.xtra.util.gone
-import com.github.andreyasadchy.xtra.util.visible
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import kotlin.math.abs
 
@@ -172,7 +170,7 @@ class PlayerGestureListener(
             callback.setWindowAttributes(lp)
             
             icon.setImageResource(R.drawable.ic_brightness_medium_black_24dp)
-            feedback.visible()
+            feedback.visibility = View.VISIBLE
             feedback.removeCallbacks(callback.getHideGestureRunnable())
             feedback.postDelayed(callback.getHideGestureRunnable(), 800)
             
@@ -193,7 +191,7 @@ class PlayerGestureListener(
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
             
             icon.setImageResource(if (newVolume == 0) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24)
-            feedback.visible()
+            feedback.visibility = View.VISIBLE
             feedback.removeCallbacks(callback.getHideGestureRunnable())
             feedback.postDelayed(callback.getHideGestureRunnable(), 800)
             
@@ -212,7 +210,7 @@ class PlayerGestureListener(
 
                 icon.setImageResource(if (seekAmount > 0) R.drawable.baseline_add_black_24 else R.drawable.baseline_remove_black_24)
                 
-                feedback.visible()
+                feedback.visibility = View.VISIBLE
                 feedback.removeCallbacks(callback.getHideGestureRunnable())
                 feedback.postDelayed(callback.getHideGestureRunnable(), 800)
                 
@@ -237,7 +235,7 @@ class PlayerGestureListener(
             }
 
             icon.setImageResource(R.drawable.baseline_speed_black_24)
-            feedback.visible()
+            feedback.visibility = View.VISIBLE
             feedback.removeCallbacks(callback.getHideGestureRunnable())
             feedback.postDelayed(callback.getHideGestureRunnable(), 800)
             
