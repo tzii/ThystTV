@@ -53,7 +53,6 @@
     <string name="permission_denied">Izin yang diperlukan ditolak</string>
     <string name="nothing_here">Kosong</string>
     <string name="watch_live">Tonton Langsung</string>
-    <string name="watch_rerun">Tonton siaran ulang</string>
     <string name="open_player">Buka pemutar</string>
     <string name="error_stream">Terjadi kesalahan saat memuat stream</string>
     <string name="dark">Gelap</string>
@@ -107,11 +106,8 @@
     <string name="playback_will_stop_hours_minutes">Pemutar akan berhenti dalam %1$s %2$s</string>
     <string name="timer_canceled">Pengatur waktu telah dibatalkan</string>
     <string name="trouble_logging_in">Mengalami masalah saat mecoba masuk?</string>
-    <string name="login_problem_solution">"Anda bisa masuk menggunakan browser eksternal. Setelah anda klik \"Authorize\", akan muncul halaman eror. Salin urlnya, kembali ke sini dan klik tombol \"Masukkan url\". Tempel urlnya dan klik \"masuk\" "</string>
     <string name="no_browser_found">Tidak ditemukan aplikasi browser</string>
     <string name="error">Kesalahan: %s</string>
-    <string name="to_enter_url">Masukkan url</string>
-    <string name="enter_url">Masukkan url</string>
     <string name="invalid_url">Url tidak sah</string>
     <string name="sort_and_order">Urutan: %1$s. Order: %2$s</string>
     <string name="alphabetically">Menurut abjad</string>
@@ -146,7 +142,6 @@
     <string name="video_type_archive">Siaran terakhir</string>
     <string name="video_type_highlight">Sorotan</string>
     <string name="video_type_upload">Unggahan</string>
-    <string name="video_type_rerun">Pemutaran ulang</string>
     <string name="all">Semua</string>
     <string name="type">Tipe</string>
     <string name="room_emote">Emote</string>
@@ -727,4 +722,14 @@
     <string name="default_cellular_quality">Default player quality on cellular network</string>
     <string name="player">Player</string>
     <string name="compact_number_formatting">Compact number formatting</string>
+    <string name="less_rounded_corners">Less rounded</string>
+    <string name="reduced_padding">Reduced padding</string>
+    <string name="compact_text">Compact text</string>
+    <string name="next">Next</string>
+    <string name="tv_login_message">To get access to all features, you need to login as an Android TV device.\n\nFollow these steps:\n• Copy the code shown on the web page.\n• Press the \"Next\" button at the bottom.\n• Enter the code and press \"Activate\".\n• Press \"Authorize\".</string>
+    <string name="open_url">Open URL</string>
+    <string name="external_login_message">You can log in using an external browser.\n\nFollow these steps:\n• Press \"Open URL\" to open the login page.\n• Login to your account and press \"Authorize\".\n• A page with an error should appear. Copy the URL of that page, paste the URL into the box below and press \"OK\".</string>
+    <string name="loading">Loading...</string>
+    <string name="copy_code">Copy code</string>
+    <string name="external_tv_login_message">To get access to all features, you need to login as an Android TV device.\n\nFollow these steps:\n• Copy the code shown on the screen.\n• Press the \"Open URL\" button.\n• Enter the code and press \"Activate\".\n• Press \"Authorize\".\n• Return to Xtra and press \"Next\".</string>
 </resources>

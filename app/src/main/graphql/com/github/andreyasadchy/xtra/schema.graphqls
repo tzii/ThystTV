@@ -171,6 +171,7 @@ type FollowerConnection {
 }
 
 type FollowerEdge {
+    followedAt: Time
     notificationSettings: ChannelNotificationSettings
 }
 
@@ -185,6 +186,7 @@ type Game {
     displayName: String
     followersCount: Int
     id: ID
+    self: GameSelfConnection
     slug: String
     streams(first: Int, after: Cursor, options: GameStreamOptions): StreamConnection
     tags(tagType: TagType!): [Tag!]
@@ -200,6 +202,14 @@ type GameConnection {
 type GameEdge {
     cursor: Cursor
     node: Game
+}
+
+type GameFollow {
+    followedAt: Time
+}
+
+type GameSelfConnection {
+    follow: GameFollow
 }
 
 type GlobalCheerConfig {
@@ -288,7 +298,6 @@ type Stream {
     id: ID
     previewImageURL: String
     title: String
-    type: String
     viewersCount: Int
 }
 

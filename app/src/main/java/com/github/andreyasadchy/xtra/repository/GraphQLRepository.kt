@@ -1,7 +1,6 @@
 package com.github.andreyasadchy.xtra.repository
 
 import android.net.http.HttpEngine
-import android.net.http.UrlResponseInfo
 import android.os.Build
 import android.os.ext.SdkExtensions
 import com.apollographql.apollo.api.ApolloResponse
@@ -23,6 +22,8 @@ import com.github.andreyasadchy.xtra.SearchChannelsQuery
 import com.github.andreyasadchy.xtra.SearchGamesQuery
 import com.github.andreyasadchy.xtra.SearchStreamsQuery
 import com.github.andreyasadchy.xtra.SearchVideosQuery
+import com.github.andreyasadchy.xtra.SelfFollowingGameQuery
+import com.github.andreyasadchy.xtra.SelfFollowingUserQuery
 import com.github.andreyasadchy.xtra.StreamPlaybackAccessTokenQuery
 import com.github.andreyasadchy.xtra.TagQuery
 import com.github.andreyasadchy.xtra.TeamLiveMembersQuery
@@ -70,8 +71,6 @@ import com.github.andreyasadchy.xtra.model.gql.followed.FollowedChannelsResponse
 import com.github.andreyasadchy.xtra.model.gql.followed.FollowedGamesResponse
 import com.github.andreyasadchy.xtra.model.gql.followed.FollowedStreamsResponse
 import com.github.andreyasadchy.xtra.model.gql.followed.FollowedVideosResponse
-import com.github.andreyasadchy.xtra.model.gql.followed.FollowingGameResponse
-import com.github.andreyasadchy.xtra.model.gql.followed.FollowingUserResponse
 import com.github.andreyasadchy.xtra.model.gql.game.GameClipsResponse
 import com.github.andreyasadchy.xtra.model.gql.game.GameStreamsResponse
 import com.github.andreyasadchy.xtra.model.gql.game.GameVideosResponse
@@ -146,7 +145,7 @@ class GraphQLRepository @Inject constructor(
         }
         when {
             networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                val response = suspendCoroutine { continuation ->
                     httpEngine.get().newUrlRequestBuilder("https://gql.twitch.tv/gql/", cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).apply {
                         headers.forEach { addHeader(it.key, it.value) }
                         addHeader("Content-Type", "application/json")
@@ -170,7 +169,7 @@ class GraphQLRepository @Inject constructor(
                         query.parseResponse(it)
                     }
                 } else {
-                    val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                    val response = suspendCoroutine { continuation ->
                         cronetEngine.get().newUrlRequestBuilder("https://gql.twitch.tv/gql/", getByteArrayCronetCallback(continuation), cronetExecutor).apply {
                             headers.forEach { addHeader(it.key, it.value) }
                             addHeader("Content-Type", "application/json")
@@ -200,7 +199,7 @@ class GraphQLRepository @Inject constructor(
     private suspend fun sendPersistedQuery(networkLibrary: String?, headers: Map<String, String>, body: String): String = withContext(Dispatchers.IO) {
         when {
             networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                val response = suspendCoroutine { continuation ->
                     httpEngine.get().newUrlRequestBuilder("https://gql.twitch.tv/gql/", cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).apply {
                         headers.forEach { addHeader(it.key, it.value) }
                         addHeader("Content-Type", "application/json")
@@ -219,7 +218,7 @@ class GraphQLRepository @Inject constructor(
                     }.build().start()
                     request.future.get().responseBody as String
                 } else {
-                    val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                    val response = suspendCoroutine { continuation ->
                         cronetEngine.get().newUrlRequestBuilder("https://gql.twitch.tv/gql/", getByteArrayCronetCallback(continuation), cronetExecutor).apply {
                             headers.forEach { addHeader(it.key, it.value) }
                             addHeader("Content-Type", "application/json")
@@ -342,6 +341,23 @@ class GraphQLRepository @Inject constructor(
             query = query,
             first = Optional.Present(first),
             after = Optional.Present(after),
+        )
+        sendQuery(networkLibrary, headers, query)
+    }
+
+    suspend fun loadQueryFollowingGame(networkLibrary: String?, headers: Map<String, String>, id: String?, slug: String?, name: String?): ApolloResponse<SelfFollowingGameQuery.Data> = withContext(Dispatchers.IO) {
+        val query = SelfFollowingGameQuery(
+            id = if (!id.isNullOrBlank()) Optional.Present(id) else Optional.Absent,
+            slug = if (!slug.isNullOrBlank()) Optional.Present(slug) else Optional.Absent,
+            name = if (!name.isNullOrBlank()) Optional.Present(name) else Optional.Absent,
+        )
+        sendQuery(networkLibrary, headers, query)
+    }
+
+    suspend fun loadQueryFollowingUser(networkLibrary: String?, headers: Map<String, String>, id: String?, login: String?): ApolloResponse<SelfFollowingUserQuery.Data> = withContext(Dispatchers.IO) {
+        val query = SelfFollowingUserQuery(
+            id = if (!id.isNullOrBlank()) Optional.Present(id) else Optional.Absent,
+            login = if (!login.isNullOrBlank()) Optional.Present(login) else Optional.Absent,
         )
         sendQuery(networkLibrary, headers, query)
     }
@@ -1292,38 +1308,6 @@ class GraphQLRepository @Inject constructor(
             }
         }.toString()
         json.decodeFromString<ErrorResponse>(sendPersistedQuery(networkLibrary, headers, body))
-    }
-
-    suspend fun loadFollowingUser(networkLibrary: String?, headers: Map<String, String>, userLogin: String?): FollowingUserResponse = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            putJsonObject("extensions") {
-                putJsonObject("persistedQuery") {
-                    put("sha256Hash", "834a75e1c06cffada00f0900664a5033e392f6fb655fae8d2e25b21b340545a9")
-                    put("version", 1)
-                }
-            }
-            put("operationName", "ChannelSupportButtons")
-            putJsonObject("variables") {
-                put("channelLogin", userLogin)
-            }
-        }.toString()
-        json.decodeFromString<FollowingUserResponse>(sendPersistedQuery(networkLibrary, headers, body))
-    }
-
-    suspend fun loadFollowingGame(networkLibrary: String?, headers: Map<String, String>, gameName: String?): FollowingGameResponse = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            putJsonObject("extensions") {
-                putJsonObject("persistedQuery") {
-                    put("sha256Hash", "cfeda60899b6b867b2d7f30c8556778c4a9cc8268bd1aadd9f88134a0f642a02")
-                    put("version", 1)
-                }
-            }
-            put("operationName", "FollowGameButton_Game")
-            putJsonObject("variables") {
-                put("name", gameName)
-            }
-        }.toString()
-        json.decodeFromString<FollowingGameResponse>(sendPersistedQuery(networkLibrary, headers, body))
     }
 
     suspend fun loadChannelPointsContext(networkLibrary: String?, headers: Map<String, String>, channelLogin: String?): ChannelPointContextResponse = withContext(Dispatchers.IO) {

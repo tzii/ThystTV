@@ -13,8 +13,10 @@ import android.provider.DocumentsContract
 import android.text.Editable
 import android.text.TextWatcher
 import android.text.format.DateUtils
+import android.view.View
 import android.widget.RadioButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
@@ -35,10 +37,7 @@ import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
-import com.github.andreyasadchy.xtra.util.gone
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.toast
-import com.github.andreyasadchy.xtra.util.visible
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
@@ -181,12 +180,12 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
             if (result.resultCode == Activity.RESULT_OK) {
                 result.data?.data?.let {
                     when {
-                        it.authority?.startsWith("com.android.providers") == true -> requireActivity().toast(getString(R.string.invalid_directory))
+                        it.authority?.startsWith("com.android.providers") == true -> Toast.makeText(requireActivity(), R.string.invalid_directory, Toast.LENGTH_LONG).show()
                         else -> {
                             requireContext().contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                             sharedPath = it.toString()
                             binding.download.isEnabled = true
-                            binding.storageSelectionContainer.directory.visible()
+                            binding.storageSelectionContainer.directory.visibility = View.VISIBLE
                             binding.storageSelectionContainer.directory.text = it.path?.substringAfter("/tree/")?.removeSuffix(":")
                         }
                     }
@@ -242,7 +241,7 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
                     repeatOnLifecycle(Lifecycle.State.STARTED) {
                         viewModel.dismiss.collectLatest {
                             if (it) {
-                                requireActivity().toast(getString(R.string.video_subscribers_only))
+                                Toast.makeText(requireActivity(), R.string.video_subscribers_only, Toast.LENGTH_LONG).show()
                                 dismiss()
                             }
                         }
@@ -304,7 +303,7 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
         val storage = requireContext().getExternalFilesDirs(".downloads").mapIndexedNotNull { index, file ->
             file?.absolutePath?.let { path ->
                 if (index == 0) {
-                    requireContext().getString(R.string.internal_storage) to path
+                    getString(R.string.internal_storage) to path
                 } else {
                     path.substringBefore("/Android/data", "").takeIf { it.isNotBlank() }?.let {
                         it.substringAfterLast(File.separatorChar) to path
@@ -322,11 +321,11 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
                 setText(selectedQuality, false)
             }
             if (type == VIDEO) {
-                timeLayout.visible()
+                timeLayout.visibility = View.VISIBLE
                 val defaultFrom = DateUtils.formatElapsedTime(currentPosition / 1000L).let { if (it.length == 5) "00:$it" else it }
                 val totalTime = DateUtils.formatElapsedTime(totalDuration / 1000L)
                 val defaultTo = totalTime.let { if (it.length != 5) it else "00:$it" }
-                duration.text = requireContext().getString(R.string.duration, totalTime)
+                duration.text = getString(R.string.duration, totalTime)
                 timeTo.editText?.hint = defaultTo
                 timeFrom.editText?.hint = defaultFrom
                 timeFrom.editText?.doOnTextChanged { text, _, _, _ -> if (text?.length == 8) timeTo.requestFocus() }
@@ -341,33 +340,35 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
                         setOnItemClickListener { _, _, position, _ ->
                             when (position) {
                                 0 -> {
-                                    sharedStorageLayout.visible()
-                                    appStorageLayout.gone()
+                                    sharedStorageLayout.visibility = View.VISIBLE
+                                    appStorageLayout.visibility = View.GONE
                                     binding.download.isEnabled = sharedPath != null
                                 }
                                 1 -> {
-                                    appStorageLayout.visible()
-                                    sharedStorageLayout.gone()
+                                    appStorageLayout.visibility = View.VISIBLE
+                                    sharedStorageLayout.visibility = View.GONE
                                     binding.download.isEnabled = true
                                 }
                             }
                         }
                         setText(adapter.getItem(location).toString(), false)
                     }
-                    sharedPath = requireContext().prefs().getString(C.DOWNLOAD_SHARED_PATH, null)
+                    if (sharedPath == null) {
+                        sharedPath = requireContext().prefs().getString(C.DOWNLOAD_SHARED_PATH, null)
+                    }
                     when (location) {
                         0 -> {
-                            sharedStorageLayout.visible()
-                            appStorageLayout.gone()
+                            sharedStorageLayout.visibility = View.VISIBLE
+                            appStorageLayout.visibility = View.GONE
                             binding.download.isEnabled = sharedPath != null
                         }
                         1 -> {
-                            appStorageLayout.visible()
-                            sharedStorageLayout.gone()
+                            appStorageLayout.visibility = View.VISIBLE
+                            sharedStorageLayout.visibility = View.GONE
                         }
                     }
                     sharedPath?.let {
-                        directory.visible()
+                        directory.visibility = View.VISIBLE
                         directory.text = Uri.decode(it.substringAfter("/tree/"))
                     }
                     selectDirectory.setOnClickListener {
@@ -410,11 +411,11 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
                         radioGroup.check(requireContext().prefs().getInt(C.DOWNLOAD_STORAGE, 0))
                     }
                 } else {
-                    noStorageDetected.visible()
-                    storageSpinner.gone()
-                    sharedStorageLayout.gone()
-                    appStorageLayout.gone()
-                    binding.download.gone()
+                    noStorageDetected.visibility = View.VISIBLE
+                    storageSpinner.visibility = View.GONE
+                    sharedStorageLayout.visibility = View.GONE
+                    appStorageLayout.visibility = View.GONE
+                    binding.download.visibility = View.GONE
                 }
             }
             downloadChat.apply {
@@ -575,10 +576,13 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
                         ActivityCompat.checkSelfPermission(requireActivity(), Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
                         !requireActivity().prefs().getBoolean(C.DOWNLOAD_NOTIFICATION_REQUESTED, false)) {
                         requireActivity().prefs().edit { putBoolean(C.DOWNLOAD_NOTIFICATION_REQUESTED, true) }
+                        val activity = requireActivity()
                         requireActivity().getAlertDialogBuilder()
                             .setMessage(R.string.notification_permission_message)
                             .setTitle(R.string.notification_permission_title)
-                            .setPositiveButton(android.R.string.ok) { _, _ -> ActivityCompat.requestPermissions(requireActivity(), arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1) }
+                            .setPositiveButton(android.R.string.ok) { _, _ ->
+                                ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+                            }
                             .setNegativeButton(android.R.string.cancel, null)
                             .show()
                     }

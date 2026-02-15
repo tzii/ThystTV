@@ -1,16 +1,20 @@
 package com.github.andreyasadchy.xtra.ui.chat
 
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.text.format.DateUtils
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import android.widget.MultiAutoCompleteTextView
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.core.content.res.use
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -46,15 +50,10 @@ import com.github.andreyasadchy.xtra.ui.player.PlayerFragment
 import com.github.andreyasadchy.xtra.ui.view.AutoCompleteAdapter
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
-import com.github.andreyasadchy.xtra.util.convertDpToPixels
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
-import com.github.andreyasadchy.xtra.util.gone
-import com.github.andreyasadchy.xtra.util.hideKeyboard
-import com.github.andreyasadchy.xtra.util.isLightTheme
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.reduceDragSensitivity
 import com.github.andreyasadchy.xtra.util.tokenPrefs
-import com.github.andreyasadchy.xtra.util.visible
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.tabs.TabLayoutMediator
 import com.google.mlkit.nl.languageid.LanguageIdentification
@@ -142,14 +141,16 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         enableTimestamps = requireContext().prefs().getBoolean(C.CHAT_TIMESTAMPS, false),
                         timestampFormat = requireContext().prefs().getString(C.CHAT_TIMESTAMP_FORMAT, "0"),
                         firstMsgVisibility = requireContext().prefs().getString(C.CHAT_FIRSTMSG_VISIBILITY, "0")?.toIntOrNull() ?: 0,
-                        firstChatMsg = requireContext().getString(R.string.chat_first),
-                        redeemedChatMsg = requireContext().getString(R.string.redeemed),
-                        redeemedNoMsg = requireContext().getString(R.string.user_redeemed),
-                        rewardChatMsg = requireContext().getString(R.string.chat_reward),
-                        replyMessage = requireContext().getString(R.string.replying_to_message),
+                        firstChatMsg = getString(R.string.chat_first),
+                        redeemedChatMsg = getString(R.string.redeemed),
+                        redeemedNoMsg = getString(R.string.user_redeemed),
+                        rewardChatMsg = getString(R.string.chat_reward),
+                        replyMessage = getString(R.string.replying_to_message),
                         useRandomColors = requireContext().prefs().getBoolean(C.CHAT_RANDOMCOLOR, true),
                         useReadableColors = requireContext().prefs().getBoolean(C.CHAT_THEME_ADAPTED_USERNAME_COLOR, true),
-                        isLightTheme = requireContext().isLightTheme,
+                        isLightTheme = requireContext().obtainStyledAttributes(intArrayOf(androidx.appcompat.R.attr.isLightTheme)).use {
+                            it.getBoolean(0, false)
+                        },
                         nameDisplay = requireContext().prefs().getString(C.UI_NAME_DISPLAY, "0"),
                         useBoldNames = requireContext().prefs().getBoolean(C.CHAT_BOLDNAMES, false),
                         showNamePaints = requireContext().prefs().getBoolean(C.CHAT_SHOW_PAINTS, true),
@@ -176,8 +177,8 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         ),
                         imageLibrary = requireContext().prefs().getString(C.CHAT_IMAGE_LIBRARY, "0"),
                         messageTextSize = (requireContext().prefs().getString(C.CHAT_TEXT_SIZE, "14")?.toFloatOrNull() ?: 14f) * sizeModifier,
-                        emoteSize = requireContext().convertDpToPixels((requireContext().prefs().getString(C.CHAT_EMOTE_SIZE, "29.5")?.toFloatOrNull() ?: 29.5f) * sizeModifier),
-                        badgeSize = requireContext().convertDpToPixels((requireContext().prefs().getString(C.CHAT_BADGE_SIZE, "18.5")?.toFloatOrNull() ?: 18.5f) * sizeModifier),
+                        emoteSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, (requireContext().prefs().getString(C.CHAT_EMOTE_SIZE, "29.5")?.toFloatOrNull() ?: 29.5f) * sizeModifier, resources.displayMetrics).toInt(),
+                        badgeSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, (requireContext().prefs().getString(C.CHAT_BADGE_SIZE, "18.5")?.toFloatOrNull() ?: 18.5f) * sizeModifier, resources.displayMetrics).toInt(),
                         emoteQuality = requireContext().prefs().getString(C.CHAT_IMAGE_QUALITY, "4") ?: "4",
                         animateGifs = requireContext().prefs().getBoolean(C.ANIMATED_EMOTES, true),
                         enableOverlayEmotes = requireContext().prefs().getBoolean(C.CHAT_ZEROWIDTH, true),
@@ -204,8 +205,8 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                     btnDown.isVisible = percentage < 100f
                                 }
                                 if (showChatStatus && chatStatus.isGone) {
-                                    chatStatus.visible()
-                                    chatStatus.postDelayed({ chatStatus.gone() }, 5000)
+                                    chatStatus.visibility = View.VISIBLE
+                                    chatStatus.postDelayed({ chatStatus.visibility = View.GONE }, 5000)
                                 }
                             }
                         })
@@ -213,22 +214,22 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                     btnDown.setOnClickListener {
                         view.post {
                             adapter.messages?.let { recyclerView.scrollToPosition(it.lastIndex) }
-                            it.gone()
+                            it.visibility = View.GONE
                         }
                     }
                     val enableMessaging = isLive && isLoggedIn
                     adapter.messageClickListener = { channelId ->
-                        editText.hideKeyboard()
+                        (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(editText.windowToken, 0)
                         editText.clearFocus()
                         MessageClickedDialog.newInstance(enableMessaging, channelId).show(this@ChatFragment.childFragmentManager, "messageDialog")
                     }
                     adapter.replyClickListener = {
-                        editText.hideKeyboard()
+                        (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(editText.windowToken, 0)
                         editText.clearFocus()
                         ReplyClickedDialog.newInstance(enableMessaging).show(this@ChatFragment.childFragmentManager, "replyDialog")
                     }
                     adapter.imageClickListener = { url, name, source, format, isAnimated, thirdParty, emoteId ->
-                        editText.hideKeyboard()
+                        (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(editText.windowToken, 0)
                         editText.clearFocus()
                         ImageClickedDialog.newInstance(url, name, source, format, isAnimated, thirdParty, emoteId).show(this@ChatFragment.childFragmentManager, "imageDialog")
                     }
@@ -284,11 +285,11 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         }
                         editText.addTextChangedListener(onTextChanged = { text, _, _, _ ->
                             if (text?.isNotBlank() == true) {
-                                send.visible()
-                                clear.visible()
+                                send.visibility = View.VISIBLE
+                                clear.visibility = View.VISIBLE
                             } else {
-                                send.gone()
-                                clear.gone()
+                                send.visibility = View.GONE
+                                clear.visibility = View.GONE
                             }
                         })
                         editText.setTokenizer(SpaceTokenizer())
@@ -308,13 +309,13 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                             editText.text.clear()
                             true
                         }
-                        replyView.gone()
+                        replyView.visibility = View.GONE
                         send.setOnClickListener { sendMessage() }
                         if (isFloatingMode ||
                             ((view.parent?.parent?.parent?.parent as? View)?.id == R.id.slidingLayout && !requireContext().prefs().getBoolean(C.KEY_CHAT_BAR_VISIBLE, true))) {
                             messageView.gone()
                         } else {
-                            messageView.visible()
+                            messageView.visibility = View.VISIBLE
                         }
                         viewPager.adapter = object : FragmentStateAdapter(this@ChatFragment) {
                             override fun getItemCount(): Int = 3
@@ -327,7 +328,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         viewPager.reduceDragSensitivity()
                         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
                             tab.text = when (position) {
-                                0 -> requireContext().getString(R.string.recent_emotes)
+                                0 -> getString(R.string.recent_emotes)
                                 1 -> "Twitch"
                                 else -> "7TV/BTTV/FFZ"
                             }
@@ -524,52 +525,52 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                             viewModel.roomState.collectLatest { roomState ->
                                 if (roomState != null) {
                                     when (roomState.emote) {
-                                        "0" -> textEmote.gone()
-                                        "1" -> textEmote.visible()
+                                        "0" -> textEmote.visibility = View.GONE
+                                        "1" -> textEmote.visibility = View.VISIBLE
                                     }
                                     if (roomState.followers != null) {
                                         when (roomState.followers) {
-                                            "-1" -> textFollowers.gone()
+                                            "-1" -> textFollowers.visibility = View.GONE
                                             "0" -> {
-                                                textFollowers.text = requireContext().getString(R.string.room_followers)
-                                                textFollowers.visible()
+                                                textFollowers.text = getString(R.string.room_followers)
+                                                textFollowers.visibility = View.VISIBLE
                                             }
                                             else -> {
-                                                textFollowers.text = requireContext().getString(
+                                                textFollowers.text = getString(
                                                     R.string.room_followers_min,
                                                     TwitchApiHelper.getDurationFromSeconds(requireContext(), (roomState.followers.toInt() * 60).toString())
                                                 )
-                                                textFollowers.visible()
+                                                textFollowers.visibility = View.VISIBLE
                                             }
                                         }
                                     }
                                     when (roomState.unique) {
-                                        "0" -> textUnique.gone()
-                                        "1" -> textUnique.visible()
+                                        "0" -> textUnique.visibility = View.GONE
+                                        "1" -> textUnique.visibility = View.VISIBLE
                                     }
                                     if (roomState.slow != null) {
                                         when (roomState.slow) {
-                                            "0" -> textSlow.gone()
+                                            "0" -> textSlow.visibility = View.GONE
                                             else -> {
-                                                textSlow.text = requireContext().getString(
+                                                textSlow.text = getString(
                                                     R.string.room_slow,
                                                     TwitchApiHelper.getDurationFromSeconds(requireContext(), roomState.slow)
                                                 )
-                                                textSlow.visible()
+                                                textSlow.visibility = View.VISIBLE
                                             }
                                         }
                                     }
                                     when (roomState.subs) {
-                                        "0" -> textSubs.gone()
-                                        "1" -> textSubs.visible()
+                                        "0" -> textSubs.visibility = View.GONE
+                                        "1" -> textSubs.visibility = View.VISIBLE
                                     }
                                     if (textEmote.isGone && textFollowers.isGone && textUnique.isGone && textSlow.isGone && textSubs.isGone) {
                                         showChatStatus = false
-                                        chatStatus.gone()
+                                        chatStatus.visibility = View.GONE
                                     } else {
                                         showChatStatus = true
-                                        chatStatus.visible()
-                                        chatStatus.postDelayed({ chatStatus.gone() }, 5000)
+                                        chatStatus.visibility = View.VISIBLE
+                                        chatStatus.postDelayed({ chatStatus.visibility = View.GONE }, 5000)
                                     }
                                     viewModel.roomState.value = null
                                 }
@@ -602,7 +603,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             viewModel.hideRaid.collectLatest {
                                 if (it) {
-                                    raidLayout.gone()
+                                    raidLayout.visibility = View.GONE
                                     viewModel.raidClosed = true
                                     viewModel.hideRaid.value = false
                                 }
@@ -625,13 +626,13 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                                     )
                                                 )
                                             }
-                                            raidLayout.gone()
+                                            raidLayout.visibility = View.GONE
                                             viewModel.raidClosed = true
                                         } else {
-                                            raidLayout.visible()
+                                            raidLayout.visibility = View.VISIBLE
                                             raidLayout.setOnClickListener { viewModel.raidClicked.value = raid }
-                                            this@ChatFragment.requireContext().imageLoader.enqueue(
-                                                ImageRequest.Builder(this@ChatFragment.requireContext()).apply {
+                                            requireContext().imageLoader.enqueue(
+                                                ImageRequest.Builder(requireContext()).apply {
                                                     data(raid.targetLogo)
                                                     if (requireContext().prefs().getBoolean(C.UI_ROUNDUSERIMAGE, true)) {
                                                         transformations(CircleCropTransformation())
@@ -641,10 +642,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                                 }.build()
                                             )
                                             raidClose.setOnClickListener {
-                                                raidLayout.gone()
+                                                raidLayout.visibility = View.GONE
                                                 viewModel.raidClosed = true
                                             }
-                                            raidText.text = requireContext().getString(
+                                            raidText.text = getString(
                                                 R.string.raid_text,
                                                 if (raid.targetLogin != null && !raid.targetLogin.equals(raid.targetName, true)) {
                                                     when (requireContext().prefs().getString(C.UI_NAME_DISPLAY, "0")) {
@@ -685,7 +686,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             viewModel.hidePoll.collectLatest {
                                 if (it) {
-                                    pollLayout.gone()
+                                    pollLayout.visibility = View.GONE
                                     viewModel.pollSecondsLeft.value = null
                                     viewModel.pollTimer?.cancel()
                                     viewModel.pollClosed = true
@@ -695,7 +696,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         }
                     }
                     pollClose.setOnClickListener {
-                        pollLayout.gone()
+                        pollLayout.visibility = View.GONE
                         viewModel.pollSecondsLeft.value = null
                         viewModel.pollTimer?.cancel()
                         viewModel.pollClosed = true
@@ -707,24 +708,24 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                     if (!viewModel.pollClosed) {
                                         when (poll.status) {
                                             "ACTIVE" -> {
-                                                pollLayout.visible()
-                                                pollTitle.text = requireContext().getString(R.string.poll_title, poll.title)
+                                                pollLayout.visibility = View.VISIBLE
+                                                pollTitle.text = getString(R.string.poll_title, poll.title)
                                                 pollChoices.text = poll.choices?.joinToString("\n") {
-                                                    requireContext().getString(
+                                                    getString(
                                                         R.string.poll_choice,
                                                         (((it.totalVotes ?: 0).toLong() * 100.0) / max((poll.totalVotes ?: 0), 1)).roundToInt(),
                                                         it.totalVotes?.let { NumberFormat.getInstance().format(it) },
                                                         it.title
                                                     )
                                                 }
-                                                pollStatus.visible()
+                                                pollStatus.visibility = View.VISIBLE
                                             }
                                             "COMPLETED", "TERMINATED" -> {
-                                                pollLayout.visible()
-                                                pollTitle.text = requireContext().getString(R.string.poll_title, poll.title)
+                                                pollLayout.visibility = View.VISIBLE
+                                                pollTitle.text = getString(R.string.poll_title, poll.title)
                                                 val winningTotal = poll.choices?.maxOfOrNull { it.totalVotes ?: 0 } ?: 0
                                                 pollChoices.text = poll.choices?.joinToString("\n") {
-                                                    requireContext().getString(
+                                                    getString(
                                                         if (winningTotal == it.totalVotes) {
                                                             R.string.poll_choice_winner
                                                         } else {
@@ -735,13 +736,13 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                                         it.title
                                                     )
                                                 }
-                                                pollStatus.gone()
+                                                pollStatus.visibility = View.GONE
                                                 viewModel.pollSecondsLeft.value = null
                                                 viewModel.pollTimer?.cancel()
-                                                viewModel.startPollTimeout { pollLayout.gone() }
+                                                viewModel.startPollTimeout { pollLayout.visibility = View.GONE }
                                             }
                                             else -> {
-                                                pollLayout.gone()
+                                                pollLayout.visibility = View.GONE
                                                 viewModel.pollSecondsLeft.value = null
                                                 viewModel.pollTimer?.cancel()
                                                 viewModel.pollClosed = true
@@ -757,7 +758,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             viewModel.pollSecondsLeft.collectLatest {
                                 if (it != null) {
-                                    pollStatus.text = requireContext().getString(R.string.remaining_time, DateUtils.formatElapsedTime(it.toLong()))
+                                    pollStatus.text = getString(R.string.remaining_time, DateUtils.formatElapsedTime(it.toLong()))
                                     if (it <= 0) {
                                         viewModel.pollSecondsLeft.value = null
                                     }
@@ -769,7 +770,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             viewModel.hidePrediction.collectLatest {
                                 if (it) {
-                                    predictionLayout.gone()
+                                    predictionLayout.visibility = View.GONE
                                     viewModel.predictionSecondsLeft.value = null
                                     viewModel.predictionTimer?.cancel()
                                     viewModel.predictionClosed = true
@@ -779,7 +780,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         }
                     }
                     predictionClose.setOnClickListener {
-                        predictionLayout.gone()
+                        predictionLayout.visibility = View.GONE
                         viewModel.predictionSecondsLeft.value = null
                         viewModel.predictionTimer?.cancel()
                         viewModel.predictionClosed = true
@@ -791,11 +792,11 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                     if (!viewModel.predictionClosed) {
                                         when (prediction.status) {
                                             "ACTIVE" -> {
-                                                predictionLayout.visible()
-                                                predictionTitle.text = requireContext().getString(R.string.prediction_title, prediction.title)
+                                                predictionLayout.visibility = View.VISIBLE
+                                                predictionTitle.text = getString(R.string.prediction_title, prediction.title)
                                                 val totalPoints = prediction.outcomes?.sumOf { it.totalPoints?.toLong() ?: 0 } ?: 0
                                                 predictionOutcomes.text = prediction.outcomes?.joinToString("\n") {
-                                                    requireContext().getString(
+                                                    getString(
                                                         R.string.prediction_outcome,
                                                         (((it.totalPoints ?: 0).toLong() * 100.0) / max(totalPoints, 1)).roundToInt(),
                                                         it.totalPoints?.let { NumberFormat.getInstance().format(it) },
@@ -803,14 +804,14 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                                         it.title
                                                     )
                                                 }
-                                                predictionStatus.visible()
+                                                predictionStatus.visibility = View.VISIBLE
                                             }
                                             "LOCKED" -> {
-                                                predictionLayout.visible()
-                                                predictionTitle.text = requireContext().getString(R.string.prediction_title, prediction.title)
+                                                predictionLayout.visibility = View.VISIBLE
+                                                predictionTitle.text = getString(R.string.prediction_title, prediction.title)
                                                 val totalPoints = prediction.outcomes?.sumOf { it.totalPoints?.toLong() ?: 0 } ?: 0
                                                 predictionOutcomes.text = prediction.outcomes?.joinToString("\n") {
-                                                    requireContext().getString(
+                                                    getString(
                                                         R.string.prediction_outcome,
                                                         (((it.totalPoints ?: 0).toLong() * 100.0) / max(totalPoints, 1)).roundToInt(),
                                                         it.totalPoints?.let { NumberFormat.getInstance().format(it) },
@@ -820,17 +821,17 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                                 }
                                                 viewModel.predictionSecondsLeft.value = null
                                                 viewModel.predictionTimer?.cancel()
-                                                viewModel.startPredictionTimeout { predictionLayout.gone() }
-                                                predictionStatus.visible()
-                                                predictionStatus.text = requireContext().getString(R.string.prediction_locked)
+                                                viewModel.startPredictionTimeout { predictionLayout.visibility = View.GONE }
+                                                predictionStatus.visibility = View.VISIBLE
+                                                predictionStatus.text = getString(R.string.prediction_locked)
                                             }
                                             "CANCELED", "CANCEL_PENDING", "RESOLVED", "RESOLVE_PENDING" -> {
-                                                predictionLayout.visible()
-                                                predictionTitle.text = requireContext().getString(R.string.prediction_title, prediction.title)
+                                                predictionLayout.visibility = View.VISIBLE
+                                                predictionTitle.text = getString(R.string.prediction_title, prediction.title)
                                                 val resolved = prediction.status == "RESOLVED" || prediction.status == "RESOLVE_PENDING"
                                                 val totalPoints = prediction.outcomes?.sumOf { it.totalPoints?.toLong() ?: 0 } ?: 0
                                                 predictionOutcomes.text = prediction.outcomes?.joinToString("\n") {
-                                                    requireContext().getString(
+                                                    getString(
                                                         if (resolved && prediction.winningOutcomeId != null && prediction.winningOutcomeId == it.id) {
                                                             R.string.prediction_outcome_winner
                                                         } else {
@@ -844,16 +845,16 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                                 }
                                                 viewModel.predictionSecondsLeft.value = null
                                                 viewModel.predictionTimer?.cancel()
-                                                viewModel.startPredictionTimeout { predictionLayout.gone() }
+                                                viewModel.startPredictionTimeout { predictionLayout.visibility = View.GONE }
                                                 if (resolved) {
-                                                    predictionStatus.gone()
+                                                    predictionStatus.visibility = View.GONE
                                                 } else {
-                                                    predictionStatus.visible()
-                                                    predictionStatus.text = requireContext().getString(R.string.prediction_refunded)
+                                                    predictionStatus.visibility = View.VISIBLE
+                                                    predictionStatus.text = getString(R.string.prediction_refunded)
                                                 }
                                             }
                                             else -> {
-                                                predictionLayout.gone()
+                                                predictionLayout.visibility = View.GONE
                                                 viewModel.predictionSecondsLeft.value = null
                                                 viewModel.predictionTimer?.cancel()
                                                 viewModel.predictionClosed = true
@@ -869,7 +870,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             viewModel.predictionSecondsLeft.collectLatest {
                                 if (it != null) {
-                                    predictionStatus.text = requireContext().getString(R.string.remaining_time, DateUtils.formatElapsedTime(it.toLong()))
+                                    predictionStatus.text = getString(R.string.remaining_time, DateUtils.formatElapsedTime(it.toLong()))
                                     if (it <= 0) {
                                         viewModel.predictionSecondsLeft.value = null
                                     }
@@ -1050,7 +1051,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         )
                     }
                 } else {
-                    chatReplayUnavailable.visible()
+                    chatReplayUnavailable.visibility = View.VISIBLE
                 }
             }
             if ((view.parent?.parent?.parent?.parent as? View)?.id != R.id.slidingLayout) {
@@ -1165,9 +1166,9 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
 
     fun toggleEmoteMenu(enable: Boolean) {
         if (enable) {
-            binding.emoteMenu.visible()
+            binding.emoteMenu.visibility = View.VISIBLE
         } else {
-            binding.emoteMenu.gone()
+            binding.emoteMenu.visibility = View.GONE
         }
         toggleBackPressedCallback(enable)
     }
@@ -1201,10 +1202,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
 
     private fun sendMessage(replyId: String? = null): Boolean {
         with(binding) {
-            editText.hideKeyboard()
+            (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(editText.windowToken, 0)
             editText.clearFocus()
             toggleEmoteMenu(false)
-            replyView.gone()
+            replyView.visibility = View.GONE
             send.setOnClickListener { sendMessage() }
             editText.setOnKeyListener { _, keyCode, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -1274,7 +1275,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         with(binding) {
             if (!replyId.isNullOrBlank()) {
                 messageDialog?.dismiss()
-                replyView.visible()
+                replyView.visibility = View.VISIBLE
                 replyText.text = message?.let {
                     val name = if (userName != null && userLogin != null && !userLogin.equals(userName, true)) {
                         when (requireContext().prefs().getString(C.UI_NAME_DISPLAY, "0")) {
@@ -1285,10 +1286,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                     } else {
                         userName ?: userLogin
                     }
-                    requireContext().getString(R.string.replying_to_message, name, message)
+                    getString(R.string.replying_to_message, name, message)
                 }
                 replyClose.setOnClickListener {
-                    replyView.gone()
+                    replyView.visibility = View.GONE
                     send.setOnClickListener { sendMessage() }
                     editText.setOnKeyListener { _, keyCode, event ->
                         if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -1343,7 +1344,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                     }
                     .addOnFailureListener {
                         val previousTranslation = chatMessage.translatedMessage
-                        chatMessage.translatedMessage = requireContext().getString(R.string.translate_failed_id)
+                        chatMessage.translatedMessage = getString(R.string.translate_failed_id)
                         chatMessage.translationFailed = true
                         chatMessage.messageLanguage = null
                         try {
@@ -1383,7 +1384,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                     .addOnSuccessListener { text ->
                         val languageName = Locale.forLanguageTag(sourceLanguage).displayLanguage
                         val previousTranslation = chatMessage.translatedMessage
-                        chatMessage.translatedMessage = requireContext().getString(R.string.translated_message, languageName, text)
+                        chatMessage.translatedMessage = getString(R.string.translated_message, languageName, text)
                         chatMessage.translationFailed = false
                         chatMessage.messageLanguage = null
                         try {
@@ -1401,7 +1402,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                     .addOnFailureListener {
                         val languageName = Locale.forLanguageTag(sourceLanguage).displayLanguage
                         val previousTranslation = chatMessage.translatedMessage
-                        chatMessage.translatedMessage = requireContext().getString(R.string.translate_failed, languageName)
+                        chatMessage.translatedMessage = getString(R.string.translate_failed, languageName)
                         chatMessage.translationFailed = true
                         chatMessage.messageLanguage = sourceLanguage
                         try {
@@ -1419,7 +1420,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
             }
         } else {
             val previousTranslation = chatMessage.translatedMessage
-            chatMessage.translatedMessage = requireContext().getString(R.string.translate_failed_id)
+            chatMessage.translatedMessage = getString(R.string.translate_failed_id)
             chatMessage.translationFailed = true
             chatMessage.messageLanguage = null
             try {
@@ -1439,7 +1440,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     private fun showLanguageDownloadDialog(chatMessage: ChatMessage, sourceLanguage: String) {
         val languageName = Locale.forLanguageTag(sourceLanguage).displayLanguage
         requireContext().getAlertDialogBuilder()
-            .setMessage(requireContext().getString(R.string.download_language_model_message, languageName))
+            .setMessage(getString(R.string.download_language_model_message, languageName))
             .setNegativeButton(getString(R.string.no), null)
             .setPositiveButton(getString(R.string.yes)) { _, _ ->
                 val targetLanguage = requireContext().prefs().getString(C.CHAT_TRANSLATE_TARGET, "en") ?: "en"
@@ -1464,7 +1465,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                 .addOnSuccessListener { text ->
                                     val languageName = Locale.forLanguageTag(sourceLanguage).displayLanguage
                                     val previousTranslation = chatMessage.translatedMessage
-                                    chatMessage.translatedMessage = requireContext().getString(R.string.translated_message, languageName, text)
+                                    chatMessage.translatedMessage = getString(R.string.translated_message, languageName, text)
                                     chatMessage.translationFailed = false
                                     chatMessage.messageLanguage = null
                                     try {

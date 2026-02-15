@@ -6,5 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 class DeviceCodeResponse(
     @SerialName("device_code")
-    val deviceCode: String,
+    val deviceCode: String? = null,
+    @SerialName("user_code")
+    val userCode: String? = null,
 )

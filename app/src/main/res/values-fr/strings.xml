@@ -53,7 +53,6 @@
     <string name="permission_denied">Les autorisations requises ont été refusées</string>
     <string name="nothing_here">Rien ici</string>
     <string name="watch_live">Regarder en direct</string>
-    <string name="watch_rerun">Regarder la rediffusion</string>
     <string name="open_player">Ouvrir le lecteur</string>
     <string name="error_stream">Erreur lors du chargement du stream</string>
     <string name="dark">Sombre</string>
@@ -107,12 +106,9 @@
     <string name="playback_will_stop_hours_minutes">La lecture s\'arrêtera dans %1$s %2$s</string>
     <string name="timer_canceled">La minuterie a été annulée</string>
     <string name="trouble_logging_in">Vous avez des problèmes de connexion ?</string>
-    <string name="login_problem_solution">Vous pouvez vous connecter à l\'aide d\'un navigateur externe. Après avoir appuyé sur "Autoriser", une page d\'erreur devrait apparaître, ne vous inquiétez pas, c\'est normal. Copiez l\'URL et revenez ici puis cliquez sur le bouton "Entrer l\'URL". Collez l\'URL et cliquez sur "Connexion".</string>
     <string name="no_browser_found">Aucun navigateur internet n\'a été trouvé</string>
     <string name="browser_workaround">Le navigateur de votre système n\'est plus pris en charge. Veuillez cliquer sur le bouton ci-dessous pour une solution de contournement</string>
     <string name="error">Erreur : %s</string>
-    <string name="to_enter_url">Entrer l\'URL</string>
-    <string name="enter_url">Valider l\'URL</string>
     <string name="invalid_url">URL invalide, merci de vérifier l\'URL.</string>
     <string name="sort_and_order">Trier par : %1$s. Ordre : %2$s</string>
     <string name="time_followed">Temps de suivi</string>
@@ -147,7 +143,6 @@
     <string name="video_type_archive">Diffusion passée</string>
     <string name="video_type_highlight">Temps forts</string>
     <string name="video_type_upload">Upload</string>
-    <string name="video_type_rerun">Redifs</string>
     <string name="all">Tout</string>
     <string name="type">Type</string>
     <string name="room_emote">Emote</string>
@@ -726,4 +721,14 @@
     <string name="default_cellular_quality">Default player quality on cellular network</string>
     <string name="player">Player</string>
     <string name="compact_number_formatting">Compact number formatting</string>
+    <string name="less_rounded_corners">Less rounded</string>
+    <string name="reduced_padding">Reduced padding</string>
+    <string name="compact_text">Compact text</string>
+    <string name="next">Next</string>
+    <string name="tv_login_message">To get access to all features, you need to login as an Android TV device.\n\nFollow these steps:\n• Copy the code shown on the web page.\n• Press the \"Next\" button at the bottom.\n• Enter the code and press \"Activate\".\n• Press \"Authorize\".</string>
+    <string name="open_url">Open URL</string>
+    <string name="external_login_message">You can log in using an external browser.\n\nFollow these steps:\n• Press \"Open URL\" to open the login page.\n• Login to your account and press \"Authorize\".\n• A page with an error should appear. Copy the URL of that page, paste the URL into the box below and press \"OK\".</string>
+    <string name="loading">Loading...</string>
+    <string name="copy_code">Copy code</string>
+    <string name="external_tv_login_message">To get access to all features, you need to login as an Android TV device.\n\nFollow these steps:\n• Copy the code shown on the screen.\n• Press the \"Open URL\" button.\n• Enter the code and press \"Activate\".\n• Press \"Authorize\".\n• Return to Xtra and press \"Next\".</string>
 </resources>

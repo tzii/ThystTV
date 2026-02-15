@@ -35,14 +35,6 @@
         app:iconSpaceReserved="false"
         app:singleLineTitle="false" />
 
-    <EditTextPreference
-        android:defaultValue="https://www.twitch.tv/"
-        android:key="gql_redirect2"
-        android:title="@string/api_gql_redirect"
-        app:useSimpleSummaryProvider="true"
-        app:iconSpaceReserved="false"
-        app:singleLineTitle="false" />
-
     <PreferenceCategory
         android:title="@string/api_current_login"
         app:iconSpaceReserved="false" />

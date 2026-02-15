@@ -1,0 +1,12 @@
+query SelfFollowingUser($id: ID, $login: String) {
+    user(id: $id, login: $login, lookupType: ALL) {
+        self {
+            follower {
+                followedAt
+                notificationSettings {
+                    isEnabled
+                }
+            }
+        }
+    }
+}

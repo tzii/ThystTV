@@ -1,7 +1,6 @@
 package com.github.andreyasadchy.xtra.ui.game
 
 import android.net.http.HttpEngine
-import android.net.http.UrlResponseInfo
 import android.os.Build
 import android.os.ext.SdkExtensions
 import androidx.lifecycle.SavedStateHandle
@@ -115,14 +114,18 @@ class GamePagerViewModel @Inject constructor(
         }
     }
 
-    fun isFollowingGame(gameId: String?, gameName: String?, setting: Int, networkLibrary: String?, gqlHeaders: Map<String, String>) {
+    fun isFollowingGame(gameId: String?, gameSlug: String?, gameName: String?, setting: Int, networkLibrary: String?, gqlHeaders: Map<String, String>) {
         if (_isFollowing.value == null) {
             viewModelScope.launch {
                 try {
                     val isFollowing = if (setting == 0 && !gqlHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
-                        gameName?.let {
-                            graphQLRepository.loadFollowingGame(networkLibrary, gqlHeaders, gameName).data?.game?.self?.follow != null
-                        } == true
+                        graphQLRepository.loadQueryFollowingGame(
+                            networkLibrary = networkLibrary,
+                            headers = gqlHeaders,
+                            id = gameId,
+                            slug = gameSlug.takeIf { gameId.isNullOrBlank() },
+                            name = gameName.takeIf { gameId.isNullOrBlank() && gameSlug.isNullOrBlank() },
+                        ).data?.game?.self?.follow?.followedAt != null
                     } else {
                         gameId?.let {
                             localFollowsGame.getFollowByGameId(it)
@@ -173,7 +176,7 @@ class GamePagerViewModel @Inject constructor(
                                 }.takeIf { !it.isNullOrBlank() }?.let { TwitchApiHelper.getTemplateUrl(it, "game") }?.let {
                                     when {
                                         networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                            val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                            val response = suspendCoroutine { continuation ->
                                                 httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                             }
                                             if (response.first.httpStatusCode in 200..299) {
@@ -193,7 +196,7 @@ class GamePagerViewModel @Inject constructor(
                                                     }
                                                 }
                                             } else {
-                                                val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                                val response = suspendCoroutine { continuation ->
                                                     cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                                 }
                                                 if (response.first.httpStatusCode in 200..299) {
@@ -284,7 +287,7 @@ class GamePagerViewModel @Inject constructor(
                             }.takeIf { !it.isNullOrBlank() }?.let { TwitchApiHelper.getTemplateUrl(it, "game") }?.let {
                                 when {
                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                        val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                         }
                                         if (response.first.httpStatusCode in 200..299) {
@@ -304,7 +307,7 @@ class GamePagerViewModel @Inject constructor(
                                                 }
                                             }
                                         } else {
-                                            val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                            val response = suspendCoroutine { continuation ->
                                                 cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                             }
                                             if (response.first.httpStatusCode in 200..299) {
