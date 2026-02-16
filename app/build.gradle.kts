@@ -20,6 +20,15 @@ android {
             storeFile = file("debug-keystore.jks")
             storePassword = "123456"
         }
+        create("release") {
+            val ksPassword = System.getenv("KEYSTORE_PASSWORD")
+            if (ksPassword != null) {
+                storeFile = file("release-keystore.jks")
+                storePassword = ksPassword
+                keyAlias = System.getenv("KEY_ALIAS") ?: "release"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: ksPassword
+            }
+        }
     }
     namespace = "com.github.andreyasadchy.xtra"
     compileSdk = 36
@@ -42,7 +51,12 @@ android {
             isShrinkResources = true
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            val ksPassword = System.getenv("KEYSTORE_PASSWORD")
+            signingConfig = if (ksPassword != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     buildFeatures {
