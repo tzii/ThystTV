@@ -40,13 +40,16 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.ViewPropertyAnimator
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.trackPipAnimationHintView
 import androidx.annotation.OptIn
 import androidx.core.content.edit
+import androidx.core.graphics.ColorUtils
 import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -83,19 +86,10 @@ import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
-import com.github.andreyasadchy.xtra.util.disable
-import com.github.andreyasadchy.xtra.util.enable
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
-import com.github.andreyasadchy.xtra.util.gone
-import com.github.andreyasadchy.xtra.util.hideKeyboard
-import com.github.andreyasadchy.xtra.util.isInPortraitOrientation
 import com.github.andreyasadchy.xtra.util.isKeyboardShown
-import com.github.andreyasadchy.xtra.util.isMeteredConnection
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.shortToast
-import com.github.andreyasadchy.xtra.util.toast
 import com.github.andreyasadchy.xtra.util.tokenPrefs
-import com.github.andreyasadchy.xtra.util.visible
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.timepicker.MaterialTimePicker
@@ -108,17 +102,17 @@ import kotlin.math.max
 
 @OptIn(UnstableApi::class)
 @AndroidEntryPoint
-abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment.OnSortOptionChanged, IntegrityDialog.CallbackListener {
+abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment.OnSortOptionChanged, IntegrityDialog.CallbackListener, PlayerGestureCallback {
 
     private var _binding: FragmentPlayerBinding? = null
-    private val hideGestureRunnable = Runnable { binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.gone() }
+    private val hideGestureRunnable = Runnable { binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.apply { visibility = View.GONE } }
     protected val binding get() = _binding!!
     protected val viewModel: PlayerViewModel by viewModels()
     protected var chatFragment: ChatFragment? = null
 
     protected var videoType: String? = null
-    private var isPortrait = false
-    var isMaximized = true
+    override var isPortrait = false
+    override var isMaximized = true
     private var isChatOpen = true
     private var isKeyboardShown = false
     private var resizeMode = 0
@@ -133,6 +127,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var startTranslationX = 0f
     private var startTranslationY = 0f
     private var statusBarSwipe = false
+    override var isEdgeSwipe = false
+    private var gestureInsets: androidx.core.graphics.Insets? = null
     private var chatStatusBarSwipe = false
     private var isAnimating = false
     private var moveAnimation: ViewPropertyAnimator? = null
@@ -144,6 +140,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var controllerAnimation: ViewPropertyAnimator? = null
     private var backgroundColor: Int? = null
     private var backgroundVisible = false
+    private var originalBrightness: Float = -1f  // -1 = system default (auto)
+    
+    // Gesture conflict prevention: track state at gesture start
+    override var controlsVisibleAtGestureStart = false
+    private var isSwipeGestureInProgress = false
 
     // Floating Chat Properties
     private var isFloatingChatEnabled = false
@@ -167,17 +168,19 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     open fun startVideo(url: String?, playbackPosition: Long?, multivariantPlaylist: Boolean) {}
     open fun startClip(url: String?) {}
     open fun startOfflineVideo(url: String?, position: Long) {}
-    open fun getCurrentPosition(): Long? = null
-    open fun getCurrentSpeed(): Float? = null
+    override fun getPlayerVideoType() = videoType
+    override fun getCurrentPosition(): Long? = null
+    override fun getDuration(): Long = 0L
+    override fun getCurrentSpeed(): Float? = null
     open fun getCurrentVolume(): Float? = null
     open fun playPause() {}
     open fun rewind() {}
     open fun fastForward() {}
-    open fun seek(position: Long) {}
+    override fun seek(position: Long) {}
     open fun seekToLivePosition() {}
-    open fun setPlaybackSpeed(speed: Float) {}
+    override fun setPlaybackSpeed(speed: Float) {}
     open fun changeVolume(volume: Float) {}
-    open fun updateProgress() {}
+    override fun updateProgress() {}
     open fun toggleAudioCompressor() {}
     open fun setSubtitlesButton() {}
     open fun toggleSubtitles(enabled: Boolean) {}
@@ -195,7 +198,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         super.onCreate(savedInstanceState)
         val activity = requireActivity()
         prefs = activity.prefs()
-        isPortrait = activity.isInPortraitOrientation
+        isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         activity.onBackPressedDispatcher.addCallback(this, backPressedCallback)
         WindowCompat.getInsetsController(
             requireActivity().window,
@@ -261,6 +264,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
                 chatLayout.updatePadding(bottom = insets.bottom)
+                // Capture system gesture insets for edge detection
+                gestureInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures())
                 WindowInsetsCompat.CONSUMED
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && requireActivity().packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
@@ -290,135 +295,63 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             val longPressTimeout = ViewConfiguration.getLongPressTimeout()
             val moveFreely = prefs.getBoolean(C.PLAYER_MOVE_FREELY, false)
             val doubleTap = prefs.getBoolean(C.PLAYER_DOUBLETAP, true) && !prefs.getBoolean(C.CHAT_DISABLE, false)
+            
+            // Gesture Settings
+            val gesturesEnabled = prefs.getBoolean(C.PLAYER_GESTURES_ENABLED, true)
+            val hapticEnabled = prefs.getBoolean(C.PLAYER_GESTURES_HAPTIC, false)
+            
+            val sensitivityPref = prefs.getString(C.PLAYER_GESTURES_SENSITIVITY, "1")?.toIntOrNull() ?: 1
+            val sensitivity = when (sensitivityPref) {
+                0 -> 0.5f // Low
+                2 -> 2.0f // High
+                else -> 1.0f // Medium (default)
+            }
+            
+            val zoneSplit = prefs.getString(C.PLAYER_GESTURES_ZONE_SPLIT, "0.5")?.toFloatOrNull() ?: 0.5f
+
             val controllerTapDetector = GestureDetector(
                 requireContext(),
-                object : GestureDetector.SimpleOnGestureListener() {
-                    private var isVolume = false
-                    private var isBrightness = false
-                    private var startVolume = 0
-                    private var startBrightness = 0f
-                    private var gestureStartY = 0f
-
-                    override fun onDown(e: MotionEvent): Boolean {
-                        isVolume = false
-                        isBrightness = false
-                        gestureStartY = e.y
-                        return true
-                    }
-
-                    override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-                        if (e1 == null || isPortrait || !isMaximized || playerControls.root.isVisible) return false
-                        
-                        val width = resources.displayMetrics.widthPixels
-                        val height = resources.displayMetrics.heightPixels
-                        
-                        if (!isVolume && !isBrightness) {
-                             if (Math.abs(distanceY) > Math.abs(distanceX)) {
-                                 if (e1.x < width / 2) {
-                                     isBrightness = true
-                                     startBrightness = requireActivity().window.attributes.screenBrightness
-                                     if (startBrightness < 0) startBrightness = 0.5f // Default fallback
-                                 } else {
-                                     isVolume = true
-                                     val audioManager = requireContext().getSystemService(android.content.Context.AUDIO_SERVICE) as AudioManager
-                                     startVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                                 }
-                             }
-                        }
-
-                        val percent = (gestureStartY - e2.y) / height
-                        val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback)
-                        val icon = feedback.findViewById<ImageView>(R.id.volumeMute)
-                        val slider = feedback.findViewById<Slider>(R.id.volumeBar)
-                        val text = feedback.findViewById<TextView>(R.id.volumeText)
-
-                        if (isBrightness) {
-                            val newBrightness = (startBrightness + percent).coerceIn(0.01f, 1.0f)
-                            val lp = requireActivity().window.attributes
-                            lp.screenBrightness = newBrightness
-                            requireActivity().window.attributes = lp
-                            
-                            icon.setImageResource(R.drawable.ic_brightness_medium_black_24dp)
-                            feedback.visible()
-                            feedback.removeCallbacks(hideGestureRunnable)
-                            feedback.postDelayed(hideGestureRunnable, 1000)
-                            
-                            slider.value = newBrightness * 100
-                            text.text = "%d".format((newBrightness * 100).toInt())
-                            return true
-                        }
-                        
-                        if (isVolume) {
-                            val audioManager = requireContext().getSystemService(android.content.Context.AUDIO_SERVICE) as AudioManager
-                            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                            val newVolume = (startVolume + (percent * maxVolume)).toInt().coerceIn(0, maxVolume)
-                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
-                            
-                            icon.setImageResource(R.drawable.baseline_volume_up_black_24)
-                            feedback.visible()
-                            feedback.removeCallbacks(hideGestureRunnable)
-                            feedback.postDelayed(hideGestureRunnable, 1000)
-                            
-                            slider.value = (newVolume.toFloat() / maxVolume.toFloat()) * 100
-                            text.text = "%d".format((slider.value).toInt())
-                            return true
-                        }
-
-                        return false
-                    }
-                    override fun onSingleTapUp(e: MotionEvent): Boolean {
-                        return if (!doubleTap || isPortrait) {
-                            val visible = playerControls.root.isVisible
-                            if (visible) {
-                                if (controllerHideOnTouch) {
-                                    hideController()
-                                }
-                            } else {
-                                showController()
-                            }
-                            if (!visible) {
-                                updateProgress()
-                            }
-                            true
-                        } else {
-                            false
-                        }
-                    }
-
-                    override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                        return if (doubleTap && !isPortrait) {
-                            val visible = playerControls.root.isVisible
-                            if (visible) {
-                                if (controllerHideOnTouch) {
-                                    hideController()
-                                }
-                            } else {
-                                showController()
-                            }
-                            if (!visible) {
-                                updateProgress()
-                            }
-                            true
-                        } else {
-                            false
-                        }
-                    }
-
-                    override fun onDoubleTap(e: MotionEvent): Boolean {
-                        return if (doubleTap && !isPortrait && isMaximized) {
-                            cycleChatMode()
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                }
+                PlayerGestureListener(
+                    requireContext(), 
+                    this@PlayerFragment, 
+                    doubleTap,
+                    gesturesEnabled,
+                    hapticEnabled,
+                    sensitivity,
+                    zoneSplit
+                )
             )
+
+            // Edge zone detection for system gesture areas
+            val defaultEdgeThreshold = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 30f, resources.displayMetrics
+            ).toInt()
+            
+            fun isInEdgeZone(x: Float, y: Float): Boolean {
+                val width = playerLayout.width
+                val height = playerLayout.height
+                val insets = gestureInsets
+                
+                // Use system gesture insets if available, otherwise use fallback
+                val leftEdge = insets?.left?.takeIf { it > 0 } ?: defaultEdgeThreshold
+                val rightEdge = insets?.right?.takeIf { it > 0 } ?: defaultEdgeThreshold
+                val topEdge = insets?.top?.takeIf { it > 0 } ?: defaultEdgeThreshold
+                val bottomEdge = insets?.bottom?.takeIf { it > 0 } ?: defaultEdgeThreshold
+                
+                return x <= leftEdge || 
+                       x >= (width - rightEdge) || 
+                       y <= topEdge || 
+                       y >= (height - bottomEdge)
+            }
 
             fun downAction(event: MotionEvent) {
                 moveAnimation?.cancel()
                 isTap = true
                 tapEventTime = event.eventTime
+                // Capture controls visibility at gesture start - this determines routing for entire gesture
+                controlsVisibleAtGestureStart = playerControls.root.isVisible
+                // Reset swipe gesture flag for new gesture
+                isSwipeGestureInProgress = false
                 if (isMaximized) {
                     if (playerControls.root.isVisible) {
                         playerControls.root.dispatchTouchEvent(event)
@@ -451,32 +384,45 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         playerControls.root.dispatchTouchEvent(event)
                     } else {
                         if (slidingLayout.translationY in touchSlopRange) {
-                            if (playerControls.root.isVisible) {
+                            // Use controlsVisibleAtGestureStart for consistent routing
+                            if (controlsVisibleAtGestureStart) {
                                 playerControls.root.dispatchTouchEvent(event)
                             } else {
                                 controllerTapDetector.onTouchEvent(event)
                             }
                         }
-                        val minimizeThreshold = slidingLayout.height / 5
-                        if (slidingLayout.translationY < minimizeThreshold) {
-                            moveAnimation = slidingLayout.animate().apply {
-                                translationX(0f)
-                                translationY(0f)
-                                setDuration(250L)
-                                setListener(
-                                    object : AnimatorListenerAdapter() {
-                                        override fun onAnimationEnd(animation: Animator) {
-                                            setListener(null)
-                                            if (slidingLayout.translationY < touchSlop) {
-                                                enableBackground()
+                        // Only check minimize threshold if controls were visible and no swipe gesture claimed this touch
+                        if (controlsVisibleAtGestureStart && !isSwipeGestureInProgress) {
+                            val minimizeThreshold = slidingLayout.height / 5
+                            if (slidingLayout.translationY < minimizeThreshold) {
+                                moveAnimation = slidingLayout.animate().apply {
+                                    translationX(0f)
+                                    translationY(0f)
+                                    setDuration(250L)
+                                    setListener(
+                                        object : AnimatorListenerAdapter() {
+                                            override fun onAnimationEnd(animation: Animator) {
+                                                setListener(null)
+                                                if (this@PlayerFragment.view != null && slidingLayout.translationY < touchSlop) {
+                                                    enableBackground()
+                                                }
                                             }
                                         }
-                                    }
-                                )
-                                start()
+                                    )
+                                    start()
+                                }
+                            } else {
+                                minimize()
                             }
-                        } else {
-                            minimize()
+                        } else if (!controlsVisibleAtGestureStart) {
+                            // Controls were hidden at start - reset any accidental translation
+                            if (slidingLayout.translationY != 0f) {
+                                moveAnimation = slidingLayout.animate().apply {
+                                    translationY(0f)
+                                    setDuration(150L)
+                                    start()
+                                }
+                            }
                         }
                     }
                 } else {
@@ -568,6 +514,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             lastX = x * slidingLayout.scaleX
                             lastY = y * slidingLayout.scaleY
                             statusBarSwipe = !isPortrait && y <= 100
+                            isEdgeSwipe = !isPortrait && isInEdgeZone(x, y)
                             downAction(event)
                         }
                         MotionEvent.ACTION_POINTER_DOWN -> {
@@ -581,35 +528,44 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     lastX = x * slidingLayout.scaleX
                                     lastY = y * slidingLayout.scaleY
                                     statusBarSwipe = !isPortrait && y <= 100
+                                    isEdgeSwipe = !isPortrait && isInEdgeZone(x, y)
                                     downAction(event)
                                 }
                             }
                         }
                         MotionEvent.ACTION_MOVE -> {
                             if (isMaximized) {
-                                playerControls.root.dispatchTouchEvent(event)
-                                if (!playerControls.progressBar.isPressed && !statusBarSwipe && activePointerId != -1 && playerControls.root.isVisible) {
-                                    val pointerIndex = event.findPointerIndex(activePointerId)
-                                    if (pointerIndex != -1) {
-                                        val y = event.getY(pointerIndex)
-                                        val translationY = y - lastY
-                                        if (slidingLayout.translationY + translationY < 0) {
-                                            slidingLayout.translationY = 0f
-                                            lastY = y
-                                        } else {
-                                            slidingLayout.translationY += translationY
-                                            lastY = y - translationY
-                                        }
-                                        if (slidingLayout.translationY < touchSlop) {
-                                            if (!backgroundVisible) {
-                                                enableBackground()
+                                // Use controlsVisibleAtGestureStart for consistent routing throughout the gesture
+                                if (controlsVisibleAtGestureStart) {
+                                    // Controls were visible at gesture start: dispatch to controls and handle minimize gesture
+                                    playerControls.root.dispatchTouchEvent(event)
+                                    // Skip minimize gesture if a swipe gesture (seek/volume/brightness/speed) claimed this gesture
+                                    if (!playerControls.progressBar.isPressed && !statusBarSwipe && activePointerId != -1 && !isSwipeGestureInProgress) {
+                                        val pointerIndex = event.findPointerIndex(activePointerId)
+                                        if (pointerIndex != -1) {
+                                            val y = event.getY(pointerIndex)
+                                            val translationY = y - lastY
+                                            if (slidingLayout.translationY + translationY < 0) {
+                                                slidingLayout.translationY = 0f
+                                                lastY = y
+                                            } else {
+                                                slidingLayout.translationY += translationY
+                                                lastY = y - translationY
                                             }
-                                        } else {
-                                            if (backgroundVisible) {
-                                                disableBackground()
+                                            if (slidingLayout.translationY < touchSlop) {
+                                                if (!backgroundVisible) {
+                                                    enableBackground()
+                                                }
+                                            } else {
+                                                if (backgroundVisible) {
+                                                    disableBackground()
+                                                }
                                             }
                                         }
                                     }
+                                } else {
+                                    // Controls were hidden at gesture start: let gesture detector handle scroll gestures
+                                    controllerTapDetector.onTouchEvent(event)
                                 }
                             } else {
                                 if (activePointerId != -1) {
@@ -739,7 +695,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     channelName
                 }
                 if (prefs.getBoolean(C.PLAYER_CHANNEL, true)) {
-                    channel.visible()
+                    channel.visibility = View.VISIBLE
                     channel.text = displayName
                     channel.setOnClickListener {
                         findNavController().navigate(
@@ -754,12 +710,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
                 val titleText = requireArguments().getString(KEY_TITLE)
                 if (!titleText.isNullOrBlank() && prefs.getBoolean(C.PLAYER_TITLE, true)) {
-                    title.visible()
+                    title.visibility = View.VISIBLE
                     title.text = titleText
                 }
                 val gameName = requireArguments().getString(KEY_GAME_NAME)
                 if (!gameName.isNullOrBlank() && prefs.getBoolean(C.PLAYER_CATEGORY, true)) {
-                    category.visible()
+                    category.visibility = View.VISIBLE
                     category.text = gameName
                     category.setOnClickListener {
                         findNavController().navigate(
@@ -781,19 +737,19 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
                 if (prefs.getBoolean(C.PLAYER_MINIMIZE, true)) {
-                    minimize.visible()
+                    minimize.visibility = View.VISIBLE
                     minimize.setOnClickListener { minimize() }
                 }
                 if (prefs.getBoolean(C.PLAYER_VOLUMEBUTTON, true)) {
-                    volume.visible()
+                    volume.visibility = View.VISIBLE
                     volume.setOnClickListener { showVolumeDialog() }
                 }
                 if (prefs.getBoolean(C.PLAYER_SETTINGS, true)) {
-                    quality.visible()
+                    quality.visibility = View.VISIBLE
                     quality.setOnClickListener { showQualityDialog() }
                 }
                 if (prefs.getBoolean(C.PLAYER_MODE, false)) {
-                    audioOnly.visible()
+                    audioOnly.visibility = View.VISIBLE
                     audioOnly.setOnClickListener {
                         if (viewModel.quality == AUDIO_ONLY_QUALITY) {
                             changeQuality(viewModel.previousQuality)
@@ -805,7 +761,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(C.PLAYER_AUDIO_COMPRESSOR_BUTTON, true)) {
-                    audioCompressor.visible()
+                    audioCompressor.visibility = View.VISIBLE
                     if (prefs.getBoolean(C.PLAYER_AUDIO_COMPRESSOR, false)) {
                         audioCompressor.setImageResource(R.drawable.baseline_audio_compressor_on_24dp)
                     } else {
@@ -816,7 +772,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
                 if (prefs.getBoolean(C.PLAYER_MENU, true)) {
-                    menu.visible()
+                    menu.visibility = View.VISIBLE
                     menu.setOnClickListener {
                         PlayerSettingsDialog.newInstance(
                             videoType = videoType,
@@ -844,7 +800,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 !TwitchApiHelper.getHelixHeaders(requireContext())[C.HEADER_TOKEN].isNullOrBlank())
                     ) {
                         if (prefs.getBoolean(C.PLAYER_CHATBARTOGGLE, false) && !prefs.getBoolean(C.CHAT_DISABLE, false)) {
-                            toggleChatInput.visible()
+                            toggleChatInput.visibility = View.VISIBLE
                             toggleChatInput.setOnClickListener { toggleChatBar() }
                         }
                         slidingLayout.viewTreeObserver.addOnGlobalLayoutListener {
@@ -902,11 +858,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         }
                     }
                     if (prefs.getBoolean(C.PLAYER_RESTART, true)) {
-                        restart.visible()
+                        restart.visibility = View.VISIBLE
                         restart.setOnClickListener { restartPlayer() }
                     }
                     if (prefs.getBoolean(C.PLAYER_SEEKLIVE, false)) {
-                        seekLive.visible()
+                        seekLive.visibility = View.VISIBLE
                         seekLive.setOnClickListener { seekToLivePosition() }
                     }
                     if (prefs.getBoolean(C.PLAYER_VIEWERLIST, false)) {
@@ -919,11 +875,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             }
                         }
                     }
-                    rewind.gone()
-                    fastForward.gone()
-                    position.gone()
-                    progressBar.gone()
-                    duration.gone()
+                    rewind.visibility = View.GONE
+                    fastForward.visibility = View.GONE
+                    position.visibility = View.GONE
+                    progressBar.visibility = View.GONE
+                    duration.visibility = View.GONE
                     updateStreamInfo(
                         requireArguments().getString(KEY_TITLE),
                         requireArguments().getString(KEY_GAME_ID),
@@ -933,7 +889,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     updateViewerCount(requireArguments().getInt(KEY_VIEWER_COUNT).takeIf { it != -1 })
                 } else {
                     if (prefs.getBoolean(C.PLAYER_SPEEDBUTTON, true)) {
-                        speed.visible()
+                        speed.visibility = View.VISIBLE
                         speed.setOnClickListener { showSpeedDialog() }
                     }
                 }
@@ -976,7 +932,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 viewModel.gamesList.collectLatest { list ->
                                     if (!list.isNullOrEmpty()) {
                                         if (prefs.getBoolean(C.PLAYER_GAMESBUTTON, true)) {
-                                            vodGames.visible()
+                                            vodGames.visibility = View.VISIBLE
                                             vodGames.setOnClickListener { showVodGames() }
                                         }
                                         (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setVodGames()
@@ -1006,7 +962,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     filtered.forEach {
                                         val quality = it.key.first.let { quality ->
                                             val quality = if (quality == "source") {
-                                                requireContext().getString(R.string.source)
+                                                getString(R.string.source)
                                             } else {
                                                 quality
                                             }
@@ -1026,7 +982,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                         }
                                         map[it.key.first] = Pair(quality, it.value)
                                     }
-                                    map.put(AUDIO_ONLY_QUALITY, Pair(requireContext().getString(R.string.audio_only), null))
+                                    map.put(AUDIO_ONLY_QUALITY, Pair(getString(R.string.audio_only), null))
                                     viewModel.qualities = map.toList()
                                         .sortedByDescending {
                                             it.first.substringAfter("p", "").takeWhile { it.isDigit() }.toIntOrNull()
@@ -1051,7 +1007,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                     val videoId = requireArguments().getString(KEY_VIDEO_ID)
                     if (!videoId.isNullOrBlank()) {
-                        binding.watchVideo.visible()
+                        binding.watchVideo.visibility = View.VISIBLE
                         binding.watchVideo.setOnClickListener {
                             viewLifecycleOwner.lifecycleScope.launch {
                                 val offset = requireArguments().getInt(KEY_VOD_OFFSET).takeIf { it != -1 }?.let {
@@ -1079,7 +1035,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 } else {
                     if (prefs.getBoolean(C.PLAYER_SLEEP, false)) {
-                        sleepTimer.visible()
+                        sleepTimer.visibility = View.VISIBLE
                         sleepTimer.setOnClickListener { showSleepTimerDialog() }
                     }
                 }
@@ -1090,8 +1046,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 if (it != null) {
                                     val url = requireArguments().getString(KEY_URL)
                                     viewModel.qualities = mapOf(
-                                        "source" to Pair(requireContext().getString(R.string.source), url),
-                                        AUDIO_ONLY_QUALITY to Pair(requireContext().getString(R.string.audio_only), null)
+                                        "source" to Pair(getString(R.string.source), url),
+                                        AUDIO_ONLY_QUALITY to Pair(getString(R.string.audio_only), null)
                                     )
                                     setDefaultQuality()
                                     changePlayerMode()
@@ -1102,33 +1058,39 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         }
                     }
                 } else {
-                    quality.disable()
-                    download.disable()
-                    audioOnly.disable()
+                    quality.isEnabled = false
+                    quality.setColorFilter(Color.GRAY)
+                    download.isEnabled = false
+                    download.setColorFilter(Color.GRAY)
+                    audioOnly.isEnabled = false
+                    audioOnly.setColorFilter(Color.GRAY)
                     viewLifecycleOwner.lifecycleScope.launch {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             viewModel.loaded.collectLatest {
                                 if (it) {
-                                    quality.enable()
-                                    download.enable()
-                                    audioOnly.enable()
+                                    quality.isEnabled = true
+                                    quality.setColorFilter(Color.WHITE)
+                                    download.isEnabled = true
+                                    download.setColorFilter(Color.WHITE)
+                                    audioOnly.isEnabled = true
+                                    audioOnly.setColorFilter(Color.WHITE)
                                     setQualityText()
                                 }
                             }
                         }
                     }
                     if (prefs.getBoolean(C.PLAYER_DOWNLOAD, false)) {
-                        download.visible()
+                        download.visibility = View.VISIBLE
                         download.setOnClickListener { showDownloadDialog() }
                     }
                     val setting = prefs.getString(C.UI_FOLLOW_BUTTON, "0")?.toIntOrNull() ?: 0
                     if (prefs.getBoolean(C.PLAYER_FOLLOW, false) && (setting == 0 || setting == 1)) {
-                        follow.visible()
+                        follow.visibility = View.VISIBLE
                         follow.setOnClickListener {
                             viewModel.isFollowing.value?.let {
                                 if (it) {
                                     requireContext().getAlertDialogBuilder()
-                                        .setMessage(requireContext().getString(R.string.unfollow_channel, displayName))
+                                        .setMessage(getString(R.string.unfollow_channel, displayName))
                                         .setNegativeButton(getString(R.string.no), null)
                                         .setPositiveButton(getString(R.string.yes)) { _, _ ->
                                             viewModel.deleteFollowChannel(
@@ -1177,12 +1139,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                         val following = pair.first
                                         val errorMessage = pair.second
                                         if (!errorMessage.isNullOrBlank()) {
-                                            requireContext().shortToast(errorMessage)
+                                            Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_SHORT).show()
                                         } else {
                                             if (following) {
-                                                requireContext().shortToast(requireContext().getString(R.string.now_following, displayName))
+                                                Toast.makeText(requireContext(), getString(R.string.now_following, displayName), Toast.LENGTH_SHORT).show()
                                             } else {
-                                                requireContext().shortToast(requireContext().getString(R.string.unfollowed, displayName))
+                                                Toast.makeText(requireContext(), getString(R.string.unfollowed, displayName), Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                         viewModel.follow.value = null
@@ -1213,7 +1175,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 // Hide floating chat in portrait mode
                 if (isFloatingChatEnabled) {
                     isFloatingChatEnabled = false
-                    floatingChatRoot.gone()
+                    floatingChatRoot.visibility = View.GONE
                     // Reparent chat view back to sidebar (don't recreate fragment)
                     reparentChatView(toFloating = false)
                 }
@@ -1230,9 +1192,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     gravity = Gravity.BOTTOM
                 }
                 if (isMaximized) {
-                    chatLayout.visible()
+                    chatLayout.visibility = View.VISIBLE
                 } else {
-                    chatLayout.gone()
+                    chatLayout.visibility = View.GONE
                     val (minimizedScaleX, minimizedScaleY) = getScaleValues()
                     slidingLayout.scaleX = minimizedScaleX
                     slidingLayout.scaleY = minimizedScaleY
@@ -1259,14 +1221,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 chatLayout.isPortrait = true
                 with(playerControls) {
                     if (prefs.getBoolean(C.PLAYER_FULLSCREEN, true)) {
-                        fullscreen.visible()
+                        fullscreen.visibility = View.VISIBLE
                         fullscreen.setImageResource(R.drawable.baseline_fullscreen_black_24)
                         fullscreen.setOnClickListener {
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                         }
                     }
-                    aspectRatio.gone()
-                    toggleChat.gone()
+                    aspectRatio.visibility = View.GONE
+                    toggleChat.visibility = View.GONE
                 }
             } else {
                 requireActivity().window.decorView.setOnSystemUiVisibilityChangeListener {
@@ -1288,14 +1250,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         gravity = Gravity.END
                     }
                     if (isChatOpen) {
-                        chatLayout.visible()
+                        chatLayout.visibility = View.VISIBLE
                         if (requireView().findViewById<Button>(R.id.btnDown)?.isVisible == false) {
                             requireView().findViewById<RecyclerView>(R.id.recyclerView)?.let { recyclerView ->
                                 recyclerView.adapter?.itemCount?.let { recyclerView.scrollToPosition(it - 1) }
                             }
                         }
                     } else {
-                        chatLayout.gone()
+                        chatLayout.visibility = View.GONE
                     }
                 } else {
                     showStatusBar()
@@ -1309,7 +1271,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         height = ViewGroup.LayoutParams.MATCH_PARENT
                         gravity = Gravity.END
                     }
-                    chatLayout.gone()
+                    chatLayout.visibility = View.GONE
                     val (minimizedScaleX, minimizedScaleY) = getScaleValues()
                     slidingLayout.scaleX = minimizedScaleX
                     slidingLayout.scaleY = minimizedScaleY
@@ -1336,7 +1298,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 chatLayout.isPortrait = false
                 with(playerControls) {
                     if (prefs.getBoolean(C.PLAYER_FULLSCREEN, true)) {
-                        fullscreen.visible()
+                        fullscreen.visibility = View.VISIBLE
                         fullscreen.setImageResource(R.drawable.baseline_fullscreen_exit_black_24)
                         fullscreen.setOnClickListener {
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -1344,20 +1306,20 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         }
                     }
                     if (prefs.getBoolean(C.PLAYER_ASPECT, true)) {
-                        aspectRatio.visible()
+                        aspectRatio.visibility = View.VISIBLE
                         aspectRatio.setOnClickListener { setResizeMode() }
                     }
                     if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true) && !prefs.getBoolean(C.CHAT_DISABLE, false)) {
-                        toggleChat.visible()
+                        toggleChat.visibility = View.VISIBLE
                         updateChatButtonIcon()
                         
                         toggleChat.setOnClickListener { 
                             cycleChatMode()
                             updateChatButtonIcon()
                         }
-                    }
-                    // Separate floating chat button is now hidden as functionality is merged
-                    toggleFloatingChat.gone()
+                        }
+                        // Separate floating chat button is now hidden as functionality is merged
+                        toggleFloatingChat.visibility = View.GONE
                 }
             }
         }
@@ -1415,15 +1377,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun showSpeedDialog() {
         val speed = getCurrentSpeed()
         if (speed != null) {
-            val speedList = prefs.getString(C.PLAYER_SPEED_LIST, "0.25\n0.5\n0.75\n1.0\n1.25\n1.5\n1.75\n2.0\n3.0\n4.0\n8.0")?.split("\n")
-            if (speedList != null) {
-                RadioButtonDialogFragment.newInstance(
-                    REQUEST_CODE_SPEED,
-                    speedList,
-                    null,
-                    speedList.indexOf(speed.toString())
-                ).show(childFragmentManager, "closeOnPip")
-            }
+            PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
         }
     }
 
@@ -1455,15 +1409,15 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         with(binding) {
             requireView().findViewById<LinearLayout>(R.id.messageView)?.let {
                 if (it.isVisible) {
-                    chatLayout.hideKeyboard()
+                    (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(chatLayout.windowToken, 0)
                     chatLayout.clearFocus()
                     if (videoType == STREAM && chatFragment?.emoteMenuIsVisible() == true) {
                         chatFragment?.toggleEmoteMenu(false)
                     }
-                    it.gone()
+                    it.visibility = View.GONE
                     prefs.edit { putBoolean(C.KEY_CHAT_BAR_VISIBLE, false) }
                 } else {
-                    it.visible()
+                    it.visibility = View.VISIBLE
                     prefs.edit { putBoolean(C.KEY_CHAT_BAR_VISIBLE, true) }
                 }
             }
@@ -1475,7 +1429,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         hideChatLayout()
         if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true)) {
             binding.playerControls.toggleChat.apply {
-                visible()
+                visibility = View.VISIBLE
                 updateChatButtonIcon()
             }
         }
@@ -1487,7 +1441,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         showChatLayout()
         if (prefs.getBoolean(C.PLAYER_CHATTOGGLE, true)) {
             binding.playerControls.toggleChat.apply {
-                visible()
+                visibility = View.VISIBLE
                 updateChatButtonIcon()
             }
         }
@@ -1506,9 +1460,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 height = ViewGroup.LayoutParams.MATCH_PARENT
                 marginEnd = 0
             }
-            chatLayout.hideKeyboard()
+            (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(chatLayout.windowToken, 0)
             chatLayout.clearFocus()
-            chatLayout.gone()
+            chatLayout.visibility = View.GONE
         }
     }
 
@@ -1524,7 +1478,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 height = ViewGroup.LayoutParams.MATCH_PARENT
                 gravity = Gravity.END
             }
-            chatLayout.visible()
+            chatLayout.visibility = View.VISIBLE
         }
     }
 
@@ -1539,11 +1493,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (viewerCount != null) {
                 viewersText.text = TwitchApiHelper.formatCount(viewerCount, requireContext().prefs().getBoolean(C.UI_TRUNCATEVIEWCOUNT, true))
                 if (prefs.getBoolean(C.PLAYER_VIEWERICON, true)) {
-                    viewersIcon.visible()
+                    viewersIcon.visibility = View.VISIBLE
                 }
             } else {
                 viewersText.text = null
-                viewersIcon.gone()
+                viewersIcon.visibility = View.GONE
             }
         }
     }
@@ -1561,16 +1515,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         with(binding.playerControls) {
             uptimeTimer.stop()
             if (uptimeMs != null && prefs.getBoolean(C.PLAYER_SHOW_UPTIME, true)) {
-                uptimeLayout.visible()
+                uptimeLayout.visibility = View.VISIBLE
                 uptimeTimer.base = SystemClock.elapsedRealtime() + uptimeMs - System.currentTimeMillis()
                 uptimeTimer.start()
                 if (prefs.getBoolean(C.PLAYER_VIEWERICON, true)) {
-                    uptimeIcon.visible()
+                    uptimeIcon.visibility = View.VISIBLE
                 } else {
-                    uptimeIcon.gone()
+                    uptimeIcon.visibility = View.GONE
                 }
             } else {
-                uptimeLayout.gone()
+                uptimeLayout.visibility = View.GONE
             }
         }
     }
@@ -1579,19 +1533,19 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         binding.playerControls.title.apply {
             if (!title.isNullOrBlank() && prefs.getBoolean(C.PLAYER_TITLE, true)) {
                 text = title.trim()
-                visible()
+                visibility = View.VISIBLE
                 setOnClickListener {
-                    requireContext().toast(title.trim())
+                    Toast.makeText(requireContext(), title.trim(), Toast.LENGTH_SHORT).show()
                 }
             } else {
                 text = null
-                gone()
+                visibility = View.GONE
             }
         }
         binding.playerControls.category.apply {
             if (!gameName.isNullOrBlank() && prefs.getBoolean(C.PLAYER_CATEGORY, true)) {
                 text = gameName
-                visible()
+                visibility = View.VISIBLE
                 setOnClickListener {
                     findNavController().navigate(
                         if (prefs.getBoolean(C.UI_GAMEPAGER, true)) {
@@ -1612,7 +1566,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
             } else {
                 text = null
-                gone()
+                visibility = View.GONE
             }
         }
     }
@@ -1663,30 +1617,29 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     protected fun setDefaultQuality() {
-        val defaultQuality = prefs.getString(C.PLAYER_DEFAULTQUALITY, "saved")?.substringBefore(" ")
-        val isDataSaver = prefs.getBoolean(C.PLAYER_DATA_SAVER, true)
-        val isMetered = requireContext().isMeteredConnection
-
-        viewModel.quality = if (isDataSaver && isMetered && !viewModel.userHasChangedQuality) {
-             requireContext().shortToast(R.string.data_saver_mode)
-             findQuality("480p") ?: findQuality("360p") ?: viewModel.qualities.entries.firstOrNull()?.key
+        val connectivityManager = requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networkCapabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+        val cellular = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+        val defaultQuality = if (cellular) {
+            prefs.getString(C.PLAYER_DEFAULT_CELLULAR_QUALITY, "saved")
         } else {
-            when (defaultQuality) {
-                "saved" -> {
-                    val savedQuality = prefs.getString(C.PLAYER_QUALITY, "720p60")?.substringBefore(" ")
-                    when (savedQuality) {
-                        AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
-                        AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
-                        CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
-                        else -> findQuality(savedQuality)
-                    }
+            prefs.getString(C.PLAYER_DEFAULTQUALITY, "saved")
+        }?.substringBefore(" ")
+        viewModel.quality = when (defaultQuality) {
+            "saved" -> {
+                val savedQuality = prefs.getString(C.PLAYER_QUALITY, "720p60")?.substringBefore(" ")
+                when (savedQuality) {
+                    AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
+                    AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
+                    CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
+                    else -> findQuality(savedQuality)
                 }
-                AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
-                "Source" -> viewModel.qualities.entries.find { it.key != AUTO_QUALITY }?.key
-                AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
-                CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
-                else -> findQuality(defaultQuality)
             }
+            AUTO_QUALITY -> viewModel.qualities.entries.find { it.key == AUTO_QUALITY }?.key
+            "Source" -> viewModel.qualities.entries.find { it.key != AUTO_QUALITY }?.key
+            AUDIO_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == AUDIO_ONLY_QUALITY }?.key
+            CHAT_ONLY_QUALITY -> viewModel.qualities.entries.find { it.key == CHAT_ONLY_QUALITY }?.key
+            else -> findQuality(defaultQuality)
         } ?: viewModel.qualities.entries.firstOrNull()?.key
     }
 
@@ -1732,6 +1685,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     protected fun showController(force: Boolean = false) {
+        // Don't show controls while a swipe gesture (seek/volume/brightness/speed) is in progress
+        if (!force && isSwipeGestureInProgress) return
         if (!controllerIsAnimating) {
             if (!binding.playerControls.root.isVisible) {
                 binding.playerControls.root.removeCallbacks(controllerHideAction)
@@ -1742,14 +1697,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         object : AnimatorListenerAdapter() {
                             override fun onAnimationStart(animation: Animator) {
                                 controllerIsAnimating = true
-                                binding.playerControls.root.visible()
-                                updateChatButtonIcon()
+                                if (view != null) {
+                                    binding.playerControls.root.visibility = View.VISIBLE
+                                    updateChatButtonIcon()
+                                }
                             }
 
                             override fun onAnimationEnd(animation: Animator) {
                                 controllerIsAnimating = false
                                 setListener(null)
-                                if (controllerAutoHide && controllerHideOnTouch && !binding.playerControls.progressBar.isPressed) {
+                                if (view != null && controllerAutoHide && controllerHideOnTouch && !binding.playerControls.progressBar.isPressed) {
                                     binding.playerControls.root.postDelayed(controllerHideAction, 3000)
                                 }
                             }
@@ -1772,7 +1729,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 controllerAnimation?.cancel()
                 binding.playerControls.root.removeCallbacks(controllerHideAction)
                 binding.playerControls.root.alpha = 1f
-                binding.playerControls.root.visible()
+                binding.playerControls.root.visibility = View.VISIBLE
                 updateChatButtonIcon()
                 // Also show floating chat controls if floating chat is active
                 if (isFloatingChatEnabled) {
@@ -1799,7 +1756,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         override fun onAnimationEnd(animation: Animator) {
                             controllerIsAnimating = false
                             setListener(null)
-                            binding.playerControls.root.gone()
+                            if (view != null) {
+                                binding.playerControls.root.visibility = View.GONE
+                            }
                         }
                     }
                 )
@@ -1813,7 +1772,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (force) {
                 controllerAnimation?.cancel()
                 binding.playerControls.root.alpha = 0f
-                binding.playerControls.root.gone()
+                binding.playerControls.root.visibility = View.GONE
                 // Also hide floating chat controls if floating chat is active
                 if (isFloatingChatEnabled) {
                     binding.dragHandleZone.alpha = 0f
@@ -1920,8 +1879,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     setActions(listOf(
                         RemoteAction(
                             Icon.createWithResource(requireContext(), R.drawable.baseline_audiotrack_black_24),
-                            requireContext().getString(R.string.audio_only),
-                            requireContext().getString(R.string.audio_only),
+                            getString(R.string.audio_only),
+                            getString(R.string.audio_only),
                             PendingIntent.getBroadcast(
                                 requireContext(),
                                 REQUEST_CODE_AUDIO_ONLY,
@@ -1932,8 +1891,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         if (playing) {
                             RemoteAction(
                                 Icon.createWithResource(requireContext(), R.drawable.baseline_pause_black_48),
-                                requireContext().getString(R.string.pause),
-                                requireContext().getString(R.string.pause),
+                                getString(R.string.pause),
+                                getString(R.string.pause),
                                 PendingIntent.getBroadcast(
                                     requireContext(),
                                     REQUEST_CODE_PLAY_PAUSE,
@@ -1944,8 +1903,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         } else {
                             RemoteAction(
                                 Icon.createWithResource(requireContext(), R.drawable.baseline_play_arrow_black_48),
-                                requireContext().getString(R.string.resume),
-                                requireContext().getString(R.string.resume),
+                                getString(R.string.resume),
+                                getString(R.string.resume),
                                 PendingIntent.getBroadcast(
                                     requireContext(),
                                     REQUEST_CODE_PLAY_PAUSE,
@@ -1969,7 +1928,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
         if (isInPIPMode) {
             if (isPortrait) {
-                binding.chatLayout.gone()
+                binding.chatLayout.visibility = View.GONE
             } else {
                 hideChatLayout()
             }
@@ -2096,13 +2055,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 val map = mutableMapOf<String, Pair<String, String?>>()
                 qualityMap.forEach {
                     when (it.key) {
-                        "source" -> map[it.key] = Pair(requireContext().getString(R.string.source), it.value)
-                        "audio_only" -> map[it.key] = Pair(requireContext().getString(R.string.audio_only), it.value)
+                        "source" -> map[it.key] = Pair(getString(R.string.source), it.value)
+                        "audio_only" -> map[it.key] = Pair(getString(R.string.audio_only), it.value)
                         else -> map[it.key] = Pair(it.key, it.value)
                     }
                 }
                 map.put(AUDIO_ONLY_QUALITY, map.remove(AUDIO_ONLY_QUALITY) //move audio option to bottom
-                    ?: Pair(requireContext().getString(R.string.audio_only), null))
+                    ?: Pair(getString(R.string.audio_only), null))
                 val qualities = map.toList()
                     .sortedByDescending {
                         it.first.substringAfter("p", "").takeWhile { it.isDigit() }.toIntOrNull()
@@ -2136,7 +2095,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         with(binding) {
+            val wasPortrait = isPortrait
             isPortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
+            // Restore brightness when switching to portrait
+            if (isPortrait && !wasPortrait) {
+                restoreBrightness()
+            }
             if (isMaximized) {
                 enableBackground()
             } else {
@@ -2148,7 +2112,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 else -> false
             }
             if (!isInPIPMode) {
-                chatLayout.hideKeyboard()
+                (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(chatLayout.windowToken, 0)
                 chatLayout.clearFocus()
                 initLayout()
             }
@@ -2171,14 +2135,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     slidingLayout.scaleY = 1f
                 }
                 if (isPortrait) {
-                    chatLayout.gone()
+                    chatLayout.visibility = View.GONE
                 } else {
                     hideChatLayout()
                 }
                 useController = false
                 controllerAnimation?.cancel()
                 binding.playerControls.root.alpha = 0f
-                binding.playerControls.root.gone()
+                binding.playerControls.root.visibility = View.GONE
                 // player dialog
                 (childFragmentManager.findFragmentByTag("closeOnPip") as? BottomSheetDialogFragment)?.dismiss()
                 // player chat message dialog
@@ -2220,9 +2184,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun minimize() {
         with(binding) {
             isMaximized = false
+            // Restore original brightness when minimizing
+            restoreBrightness()
             // Hide floating chat when minimizing - it should only appear in fullscreen
             if (isFloatingChatEnabled) {
-                floatingChatRoot.gone()
+                floatingChatRoot.visibility = View.GONE
             }
             if (videoType == STREAM && chatFragment?.emoteMenuIsVisible() == true) {
                 chatFragment?.toggleBackPressedCallback(false)
@@ -2255,7 +2221,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         object : AnimatorListenerAdapter() {
                             override fun onAnimationStart(animation: Animator) {
                                 isAnimating = true
-                                disableBackground()
+                                if (view != null) {
+                                    disableBackground()
+                                }
                             }
 
                             override fun onAnimationEnd(animation: Animator) {
@@ -2269,7 +2237,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
             }
             if (isPortrait) {
-                chatLayout.gone()
+                chatLayout.visibility = View.GONE
                 slidingLayout.doOnLayout {
                     animate()
                 }
@@ -2301,12 +2269,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 updateProgress()
             }
             if (isPortrait) {
-                chatLayout.visible()
+                chatLayout.visibility = View.VISIBLE
             } else {
                 hideStatusBar()
                 // Show floating chat again if it was enabled
                 if (isFloatingChatEnabled) {
-                    floatingChatRoot.visible()
+                    floatingChatRoot.visibility = View.VISIBLE
                 } else if (isChatOpen) {
                     showChatLayout()
                 }
@@ -2326,7 +2294,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         override fun onAnimationEnd(animation: Animator) {
                             isAnimating = false
                             setListener(null)
-                            enableBackground()
+                            if (view != null) {
+                                enableBackground()
+                            }
                             activePointerId = -1
                         }
                     }
@@ -2389,7 +2359,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     fun onSleepTimerChanged(durationMs: Long, hours: Int, minutes: Int, lockScreen: Boolean) {
         if (durationMs > 0L) {
-            requireContext().toast(
+            Toast.makeText(
+                requireContext(),
                 when {
                     hours == 0 -> getString(
                         R.string.playback_will_stop,
@@ -2404,10 +2375,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         resources.getQuantityString(R.plurals.hours, hours, hours),
                         resources.getQuantityString(R.plurals.minutes, minutes, minutes)
                     )
-                }
-            )
+                },
+                Toast.LENGTH_LONG
+            ).show()
         } else if (((activity as? MainActivity)?.getSleepTimerTimeLeft() ?: 0) > 0L) {
-            requireContext().toast(R.string.timer_canceled)
+            Toast.makeText(requireContext(), R.string.timer_canceled, Toast.LENGTH_LONG).show()
         }
         if (lockScreen != prefs.getBoolean(C.SLEEP_TIMER_LOCK, false)) {
             prefs.edit { putBoolean(C.SLEEP_TIMER_LOCK, lockScreen) }
@@ -2619,6 +2591,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun onDestroyView() {
+        // Restore original brightness when fragment is destroyed
+        restoreBrightness()
         super.onDestroyView()
         _binding = null
     }
@@ -2796,7 +2770,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
-    private fun cycleChatMode() {
+    override fun cycleChatMode() {
         // Check if floating chat is enabled in settings
         val floatingChatAllowed = prefs.getBoolean(C.FLOATING_CHAT_ENABLED, true)
         
@@ -2814,7 +2788,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         } else {
             // Floating -> Hide chat completely
             isFloatingChatEnabled = false
-            binding.floatingChatRoot.gone()
+            binding.floatingChatRoot.visibility = View.GONE
             // Move chat view back to sidebar container (reparent, don't recreate)
             reparentChatView(toFloating = false)
             isChatOpen = false
@@ -2833,25 +2807,27 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
         if (isFloatingChatEnabled) {
             // Hide sidebar chat and reset player margin
-            binding.chatLayout.gone()
+            binding.chatLayout.visibility = View.GONE
             binding.playerLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                 marginEnd = 0
             }
             // Show with fade-in animation
             binding.floatingChatRoot.alpha = 0f
-            binding.floatingChatRoot.visible()
+            binding.floatingChatRoot.visibility = View.VISIBLE
             binding.floatingChatRoot.animate().alpha(1f).setDuration(200).start()
             // Start with drag handle hidden (synced with player controls)
             binding.dragHandleZone.alpha = if (binding.playerControls.root.isVisible) 1f else 0f
             restoreFloatingChatPosition()
-            // Apply transparency to the container background, not the whole view
-            val transparency = prefs.getInt(C.FLOATING_CHAT_TRANSPARENCY, 100)
+            // Apply transparency to the container background using theme-aware colors
+            val transparency = prefs.getInt(C.FLOATING_CHAT_TRANSPARENCY, 0)
             val alpha = (transparency * 255 / 100).coerceIn(0, 255)
-            binding.floatingChatContainer.setBackgroundColor(Color.argb(alpha, 0, 0, 0))
+            val surfaceColor = MaterialColors.getColor(binding.floatingChatContainer, com.google.android.material.R.attr.colorSurface)
+            val themedColor = ColorUtils.setAlphaComponent(surfaceColor, alpha)
+            binding.floatingChatContainer.setBackgroundColor(themedColor)
         } else {
             // Hide with fade-out animation
             binding.floatingChatRoot.animate().alpha(0f).setDuration(200)
-                .withEndAction { binding.floatingChatRoot.gone() }.start()
+                .withEndAction { binding.floatingChatRoot.visibility = View.GONE }.start()
             // Restore sidebar chat with proper layout
             isChatOpen = true
             showChatLayout()
@@ -2878,6 +2854,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             currentParent.removeView(chatView)
             targetContainer.addView(chatView)
         }
+        // Update high visibility mode - should only apply to floating chat
+        chatFragment?.updateHighVisibility(toFloating)
     }
 
     private fun saveFloatingChatPosition() {
@@ -2952,6 +2930,41 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 childFragmentManager.beginTransaction().replace(R.id.floating_chat_container, fragment).commitNow()
                 chatFragment = fragment
             }
+        }
+    }
+
+    // PlayerGestureCallback implementation
+    override val isControlsVisible get() = binding.playerControls.root.isVisible
+    override val screenWidth get() = resources.displayMetrics.widthPixels
+    override val screenHeight get() = resources.displayMetrics.heightPixels
+    override val windowAttributes: android.view.WindowManager.LayoutParams get() = requireActivity().window.attributes
+    override fun setWindowAttributes(params: android.view.WindowManager.LayoutParams) { 
+        // Save original brightness before first modification
+        if (originalBrightness == -1f && params.screenBrightness != -1f) {
+            originalBrightness = requireActivity().window.attributes.screenBrightness
+        }
+        requireActivity().window.attributes = params 
+    }
+    override fun getGestureFeedbackView() = binding.playerLayout.findViewById<View>(R.id.gestureFeedback)
+    override fun getHideGestureRunnable() = hideGestureRunnable
+    override fun isControllerHideOnTouch() = controllerHideOnTouch
+    override fun showController() = showController(false)
+    override fun hideController() = hideController(false)
+    
+    override fun onSwipeGestureStarted() {
+        isSwipeGestureInProgress = true
+    }
+    
+    override fun onSwipeGestureEnded() {
+        isSwipeGestureInProgress = false
+    }
+    
+    private fun restoreBrightness() {
+        if (originalBrightness != -1f) {
+            val lp = requireActivity().window.attributes
+            lp.screenBrightness = originalBrightness
+            requireActivity().window.attributes = lp
+            originalBrightness = -1f
         }
     }
 }

@@ -3,270 +3,502 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ThystTV - A Feature-Rich Twitch Client for Android</title>
+    <title>ThystTV — A Feature-Rich Twitch Client for Android</title>
     <meta name="description" content="ThystTV is an open-source Android Twitch client with floating chat, gesture controls, viewing stats, and more.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;0,6..72,400;1,6..72,200;1,6..72,300;1,6..72,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        /* ── Design tokens — dark (default) ──────────────── */
         :root {
-            --primary: #9146FF;
-            --primary-dark: #772CE8;
-            --bg-dark: #0E0E10;
-            --bg-card: #18181B;
-            --text: #EFEFF1;
-            --text-muted: #ADADB8;
+            --bg:           #05070F;
+            --bg-mid:       #080C18;
+            --surface:      #0D1225;
+            --surface-2:    #111830;
+            --accent:       #22D3EE;
+            --accent-glow:  rgba(34,211,238,0.18);
+            --amethyst:     #A78BFA;
+            --amethyst-dk:  #7C3AED;
+            --amethyst-glow:rgba(167,139,250,0.15);
+            --crystal-hi:   #67E8F9;
+            --text:         #E2E8F0;
+            --text-muted:   rgba(226,232,240,0.5);
+            --border:       rgba(100,130,200,0.12);
+            --border-bright:rgba(34,211,238,0.22);
+            --nav-bg:       rgba(5,7,15,0.82);
+            --footer-bg:    #05070F;
+            --badge-bg:     linear-gradient(135deg,rgba(34,211,238,0.08),rgba(167,139,250,0.08));
+            --card-bg:      linear-gradient(145deg,#111830,rgba(13,18,37,.5));
+            --shadow-card:  rgba(10,14,30,0.6);
+            --radius-lg:    20px;
+            --radius-full:  9999px;
+            --transition:   300ms cubic-bezier(0.4,0,0.2,1);
         }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+
+        /* ── Light mode overrides ────────────────────────── */
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg:           #F0F4FF;
+                --bg-mid:       #E8EEF8;
+                --surface:      #FFFFFF;
+                --surface-2:    #F5F8FF;
+                --accent:       #0891B2;          /* cyan-600 — readable on white */
+                --accent-glow:  rgba(8,145,178,0.15);
+                --amethyst:     #7C3AED;
+                --amethyst-dk:  #5B21B6;
+                --amethyst-glow:rgba(124,58,237,0.12);
+                --crystal-hi:   #0E7490;
+                --text:         #0F172A;
+                --text-muted:   rgba(15,23,42,0.5);
+                --border:       rgba(100,130,200,0.18);
+                --border-bright:rgba(8,145,178,0.28);
+                --nav-bg:       rgba(240,244,255,0.88);
+                --footer-bg:    #E8EEF8;
+                --badge-bg:     linear-gradient(135deg,rgba(8,145,178,0.08),rgba(124,58,237,0.08));
+                --card-bg:      linear-gradient(145deg,#FFFFFF,#F5F8FF);
+                --shadow-card:  rgba(100,120,180,0.15);
+            }
+            /* Invert aurora blobs for light bg */
+            .aurora::before {
+                background: radial-gradient(circle,rgba(124,58,237,0.1) 0%,transparent 70%);
+            }
+            .aurora::after {
+                background: radial-gradient(circle,rgba(8,145,178,0.09) 0%,transparent 70%);
+            }
+            /* Feature section tint */
+            .features::before {
+                background: radial-gradient(ellipse 80% 60% at 50% 0%,rgba(124,58,237,0.05) 0%,transparent 70%);
+            }
+            .download::before {
+                background: radial-gradient(ellipse 70% 80% at 50% 50%,rgba(124,58,237,0.06) 0%,transparent 70%);
+            }
+            /* Tech stack underline */
+            .tech-stack::after {
+                background: linear-gradient(90deg,transparent,var(--border-bright),transparent);
+            }
+            /* Crystal cluster opacity boost for light bg */
+            .crystal-cluster-left,
+            .crystal-cluster-right { opacity: 0.25; }
+
+            /* Wave SVG fills need to match new surface colour */
+            .wave-feat   { fill: #FFFFFF !important; }
+            .wave-tech   { fill: #E8EEF8 !important; }
+            .wave-dl     { fill: #F0F4FF !important; }
+            .wave-feat-bg{ fill: #E8EEF8 !important; }
+            .wave-tech-bg{ fill: #FFFFFF !important; }
+
+            /* Changelog light colors */
+            .cl-dot { background: var(--accent); }
         }
-        
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html { scroll-behavior: smooth; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg-dark);
+            font-family: 'Instrument Sans', sans-serif;
+            background: var(--bg);
             color: var(--text);
+            font-size: 18px;
             line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
         }
-        
+
+        /* ── Noise ───────────────────────────────────────── */
+        .noise-overlay {
+            position:fixed; inset:0; z-index:9999;
+            pointer-events:none; opacity:0.03; mix-blend-mode:overlay;
+        }
+
+        /* ── Aurora ──────────────────────────────────────── */
+        .aurora {
+            position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
+        }
+        .aurora::before,.aurora::after {
+            content:''; position:absolute; border-radius:50%;
+            filter:blur(120px);
+            animation:auroPulse 8s ease-in-out infinite alternate;
+        }
+        .aurora::before {
+            width:700px; height:700px;
+            background:radial-gradient(circle,rgba(124,58,237,.2) 0%,transparent 70%);
+            top:-200px; left:-150px;
+        }
+        .aurora::after {
+            width:600px; height:600px;
+            background:radial-gradient(circle,rgba(34,211,238,.15) 0%,transparent 70%);
+            bottom:-200px; right:-100px;
+            animation-delay:3s;
+        }
+        @keyframes auroPulse {
+            0%   { transform:scale(1) translate(0,0); opacity:.8; }
+            100% { transform:scale(1.15) translate(40px,30px); opacity:1; }
+        }
+
+        /* ── Typography ──────────────────────────────────── */
+        h1,h2,h3 {
+            font-family:'Newsreader',serif;
+            letter-spacing:-0.02em; font-weight:300; line-height:1.15;
+        }
+        h1 { font-size:clamp(2.8rem,6vw,4.5rem); font-weight:200; }
+        h2 { font-size:clamp(1.8rem,3.5vw,2.6rem); }
+        h3 { font-size:1.3rem; font-weight:400; }
+
+        .label {
+            font-family:'Instrument Sans',sans-serif;
+            font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:.1em;
+            color:var(--accent);
+        }
+        .mono {
+            font-family:ui-monospace,'SF Mono','Cascadia Code',monospace;
+            font-size:12px; color:var(--text-muted);
+        }
+
+        /* ── Layout ──────────────────────────────────────── */
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
+            max-width:1140px; margin:0 auto; padding:0 24px;
+            position:relative; z-index:1;
         }
-        
-        /* Header */
+
+        /* ── Header ──────────────────────────────────────── */
         header {
-            padding: 20px 0;
-            border-bottom: 1px solid #2F2F35;
+            padding:18px 0; position:sticky; top:0; z-index:200;
+            background:var(--nav-bg);
+            backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+            border-bottom:1px solid var(--border);
         }
-        
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
+        nav { display:flex; justify-content:space-between; align-items:center; }
         .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-            color: var(--text);
+            display:flex; align-items:center; gap:12px;
+            text-decoration:none; color:var(--text);
         }
-        
         .logo img {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
+            width:36px; height:36px; border-radius:8px;
+            filter:drop-shadow(0 0 8px var(--accent-glow));
         }
-        
         .logo span {
-            font-size: 1.5rem;
-            font-weight: 700;
+            font-family:'Instrument Sans',sans-serif;
+            font-size:1.1rem; font-weight:600;
+            background:linear-gradient(90deg,var(--accent),var(--amethyst));
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
         }
-        
-        .nav-links {
-            display: flex;
-            gap: 24px;
-        }
-        
+        .nav-links { display:flex; gap:32px; align-items:center; }
         .nav-links a {
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: color 0.2s;
+            font-size:14px; font-weight:500; color:var(--text-muted);
+            text-decoration:none; transition:color var(--transition);
         }
-        
-        .nav-links a:hover {
-            color: var(--primary);
-        }
-        
-        /* Hero */
+        .nav-links a:hover { color:var(--accent); }
+
+        /* ── Hero ────────────────────────────────────────── */
         .hero {
-            padding: 80px 0;
-            text-align: center;
+            padding:110px 0 90px; text-align:center;
+            position:relative; overflow:hidden;
         }
-        
-        .hero h1 {
-            font-size: 3rem;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, var(--primary), #00D4AA);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        .crystal-cluster-left,.crystal-cluster-right {
+            position:absolute; top:50%; transform:translateY(-50%);
+            opacity:.45; pointer-events:none;
         }
-        
+        .crystal-cluster-left  { left:-30px; }
+        .crystal-cluster-right { right:-30px; transform:translateY(-50%) scaleX(-1); }
+
+        .hero-badge {
+            display:inline-flex; align-items:center; gap:8px;
+            background:var(--badge-bg);
+            border:1px solid var(--border-bright);
+            border-radius:var(--radius-full);
+            padding:6px 18px; font-size:13px; color:var(--text-muted);
+            margin-bottom:32px;
+        }
+        .hero-badge .dot {
+            width:6px; height:6px; border-radius:50%;
+            background:var(--accent); box-shadow:0 0 8px var(--accent);
+            animation:pulseDot 2s ease-in-out infinite;
+        }
+        @keyframes pulseDot { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        .hero .label {
+            margin-bottom:24px;
+            display:inline-flex; align-items:center; gap:8px;
+        }
+        .hero .label::before,.hero .label::after {
+            content:''; display:inline-block; width:24px; height:1px;
+            background:var(--accent); opacity:.6;
+        }
+        .hero h1 { margin-bottom:24px; }
+        .hero h1 em {
+            font-style:italic;
+            background:linear-gradient(135deg,var(--accent) 0%,var(--amethyst) 100%);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+        }
         .hero p {
-            font-size: 1.25rem;
-            color: var(--text-muted);
-            max-width: 600px;
-            margin: 0 auto 40px;
+            font-size:1.1rem; color:var(--text-muted);
+            max-width:520px; margin:0 auto 52px; line-height:1.75;
         }
-        
-        .cta-buttons {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        
+
+        /* ── Buttons ─────────────────────────────────────── */
+        .cta-buttons { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
         .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 14px 28px;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: transform 0.2s, box-shadow 0.2s;
+            display:inline-flex; align-items:center; gap:10px;
+            padding:13px 30px; border-radius:var(--radius-full);
+            font-family:'Instrument Sans',sans-serif;
+            font-size:15px; font-weight:600; text-decoration:none;
+            transition:transform var(--transition), box-shadow var(--transition), background var(--transition);
+            cursor:pointer; border:none;
         }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-        }
-        
+        .btn:hover { transform:translateY(-2px); }
         .btn-primary {
-            background: var(--primary);
-            color: white;
+            background:linear-gradient(135deg,var(--accent),#818CF8);
+            color:#05070F;
         }
-        
         .btn-primary:hover {
-            box-shadow: 0 8px 20px rgba(145, 70, 255, 0.4);
+            box-shadow:0 8px 32px rgba(34,211,238,.3), 0 4px 16px rgba(129,140,248,.2);
         }
-        
         .btn-secondary {
-            background: var(--bg-card);
-            color: var(--text);
-            border: 1px solid #3F3F46;
+            background:transparent; color:var(--text);
+            border:1px solid var(--border-bright); backdrop-filter:blur(8px);
         }
-        
         .btn-secondary:hover {
-            border-color: var(--primary);
+            border-color:var(--amethyst);
+            background:rgba(167,139,250,.07);
+            box-shadow:0 0 20px var(--amethyst-glow);
         }
-        
-        /* Features */
-        .features {
-            padding: 80px 0;
+
+        /* ── Crystal wave dividers ───────────────────────── */
+        .crystal-divider { width:100%; overflow:hidden; line-height:0; position:relative; z-index:1; }
+        .crystal-divider svg { display:block; width:100%; }
+
+        /* ── Features ────────────────────────────────────── */
+        .features { padding:90px 0 100px; background:var(--surface); position:relative; }
+        .features::before {
+            content:''; position:absolute; inset:0;
+            background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(124,58,237,.08) 0%,transparent 70%);
+            pointer-events:none;
         }
-        
-        .features h2 {
-            text-align: center;
-            font-size: 2rem;
-            margin-bottom: 60px;
-        }
-        
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 24px;
-        }
-        
+        .section-header { text-align:center; margin-bottom:64px; }
+        .section-header .label { margin-bottom:16px; display:inline-block; }
+        .section-header h2 em { font-style:italic; color:var(--amethyst); }
+
+        .features-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+
         .feature-card {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 32px;
-            border: 1px solid #2F2F35;
-            transition: border-color 0.2s, transform 0.2s;
+            background:var(--card-bg);
+            border-radius:var(--radius-lg);
+            padding:34px 30px;
+            border:1px solid var(--border);
+            transition:border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+            position:relative; overflow:hidden;
         }
-        
+        .feature-card::before {
+            content:''; position:absolute; top:-20px; right:-20px;
+            width:80px; height:80px;
+            background:linear-gradient(135deg,var(--amethyst-glow),var(--accent-glow));
+            clip-path:polygon(100% 0,0 0,100% 100%);
+            opacity:0; transition:opacity var(--transition);
+        }
         .feature-card:hover {
-            border-color: var(--primary);
-            transform: translateY(-4px);
+            border-color:rgba(167,139,250,.35);
+            transform:translateY(-5px);
+            box-shadow:0 16px 40px var(--shadow-card), 0 0 0 1px rgba(167,139,250,.12);
         }
-        
-        .feature-icon {
-            font-size: 2.5rem;
-            margin-bottom: 16px;
+        .feature-card:hover::before { opacity:1; }
+        .feature-card .mono { margin-bottom:18px; display:block; }
+        .feature-icon { font-size:1.8rem; margin-bottom:14px; display:block; }
+        .gem-badge {
+            display:inline-block; width:8px; height:8px;
+            background:linear-gradient(135deg,var(--accent),var(--amethyst));
+            clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+            margin-right:6px; vertical-align:middle; margin-bottom:2px;
         }
-        
-        .feature-card h3 {
-            font-size: 1.25rem;
-            margin-bottom: 12px;
+        .feature-card h3 { margin-bottom:10px; color:var(--text); }
+        .feature-card p { color:var(--text-muted); font-size:15px; line-height:1.65; }
+
+        /* ── Changelog ───────────────────────────────────── */
+        .changelog {
+            padding:90px 0 100px; background:var(--bg-mid); position:relative;
         }
-        
-        .feature-card p {
-            color: var(--text-muted);
+        .changelog .section-header h2 em { color:var(--accent); }
+
+        .cl-timeline {
+            max-width:720px;
+            margin:0 auto;
+            display:flex; flex-direction:column; gap:0;
         }
-        
-        /* Tech Stack */
-        .tech-stack {
-            padding: 60px 0;
-            background: var(--bg-card);
-            border-top: 1px solid #2F2F35;
-            border-bottom: 1px solid #2F2F35;
+
+        .cl-entry {
+            display:grid;
+            grid-template-columns:110px 24px 1fr;
+            gap:0 14px;
+            position:relative;
+            padding-bottom:40px;
         }
-        
-        .tech-stack h2 {
-            text-align: center;
-            margin-bottom: 40px;
+        .cl-entry:last-child { padding-bottom:0; }
+
+        .cl-date {
+            text-align:right;
+            padding-top:2px;
+            font-family:'Instrument Sans',sans-serif;
+            font-size:13px; font-weight:500;
+            color:var(--text-muted);
+            line-height:1.4;
         }
-        
-        .tech-badges {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 12px;
+        .cl-date strong {
+            display:block; font-size:15px; font-weight:600;
+            color:var(--accent);
         }
-        
+
+        /* The vertical line column */
+        .cl-spine {
+            display:flex; flex-direction:column; align-items:center;
+        }
+        .cl-dot {
+            width:12px; height:12px; border-radius:50%; flex-shrink:0;
+            background:linear-gradient(135deg,var(--accent),var(--amethyst));
+            box-shadow:0 0 10px var(--accent-glow);
+            margin-top:3px;
+        }
+        .cl-line {
+            width:1px; flex:1;
+            background:linear-gradient(to bottom, var(--border-bright), transparent);
+            margin-top:6px;
+        }
+        .cl-entry:last-child .cl-line { display:none; }
+
+        .cl-body { padding-top:0; }
+        .cl-version {
+            font-family:'Instrument Sans',sans-serif;
+            font-size:13px; font-weight:600; text-transform:uppercase;
+            letter-spacing:.08em; color:var(--amethyst);
+            margin-bottom:6px;
+        }
+        .cl-body h3 {
+            font-size:1.15rem; margin-bottom:10px; color:var(--text);
+        }
+        .cl-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+        .cl-tag {
+            font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+            padding:2px 10px; border-radius:var(--radius-full);
+            background:rgba(34,211,238,.08); color:var(--accent);
+            border:1px solid rgba(34,211,238,.2);
+        }
+        .cl-tag.feature { background:rgba(167,139,250,.08); color:var(--amethyst); border-color:rgba(167,139,250,.2); }
+        .cl-tag.fix     { background:rgba(52,211,153,.08); color:#34D399; border-color:rgba(52,211,153,.2); }
+        .cl-tag.perf    { background:rgba(251,191,36,.07); color:#FBBF24; border-color:rgba(251,191,36,.2); }
+
+        .cl-items { list-style:none; display:flex; flex-direction:column; gap:5px; }
+        .cl-items li {
+            font-size:15px; color:var(--text-muted); line-height:1.55;
+            padding-left:16px; position:relative;
+        }
+        .cl-items li::before {
+            content:''; position:absolute; left:0; top:9px;
+            width:5px; height:5px; border-radius:50%;
+            background:var(--accent); opacity:.5;
+        }
+
+        /* ── Tech Stack ──────────────────────────────────── */
+        .tech-stack { padding:80px 0; background:var(--bg-mid); position:relative; }
+        .tech-stack::after {
+            content:''; position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+            width:60%; height:1px;
+            background:linear-gradient(90deg,transparent,var(--border-bright),transparent);
+        }
+        .tech-stack .section-header h2 em { color:var(--accent); }
+        .tech-badges { display:flex; justify-content:center; flex-wrap:wrap; gap:10px; }
         .tech-badge {
-            background: var(--bg-dark);
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            border: 1px solid #3F3F46;
+            background:linear-gradient(135deg,rgba(13,18,37,.8),rgba(17,24,48,.8));
+            padding:9px 22px; border-radius:var(--radius-full);
+            font-family:'Instrument Sans',sans-serif;
+            font-size:14px; font-weight:500; color:var(--text-muted);
+            border:1px solid var(--border);
+            transition:border-color var(--transition), color var(--transition), box-shadow var(--transition);
+            cursor:default;
         }
-        
-        /* Download */
-        .download {
-            padding: 80px 0;
-            text-align: center;
+        .tech-badge:hover {
+            border-color:var(--accent); color:var(--crystal-hi);
+            box-shadow:0 0 16px var(--accent-glow), inset 0 0 10px rgba(34,211,238,.05);
         }
-        
-        .download h2 {
-            font-size: 2rem;
-            margin-bottom: 20px;
+
+        /* ── Download ────────────────────────────────────── */
+        .download { padding:110px 0; text-align:center; position:relative; overflow:hidden; }
+        .download::before {
+            content:''; position:absolute; inset:0;
+            background:radial-gradient(ellipse 70% 80% at 50% 50%,rgba(124,58,237,.1) 0%,transparent 70%);
+            pointer-events:none;
         }
-        
+        .crystal-ring {
+            position:absolute; left:50%; top:50%;
+            transform:translate(-50%,-50%);
+            width:500px; height:500px;
+            border-radius:50%;
+            border:1px solid rgba(167,139,250,.08);
+            pointer-events:none;
+            animation:ringRotate 40s linear infinite;
+        }
+        .crystal-ring::before {
+            content:''; position:absolute; inset:30px;
+            border-radius:50%; border:1px solid rgba(34,211,238,.06);
+        }
+        @keyframes ringRotate { to { transform:translate(-50%,-50%) rotate(360deg); } }
+
+        .download .label { margin-bottom:16px; display:inline-block; }
+        .download h2 { margin-bottom:16px; }
+        .download h2 em {
+            font-style:italic;
+            background:linear-gradient(90deg,var(--accent),var(--amethyst));
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+        }
         .download p {
-            color: var(--text-muted);
-            margin-bottom: 40px;
+            color:var(--text-muted); margin:0 auto 40px; font-size:15px; max-width:400px;
         }
-        
-        /* Footer */
+
+        /* ── Footer ──────────────────────────────────────── */
         footer {
-            padding: 40px 0;
-            border-top: 1px solid #2F2F35;
-            text-align: center;
-            color: var(--text-muted);
+            padding:40px 0; border-top:1px solid var(--border);
+            text-align:center; background:var(--footer-bg);
         }
-        
-        footer a {
-            color: var(--primary);
-            text-decoration: none;
+        footer p { color:var(--text-muted); font-size:14px; }
+        footer a { color:var(--accent); text-decoration:none; transition:color var(--transition); }
+        footer a:hover { color:var(--amethyst); }
+
+        /* ── Light-mode tech-badge tweak ─────────────────── */
+        @media (prefers-color-scheme: light) {
+            .tech-badge {
+                background:linear-gradient(135deg,rgba(240,244,255,.9),rgba(248,250,255,.9));
+            }
         }
-        
-        footer a:hover {
-            text-decoration: underline;
+
+        /* ── Responsive ──────────────────────────────────── */
+        @media (max-width:900px) {
+            .features-grid { grid-template-columns:repeat(2,1fr); }
+            .crystal-cluster-left,.crystal-cluster-right { display:none; }
         }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 2rem;
-            }
-            
-            .hero p {
-                font-size: 1rem;
-            }
-            
-            .nav-links {
-                display: none;
-            }
+        @media (max-width:700px) {
+            .cl-entry { grid-template-columns:0px 24px 1fr; }
+            .cl-date { display:none; }
+        }
+        @media (max-width:640px) {
+            body { font-size:16px; }
+            .hero { padding:72px 0 60px; }
+            .features-grid { grid-template-columns:1fr; }
+            .nav-links { display:none; }
+            .feature-card { padding:26px 22px; }
+            .crystal-ring { width:300px; height:300px; }
         }
     </style>
 </head>
 <body>
+
+    <!-- Noise -->
+    <svg class="noise-overlay" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+        <filter id="noise">
+            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+        </filter>
+        <rect width="100%" height="100%" filter="url(#noise)"/>
+    </svg>
+
+    <!-- Aurora -->
+    <div class="aurora"></div>
+
+    <!-- ── Header ─────────────────────────────────────── -->
     <header>
         <div class="container">
             <nav>
@@ -276,6 +508,7 @@
                 </a>
                 <div class="nav-links">
                     <a href="#features">Features</a>
+                    <a href="#changelog">Changelog</a>
                     <a href="#download">Download</a>
                     <a href="https://github.com/tzii/ThystTV">GitHub</a>
                 </div>
@@ -283,64 +516,226 @@
         </div>
     </header>
 
+    <!-- ── Hero ───────────────────────────────────────── -->
     <section class="hero">
+        <!-- Crystal clusters -->
+        <svg class="crystal-cluster-left" width="160" height="340" viewBox="0 0 160 340" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+                <linearGradient id="cg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A78BFA"/><stop offset="100%" stop-color="#22D3EE"/></linearGradient>
+                <linearGradient id="cg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#0EA5E9"/></linearGradient>
+                <linearGradient id="cg3" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C084FC"/><stop offset="100%" stop-color="#38BDF8"/></linearGradient>
+            </defs>
+            <polygon points="80,0 110,90 80,120 50,90"        fill="url(#cg1)" opacity=".7"/>
+            <polygon points="80,120 110,90 120,200 80,180"    fill="url(#cg2)" opacity=".5"/>
+            <polygon points="80,120 50,90 40,200 80,180"      fill="url(#cg3)" opacity=".6"/>
+            <polygon points="80,180 120,200 100,310 60,290"   fill="url(#cg1)" opacity=".4"/>
+            <polygon points="80,180 40,200 60,290 80,320"     fill="url(#cg2)" opacity=".3"/>
+            <polygon points="30,60 55,100 40,130 15,90"       fill="url(#cg3)" opacity=".35"/>
+            <polygon points="115,40 140,80 130,110 105,70"    fill="url(#cg1)" opacity=".3"/>
+        </svg>
+        <svg class="crystal-cluster-right" width="160" height="340" viewBox="0 0 160 340" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+                <linearGradient id="cg4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A78BFA"/><stop offset="100%" stop-color="#22D3EE"/></linearGradient>
+                <linearGradient id="cg5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#0EA5E9"/></linearGradient>
+                <linearGradient id="cg6" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C084FC"/><stop offset="100%" stop-color="#38BDF8"/></linearGradient>
+            </defs>
+            <polygon points="80,0 110,90 80,120 50,90"        fill="url(#cg4)" opacity=".7"/>
+            <polygon points="80,120 110,90 120,200 80,180"    fill="url(#cg5)" opacity=".5"/>
+            <polygon points="80,120 50,90 40,200 80,180"      fill="url(#cg6)" opacity=".6"/>
+            <polygon points="80,180 120,200 100,310 60,290"   fill="url(#cg4)" opacity=".4"/>
+            <polygon points="80,180 40,200 60,290 80,320"     fill="url(#cg5)" opacity=".3"/>
+            <polygon points="30,60 55,100 40,130 15,90"       fill="url(#cg6)" opacity=".35"/>
+            <polygon points="115,40 140,80 130,110 105,70"    fill="url(#cg4)" opacity=".3"/>
+        </svg>
+
         <div class="container">
-            <h1>A Better Way to Watch Twitch</h1>
-            <p>ThystTV is a feature-rich, open-source Android client for Twitch with floating chat, gesture controls, viewing statistics, and more.</p>
+            <div class="hero-badge"><span class="dot"></span>Open-Source · Android</div>
+            <span class="label">Twitch Client for Android</span>
+            <h1>A <em>better</em> way<br>to watch Twitch</h1>
+            <p>Feature-rich, privacy-respecting, and beautifully crafted. Floating chat, gesture controls, viewing statistics, and more.</p>
             <div class="cta-buttons">
                 <a href="https://github.com/tzii/ThystTV/releases/latest" class="btn btn-primary">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13 5v6h1.17L12 13.17 9.83 11H11V5h2m2-2H9v6H5l7 7 7-7h-4V3zm4 15H5v2h14v-2z"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 5v6h1.17L12 13.17 9.83 11H11V5h2m2-2H9v6H5l7 7 7-7h-4V3zm4 15H5v2h14v-2z"/></svg>
                     Download APK
                 </a>
                 <a href="https://github.com/tzii/ThystTV" class="btn btn-secondary">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                     View Source
                 </a>
             </div>
         </div>
     </section>
 
+    <!-- Wave: hero → features -->
+    <div class="crystal-divider">
+        <svg viewBox="0 0 1440 60" preserveAspectRatio="none" height="60" xmlns="http://www.w3.org/2000/svg">
+            <polygon class="wave-feat" points="0,60 180,10 360,45 540,5 720,40 900,8 1080,42 1260,12 1440,50 1440,60" fill="#0D1225"/>
+        </svg>
+    </div>
+
+    <!-- ── Features ────────────────────────────────────── -->
     <section class="features" id="features">
         <div class="container">
-            <h2>Features</h2>
+            <div class="section-header">
+                <span class="label">Capabilities</span>
+                <h2>Built for <em>real</em> viewers</h2>
+            </div>
             <div class="features-grid">
                 <div class="feature-card">
-                    <div class="feature-icon">💬</div>
-                    <h3>Floating Chat</h3>
+                    <span class="mono">Fig. 1A</span>
+                    <span class="feature-icon">💬</span>
+                    <h3><span class="gem-badge"></span>Floating Chat</h3>
                     <p>Keep up with chat while watching in fullscreen. Resize, move, and adjust opacity to your preference.</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon">👆</div>
-                    <h3>Gesture Controls</h3>
+                    <span class="mono">Fig. 1B</span>
+                    <span class="feature-icon">👆</span>
+                    <h3><span class="gem-badge"></span>Gesture Controls</h3>
                     <p>Swipe up/down on the left for brightness, right for volume. Intuitive controls without blocking the view.</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon">📊</div>
-                    <h3>Viewing Stats</h3>
+                    <span class="mono">Fig. 1C</span>
+                    <span class="feature-icon">📊</span>
+                    <h3><span class="gem-badge"></span>Viewing Stats</h3>
                     <p>Track your daily watch time and see your most-watched channels. All data stored locally and private.</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon">📉</div>
-                    <h3>Data Saver</h3>
+                    <span class="mono">Fig. 2A</span>
+                    <span class="feature-icon">📉</span>
+                    <h3><span class="gem-badge"></span>Data Saver</h3>
                     <p>Automatically caps quality to 480p on mobile data. Smart detection with manual override option.</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon">🎨</div>
-                    <h3>Third-Party Emotes</h3>
+                    <span class="mono">Fig. 2B</span>
+                    <span class="feature-icon">🎨</span>
+                    <h3><span class="gem-badge"></span>Third-Party Emotes</h3>
                     <p>Full support for 7TV, BTTV, and FFZ emotes. See all your favorite emotes in chat.</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon">📥</div>
-                    <h3>VOD Downloads</h3>
+                    <span class="mono">Fig. 2C</span>
+                    <span class="feature-icon">📥</span>
+                    <h3><span class="gem-badge"></span>VOD Downloads</h3>
                     <p>Download VODs and clips for offline viewing. Watch your favorite content anywhere.</p>
                 </div>
             </div>
         </div>
     </section>
 
+    <!-- Wave: features → changelog -->
+    <div class="crystal-divider" style="background:var(--surface);">
+        <svg viewBox="0 0 1440 60" preserveAspectRatio="none" height="60" xmlns="http://www.w3.org/2000/svg">
+            <polygon class="wave-feat-bg" points="0,0 180,50 360,15 540,55 720,20 900,52 1080,18 1260,48 1440,10 1440,0" fill="#080C18"/>
+        </svg>
+    </div>
+
+    <!-- ── Changelog ────────────────────────────────────── -->
+    <section class="changelog" id="changelog">
+        <div class="container">
+            <div class="section-header">
+                <span class="label">What's New</span>
+                <h2>Change<em>log</em></h2>
+            </div>
+
+            <div class="cl-timeline">
+
+                <!-- Entry 1 -->
+                <div class="cl-entry">
+                    <div class="cl-date"><strong>Latest</strong>Feb 2026</div>
+                    <div class="cl-spine"><div class="cl-dot"></div><div class="cl-line"></div></div>
+                    <div class="cl-body">
+                        <div class="cl-version">Current</div>
+                        <h3>Gesture System Polish</h3>
+                        <div class="cl-tags">
+                            <span class="cl-tag fix">Fix</span>
+                            <span class="cl-tag feature">Feature</span>
+                        </div>
+                        <ul class="cl-items">
+                            <li>Fixed tap sensitivity immediately after a scroll gesture</li>
+                            <li>Gestures now blocked when player controls are visible, preventing conflicts</li>
+                            <li>Optional haptic feedback added (disabled by default)</li>
+                            <li>Configurable gesture zone split between top/bottom areas</li>
+                            <li>Full settings integration — adjust sensitivity, zones, and haptics</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Entry 2 -->
+                <div class="cl-entry">
+                    <div class="cl-date"><strong>v1.x</strong>Jan 2026</div>
+                    <div class="cl-spine"><div class="cl-dot"></div><div class="cl-line"></div></div>
+                    <div class="cl-body">
+                        <div class="cl-version">Feature</div>
+                        <h3>Stats &amp; Analytics Dashboard</h3>
+                        <div class="cl-tags">
+                            <span class="cl-tag feature">Feature</span>
+                        </div>
+                        <ul class="cl-items">
+                            <li>New Stats tab in bottom navigation for easy access</li>
+                            <li>Daily watch time tracking with bar charts and heatmaps</li>
+                            <li>Category breakdown with pie charts and legends</li>
+                            <li>Top channels leaderboard — all data stays local and private</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Entry 3 -->
+                <div class="cl-entry">
+                    <div class="cl-date"><strong>v1.x</strong>Dec 2025</div>
+                    <div class="cl-spine"><div class="cl-dot"></div><div class="cl-line"></div></div>
+                    <div class="cl-body">
+                        <div class="cl-version">Feature</div>
+                        <h3>Floating Chat Overlay</h3>
+                        <div class="cl-tags">
+                            <span class="cl-tag feature">Feature</span>
+                        </div>
+                        <ul class="cl-items">
+                            <li>Overlay chat on top of fullscreen streams</li>
+                            <li>Freely draggable and resizable window</li>
+                            <li>Adjustable opacity for perfect balance</li>
+                            <li>High-contrast mode for readability over bright content</li>
+                            <li>Double-tap to cycle: overlay → side-by-side → hidden</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Entry 4 -->
+                <div class="cl-entry">
+                    <div class="cl-date"><strong>v1.0</strong>Nov 2025</div>
+                    <div class="cl-spine"><div class="cl-dot"></div><div class="cl-line"></div></div>
+                    <div class="cl-body">
+                        <div class="cl-version">Initial</div>
+                        <h3>Fork from Xtra</h3>
+                        <div class="cl-tags">
+                            <span class="cl-tag">New</span>
+                        </div>
+                        <ul class="cl-items">
+                            <li>Forked from <a href="https://github.com/crackededed/Xtra" style="color:var(--accent);text-decoration:none;">Xtra</a> with full upstream feature set</li>
+                            <li>Gesture controls for volume and brightness</li>
+                            <li>VOD seek and playback speed via horizontal swipe</li>
+                            <li>Data saver mode — caps to 480p on mobile networks</li>
+                            <li>Third-party emote support: 7TV, BTTV, FFZ</li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Wave: changelog → tech -->
+    <div class="crystal-divider" style="background:var(--bg-mid);">
+        <svg viewBox="0 0 1440 60" preserveAspectRatio="none" height="60" xmlns="http://www.w3.org/2000/svg">
+            <polygon class="wave-tech" points="0,60 200,20 400,50 600,10 800,45 1000,15 1200,40 1440,5 1440,60" fill="#080C18"/>
+        </svg>
+    </div>
+
+    <!-- ── Tech Stack ───────────────────────────────────── -->
     <section class="tech-stack">
         <div class="container">
-            <h2>Built With</h2>
+            <div class="section-header">
+                <span class="label">Under the Hood</span>
+                <h2>Built <em>with</em></h2>
+            </div>
             <div class="tech-badges">
                 <span class="tech-badge">Kotlin</span>
                 <span class="tech-badge">Media3 ExoPlayer</span>
@@ -354,22 +749,34 @@
         </div>
     </section>
 
+    <!-- Wave: tech → download -->
+    <div class="crystal-divider" style="background:var(--bg-mid);">
+        <svg viewBox="0 0 1440 60" preserveAspectRatio="none" height="60" xmlns="http://www.w3.org/2000/svg">
+            <polygon class="wave-dl" points="0,0 250,45 500,10 750,50 1000,12 1250,44 1440,15 1440,0" fill="#05070F"/>
+        </svg>
+    </div>
+
+    <!-- ── Download ─────────────────────────────────────── -->
     <section class="download" id="download">
+        <div class="crystal-ring"></div>
         <div class="container">
-            <h2>Get ThystTV</h2>
+            <span class="label">Get Started</span>
+            <h2>Try <em>ThystTV</em> today</h2>
             <p>Download the latest release from GitHub. Requires Android 7.0 or higher.</p>
             <a href="https://github.com/tzii/ThystTV/releases/latest" class="btn btn-primary">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13 5v6h1.17L12 13.17 9.83 11H11V5h2m2-2H9v6H5l7 7 7-7h-4V3zm4 15H5v2h14v-2z"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 5v6h1.17L12 13.17 9.83 11H11V5h2m2-2H9v6H5l7 7 7-7h-4V3zm4 15H5v2h14v-2z"/></svg>
                 Download Latest Release
             </a>
         </div>
     </section>
 
+    <!-- ── Footer ───────────────────────────────────────── -->
     <footer>
         <div class="container">
             <p>ThystTV is a fork of <a href="https://github.com/crackededed/Xtra">Xtra</a>. Open source under the GPL-3.0 License.</p>
-            <p style="margin-top: 8px;">Made with ❤️ for the Twitch community</p>
+            <p style="margin-top:8px;">Made with ❤️ for the Twitch community</p>
         </div>
     </footer>
+
 </body>
 </html>

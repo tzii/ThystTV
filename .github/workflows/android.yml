@@ -23,19 +23,17 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-    - name: Create debug keystore
-      run: |
-        keytool -genkey -v -keystore app/debug-keystore.jks \
-          -storepass 123456 -alias debug -keypass 123456 \
-          -keyalg RSA -keysize 2048 -validity 10000 \
-          -dname "CN=Debug, OU=Debug, O=Debug, L=Debug, ST=Debug, C=US" \
-          -storetype JKS
-      shell: bash
+    - name: Decode keystore
+      run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release-keystore.jks
 
     - name: Run Unit Tests
       run: ./gradlew test
 
     - name: Build Release APK
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       run: ./gradlew assembleRelease
 
     - name: Get version name
@@ -61,7 +59,25 @@ jobs:
         echo "### Changes" >> notes.txt
         git log $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~10)..HEAD --oneline --decorate=no >> notes.txt || echo "Initial release" >> notes.txt
 
-    - name: Delete existing release
+    # --- Versioned release (v1.1.0, etc.) ---
+    - name: Create versioned release
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        TAG="v${{ steps.version.outputs.version }}"
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git tag -f "$TAG"
+        git push -f origin tag "$TAG"
+        gh release delete "$TAG" -y 2>/dev/null || true
+        gh release create "$TAG" \
+          --title "ThystTV ${{ steps.version.outputs.version }}" \
+          --notes-file notes.txt \
+          app/build/outputs/apk/release/ThystTV-*.apk
+
+    # --- Rolling "latest" release ---
+    - name: Delete existing latest release
       continue-on-error: true
       env:
         GH_TOKEN: ${{ github.token }}
@@ -74,12 +90,12 @@ jobs:
         git tag -f latest
         git push -f origin tag latest
 
-    - name: Create GitHub Release
+    - name: Create latest release
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         gh release create latest \
-          --title "ThystTV ${{ steps.version.outputs.version }}" \
+          --title "ThystTV ${{ steps.version.outputs.version }} (latest)" \
           --notes-file notes.txt \
           --latest \
           app/build/outputs/apk/release/ThystTV-*.apk

@@ -524,8 +524,12 @@ class Media3Fragment : PlayerFragment() {
                 PlaybackService.START_STREAM, bundleOf(
                     PlaybackService.URI to url,
                     PlaybackService.TITLE to requireArguments().getString(KEY_TITLE),
+                    PlaybackService.CHANNEL_ID to requireArguments().getString(KEY_CHANNEL_ID),
                     PlaybackService.CHANNEL_NAME to requireArguments().getString(KEY_CHANNEL_NAME),
+                    PlaybackService.CHANNEL_LOGIN to requireArguments().getString(KEY_CHANNEL_LOGIN),
                     PlaybackService.CHANNEL_LOGO to requireArguments().getString(KEY_CHANNEL_LOGO),
+                    PlaybackService.GAME_ID to requireArguments().getString(KEY_GAME_ID),
+                    PlaybackService.GAME_NAME to requireArguments().getString(KEY_GAME_NAME),
                 )
             ), Bundle.EMPTY
         )
@@ -544,8 +548,12 @@ class Media3Fragment : PlayerFragment() {
                         PlaybackService.PLAYBACK_POSITION to playbackPosition,
                         PlaybackService.VIDEO_ID to requireArguments().getString(KEY_VIDEO_ID)?.toLongOrNull(),
                         PlaybackService.TITLE to requireArguments().getString(KEY_TITLE),
+                        PlaybackService.CHANNEL_ID to requireArguments().getString(KEY_CHANNEL_ID),
                         PlaybackService.CHANNEL_NAME to requireArguments().getString(KEY_CHANNEL_NAME),
+                        PlaybackService.CHANNEL_LOGIN to requireArguments().getString(KEY_CHANNEL_LOGIN),
                         PlaybackService.CHANNEL_LOGO to requireArguments().getString(KEY_CHANNEL_LOGO),
+                        PlaybackService.GAME_ID to requireArguments().getString(KEY_GAME_ID),
+                        PlaybackService.GAME_NAME to requireArguments().getString(KEY_GAME_NAME),
                     )
                 ), Bundle.EMPTY
             )
@@ -571,8 +579,12 @@ class Media3Fragment : PlayerFragment() {
                     PlaybackService.START_CLIP, bundleOf(
                         PlaybackService.URI to url,
                         PlaybackService.TITLE to requireArguments().getString(KEY_TITLE),
+                        PlaybackService.CHANNEL_ID to requireArguments().getString(KEY_CHANNEL_ID),
                         PlaybackService.CHANNEL_NAME to requireArguments().getString(KEY_CHANNEL_NAME),
+                        PlaybackService.CHANNEL_LOGIN to requireArguments().getString(KEY_CHANNEL_LOGIN),
                         PlaybackService.CHANNEL_LOGO to requireArguments().getString(KEY_CHANNEL_LOGO),
+                        PlaybackService.GAME_ID to requireArguments().getString(KEY_GAME_ID),
+                        PlaybackService.GAME_NAME to requireArguments().getString(KEY_GAME_NAME),
                     )
                 ), Bundle.EMPTY
             )
@@ -600,8 +612,12 @@ class Media3Fragment : PlayerFragment() {
                         PlaybackService.VIDEO_ID to requireArguments().getInt(KEY_OFFLINE_VIDEO_ID),
                         PlaybackService.PLAYBACK_POSITION to position,
                         PlaybackService.TITLE to requireArguments().getString(KEY_TITLE),
+                        PlaybackService.CHANNEL_ID to requireArguments().getString(KEY_CHANNEL_ID),
                         PlaybackService.CHANNEL_NAME to requireArguments().getString(KEY_CHANNEL_NAME),
+                        PlaybackService.CHANNEL_LOGIN to requireArguments().getString(KEY_CHANNEL_LOGIN),
                         PlaybackService.CHANNEL_LOGO to requireArguments().getString(KEY_CHANNEL_LOGO),
+                        PlaybackService.GAME_ID to requireArguments().getString(KEY_GAME_ID),
+                        PlaybackService.GAME_NAME to requireArguments().getString(KEY_GAME_NAME),
                     )
                 ), Bundle.EMPTY
             )
@@ -609,6 +625,8 @@ class Media3Fragment : PlayerFragment() {
     }
 
     override fun getCurrentPosition() = player?.currentPosition
+
+    override fun getDuration() = player?.duration ?: 0L
 
     override fun getCurrentSpeed() = player?.playbackParameters?.speed
 

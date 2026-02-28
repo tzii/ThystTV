@@ -120,7 +120,7 @@ class StatsFragment : Fragment(R.layout.fragment_stats) {
         val avgSeconds = if (chartData.isNotEmpty()) weekTotalSeconds / 7 else 0L
         val avgHours = avgSeconds / 3600
         val avgMinutes = (avgSeconds % 3600) / 60
-        binding.dailyAverageText.text = formatTime(avgHours, avgMinutes, "daily average")
+        binding.dailyAverageText.text = formatTimeShort(avgHours, avgMinutes)
         
         // Week change - compare with previous week (placeholder for now)
         binding.weekChangeText.text = "↑ from last week"
@@ -140,8 +140,8 @@ class StatsFragment : Fragment(R.layout.fragment_stats) {
     private fun updateStreakDisplay(binding: FragmentStatsBinding, streak: WatchStreak?) {
         if (streak != null) {
             binding.streakCard.visibility = VISIBLE
-            binding.currentStreakText.text = "${streak.currentStreakDays} days"
-            binding.longestStreakText.text = "${streak.longestStreakDays} days"
+            binding.currentStreakText.text = streak.currentStreakDays.toString()
+            binding.longestStreakText.text = streak.longestStreakDays.toString()
         } else {
             binding.streakCard.visibility = GONE
         }

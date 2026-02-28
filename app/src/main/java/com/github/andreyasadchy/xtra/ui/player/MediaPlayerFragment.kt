@@ -608,6 +608,8 @@ class MediaPlayerFragment : PlayerFragment() {
 
     override fun getCurrentPosition(): Long? = player?.currentPosition?.toLong()
 
+    override fun getDuration() = player?.duration?.toLong() ?: 0L
+
     override fun getCurrentSpeed(): Float {
         return if (videoType == STREAM) {
             1f

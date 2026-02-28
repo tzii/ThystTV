@@ -45,10 +45,10 @@
 
             <include
                 android:id="@+id/gestureFeedback"
-                layout="@layout/player_volume"
-                android:layout_width="300dp"
+                layout="@layout/layout_player_gesture_feedback"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
+                android:layout_gravity="top|center_horizontal"
                 android:visibility="gone" />
             <include
                 android:id="@+id/playerControls"
@@ -111,7 +111,7 @@
             android:id="@+id/floating_chat_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#80000000"
+            android:background="@android:color/transparent"
             android:layout_above="@+id/drag_handle_zone" />
 
         <LinearLayout

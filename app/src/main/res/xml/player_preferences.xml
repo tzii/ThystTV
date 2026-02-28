@@ -1,6 +1,47 @@
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <PreferenceCategory
+        android:title="@string/player_gestures_category">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="player_gestures_enabled"
+            android:title="@string/player_gestures_enabled"
+            android:summary="@string/player_gestures_enabled_summary"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="player_gestures_haptic"
+            android:title="@string/player_gestures_haptic"
+            android:summary="@string/player_gestures_haptic_summary"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <ListPreference
+            android:defaultValue="1"
+            android:entries="@array/playerGesturesSensitivityEntries"
+            android:entryValues="@array/playerGesturesSensitivityValues"
+            android:key="player_gestures_sensitivity"
+            android:title="@string/player_gestures_sensitivity"
+            android:summary="%s"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <ListPreference
+            android:defaultValue="0.5"
+            android:entries="@array/playerGesturesZoneSplitEntries"
+            android:entryValues="@array/playerGesturesZoneSplitValues"
+            android:key="player_gestures_zone_split"
+            android:title="@string/player_gestures_zone_split"
+            android:summary="%s"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+    </PreferenceCategory>
+
     <SwitchPreferenceCompat
         android:defaultValue="true"
         android:key="player_disable_background_video"

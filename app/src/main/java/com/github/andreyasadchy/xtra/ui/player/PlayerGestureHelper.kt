@@ -156,11 +156,22 @@
       * @param brightnessPercent Brightness as percentage (0-100)
       * @return Icon level (0=low, 1=medium, 2=high)
       */
-     fun getBrightnessIconLevel(brightnessPercent: Int): Int {
-         return when {
-             brightnessPercent < 33 -> 0
-             brightnessPercent < 66 -> 1
-             else -> 2
-         }
-     }
- }
+    fun getBrightnessIconLevel(brightnessPercent: Int): Int {
+        return when {
+            brightnessPercent < 33 -> 0
+            brightnessPercent < 66 -> 1
+            else -> 2
+        }
+    }
+
+    /**
+     * Determines if a touch Y coordinate is in the top zone based on the split ratio.
+     * @param y Touch Y coordinate
+     * @param height Screen height
+     * @param splitRatio Ratio of the screen defined as the top zone (0.0 to 1.0)
+     * @return true if in top zone, false otherwise
+     */
+    fun isTopZone(y: Float, height: Float, splitRatio: Float): Boolean {
+        return y < height * splitRatio
+    }
+}

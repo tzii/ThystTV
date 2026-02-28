@@ -47,6 +47,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.github.andreyasadchy.xtra.model.VideoPosition
+import com.github.andreyasadchy.xtra.model.stats.WatchSession
 import com.github.andreyasadchy.xtra.player.lowlatency.CronetDataSource
 import com.github.andreyasadchy.xtra.player.lowlatency.HlsPlaylistParser
 import com.github.andreyasadchy.xtra.player.lowlatency.HttpEngineDataSource
@@ -105,7 +106,11 @@ class PlaybackService : MediaSessionService() {
     lateinit var statsRepository: StatsRepository
 
     private val statsScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var currentChannelId: String? = null
     private var currentChannelName: String? = null
+    private var currentChannelLogin: String? = null
+    private var currentGameId: String? = null
+    private var currentGameName: String? = null
     private var lastStatsTime: Long = 0L
 
     private var mediaSession: MediaSession? = null
@@ -247,9 +252,17 @@ class PlaybackService : MediaSessionService() {
                             START_STREAM -> {
                                 val uri = customCommand.customExtras.getString(URI)
                                 val title = customCommand.customExtras.getString(TITLE)
+                                val channelId = customCommand.customExtras.getString(CHANNEL_ID)
                                 val channelName = customCommand.customExtras.getString(CHANNEL_NAME)
+                                val channelLogin = customCommand.customExtras.getString(CHANNEL_LOGIN)
                                 val channelLogo = customCommand.customExtras.getString(CHANNEL_LOGO)
+                                val gameId = customCommand.customExtras.getString(GAME_ID)
+                                val gameName = customCommand.customExtras.getString(GAME_NAME)
+                                currentChannelId = channelId
                                 currentChannelName = channelName
+                                currentChannelLogin = channelLogin
+                                currentGameId = gameId
+                                currentGameName = gameName
                                 lastStatsTime = if (session.player.isPlaying) System.currentTimeMillis() else 0L
                                 videoId = null
                                 offlineVideoId = null
@@ -369,9 +382,17 @@ class PlaybackService : MediaSessionService() {
                             START_VIDEO -> {
                                 val uri = customCommand.customExtras.getString(URI)
                                 val title = customCommand.customExtras.getString(TITLE)
+                                val channelId = customCommand.customExtras.getString(CHANNEL_ID)
                                 val channelName = customCommand.customExtras.getString(CHANNEL_NAME)
+                                val channelLogin = customCommand.customExtras.getString(CHANNEL_LOGIN)
                                 val channelLogo = customCommand.customExtras.getString(CHANNEL_LOGO)
+                                val gameId = customCommand.customExtras.getString(GAME_ID)
+                                val gameName = customCommand.customExtras.getString(GAME_NAME)
+                                currentChannelId = channelId
                                 currentChannelName = channelName
+                                currentChannelLogin = channelLogin
+                                currentGameId = gameId
+                                currentGameName = gameName
                                 lastStatsTime = if (session.player.isPlaying) System.currentTimeMillis() else 0L
                                 val newId = customCommand.customExtras.getLong(VIDEO_ID).takeIf { it != 0L }
                                 val position = if (videoId == newId && session.player.currentMediaItem != null) {
@@ -423,9 +444,17 @@ class PlaybackService : MediaSessionService() {
                             START_CLIP -> {
                                 val uri = customCommand.customExtras.getString(URI)
                                 val title = customCommand.customExtras.getString(TITLE)
+                                val channelId = customCommand.customExtras.getString(CHANNEL_ID)
                                 val channelName = customCommand.customExtras.getString(CHANNEL_NAME)
+                                val channelLogin = customCommand.customExtras.getString(CHANNEL_LOGIN)
                                 val channelLogo = customCommand.customExtras.getString(CHANNEL_LOGO)
+                                val gameId = customCommand.customExtras.getString(GAME_ID)
+                                val gameName = customCommand.customExtras.getString(GAME_NAME)
+                                currentChannelId = channelId
                                 currentChannelName = channelName
+                                currentChannelLogin = channelLogin
+                                currentGameId = gameId
+                                currentGameName = gameName
                                 lastStatsTime = if (session.player.isPlaying) System.currentTimeMillis() else 0L
                                 videoId = null
                                 offlineVideoId = null
@@ -468,9 +497,17 @@ class PlaybackService : MediaSessionService() {
                             START_OFFLINE_VIDEO -> {
                                 val uri = customCommand.customExtras.getString(URI)
                                 val title = customCommand.customExtras.getString(TITLE)
+                                val channelId = customCommand.customExtras.getString(CHANNEL_ID)
                                 val channelName = customCommand.customExtras.getString(CHANNEL_NAME)
+                                val channelLogin = customCommand.customExtras.getString(CHANNEL_LOGIN)
                                 val channelLogo = customCommand.customExtras.getString(CHANNEL_LOGO)
+                                val gameId = customCommand.customExtras.getString(GAME_ID)
+                                val gameName = customCommand.customExtras.getString(GAME_NAME)
+                                currentChannelId = channelId
                                 currentChannelName = channelName
+                                currentChannelLogin = channelLogin
+                                currentGameId = gameId
+                                currentGameName = gameName
                                 lastStatsTime = if (session.player.isPlaying) System.currentTimeMillis() else 0L
                                 val newId = customCommand.customExtras.getInt(VIDEO_ID).takeIf { it != 0 }
                                 val position = if (offlineVideoId == newId && session.player.currentMediaItem != null) {
@@ -640,10 +677,27 @@ class PlaybackService : MediaSessionService() {
             val diff = (now - lastStatsTime) / 1000
             if (diff > 0) {
                 val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                val hourOfDay = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
                 statsScope.launch {
                     statsRepository.updateScreenTime(date, diff)
-                    currentChannelName?.let {
-                        statsRepository.updateStreamWatchStats(it, it, diff)
+                    currentChannelId?.let { channelId ->
+                        statsRepository.updateStreamWatchStats(channelId, currentChannelName ?: channelId, diff)
+                    }
+                    // Record watch session with category info for detailed analytics
+                    if (currentChannelId != null || currentGameId != null) {
+                        val session = WatchSession(
+                            channelId = currentChannelId,
+                            channelName = currentChannelName,
+                            channelLogin = currentChannelLogin,
+                            gameId = currentGameId,
+                            gameName = currentGameName,
+                            startTime = lastStatsTime,
+                            endTime = now,
+                            durationSeconds = diff,
+                            date = date,
+                            hourOfDay = hourOfDay
+                        )
+                        statsRepository.recordWatchSession(session)
                     }
                 }
             }
@@ -737,8 +791,12 @@ class PlaybackService : MediaSessionService() {
         const val VIDEO_ID = "videoId"
         const val PLAYBACK_POSITION = "playbackPosition"
         const val TITLE = "title"
+        const val CHANNEL_ID = "channelId"
         const val CHANNEL_NAME = "channelName"
+        const val CHANNEL_LOGIN = "channelLogin"
         const val CHANNEL_LOGO = "channelLogo"
+        const val GAME_ID = "gameId"
+        const val GAME_NAME = "gameName"
         const val USING_PROXY = "usingProxy"
         const val DURATION = "duration"
         const val NAMES = "names"

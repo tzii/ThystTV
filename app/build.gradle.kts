@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -21,6 +21,15 @@ android {
             storeFile = file("debug-keystore.jks")
             storePassword = "123456"
         }
+        create("release") {
+            val ksPassword = System.getenv("KEYSTORE_PASSWORD")
+            if (ksPassword != null) {
+                storeFile = file("release-keystore.jks")
+                storePassword = ksPassword
+                keyAlias = System.getenv("KEY_ALIAS") ?: "release"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: ksPassword
+            }
+        }
     }
     namespace = "com.github.andreyasadchy.xtra"
     compileSdk = 36
@@ -29,8 +38,8 @@ android {
         applicationId = "com.tzii.thysttv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.1.0"
     }
 
     buildTypes {
@@ -43,7 +52,12 @@ android {
             isShrinkResources = true
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            val ksPassword = System.getenv("KEYSTORE_PASSWORD")
+            signingConfig = if (ksPassword != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     buildFeatures {
@@ -112,6 +126,11 @@ dependencies {
     implementation(libs.coil.gif)
     implementation(libs.coil.okhttp)
 
+    implementation(libs.glide)
+    ksp(libs.glide.ksp)
+    implementation(libs.glide.okhttp)
+    implementation(libs.glide.webpdecoder)
+
     implementation(libs.hilt)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.work)
@@ -130,6 +149,7 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("org.mockito:mockito-core:5.10.0")
+    testImplementation("org.mockito:mockito-inline:5.2.0")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
 }
 

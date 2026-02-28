@@ -72,7 +72,7 @@ class ChatAdapter(
     private val translateMessage: (ChatMessage, String?) -> Unit,
     private val showLanguageDownloadDialog: (ChatMessage, String) -> Unit,
     private val channelId: String?,
-    private val useHighVisibility: Boolean = false,
+    var useHighVisibility: Boolean = false,
     private val loggedInUser: String?,
     private val messageClickListener: ((String?) -> Unit)?,
     private val replyClickListener: (() -> Unit)?,

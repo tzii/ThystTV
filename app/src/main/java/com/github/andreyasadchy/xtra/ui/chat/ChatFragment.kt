@@ -940,6 +940,21 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         binding.editText.text.append(emote.name).append(' ')
     }
 
+    /**
+     * Update the high visibility mode for the chat adapter.
+     * Called when the chat is reparented between sidebar and floating modes.
+     * High visibility (bold text + shadow) should only apply to floating chat.
+     */
+    fun updateHighVisibility(isFloating: Boolean) {
+        adapter?.let { chatAdapter ->
+            val useHighVisibility = isFloating && requireContext().prefs().getBoolean(C.FLOATING_CHAT_HIGH_VISIBILITY, true)
+            if (chatAdapter.useHighVisibility != useHighVisibility) {
+                chatAdapter.useHighVisibility = useHighVisibility
+                chatAdapter.notifyDataSetChanged()
+            }
+        }
+    }
+
     private fun sendMessage(replyId: String? = null): Boolean {
         with(binding) {
             (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(editText.windowToken, 0)

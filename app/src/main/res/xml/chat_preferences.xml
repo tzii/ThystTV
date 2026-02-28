@@ -336,7 +336,7 @@
         app:singleLineTitle="false" />
 
     <SeekBarPreference
-        android:defaultValue="100"
+        android:defaultValue="0"
         android:key="floating_chat_transparency"
         android:max="100"
         android:min="0"
@@ -354,7 +354,7 @@
         app:singleLineTitle="false" />
 
     <SwitchPreferenceCompat
-        android:defaultValue="false"
+        android:defaultValue="true"
         android:key="floating_chat_high_visibility"
         android:title="@string/floating_chat_high_visibility"
         app:iconSpaceReserved="false"
