@@ -1,6 +1,8 @@
 package com.github.andreyasadchy.xtra.util
 
 import android.graphics.Rect
+import android.content.Context
+import android.view.inputmethod.InputMethodManager
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
@@ -29,4 +31,31 @@ fun ViewPager2.reduceDragSensitivity() {
         touchSlopField.set(recyclerView, touchSlop * 2)
     } catch (e: Exception) {
     }
+}
+
+fun View.visible() {
+    visibility = View.VISIBLE
+}
+
+fun View.invisible() {
+    visibility = View.INVISIBLE
+}
+
+fun View.gone() {
+    visibility = View.GONE
+}
+
+fun View.hideKeyboard() {
+    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+    imm?.hideSoftInputFromWindow(windowToken, 0)
+}
+
+fun View.enable() {
+    isEnabled = true
+    alpha = 1f
+}
+
+fun View.disable() {
+    isEnabled = false
+    alpha = 0.6f
 }

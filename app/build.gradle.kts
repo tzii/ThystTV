@@ -139,7 +139,7 @@ ksp {
 
 apollo {
     service("service") {
-        packageName.set("com.github.andreyasadchy.xtra")
+        packageName.set("com.github.andreyasadchy.xtra.graphql")
     }
 }
 
