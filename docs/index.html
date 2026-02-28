@@ -641,67 +641,68 @@
 
                 <!-- Entry 1 -->
                 <div class="cl-entry">
-                    <div class="cl-date"><strong>Latest</strong>Feb 2026</div>
+                    <div class="cl-date"><strong>v1.1.1</strong>Feb 2026</div>
                     <div class="cl-spine"><div class="cl-dot"></div><div class="cl-line"></div></div>
                     <div class="cl-body">
-                        <div class="cl-version">Current</div>
-                        <h3>Gesture System Polish</h3>
+                        <div class="cl-version">Patch Release</div>
+                        <h3>Upstream Sync + Stability Hardening</h3>
                         <div class="cl-tags">
                             <span class="cl-tag fix">Fix</span>
+                            <span class="cl-tag perf">Stability</span>
                             <span class="cl-tag feature">Feature</span>
                         </div>
                         <ul class="cl-items">
-                            <li>Fixed tap sensitivity immediately after a scroll gesture</li>
-                            <li>Gestures now blocked when player controls are visible, preventing conflicts</li>
-                            <li>Optional haptic feedback added (disabled by default)</li>
-                            <li>Configurable gesture zone split between top/bottom areas</li>
-                            <li>Full settings integration — adjust sensitivity, zones, and haptics</li>
+                            <li>Synced latest upstream Xtra fixes, including chat reconnect reliability, websocket timer handling, Helix request fixes, startup crash protection, and portrait aspect ratio corrections.</li>
+                            <li>Resolved merge compatibility across chat and player components while preserving ThystTV behavior for floating chat mode handling and custom interaction flow.</li>
+                            <li>Preserved fork-specific networking and chat rendering behavior, including ThystTV user-agent usage and Coil-based image loading paths.</li>
+                            <li>Finalized icon/resource updates: adaptive launcher layers, monochrome notification icon, and launcher-derived SVG branding on website + README.</li>
+                            <li>Release gate re-verified before publish with full unit tests and debug assemble build.</li>
                         </ul>
                     </div>
                 </div>
 
                 <!-- Entry 2 -->
                 <div class="cl-entry">
-                    <div class="cl-date"><strong>v1.x</strong>Jan 2026</div>
+                    <div class="cl-date"><strong>v1.1.0</strong>Feb 2026</div>
                     <div class="cl-spine"><div class="cl-dot"></div><div class="cl-line"></div></div>
                     <div class="cl-body">
                         <div class="cl-version">Feature</div>
-                        <h3>Stats &amp; Analytics Dashboard</h3>
+                        <h3>Gesture System + Stats Expansion</h3>
                         <div class="cl-tags">
                             <span class="cl-tag feature">Feature</span>
+                            <span class="cl-tag perf">UX</span>
                         </div>
                         <ul class="cl-items">
-                            <li>New Stats tab in bottom navigation for easy access</li>
-                            <li>Daily watch time tracking with bar charts and heatmaps</li>
-                            <li>Category breakdown with pie charts and legends</li>
-                            <li>Top channels leaderboard — all data stays local and private</li>
+                            <li>Modern split-zone gesture controls with conflict prevention, sensitivity tuning, haptic options, and safer minimize interactions.</li>
+                            <li>Stats experience expanded with richer charts, improved layouts, and stronger helper/test coverage.</li>
+                            <li>Player interaction updates including a dedicated speed dialog and improved gesture feedback overlays.</li>
+                            <li>Release/signing workflow improved to keep APK signing behavior consistent across builds.</li>
                         </ul>
                     </div>
                 </div>
 
                 <!-- Entry 3 -->
                 <div class="cl-entry">
-                    <div class="cl-date"><strong>v1.x</strong>Dec 2025</div>
+                    <div class="cl-date"><strong>v1.0.1</strong>Jan 2026</div>
                     <div class="cl-spine"><div class="cl-dot"></div><div class="cl-line"></div></div>
                     <div class="cl-body">
                         <div class="cl-version">Feature</div>
-                        <h3>Floating Chat Overlay</h3>
+                        <h3>Floating Chat + UI Iteration</h3>
                         <div class="cl-tags">
                             <span class="cl-tag feature">Feature</span>
+                            <span class="cl-tag fix">Fix</span>
                         </div>
                         <ul class="cl-items">
-                            <li>Overlay chat on top of fullscreen streams</li>
-                            <li>Freely draggable and resizable window</li>
-                            <li>Adjustable opacity for perfect balance</li>
-                            <li>High-contrast mode for readability over bright content</li>
-                            <li>Double-tap to cycle: overlay → side-by-side → hidden</li>
+                            <li>Floating chat defaults and behavior refined for a cleaner first-run experience.</li>
+                            <li>Additional polish for chat transparency, high-visibility rendering, and mode transitions.</li>
+                            <li>Refactoring groundwork added in large classes to make continued feature work safer and easier to review.</li>
                         </ul>
                     </div>
                 </div>
 
                 <!-- Entry 4 -->
                 <div class="cl-entry">
-                    <div class="cl-date"><strong>v1.0</strong>Nov 2025</div>
+                    <div class="cl-date"><strong>v1.0.0</strong>Nov 2025</div>
                     <div class="cl-spine"><div class="cl-dot"></div><div class="cl-line"></div></div>
                     <div class="cl-body">
                         <div class="cl-version">Initial</div>
@@ -710,11 +711,9 @@
                             <span class="cl-tag">New</span>
                         </div>
                         <ul class="cl-items">
-                            <li>Forked from <a href="https://github.com/crackededed/Xtra" style="color:var(--accent);text-decoration:none;">Xtra</a> with full upstream feature set</li>
-                            <li>Gesture controls for volume and brightness</li>
-                            <li>VOD seek and playback speed via horizontal swipe</li>
-                            <li>Data saver mode — caps to 480p on mobile networks</li>
-                            <li>Third-party emote support: 7TV, BTTV, FFZ</li>
+                            <li>Forked from <a href="https://github.com/crackededed/Xtra" style="color:var(--accent);text-decoration:none;">Xtra</a> as a base for ThystTV-specific player/chat improvements.</li>
+                            <li>Introduced floating chat, data-saver focused tuning, and stronger viewing UX customization.</li>
+                            <li>Kept broad Twitch ecosystem support including 7TV/BTTV/FFZ emotes and existing Xtra playback capabilities.</li>
                         </ul>
                     </div>
                 </div>
@@ -781,3 +780,4 @@
 
 </body>
 </html>
+
