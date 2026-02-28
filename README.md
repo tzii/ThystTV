@@ -1,7 +1,7 @@
 # ThystTV
 
 <p align="center">
-  <img src="docs/images/icon.png" width="128" height="128" />
+  <img src="docs/images/ic_launcher_foreground.svg" width="128" height="128" />
 </p>
 
 A fork of [Xtra](https://github.com/crackededed/Xtra) with additional features focused on viewer experience, data management, and accessibility.
