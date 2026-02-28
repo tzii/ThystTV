@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.http.HttpEngine
-import android.net.http.UrlResponseInfo
 import android.os.Build
 import android.os.ext.SdkExtensions
 import android.provider.DocumentsContract
@@ -39,7 +38,7 @@ import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
-import com.github.andreyasadchy.xtra.util.chat.ChatReadWebSocketOkHttp
+import com.github.andreyasadchy.xtra.util.chat.ChatReadWebSocket
 import com.github.andreyasadchy.xtra.util.chat.ChatUtils
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
 import com.github.andreyasadchy.xtra.util.m3u8.PlaylistUtils
@@ -47,6 +46,8 @@ import com.github.andreyasadchy.xtra.util.prefs
 import dagger.Lazy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -60,9 +61,6 @@ import kotlinx.coroutines.sync.withPermit
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
 import org.chromium.net.CronetEngine
 import org.chromium.net.apihelpers.RedirectHandlers
 import org.chromium.net.apihelpers.UrlRequestCallbacks
@@ -72,9 +70,9 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.InetSocketAddress
 import java.net.Proxy
-import java.util.Random
 import java.util.concurrent.ExecutorService
 import javax.inject.Inject
+import javax.net.ssl.X509TrustManager
 import kotlin.coroutines.suspendCoroutine
 import kotlin.math.max
 
@@ -99,6 +97,10 @@ class StreamDownloadWorker @AssistedInject constructor(
     lateinit var okHttpClient: OkHttpClient
 
     @Inject
+    @JvmField
+    var trustManager: X509TrustManager? = null
+
+    @Inject
     lateinit var graphQLRepository: GraphQLRepository
 
     @Inject
@@ -112,7 +114,7 @@ class StreamDownloadWorker @AssistedInject constructor(
 
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private lateinit var offlineVideo: OfflineVideo
-    private var chatReadWebSocketOkHttp: ChatReadWebSocketOkHttp? = null
+    private var chatReadWebSocket: ChatReadWebSocket? = null
     private var chatFileWriter: BufferedWriter? = null
     private var chatPosition: Long = 0
 
@@ -146,7 +148,7 @@ class StreamDownloadWorker @AssistedInject constructor(
         while (loop) {
             val playlist = when {
                 networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                    val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                    val response = suspendCoroutine { continuation ->
                         httpEngine!!.get().newUrlRequestBuilder(playlistUrl, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                     }
                     if (response.first.httpStatusCode in 200..299) {
@@ -162,7 +164,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                             response.responseBody as String
                         } else null
                     } else {
-                        val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                        val response = suspendCoroutine { continuation ->
                             cronetEngine!!.get().newUrlRequestBuilder(playlistUrl, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                         }
                         if (response.first.httpStatusCode in 200..299) {
@@ -217,7 +219,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                         }
                         val newPlaylist = when {
                             networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null && !proxyMultivariantPlaylist -> {
-                                val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                val response = suspendCoroutine { continuation ->
                                     httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                 }
                                 String(response.second)
@@ -228,7 +230,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                     cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
                                     request.future.get().responseBody as String
                                 } else {
-                                    val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                    val response = suspendCoroutine { continuation ->
                                         cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                     }
                                     String(response.second)
@@ -288,7 +290,9 @@ class StreamDownloadWorker @AssistedInject constructor(
                     val done = try {
                         download(channelLogin, url, path)
                     } finally {
-                        chatReadWebSocketOkHttp?.disconnect()
+                        MainScope().launch(Dispatchers.IO) {
+                            chatReadWebSocket?.disconnect(null)
+                        }
                         chatFileWriter?.close()
                     }
                     if (done) {
@@ -365,7 +369,7 @@ class StreamDownloadWorker @AssistedInject constructor(
         val networkLibrary = context.prefs().getString(C.NETWORK_LIBRARY, "OkHttp")
         val playlist = when {
             networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                val response = suspendCoroutine { continuation ->
                     httpEngine!!.get().newUrlRequestBuilder(sourceUrl, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                 }
                 if (response.first.httpStatusCode in 200..299) {
@@ -397,7 +401,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                         return false
                     }
                 } else {
-                    val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                    val response = suspendCoroutine { continuation ->
                         cronetEngine!!.get().newUrlRequestBuilder(sourceUrl, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                     }
                     if (response.first.httpStatusCode in 200..299) {
@@ -477,7 +481,7 @@ class StreamDownloadWorker @AssistedInject constructor(
             val initSegmentBytes = initSegmentUri?.let {
                 when {
                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                        val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                        val response = suspendCoroutine { continuation ->
                             httpEngine!!.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                         }
                         if (isShared) {
@@ -497,7 +501,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                             cronetEngine!!.get().newUrlRequestBuilder(it, request.callback, cronetExecutor).build().start()
                             request.future.get().responseBody as ByteArray
                         } else {
-                            val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                            val response = suspendCoroutine { continuation ->
                                 cronetEngine!!.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                             }
                             response.second
@@ -555,7 +559,6 @@ class StreamDownloadWorker @AssistedInject constructor(
                                         gameId = it.stream?.game?.id,
                                         gameSlug = it.stream?.game?.slug,
                                         gameName = it.stream?.game?.displayName,
-                                        type = it.stream?.type,
                                         title = it.stream?.broadcaster?.broadcastSettings?.title,
                                         viewerCount = it.stream?.viewersCount,
                                         startedAt = it.stream?.createdAt?.toString(),
@@ -581,7 +584,6 @@ class StreamDownloadWorker @AssistedInject constructor(
                                             channelName = it.channelName,
                                             gameId = it.gameId,
                                             gameName = it.gameName,
-                                            type = it.type,
                                             title = it.title,
                                             viewerCount = it.viewerCount,
                                             startedAt = it.startedAt,
@@ -617,7 +619,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                             try {
                                                 when {
                                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                                        val response = suspendCoroutine { continuation ->
                                                             httpEngine!!.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                                         }
                                                         if (response.first.httpStatusCode in 200..299) {
@@ -637,7 +639,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                                 }
                                                             }
                                                         } else {
-                                                            val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                                            val response = suspendCoroutine { continuation ->
                                                                 cronetEngine!!.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                                             }
                                                             if (response.first.httpStatusCode in 200..299) {
@@ -697,7 +699,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                         requestSemaphore.withPermit {
                             when {
                                 networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                    val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                    val response = suspendCoroutine { continuation ->
                                         httpEngine!!.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                     }
                                     val mutex = Mutex()
@@ -721,7 +723,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                         cronetEngine!!.get().newUrlRequestBuilder(it, request.callback, cronetExecutor).build().start()
                                         request.future.get().responseBody as ByteArray
                                     } else {
-                                        val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             cronetEngine!!.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                         }
                                         response.second
@@ -772,7 +774,7 @@ class StreamDownloadWorker @AssistedInject constructor(
             while (true) {
                 val playlist = when {
                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                        val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                        val response = suspendCoroutine { continuation ->
                             httpEngine!!.get().newUrlRequestBuilder(sourceUrl, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                         }
                         if (response.first.httpStatusCode in 200..299) {
@@ -804,7 +806,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                 return true
                             }
                         } else {
-                            val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                            val response = suspendCoroutine { continuation ->
                                 cronetEngine!!.get().newUrlRequestBuilder(sourceUrl, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                             }
                             if (response.first.httpStatusCode in 200..299) {
@@ -847,7 +849,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                 requestSemaphore.withPermit {
                                     when {
                                         networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                            val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                            val response = suspendCoroutine { continuation ->
                                                 httpEngine!!.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                             }
                                             val mutex = Mutex()
@@ -871,7 +873,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                                                 cronetEngine!!.get().newUrlRequestBuilder(it, request.callback, cronetExecutor).build().start()
                                                 request.future.get().responseBody as ByteArray
                                             } else {
-                                                val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                                val response = suspendCoroutine { continuation ->
                                                     cronetEngine!!.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                                 }
                                                 response.second
@@ -1145,318 +1147,289 @@ class StreamDownloadWorker @AssistedInject constructor(
                 writer.name("liveStartTime".also { position += it.length + 4 }).value(streamStartTime.also { position += it.length + 2 })
             }
             chatPosition = position
-            chatReadWebSocketOkHttp = ChatReadWebSocketOkHttp(false, channelLogin, okHttpClient,
-                webSocketListener = object : WebSocketListener() {
-                    override fun onOpen(webSocket: WebSocket, response: Response) {
-                        chatReadWebSocketOkHttp?.apply {
-                            write("CAP REQ :twitch.tv/tags twitch.tv/commands")
-                            write("NICK justinfan${Random().nextInt(((9999 - 1000) + 1)) + 1000}") //random number between 1000 and 9999
-                            write("JOIN $hashChannelName")
-                            pingTimer?.cancel()
-                            pongTimer?.cancel()
-                            startPingTimer()
-                        }
+            chatReadWebSocket = ChatReadWebSocket(
+                channelLogin = channelLogin,
+                trustManager = trustManager,
+                listener = object : ChatReadWebSocket.Listener {
+                    override suspend fun onChatMessage(message: String, userNotice: Boolean) {
+                        saveMessage(message, writer, downloadEmotes, networkLibrary, emoteQuality, savedTwitchEmotes, savedBadges, savedEmotes, badgeList, cheerEmoteList, emoteList)
                     }
 
-                    override fun onMessage(webSocket: WebSocket, text: String) {
-                        val list = mutableListOf<String>()
-                        text.removeSuffix("\r\n").split("\r\n").forEach {
-                            it.run {
-                                when {
-                                    contains("PRIVMSG") -> list.add(this)
-                                    contains("USERNOTICE") -> list.add(this)
-                                    contains("CLEARMSG") -> list.add(this)
-                                    contains("CLEARCHAT") -> list.add(this)
-                                    contains("NOTICE") -> {}
-                                    contains("ROOMSTATE") -> {}
-                                    startsWith("PING") -> chatReadWebSocketOkHttp?.write("PONG")
-                                    startsWith("PONG") -> {
-                                        chatReadWebSocketOkHttp?.apply {
-                                            pingTimer?.cancel()
-                                            pongTimer?.cancel()
-                                            startPingTimer()
-                                        }
-                                    }
-                                    startsWith("RECONNECT") -> {
-                                        chatReadWebSocketOkHttp?.apply {
-                                            pingTimer?.cancel()
-                                            pongTimer?.cancel()
-                                            reconnect()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (list.isNotEmpty()) {
-                            writer.name("liveComments".also { position += it.length + 4 })
-                            writer.beginArray().also { position += 1 }
-                            list.forEach { message ->
-                                writer.value(message.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 3 })
-                            }
-                            writer.endArray()
-                            if (downloadEmotes) {
-                                list.forEach { message ->
-                                    val userNotice = when {
-                                        message.contains("PRIVMSG") -> false
-                                        message.contains("USERNOTICE") -> true
-                                        else -> null
-                                    }
-                                    if (userNotice != null) {
-                                        val chatMessage = ChatUtils.parseChatMessage(message, userNotice)
-                                        val twitchEmotes = mutableListOf<TwitchEmote>()
-                                        val twitchBadges = mutableListOf<TwitchBadge>()
-                                        val cheerEmotes = mutableListOf<CheerEmote>()
-                                        val emotes = mutableListOf<Emote>()
-                                        chatMessage.emotes?.forEach {
-                                            if (it.id != null && !savedTwitchEmotes.contains(it.id)) {
-                                                savedTwitchEmotes.add(it.id)
-                                                twitchEmotes.add(it)
-                                            }
-                                        }
-                                        chatMessage.badges?.forEach {
-                                            val pair = Pair(it.setId, it.version)
-                                            if (!savedBadges.contains(pair)) {
-                                                savedBadges.add(pair)
-                                                val badge = badgeList.find { badge -> badge.setId == it.setId && badge.version == it.version }
-                                                if (badge != null) {
-                                                    twitchBadges.add(badge)
-                                                }
-                                            }
-                                        }
-                                        chatMessage.message?.split(" ")?.forEach { word ->
-                                            if (!savedEmotes.contains(word)) {
-                                                val cheerEmote = if (chatMessage.bits != null) {
-                                                    val bitsCount = word.takeLastWhile { it.isDigit() }
-                                                    val bitsName = word.substringBeforeLast(bitsCount)
-                                                    if (bitsCount.isNotEmpty()) {
-                                                        cheerEmoteList.findLast { it.name.equals(bitsName, true) && it.minBits <= bitsCount.toInt() }
-                                                    } else null
-                                                } else null
-                                                if (cheerEmote != null) {
-                                                    savedEmotes.add(word)
-                                                    cheerEmotes.add(cheerEmote)
-                                                } else {
-                                                    val emote = emoteList.find { it.name == word }
-                                                    if (emote != null) {
-                                                        savedEmotes.add(word)
-                                                        emotes.add(emote)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        if (twitchEmotes.isNotEmpty()) {
-                                            writer.name("twitchEmotes".also { position += it.length + 4 })
-                                            writer.beginArray().also { position += 1 }
-                                            val last = twitchEmotes.lastOrNull()
-                                            twitchEmotes.forEach { emote ->
-                                                val url = when (emoteQuality) {
-                                                    "4" -> emote.url4x ?: emote.url3x ?: emote.url2x ?: emote.url1x
-                                                    "3" -> emote.url3x ?: emote.url2x ?: emote.url1x
-                                                    "2" -> emote.url2x ?: emote.url1x
-                                                    else -> emote.url1x
-                                                }!!
-                                                val response = when {
-                                                    networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        runBlocking {
-                                                            val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
-                                                                httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
-                                                            }
-                                                            response.second
-                                                        }
-                                                    }
-                                                    networkLibrary == "Cronet" && cronetEngine != null -> {
-                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                                            val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
-                                                            cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
-                                                            request.future.get().responseBody as ByteArray
-                                                        } else {
-                                                            runBlocking {
-                                                                val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
-                                                                    cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
-                                                                }
-                                                                response.second
-                                                            }
-                                                        }
-                                                    }
-                                                    else -> {
-                                                        okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                                                            response.body.source().readByteArray()
-                                                        }
-                                                    }
-                                                }
-                                                writer.beginObject().also { position += 1 }
-                                                writer.name("data".also { position += it.length + 3 }).value(Base64.encodeToString(response, Base64.NO_WRAP or Base64.NO_PADDING).also { position += it.toByteArray().size + 2 })
-                                                writer.name("id".also { position += it.length + 4 }).value(emote.id.also { position += it.toString().toByteArray().size + it.toString().count { c -> c == '"' || c == '\\' } + 2 })
-                                                writer.endObject().also { position += 1 }
-                                                if (emote != last) {
-                                                    position += 1
-                                                }
-                                            }
-                                            writer.endArray().also { position += 1 }
-                                        }
-                                        if (twitchBadges.isNotEmpty()) {
-                                            writer.name("twitchBadges".also { position += it.length + 4 })
-                                            writer.beginArray().also { position += 1 }
-                                            val last = twitchBadges.lastOrNull()
-                                            twitchBadges.forEach { badge ->
-                                                val url = when (emoteQuality) {
-                                                    "4" -> badge.url4x ?: badge.url3x ?: badge.url2x ?: badge.url1x
-                                                    "3" -> badge.url3x ?: badge.url2x ?: badge.url1x
-                                                    "2" -> badge.url2x ?: badge.url1x
-                                                    else -> badge.url1x
-                                                }!!
-                                                val response = when {
-                                                    networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        runBlocking {
-                                                            val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
-                                                                httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
-                                                            }
-                                                            response.second
-                                                        }
-                                                    }
-                                                    networkLibrary == "Cronet" && cronetEngine != null -> {
-                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                                            val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
-                                                            cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
-                                                            request.future.get().responseBody as ByteArray
-                                                        } else {
-                                                            runBlocking {
-                                                                val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
-                                                                    cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
-                                                                }
-                                                                response.second
-                                                            }
-                                                        }
-                                                    }
-                                                    else -> {
-                                                        okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                                                            response.body.source().readByteArray()
-                                                        }
-                                                    }
-                                                }
-                                                writer.beginObject().also { position += 1 }
-                                                writer.name("data".also { position += it.length + 3 }).value(Base64.encodeToString(response, Base64.NO_WRAP or Base64.NO_PADDING).also { position += it.toByteArray().size + 2 })
-                                                writer.name("setId".also { position += it.length + 4 }).value(badge.setId.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 2 })
-                                                writer.name("version".also { position += it.length + 4 }).value(badge.version.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 2 })
-                                                writer.endObject().also { position += 1 }
-                                                if (badge != last) {
-                                                    position += 1
-                                                }
-                                            }
-                                            writer.endArray().also { position += 1 }
-                                        }
-                                        if (cheerEmotes.isNotEmpty()) {
-                                            writer.name("cheerEmotes".also { position += it.length + 4 })
-                                            writer.beginArray().also { position += 1 }
-                                            val last = cheerEmotes.lastOrNull()
-                                            cheerEmotes.forEach { cheerEmote ->
-                                                val url = when (emoteQuality) {
-                                                    "4" -> cheerEmote.url4x ?: cheerEmote.url3x ?: cheerEmote.url2x ?: cheerEmote.url1x
-                                                    "3" -> cheerEmote.url3x ?: cheerEmote.url2x ?: cheerEmote.url1x
-                                                    "2" -> cheerEmote.url2x ?: cheerEmote.url1x
-                                                    else -> cheerEmote.url1x
-                                                }!!
-                                                val response = when {
-                                                    networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        runBlocking {
-                                                            val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
-                                                                httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
-                                                            }
-                                                            response.second
-                                                        }
-                                                    }
-                                                    networkLibrary == "Cronet" && cronetEngine != null -> {
-                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                                            val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
-                                                            cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
-                                                            request.future.get().responseBody as ByteArray
-                                                        } else {
-                                                            runBlocking {
-                                                                val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
-                                                                    cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
-                                                                }
-                                                                response.second
-                                                            }
-                                                        }
-                                                    }
-                                                    else -> {
-                                                        okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                                                            response.body.source().readByteArray()
-                                                        }
-                                                    }
-                                                }
-                                                writer.beginObject().also { position += 1 }
-                                                writer.name("data".also { position += it.length + 3 }).value(Base64.encodeToString(response, Base64.NO_WRAP or Base64.NO_PADDING).also { position += it.toByteArray().size + 2 })
-                                                writer.name("name".also { position += it.length + 4 }).value(cheerEmote.name.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 2 })
-                                                writer.name("minBits".also { position += it.length + 4 }).value(cheerEmote.minBits.also { position += it.toString().length })
-                                                cheerEmote.color?.let { value -> writer.name("color".also { position += it.length + 4 }).value(value.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 2 }) }
-                                                writer.endObject().also { position += 1 }
-                                                if (cheerEmote != last) {
-                                                    position += 1
-                                                }
-                                            }
-                                            writer.endArray().also { position += 1 }
-                                        }
-                                        if (emotes.isNotEmpty()) {
-                                            writer.name("emotes".also { position += it.length + 4 })
-                                            writer.beginArray().also { position += 1 }
-                                            val last = emotes.lastOrNull()
-                                            emotes.forEach { emote ->
-                                                val url = when (emoteQuality) {
-                                                    "4" -> emote.url4x ?: emote.url3x ?: emote.url2x ?: emote.url1x
-                                                    "3" -> emote.url3x ?: emote.url2x ?: emote.url1x
-                                                    "2" -> emote.url2x ?: emote.url1x
-                                                    else -> emote.url1x
-                                                }!!
-                                                val response = when {
-                                                    networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                                        runBlocking {
-                                                            val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
-                                                                httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
-                                                            }
-                                                            response.second
-                                                        }
-                                                    }
-                                                    networkLibrary == "Cronet" && cronetEngine != null -> {
-                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                                            val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
-                                                            cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
-                                                            request.future.get().responseBody as ByteArray
-                                                        } else {
-                                                            runBlocking {
-                                                                val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
-                                                                    cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
-                                                                }
-                                                                response.second
-                                                            }
-                                                        }
-                                                    }
-                                                    else -> {
-                                                        okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                                                            response.body.source().readByteArray()
-                                                        }
-                                                    }
-                                                }
-                                                writer.beginObject().also { position += 1 }
-                                                writer.name("data".also { position += it.length + 3 }).value(Base64.encodeToString(response, Base64.NO_WRAP or Base64.NO_PADDING).also { position += it.toByteArray().size + 2 })
-                                                writer.name("name".also { position += it.length + 4 }).value(emote.name.also { position += it.toString().toByteArray().size + it.toString().count { c -> c == '"' || c == '\\' } + 2 })
-                                                writer.name("isZeroWidth".also { position += it.length + 4 }).value(emote.isOverlayEmote.also { position += it.toString().length })
-                                                writer.endObject().also { position += 1 }
-                                                if (emote != last) {
-                                                    position += 1
-                                                }
-                                            }
-                                            writer.endArray().also { position += 1 }
-                                        }
-                                    }
-                                }
-                            }
-                            chatPosition = position
+                    override suspend fun onClearMessage(message: String) {
+                        saveMessage(message, writer, downloadEmotes, networkLibrary, emoteQuality, savedTwitchEmotes, savedBadges, savedEmotes, badgeList, cheerEmoteList, emoteList)
+                    }
+
+                    override suspend fun onClearChat(message: String) {
+                        saveMessage(message, writer, downloadEmotes, networkLibrary, emoteQuality, savedTwitchEmotes, savedBadges, savedEmotes, badgeList, cheerEmoteList, emoteList)
+                    }
+                }
+            )
+            chatReadWebSocket?.connect(MainScope())
+        }
+    }
+
+    private fun saveMessage(message: String, writer: JsonWriter, downloadEmotes: Boolean, networkLibrary: String?, emoteQuality: String, savedTwitchEmotes: MutableList<String>, savedBadges: MutableList<Pair<String, String>>, savedEmotes: MutableList<String>, badgeList: List<TwitchBadge>, cheerEmoteList: List<CheerEmote>, emoteList: List<Emote>) {
+        var position = chatPosition
+        writer.name("liveComments".also { position += it.length + 4 })
+        writer.beginArray().also { position += 1 }
+        writer.value(message.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 3 })
+        writer.endArray()
+        if (downloadEmotes) {
+            val userNotice = when {
+                message.contains("PRIVMSG") -> false
+                message.contains("USERNOTICE") -> true
+                else -> null
+            }
+            if (userNotice != null) {
+                val chatMessage = ChatUtils.parseChatMessage(message, userNotice)
+                val twitchEmotes = mutableListOf<TwitchEmote>()
+                val twitchBadges = mutableListOf<TwitchBadge>()
+                val cheerEmotes = mutableListOf<CheerEmote>()
+                val emotes = mutableListOf<Emote>()
+                chatMessage.emotes?.forEach {
+                    if (it.id != null && !savedTwitchEmotes.contains(it.id)) {
+                        savedTwitchEmotes.add(it.id)
+                        twitchEmotes.add(it)
+                    }
+                }
+                chatMessage.badges?.forEach {
+                    val pair = Pair(it.setId, it.version)
+                    if (!savedBadges.contains(pair)) {
+                        savedBadges.add(pair)
+                        val badge = badgeList.find { badge -> badge.setId == it.setId && badge.version == it.version }
+                        if (badge != null) {
+                            twitchBadges.add(badge)
                         }
                     }
                 }
-            ).apply { connect() }
+                chatMessage.message?.split(" ")?.forEach { word ->
+                    if (!savedEmotes.contains(word)) {
+                        val cheerEmote = if (chatMessage.bits != null) {
+                            val bitsCount = word.takeLastWhile { it.isDigit() }
+                            val bitsName = word.substringBeforeLast(bitsCount)
+                            if (bitsCount.isNotEmpty()) {
+                                cheerEmoteList.findLast { it.name.equals(bitsName, true) && it.minBits <= bitsCount.toInt() }
+                            } else null
+                        } else null
+                        if (cheerEmote != null) {
+                            savedEmotes.add(word)
+                            cheerEmotes.add(cheerEmote)
+                        } else {
+                            val emote = emoteList.find { it.name == word }
+                            if (emote != null) {
+                                savedEmotes.add(word)
+                                emotes.add(emote)
+                            }
+                        }
+                    }
+                }
+                if (twitchEmotes.isNotEmpty()) {
+                    writer.name("twitchEmotes".also { position += it.length + 4 })
+                    writer.beginArray().also { position += 1 }
+                    val last = twitchEmotes.lastOrNull()
+                    twitchEmotes.forEach { emote ->
+                        val url = when (emoteQuality) {
+                            "4" -> emote.url4x ?: emote.url3x ?: emote.url2x ?: emote.url1x
+                            "3" -> emote.url3x ?: emote.url2x ?: emote.url1x
+                            "2" -> emote.url2x ?: emote.url1x
+                            else -> emote.url1x
+                        }!!
+                        val response = when {
+                            networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
+                                runBlocking {
+                                    val response = suspendCoroutine { continuation ->
+                                        httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
+                                    }
+                                    response.second
+                                }
+                            }
+                            networkLibrary == "Cronet" && cronetEngine != null -> {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                    val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
+                                    cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
+                                    request.future.get().responseBody as ByteArray
+                                } else {
+                                    runBlocking {
+                                        val response = suspendCoroutine { continuation ->
+                                            cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
+                                        }
+                                        response.second
+                                    }
+                                }
+                            }
+                            else -> {
+                                okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                                    response.body.source().readByteArray()
+                                }
+                            }
+                        }
+                        writer.beginObject().also { position += 1 }
+                        writer.name("data".also { position += it.length + 3 }).value(Base64.encodeToString(response, Base64.NO_WRAP or Base64.NO_PADDING).also { position += it.toByteArray().size + 2 })
+                        writer.name("id".also { position += it.length + 4 }).value(emote.id.also { position += it.toString().toByteArray().size + it.toString().count { c -> c == '"' || c == '\\' } + 2 })
+                        writer.endObject().also { position += 1 }
+                        if (emote != last) {
+                            position += 1
+                        }
+                    }
+                    writer.endArray().also { position += 1 }
+                }
+                if (twitchBadges.isNotEmpty()) {
+                    writer.name("twitchBadges".also { position += it.length + 4 })
+                    writer.beginArray().also { position += 1 }
+                    val last = twitchBadges.lastOrNull()
+                    twitchBadges.forEach { badge ->
+                        val url = when (emoteQuality) {
+                            "4" -> badge.url4x ?: badge.url3x ?: badge.url2x ?: badge.url1x
+                            "3" -> badge.url3x ?: badge.url2x ?: badge.url1x
+                            "2" -> badge.url2x ?: badge.url1x
+                            else -> badge.url1x
+                        }!!
+                        val response = when {
+                            networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
+                                runBlocking {
+                                    val response = suspendCoroutine { continuation ->
+                                        httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
+                                    }
+                                    response.second
+                                }
+                            }
+                            networkLibrary == "Cronet" && cronetEngine != null -> {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                    val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
+                                    cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
+                                    request.future.get().responseBody as ByteArray
+                                } else {
+                                    runBlocking {
+                                        val response = suspendCoroutine { continuation ->
+                                            cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
+                                        }
+                                        response.second
+                                    }
+                                }
+                            }
+                            else -> {
+                                okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                                    response.body.source().readByteArray()
+                                }
+                            }
+                        }
+                        writer.beginObject().also { position += 1 }
+                        writer.name("data".also { position += it.length + 3 }).value(Base64.encodeToString(response, Base64.NO_WRAP or Base64.NO_PADDING).also { position += it.toByteArray().size + 2 })
+                        writer.name("setId".also { position += it.length + 4 }).value(badge.setId.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 2 })
+                        writer.name("version".also { position += it.length + 4 }).value(badge.version.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 2 })
+                        writer.endObject().also { position += 1 }
+                        if (badge != last) {
+                            position += 1
+                        }
+                    }
+                    writer.endArray().also { position += 1 }
+                }
+                if (cheerEmotes.isNotEmpty()) {
+                    writer.name("cheerEmotes".also { position += it.length + 4 })
+                    writer.beginArray().also { position += 1 }
+                    val last = cheerEmotes.lastOrNull()
+                    cheerEmotes.forEach { cheerEmote ->
+                        val url = when (emoteQuality) {
+                            "4" -> cheerEmote.url4x ?: cheerEmote.url3x ?: cheerEmote.url2x ?: cheerEmote.url1x
+                            "3" -> cheerEmote.url3x ?: cheerEmote.url2x ?: cheerEmote.url1x
+                            "2" -> cheerEmote.url2x ?: cheerEmote.url1x
+                            else -> cheerEmote.url1x
+                        }!!
+                        val response = when {
+                            networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
+                                runBlocking {
+                                    val response = suspendCoroutine { continuation ->
+                                        httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
+                                    }
+                                    response.second
+                                }
+                            }
+                            networkLibrary == "Cronet" && cronetEngine != null -> {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                    val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
+                                    cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
+                                    request.future.get().responseBody as ByteArray
+                                } else {
+                                    runBlocking {
+                                        val response = suspendCoroutine { continuation ->
+                                            cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
+                                        }
+                                        response.second
+                                    }
+                                }
+                            }
+                            else -> {
+                                okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                                    response.body.source().readByteArray()
+                                }
+                            }
+                        }
+                        writer.beginObject().also { position += 1 }
+                        writer.name("data".also { position += it.length + 3 }).value(Base64.encodeToString(response, Base64.NO_WRAP or Base64.NO_PADDING).also { position += it.toByteArray().size + 2 })
+                        writer.name("name".also { position += it.length + 4 }).value(cheerEmote.name.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 2 })
+                        writer.name("minBits".also { position += it.length + 4 }).value(cheerEmote.minBits.also { position += it.toString().length })
+                        cheerEmote.color?.let { value -> writer.name("color".also { position += it.length + 4 }).value(value.also { position += it.toByteArray().size + it.count { c -> c == '"' || c == '\\' } + 2 }) }
+                        writer.endObject().also { position += 1 }
+                        if (cheerEmote != last) {
+                            position += 1
+                        }
+                    }
+                    writer.endArray().also { position += 1 }
+                }
+                if (emotes.isNotEmpty()) {
+                    writer.name("emotes".also { position += it.length + 4 })
+                    writer.beginArray().also { position += 1 }
+                    val last = emotes.lastOrNull()
+                    emotes.forEach { emote ->
+                        val url = when (emoteQuality) {
+                            "4" -> emote.url4x ?: emote.url3x ?: emote.url2x ?: emote.url1x
+                            "3" -> emote.url3x ?: emote.url2x ?: emote.url1x
+                            "2" -> emote.url2x ?: emote.url1x
+                            else -> emote.url1x
+                        }!!
+                        val response = when {
+                            networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
+                                runBlocking {
+                                    val response = suspendCoroutine { continuation ->
+                                        httpEngine!!.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
+                                    }
+                                    response.second
+                                }
+                            }
+                            networkLibrary == "Cronet" && cronetEngine != null -> {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                    val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
+                                    cronetEngine!!.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
+                                    request.future.get().responseBody as ByteArray
+                                } else {
+                                    runBlocking {
+                                        val response = suspendCoroutine { continuation ->
+                                            cronetEngine!!.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
+                                        }
+                                        response.second
+                                    }
+                                }
+                            }
+                            else -> {
+                                okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                                    response.body.source().readByteArray()
+                                }
+                            }
+                        }
+                        writer.beginObject().also { position += 1 }
+                        writer.name("data".also { position += it.length + 3 }).value(Base64.encodeToString(response, Base64.NO_WRAP or Base64.NO_PADDING).also { position += it.toByteArray().size + 2 })
+                        writer.name("name".also { position += it.length + 4 }).value(emote.name.also { position += it.toString().toByteArray().size + it.toString().count { c -> c == '"' || c == '\\' } + 2 })
+                        writer.name("isZeroWidth".also { position += it.length + 4 }).value(emote.isOverlayEmote.also { position += it.toString().length })
+                        writer.endObject().also { position += 1 }
+                        if (emote != last) {
+                            position += 1
+                        }
+                    }
+                    writer.endArray().also { position += 1 }
+                }
+            }
         }
+        chatPosition = position
     }
 
     private fun createForegroundInfo(live: Boolean, offlineVideo: OfflineVideo): ForegroundInfo {

@@ -2,6 +2,7 @@ type Query {
     badges: [Badge]
     cheerConfig: GlobalCheerConfig
     clip(slug: ID!): Clip
+    contentTag(id: ID!): Tag
     games(first: Int, after: Cursor, options: GameOptions): GameConnection
     game(id: ID, slug: String, name: String): Game
     searchCategories(query: String!, first: Int, after: Cursor): SearchCategoriesConnection
@@ -170,6 +171,7 @@ type FollowerConnection {
 }
 
 type FollowerEdge {
+    followedAt: Time
     notificationSettings: ChannelNotificationSettings
 }
 
@@ -182,7 +184,9 @@ type Game {
     broadcastersCount: Int
     clips(first: Int, after: Cursor, criteria: GameClipsInput): ClipConnection
     displayName: String
+    followersCount: Int
     id: ID
+    self: GameSelfConnection
     slug: String
     streams(first: Int, after: Cursor, options: GameStreamOptions): StreamConnection
     tags(tagType: TagType!): [Tag!]
@@ -198,6 +202,14 @@ type GameConnection {
 type GameEdge {
     cursor: Cursor
     node: Game
+}
+
+type GameFollow {
+    followedAt: Time
+}
+
+type GameSelfConnection {
+    follow: GameFollow
 }
 
 type GlobalCheerConfig {
@@ -286,7 +298,6 @@ type Stream {
     id: ID
     previewImageURL: String
     title: String
-    type: String
     viewersCount: Int
 }
 

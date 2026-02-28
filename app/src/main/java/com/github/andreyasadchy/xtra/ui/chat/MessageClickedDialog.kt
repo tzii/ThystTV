@@ -35,9 +35,7 @@ import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
-import com.github.andreyasadchy.xtra.util.gone
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.visible
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.mlkit.nl.translate.TranslateLanguage
@@ -50,7 +48,7 @@ import java.util.Locale
 class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.CallbackListener {
 
     interface OnButtonClickListener {
-        fun onCreateMessageClickedChatAdapter(): MessageClickedChatAdapter
+        fun onCreateMessageClickedChatAdapter(): MessageClickedChatAdapter?
         fun onReplyClicked(replyId: String?, userLogin: String?, userName: String?, message: String?)
         fun onCopyMessageClicked(message: String)
         fun onViewProfileClicked(id: String?, login: String?, name: String?, channelLogo: String?)
@@ -80,6 +78,7 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
     private lateinit var listener: OnButtonClickListener
     var adapter: MessageClickedChatAdapter? = null
     private var isChatTouched = false
+    private var messageLimit: Int? = null
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -137,7 +136,9 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                 adapter.messageClickListener = { selectedMessage, previousSelectedMessage ->
                     updateButtons(selectedMessage)
                     previousSelectedMessage?.let {
-                        adapter.messages?.indexOf(it)?.takeIf { it != -1 }?.let {
+                        synchronized(adapter.messages) {
+                            adapter.messages.indexOf(it).takeIf { it != -1 }
+                        }?.let {
                             (recyclerView.layoutManager?.findViewByPosition(it) as? TextView)?.let {
                                 adapter.updateBackground(previousSelectedMessage, it)
                             } ?: adapter.notifyItemChanged(it)
@@ -146,7 +147,11 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                 }
                 adapter.selectedMessage?.let { selectedMessage ->
                     updateButtons(selectedMessage)
-                    adapter.messages?.indexOf(selectedMessage)?.takeIf { it != -1 }?.let { binding.recyclerView.scrollToPosition(it) }
+                    synchronized(adapter.messages) {
+                        adapter.messages.indexOf(selectedMessage).takeIf { it != -1 }
+                    }?.let {
+                        binding.recyclerView.scrollToPosition(it)
+                    }
                     if (selectedMessage.userId != null || selectedMessage.userLogin != null) {
                         val targetId = requireArguments().getString(KEY_CHANNEL_ID)
                         val item = selectedMessage.userId?.let { savedUsers.find { it.first.channelId == selectedMessage.userId && it.second == targetId } }
@@ -158,7 +163,7 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                                     selectedMessage.userName.isNullOrBlank() &&
                                     channelName.isNotBlank()
                                 ) {
-                                    reply.visible()
+                                    reply.visibility = View.VISIBLE
                                     reply.setOnClickListener {
                                         listener.onReplyClicked(
                                             selectedMessage.id,
@@ -195,7 +200,7 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                                                         selectedMessage.userName.isNullOrBlank() &&
                                                         !user.channelName.isNullOrBlank()
                                                     ) {
-                                                        reply.visible()
+                                                        reply.visibility = View.VISIBLE
                                                         reply.setOnClickListener {
                                                             listener.onReplyClicked(
                                                                 selectedMessage.id,
@@ -210,7 +215,7 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                                                 viewModel.user.value = Pair(null, false)
                                             } else {
                                                 if (error == true) {
-                                                    viewProfile.visible()
+                                                    viewProfile.visibility = View.VISIBLE
                                                 }
                                             }
                                         }
@@ -226,7 +231,7 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                 }
             }
             if (requireContext().prefs().getBoolean(C.DEBUG_CHAT_FULLMSG, false)) {
-                copyFullMsg.visible()
+                copyFullMsg.visibility = View.VISIBLE
             }
         }
     }
@@ -235,22 +240,22 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
         with(binding) {
             if (requireArguments().getBoolean(KEY_MESSAGING) && (!chatMessage.userId.isNullOrBlank() || !chatMessage.userLogin.isNullOrBlank())) {
                 if (!chatMessage.id.isNullOrBlank()) {
-                    reply.visible()
+                    reply.visibility = View.VISIBLE
                     reply.setOnClickListener {
                         listener.onReplyClicked(chatMessage.id, chatMessage.userLogin, chatMessage.userName, chatMessage.message)
                         dismiss()
                     }
                 } else {
-                    reply.gone()
+                    reply.visibility = View.GONE
                 }
                 if (!chatMessage.message.isNullOrBlank()) {
-                    copyMessage.visible()
+                    copyMessage.visibility = View.VISIBLE
                     copyMessage.setOnClickListener {
                         listener.onCopyMessageClicked(chatMessage.message)
                         dismiss()
                     }
                 } else {
-                    copyMessage.gone()
+                    copyMessage.visibility = View.GONE
                 }
             }
             val clipboard = getSystemService(requireContext(), ClipboardManager::class.java)
@@ -263,11 +268,11 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                 dismiss()
             }
             if (requireContext().prefs().getBoolean(C.CHAT_TRANSLATE, false) && (chatMessage.message != null || chatMessage.systemMsg != null) && Build.SUPPORTED_64_BIT_ABIS.firstOrNull() == "arm64-v8a") {
-                translateMessage.visible()
+                translateMessage.visibility = View.VISIBLE
                 translateMessage.setOnClickListener {
                     listener.onTranslateMessageClicked(chatMessage, null)
                 }
-                translateMessageSelectLanguage.visible()
+                translateMessageSelectLanguage.visibility = View.VISIBLE
                 translateMessageSelectLanguage.setOnClickListener {
                     val languages = TranslateLanguage.getAllLanguages()
                     val names = languages.map { Locale.forLanguageTag(it).displayName }.toTypedArray()
@@ -286,8 +291,8 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                         .show()
                 }
             } else {
-                translateMessage.gone()
-                translateMessageSelectLanguage.gone()
+                translateMessage.visibility = View.GONE
+                translateMessageSelectLanguage.visibility = View.GONE
             }
         }
     }
@@ -295,23 +300,23 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
     private fun updateUserLayout(user: User) {
         with(binding) {
             if (user.bannerImageURL != null) {
-                userLayout.visible()
-                bannerImage.visible()
-                this@MessageClickedDialog.requireContext().imageLoader.enqueue(
-                    ImageRequest.Builder(this@MessageClickedDialog.requireContext()).apply {
+                userLayout.visibility = View.VISIBLE
+                bannerImage.visibility = View.VISIBLE
+                requireContext().imageLoader.enqueue(
+                    ImageRequest.Builder(requireContext()).apply {
                         data(user.bannerImageURL)
                         crossfade(true)
                         target(bannerImage)
                     }.build()
                 )
             } else {
-                bannerImage.gone()
+                bannerImage.visibility = View.GONE
             }
             if (user.channelLogo != null) {
-                userLayout.visible()
-                userImage.visible()
-                this@MessageClickedDialog.requireContext().imageLoader.enqueue(
-                    ImageRequest.Builder(this@MessageClickedDialog.requireContext()).apply {
+                userLayout.visibility = View.VISIBLE
+                userImage.visibility = View.VISIBLE
+                requireContext().imageLoader.enqueue(
+                    ImageRequest.Builder(requireContext()).apply {
                         data(user.channelLogo)
                         if (requireContext().prefs().getBoolean(C.UI_ROUNDUSERIMAGE, true)) {
                             transformations(CircleCropTransformation())
@@ -325,11 +330,11 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                     dismiss()
                 }
             } else {
-                userImage.gone()
+                userImage.visibility = View.GONE
             }
             if (user.channelName != null) {
-                userLayout.visible()
-                userName.visible()
+                userLayout.visibility = View.VISIBLE
+                userName.visibility = View.VISIBLE
                 userName.text = if (user.channelLogin != null && !user.channelLogin.equals(user.channelName, true)) {
                     when (requireContext().prefs().getString(C.UI_NAME_DISPLAY, "0")) {
                         "0" -> "${user.channelName}(${user.channelLogin})"
@@ -348,51 +353,55 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
                     userName.setShadowLayer(4f, 0f, 0f, Color.BLACK)
                 }
             } else {
-                userName.gone()
+                userName.visibility = View.GONE
             }
             if (user.createdAt != null) {
-                userLayout.visible()
-                userCreated.visible()
-                userCreated.text = requireContext().getString(R.string.created_at, TwitchApiHelper.formatTimeString(requireContext(), user.createdAt))
+                userLayout.visibility = View.VISIBLE
+                userCreated.visibility = View.VISIBLE
+                userCreated.text = getString(R.string.created_at, TwitchApiHelper.formatTimeString(requireContext(), user.createdAt))
                 if (user.bannerImageURL != null) {
                     userCreated.setTextColor(Color.LTGRAY)
                     userCreated.setShadowLayer(4f, 0f, 0f, Color.BLACK)
                 }
             } else {
-                userCreated.gone()
+                userCreated.visibility = View.GONE
             }
             if (user.followedAt != null) {
-                userLayout.visible()
-                userFollowed.visible()
-                userFollowed.text = requireContext().getString(R.string.followed_at, TwitchApiHelper.formatTimeString(requireContext(), user.followedAt!!))
+                userLayout.visibility = View.VISIBLE
+                userFollowed.visibility = View.VISIBLE
+                userFollowed.text = getString(R.string.followed_at, TwitchApiHelper.formatTimeString(requireContext(), user.followedAt!!))
                 if (user.bannerImageURL != null) {
                     userFollowed.setTextColor(Color.LTGRAY)
                     userFollowed.setShadowLayer(4f, 0f, 0f, Color.BLACK)
                 }
             } else {
-                userFollowed.gone()
+                userFollowed.visibility = View.GONE
             }
             if (!userImage.isVisible && !userName.isVisible) {
-                viewProfile.visible()
+                viewProfile.visibility = View.VISIBLE
             }
         }
     }
 
     fun updateUserMessages(userId: String) {
         adapter?.let { adapter ->
-            adapter.messages?.toList()?.let { messages ->
-                messages.filter { it.userId != null && it.userId == userId }.forEach { message ->
-                    messages.indexOf(message).takeIf { it != -1 }?.let {
-                        adapter.notifyItemChanged(it)
-                    }
+            synchronized(adapter.messages) {
+                adapter.messages.mapIndexedNotNull { index, message ->
+                    if (message.userId != null && message.userId == userId) {
+                        index
+                    } else null
                 }
+            }.forEach {
+                adapter.notifyItemChanged(it)
             }
         }
     }
 
     fun updateTranslation(chatMessage: ChatMessage, previousTranslation: String?) {
         adapter?.let { adapter ->
-            adapter.messages?.toList()?.indexOf(chatMessage)?.takeIf { it != -1 }?.let {
+            synchronized(adapter.messages) {
+                adapter.messages.indexOf(chatMessage).takeIf { it != -1 }
+            }?.let {
                 (binding.recyclerView.layoutManager?.findViewByPosition(it) as? TextView)?.let {
                     adapter.updateTranslation(chatMessage, it, previousTranslation)
                 } ?: adapter.notifyItemChanged(it)
@@ -400,9 +409,42 @@ class MessageClickedDialog : BottomSheetDialogFragment(), IntegrityDialog.Callba
         }
     }
 
-    fun scrollToLastPosition() {
-        if (!isChatTouched && !shouldShowButton()) {
-            adapter?.messages?.let { binding.recyclerView.scrollToPosition(it.lastIndex) }
+    fun newMessage(message: ChatMessage) {
+        adapter?.let { adapter ->
+            if ((!adapter.userId.isNullOrBlank() && (message.userId == adapter.userId || message.replyParent?.userId == adapter.userId)) ||
+                (!adapter.userLogin.isNullOrBlank() && (message.userLogin == adapter.userLogin || message.replyParent?.userLogin == adapter.userLogin))) {
+                synchronized(adapter.messages) {
+                    if (adapter.messages.size >= (messageLimit ?: requireContext().prefs().getInt(C.CHAT_LIMIT, 600).also { messageLimit = it })) {
+                        adapter.messages.removeAt(0)
+                        adapter.notifyItemRemoved(0)
+                    }
+                    adapter.messages.add(message)
+                    val lastIndex = adapter.messages.lastIndex
+                    adapter.notifyItemInserted(lastIndex)
+                    if (!isChatTouched && !shouldShowButton()) {
+                        binding.recyclerView.scrollToPosition(lastIndex)
+                    }
+                }
+            }
+        }
+    }
+
+    fun addMessages(messages: List<ChatMessage>) {
+        adapter?.let { adapter ->
+            synchronized(adapter.messages) {
+                val left = (messageLimit ?: requireContext().prefs().getInt(C.CHAT_LIMIT, 600).also { messageLimit = it }) - adapter.messages.size
+                if (left > 0) {
+                    val items = messages.filter { message ->
+                        (!message.userId.isNullOrBlank() && (message.userId == adapter.userId || message.replyParent?.userId == adapter.userId)) ||
+                                (!message.userLogin.isNullOrBlank() && (message.userLogin == adapter.userLogin || message.replyParent?.userLogin == adapter.userLogin))
+                    }.takeLast(left)
+                    adapter.messages.addAll(0, items)
+                    adapter.notifyItemRangeInserted(0, items.size)
+                    if (!isChatTouched && !shouldShowButton()) {
+                        binding.recyclerView.scrollToPosition(adapter.messages.lastIndex)
+                    }
+                }
+            }
         }
     }
 

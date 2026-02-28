@@ -6,9 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.net.http.HttpEngine
-import android.net.http.UrlResponseInfo
 import android.os.Build
 import android.os.ext.SdkExtensions
+import android.widget.Toast
 import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,7 +21,9 @@ import androidx.work.workDataOf
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.model.VideoPosition
 import com.github.andreyasadchy.xtra.model.ui.Clip
+import com.github.andreyasadchy.xtra.model.ui.Game
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
+import com.github.andreyasadchy.xtra.model.ui.Tag
 import com.github.andreyasadchy.xtra.model.ui.User
 import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.repository.AuthRepository
@@ -36,7 +38,6 @@ import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
-import com.github.andreyasadchy.xtra.util.toast
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import dagger.Lazy
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -89,13 +90,15 @@ class MainViewModel @Inject constructor(
     var sleepTimer: Timer? = null
     var sleepTimerEndTime = 0L
 
-    val video = MutableStateFlow<Video?>(null)
+    val video = MutableStateFlow<Pair<Video?, Long?>?>(null)
     val clip = MutableStateFlow<Clip?>(null)
     val user = MutableStateFlow<User?>(null)
+    val game = MutableStateFlow<Pair<Game?, String?>?>(null)
+    val tag = MutableStateFlow<Tag?>(null)
 
     val updateUrl = MutableSharedFlow<String?>()
 
-    fun loadVideo(videoId: String?, offset: Long?, saveVideoPositions: Boolean, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean) {
+    fun loadVideo(videoId: String?, offset: Long?, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean) {
         if (video.value == null) {
             viewModelScope.launch {
                 val item = try {
@@ -148,14 +151,13 @@ class MainViewModel @Inject constructor(
                         }
                     } else null
                 }
-                if (item != null && saveVideoPositions) {
-                    videoId?.toLongOrNull()?.let { id ->
-                        playerRepository.saveVideoPosition(VideoPosition(id, offset ?: 0))
-                    }
-                }
-                video.value = item
+                video.value = item to offset
             }
         }
+    }
+
+    suspend fun savePosition(id: Long, position: Long) {
+        playerRepository.saveVideoPosition(VideoPosition(id, position))
     }
 
     fun loadClip(clipId: String?, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean) {
@@ -272,6 +274,93 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun loadGame(gameSlug: String? = null, gameName: String? = null, tag: String?, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean) {
+        if (game.value == null) {
+            viewModelScope.launch {
+                game.value = try {
+                    val response = graphQLRepository.loadQueryGame(
+                        networkLibrary = networkLibrary,
+                        headers = gqlHeaders,
+                        slug = gameSlug,
+                        name = gameName.takeIf { gameSlug.isNullOrBlank() },
+                    )
+                    if (enableIntegrity && integrity.value == null) {
+                        response.errors?.find { it.message == "failed integrity check" }?.let {
+                            integrity.value = "refresh"
+                            return@launch
+                        }
+                    }
+                    response.data!!.game?.let {
+                        Game(
+                            gameId = it.id,
+                            gameSlug = it.slug,
+                            gameName = it.displayName,
+                            boxArtUrl = it.boxArtURL,
+                        )
+                    }
+                } catch (e: Exception) {
+                    if (!helixHeaders[C.HEADER_TOKEN].isNullOrBlank() && !gameName.isNullOrBlank()) {
+                        try {
+                            helixRepository.getGames(
+                                networkLibrary = networkLibrary,
+                                headers = helixHeaders,
+                                names = listOf(gameName)
+                            ).data.firstOrNull()?.let {
+                                Game(
+                                    gameId = it.id,
+                                    gameName = it.name,
+                                    boxArtUrl = it.boxArtUrl,
+                                )
+                            }
+                        } catch (e: Exception) {
+                            null
+                        }
+                    } else null
+                } to tag
+            }
+        }
+    }
+
+    fun loadTag(tagId: String, networkLibrary: String?, gqlHeaders: Map<String, String>, enableIntegrity: Boolean) {
+        if (tag.value == null) {
+            viewModelScope.launch {
+                tag.value = try {
+                    val response = graphQLRepository.loadQueryTag(networkLibrary, gqlHeaders, tagId)
+                    if (enableIntegrity && integrity.value == null) {
+                        response.errors?.find { it.message == "failed integrity check" }?.let {
+                            integrity.value = "refresh"
+                            return@launch
+                        }
+                    }
+                    response.data!!.contentTag?.let {
+                        Tag(
+                            id = tagId,
+                            name = it.localizedName,
+                        )
+                    }
+                } catch (e: Exception) {
+                    try {
+                        val response = graphQLRepository.loadTag(networkLibrary, gqlHeaders, tagId)
+                        if (enableIntegrity && integrity.value == null) {
+                            response.errors?.find { it.message == "failed integrity check" }?.let {
+                                integrity.value = "refresh"
+                                return@launch
+                            }
+                        }
+                        response.data!!.contentTag.let {
+                            Tag(
+                                id = tagId,
+                                name = it.localizedName,
+                            )
+                        }
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+            }
+        }
+    }
+
     fun downloadStream(networkLibrary: String?, filesDir: String, id: String?, title: String?, startedAt: String?, channelId: String?, channelLogin: String?, channelName: String?, channelLogo: String?, thumbnail: String?, gameId: String?, gameSlug: String?, gameName: String?, downloadPath: String, quality: String, downloadChat: Boolean, downloadChatEmotes: Boolean, wifiOnly: Boolean) {
         viewModelScope.launch {
             if (!channelLogin.isNullOrBlank()) {
@@ -283,7 +372,7 @@ class MainViewModel @Inject constructor(
                             try {
                                 when {
                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                        val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                         }
                                         if (response.first.httpStatusCode in 200..299) {
@@ -303,7 +392,7 @@ class MainViewModel @Inject constructor(
                                                 }
                                             }
                                         } else {
-                                            val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                            val response = suspendCoroutine { continuation ->
                                                 cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                             }
                                             if (response.first.httpStatusCode in 200..299) {
@@ -340,7 +429,7 @@ class MainViewModel @Inject constructor(
                             try {
                                 when {
                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                        val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                         }
                                         if (response.first.httpStatusCode in 200..299) {
@@ -360,7 +449,7 @@ class MainViewModel @Inject constructor(
                                                 }
                                             }
                                         } else {
-                                            val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                            val response = suspendCoroutine { continuation ->
                                                 cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                             }
                                             if (response.first.httpStatusCode in 200..299) {
@@ -436,7 +525,7 @@ class MainViewModel @Inject constructor(
                         try {
                             when {
                                 networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                    val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                    val response = suspendCoroutine { continuation ->
                                         httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                     }
                                     if (response.first.httpStatusCode in 200..299) {
@@ -456,7 +545,7 @@ class MainViewModel @Inject constructor(
                                             }
                                         }
                                     } else {
-                                        val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                         }
                                         if (response.first.httpStatusCode in 200..299) {
@@ -493,7 +582,7 @@ class MainViewModel @Inject constructor(
                         try {
                             when {
                                 networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                    val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                    val response = suspendCoroutine { continuation ->
                                         httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                     }
                                     if (response.first.httpStatusCode in 200..299) {
@@ -513,7 +602,7 @@ class MainViewModel @Inject constructor(
                                             }
                                         }
                                     } else {
-                                        val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                         }
                                         if (response.first.httpStatusCode in 200..299) {
@@ -594,7 +683,7 @@ class MainViewModel @Inject constructor(
                         try {
                             when {
                                 networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                    val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                    val response = suspendCoroutine { continuation ->
                                         httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                     }
                                     if (response.first.httpStatusCode in 200..299) {
@@ -614,7 +703,7 @@ class MainViewModel @Inject constructor(
                                             }
                                         }
                                     } else {
-                                        val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                         }
                                         if (response.first.httpStatusCode in 200..299) {
@@ -651,7 +740,7 @@ class MainViewModel @Inject constructor(
                         try {
                             when {
                                 networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                    val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                    val response = suspendCoroutine { continuation ->
                                         httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                     }
                                     if (response.first.httpStatusCode in 200..299) {
@@ -671,7 +760,7 @@ class MainViewModel @Inject constructor(
                                             }
                                         }
                                     } else {
-                                        val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                         }
                                         if (response.first.httpStatusCode in 200..299) {
@@ -741,7 +830,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun validate(networkLibrary: String?, gqlHeaders: Map<String, String>, webGQLToken: String?, helixHeaders: Map<String, String>, accountId: String?, accountLogin: String?, activity: Activity) {
+    fun validate(networkLibrary: String?, gqlHeaders: Map<String, String>, gqlWebClientId: String?, gqlWebToken: String?, helixHeaders: Map<String, String>, accountId: String?, accountLogin: String?, activity: Activity) {
         viewModelScope.launch {
             try {
                 val helixToken = helixHeaders[C.HEADER_TOKEN]
@@ -761,7 +850,7 @@ class MainViewModel @Inject constructor(
                 val gqlToken = gqlHeaders[C.HEADER_TOKEN]
                 if (!gqlToken.isNullOrBlank()) {
                     val response = authRepository.validate(networkLibrary, gqlToken)
-                    if (response.clientId.isNotBlank() && response.clientId == gqlHeaders[C.HEADER_CLIENT_ID]) {
+                    if (response.clientId.isNotBlank() && (response.clientId == gqlHeaders[C.HEADER_CLIENT_ID] || response.clientId == gqlWebClientId)) {
                         if ((!response.userId.isNullOrBlank() && response.userId != accountId) || (!response.login.isNullOrBlank() && response.login != accountLogin)) {
                             activity.tokenPrefs().edit {
                                 putString(C.USER_ID, response.userId?.takeIf { it.isNotBlank() } ?: accountId)
@@ -772,9 +861,9 @@ class MainViewModel @Inject constructor(
                         throw IllegalStateException("401")
                     }
                 }
-                if (!webGQLToken.isNullOrBlank()) {
-                    val response = authRepository.validate(networkLibrary, webGQLToken)
-                    if (response.clientId.isNotBlank() && response.clientId == "kimne78kx3ncx6brgo4mv6wki5h1ko") {
+                if (!gqlWebToken.isNullOrBlank() && gqlWebToken != gqlToken) {
+                    val response = authRepository.validate(networkLibrary, gqlWebToken)
+                    if (response.clientId.isNotBlank() && response.clientId == gqlWebClientId) {
                         if ((!response.userId.isNullOrBlank() && response.userId != accountId) || (!response.login.isNullOrBlank() && response.login != accountLogin)) {
                             activity.tokenPrefs().edit {
                                 putString(C.USER_ID, response.userId?.takeIf { it.isNotBlank() } ?: accountId)
@@ -787,7 +876,7 @@ class MainViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 if (e is IllegalStateException && e.message == "401") {
-                    activity.toast(R.string.token_expired)
+                    Toast.makeText(activity, R.string.token_expired, Toast.LENGTH_LONG).show()
                     (activity as? MainActivity)?.logoutResultLauncher?.launch(Intent(activity, LoginActivity::class.java))
                 }
             }
@@ -801,7 +890,7 @@ class MainViewModel @Inject constructor(
                 try {
                     val response = when {
                         networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                            val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                            val response = suspendCoroutine { continuation ->
                                 httpEngine.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                             }
                             json.decodeFromString<JsonObject>(String(response.second))
@@ -813,7 +902,7 @@ class MainViewModel @Inject constructor(
                                 val response = request.future.get().responseBody as String
                                 json.decodeFromString<JsonObject>(response)
                             } else {
-                                val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                val response = suspendCoroutine { continuation ->
                                     cronetEngine.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                 }
                                 json.decodeFromString<JsonObject>(String(response.second))
@@ -847,7 +936,7 @@ class MainViewModel @Inject constructor(
             try {
                 val response = when {
                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                        val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                        val response = suspendCoroutine { continuation ->
                             httpEngine.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                         }
                         if (response.first.httpStatusCode in 200..299) {
@@ -863,7 +952,7 @@ class MainViewModel @Inject constructor(
                                 response.responseBody as ByteArray
                             } else null
                         } else {
-                            val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                            val response = suspendCoroutine { continuation ->
                                 cronetEngine.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                             }
                             if (response.first.httpStatusCode in 200..299) {

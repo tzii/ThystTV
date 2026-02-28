@@ -25,7 +25,6 @@ import com.github.andreyasadchy.xtra.ui.common.FragmentHost
 import com.github.andreyasadchy.xtra.ui.common.PagedListFragment
 import com.github.andreyasadchy.xtra.ui.common.Scrollable
 import com.github.andreyasadchy.xtra.ui.common.Sortable
-import com.github.andreyasadchy.xtra.util.visible
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -64,9 +63,9 @@ class FollowedChannelsFragment : PagedListFragment(), Scrollable, Sortable, Foll
                     sort = sortValues?.videoSort,
                     order = sortValues?.videoType,
                 )
-                viewModel.sortText.value = requireContext().getString(
+                viewModel.sortText.value = getString(
                     R.string.sort_and_order,
-                    requireContext().getString(
+                    getString(
                         when (viewModel.sort) {
                             FollowedChannelsSortDialog.SORT_FOLLOWED_AT -> R.string.time_followed
                             FollowedChannelsSortDialog.SORT_ALPHABETICALLY -> R.string.alphabetically
@@ -74,7 +73,7 @@ class FollowedChannelsFragment : PagedListFragment(), Scrollable, Sortable, Foll
                             else -> R.string.last_broadcast
                         }
                     ),
-                    requireContext().getString(
+                    getString(
                         when (viewModel.order) {
                             FollowedChannelsSortDialog.ORDER_DESC -> R.string.descending
                             FollowedChannelsSortDialog.ORDER_ASC -> R.string.ascending
@@ -93,7 +92,7 @@ class FollowedChannelsFragment : PagedListFragment(), Scrollable, Sortable, Foll
     }
 
     override fun setupSortBar(sortBar: SortBarBinding) {
-        sortBar.root.visible()
+        sortBar.root.visibility = View.VISIBLE
         sortBar.root.setOnClickListener {
             FollowedChannelsSortDialog.newInstance(
                 sort = viewModel.sort,
@@ -115,7 +114,7 @@ class FollowedChannelsFragment : PagedListFragment(), Scrollable, Sortable, Foll
                 if (changed) {
                     pagingAdapter.submitData(PagingData.empty())
                     viewModel.setFilter(sort, order)
-                    viewModel.sortText.value = requireContext().getString(R.string.sort_and_order, sortText, orderText)
+                    viewModel.sortText.value = getString(R.string.sort_and_order, sortText, orderText)
                 }
                 if (saveDefault) {
                     val item = viewModel.getSortChannel("followed_channels")?.apply {

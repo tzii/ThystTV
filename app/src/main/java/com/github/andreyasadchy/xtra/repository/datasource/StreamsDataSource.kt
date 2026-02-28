@@ -2,11 +2,11 @@ package com.github.andreyasadchy.xtra.repository.datasource
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import com.github.andreyasadchy.xtra.graphql.type.Language
+import com.github.andreyasadchy.xtra.graphql.type.StreamSort
 import com.github.andreyasadchy.xtra.model.ui.Stream
 import com.github.andreyasadchy.xtra.repository.GraphQLRepository
 import com.github.andreyasadchy.xtra.repository.HelixRepository
-import com.github.andreyasadchy.xtra.type.Language
-import com.github.andreyasadchy.xtra.type.StreamSort
 import com.github.andreyasadchy.xtra.util.C
 
 class StreamsDataSource(
@@ -77,7 +77,6 @@ class StreamsDataSource(
                     gameId = it.game?.id,
                     gameSlug = it.game?.slug,
                     gameName = it.game?.displayName,
-                    type = it.type,
                     title = it.broadcaster?.broadcastSettings?.title,
                     viewerCount = it.viewersCount,
                     startedAt = it.createdAt?.toString(),
@@ -115,7 +114,6 @@ class StreamsDataSource(
                     gameId = it.game?.id,
                     gameSlug = it.game?.slug,
                     gameName = it.game?.displayName,
-                    type = it.type,
                     title = it.title,
                     viewerCount = it.viewersCount,
                     startedAt = it.createdAt,
@@ -158,7 +156,6 @@ class StreamsDataSource(
                 channelName = it.channelName,
                 gameId = it.gameId,
                 gameName = it.gameName,
-                type = it.type,
                 title = it.title,
                 viewerCount = it.viewerCount,
                 startedAt = it.startedAt,

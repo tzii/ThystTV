@@ -19,9 +19,7 @@ import com.github.andreyasadchy.xtra.databinding.DialogChatMessageClickBinding
 import com.github.andreyasadchy.xtra.model.chat.ChatMessage
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
-import com.github.andreyasadchy.xtra.util.gone
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.visible
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.mlkit.nl.translate.TranslateLanguage
@@ -32,7 +30,7 @@ import java.util.Locale
 class ReplyClickedDialog : BottomSheetDialogFragment() {
 
     interface OnButtonClickListener {
-        fun onCreateReplyClickedChatAdapter(): ReplyClickedChatAdapter
+        fun onCreateReplyClickedChatAdapter(): ReplyClickedChatAdapter?
         fun onReplyClicked(replyId: String?, userLogin: String?, userName: String?, message: String?)
         fun onCopyMessageClicked(message: String)
         fun onTranslateMessageClicked(chatMessage: ChatMessage, languageTag: String?)
@@ -57,6 +55,7 @@ class ReplyClickedDialog : BottomSheetDialogFragment() {
     private lateinit var listener: OnButtonClickListener
     var adapter: ReplyClickedChatAdapter? = null
     private var isChatTouched = false
+    private var messageLimit: Int? = null
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -100,20 +99,26 @@ class ReplyClickedDialog : BottomSheetDialogFragment() {
                 adapter.messageClickListener = { selectedMessage, previousSelectedMessage ->
                     updateButtons(selectedMessage)
                     previousSelectedMessage?.let {
-                        adapter.messages?.indexOf(it)?.takeIf { it != -1 }?.let {
+                        synchronized(adapter.messages) {
+                            adapter.messages.indexOf(it).takeIf { it != -1 }
+                        }?.let {
                             (recyclerView.layoutManager?.findViewByPosition(it) as? TextView)?.let {
                                 adapter.updateBackground(previousSelectedMessage, it)
                             } ?: adapter.notifyItemChanged(it)
                         }
                     }
                 }
-                adapter.selectedMessage?.let {
-                    updateButtons(it)
-                    adapter.messages?.indexOf(it)?.takeIf { it != -1 }?.let { binding.recyclerView.scrollToPosition(it) }
+                adapter.selectedMessage?.let { selectedMessage ->
+                    updateButtons(selectedMessage)
+                    synchronized(adapter.messages) {
+                        adapter.messages.indexOf(selectedMessage).takeIf { it != -1 }
+                    }?.let {
+                        binding.recyclerView.scrollToPosition(it)
+                    }
                 }
             }
             if (requireContext().prefs().getBoolean(C.DEBUG_CHAT_FULLMSG, false)) {
-                copyFullMsg.visible()
+                copyFullMsg.visibility = View.VISIBLE
             }
         }
     }
@@ -122,22 +127,22 @@ class ReplyClickedDialog : BottomSheetDialogFragment() {
         with(binding) {
             if (requireArguments().getBoolean(KEY_MESSAGING) && (!chatMessage.userId.isNullOrBlank() || !chatMessage.userLogin.isNullOrBlank())) {
                 if (!chatMessage.id.isNullOrBlank()) {
-                    reply.visible()
+                    reply.visibility = View.VISIBLE
                     reply.setOnClickListener {
                         listener.onReplyClicked(chatMessage.id, chatMessage.userLogin, chatMessage.userName, chatMessage.message)
                         dismiss()
                     }
                 } else {
-                    reply.gone()
+                    reply.visibility = View.GONE
                 }
                 if (!chatMessage.message.isNullOrBlank()) {
-                    copyMessage.visible()
+                    copyMessage.visibility = View.VISIBLE
                     copyMessage.setOnClickListener {
                         listener.onCopyMessageClicked(chatMessage.message)
                         dismiss()
                     }
                 } else {
-                    copyMessage.gone()
+                    copyMessage.visibility = View.GONE
                 }
             }
             val clipboard = getSystemService(requireContext(), ClipboardManager::class.java)
@@ -150,11 +155,11 @@ class ReplyClickedDialog : BottomSheetDialogFragment() {
                 dismiss()
             }
             if (requireContext().prefs().getBoolean(C.CHAT_TRANSLATE, false) && (chatMessage.message != null || chatMessage.systemMsg != null) && Build.SUPPORTED_64_BIT_ABIS.firstOrNull() == "arm64-v8a") {
-                translateMessage.visible()
+                translateMessage.visibility = View.VISIBLE
                 translateMessage.setOnClickListener {
                     listener.onTranslateMessageClicked(chatMessage, null)
                 }
-                translateMessageSelectLanguage.visible()
+                translateMessageSelectLanguage.visibility = View.VISIBLE
                 translateMessageSelectLanguage.setOnClickListener {
                     val languages = TranslateLanguage.getAllLanguages()
                     val names = languages.map { Locale.forLanguageTag(it).displayName }.toTypedArray()
@@ -173,15 +178,72 @@ class ReplyClickedDialog : BottomSheetDialogFragment() {
                         .show()
                 }
             } else {
-                translateMessage.gone()
-                translateMessageSelectLanguage.gone()
+                translateMessage.visibility = View.GONE
+                translateMessageSelectLanguage.visibility = View.GONE
             }
         }
     }
 
-    fun scrollToLastPosition() {
-        if (!isChatTouched && !shouldShowButton()) {
-            adapter?.messages?.let { binding.recyclerView.scrollToPosition(it.lastIndex) }
+    fun updateUserMessages(userId: String) {
+        adapter?.let { adapter ->
+            synchronized(adapter.messages) {
+                adapter.messages.mapIndexedNotNull { index, message ->
+                    if (message.userId != null && message.userId == userId) {
+                        index
+                    } else null
+                }
+            }.forEach {
+                adapter.notifyItemChanged(it)
+            }
+        }
+    }
+
+    fun updateTranslation(chatMessage: ChatMessage, previousTranslation: String?) {
+        adapter?.let { adapter ->
+            synchronized(adapter.messages) {
+                adapter.messages.indexOf(chatMessage).takeIf { it != -1 }
+            }?.let {
+                (binding.recyclerView.layoutManager?.findViewByPosition(it) as? TextView)?.let {
+                    adapter.updateTranslation(chatMessage, it, previousTranslation)
+                } ?: adapter.notifyItemChanged(it)
+            }
+        }
+    }
+
+    fun newMessage(message: ChatMessage) {
+        adapter?.let { adapter ->
+            if ((message.reply?.threadParentId == adapter.threadParentId || message.id == adapter.threadParentId) && !message.isReply) {
+                synchronized(adapter.messages) {
+                    if (adapter.messages.size >= (messageLimit ?: requireContext().prefs().getInt(C.CHAT_LIMIT, 600).also { messageLimit = it })) {
+                        adapter.messages.removeAt(0)
+                        adapter.notifyItemRemoved(0)
+                    }
+                    adapter.messages.add(message)
+                    val lastIndex = adapter.messages.lastIndex
+                    adapter.notifyItemInserted(lastIndex)
+                    if (!isChatTouched && !shouldShowButton()) {
+                        binding.recyclerView.scrollToPosition(lastIndex)
+                    }
+                }
+            }
+        }
+    }
+
+    fun addMessages(messages: List<ChatMessage>) {
+        adapter?.let { adapter ->
+            synchronized(adapter.messages) {
+                val left = (messageLimit ?: requireContext().prefs().getInt(C.CHAT_LIMIT, 600).also { messageLimit = it }) - adapter.messages.size
+                if (left > 0) {
+                    val items = messages.filter { message ->
+                        (message.reply?.threadParentId == adapter.threadParentId || message.id == adapter.threadParentId) && !message.isReply
+                    }.takeLast(left)
+                    adapter.messages.addAll(0, items)
+                    adapter.notifyItemRangeInserted(0, items.size)
+                    if (!isChatTouched && !shouldShowButton()) {
+                        binding.recyclerView.scrollToPosition(adapter.messages.lastIndex)
+                    }
+                }
+            }
         }
     }
 
@@ -195,28 +257,6 @@ class ReplyClickedDialog : BottomSheetDialogFragment() {
             val range = recyclerView.computeVerticalScrollRange()
             val percentage = (100f * offset / (range - extent).toFloat())
             return percentage < 100f
-        }
-    }
-
-    fun updateUserMessages(userId: String) {
-        adapter?.let { adapter ->
-            adapter.messages?.toList()?.let { messages ->
-                messages.filter { it.userId != null && it.userId == userId }.forEach { message ->
-                    messages.indexOf(message).takeIf { it != -1 }?.let {
-                        adapter.notifyItemChanged(it)
-                    }
-                }
-            }
-        }
-    }
-
-    fun updateTranslation(chatMessage: ChatMessage, previousTranslation: String?) {
-        adapter?.let { adapter ->
-            adapter.messages?.toList()?.indexOf(chatMessage)?.takeIf { it != -1 }?.let {
-                (binding.recyclerView.layoutManager?.findViewByPosition(it) as? TextView)?.let {
-                    adapter.updateTranslation(chatMessage, it, previousTranslation)
-                } ?: adapter.notifyItemChanged(it)
-            }
         }
     }
 

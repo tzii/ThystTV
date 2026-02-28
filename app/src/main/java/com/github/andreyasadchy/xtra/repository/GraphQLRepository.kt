@@ -1,7 +1,6 @@
 package com.github.andreyasadchy.xtra.repository
 
 import android.net.http.HttpEngine
-import android.net.http.UrlResponseInfo
 import android.os.Build
 import android.os.ext.SdkExtensions
 import com.apollographql.apollo.api.ApolloResponse
@@ -12,42 +11,52 @@ import com.apollographql.apollo.api.json.buildJsonString
 import com.apollographql.apollo.api.json.jsonReader
 import com.apollographql.apollo.api.json.writeObject
 import com.apollographql.apollo.api.parseResponse
-import com.github.andreyasadchy.xtra.BadgesQuery
-import com.github.andreyasadchy.xtra.ClipUrlsQuery
-import com.github.andreyasadchy.xtra.GameBoxArtQuery
-import com.github.andreyasadchy.xtra.GameClipsQuery
-import com.github.andreyasadchy.xtra.GameStreamsQuery
-import com.github.andreyasadchy.xtra.GameVideosQuery
-import com.github.andreyasadchy.xtra.SearchChannelsQuery
-import com.github.andreyasadchy.xtra.SearchGamesQuery
-import com.github.andreyasadchy.xtra.SearchStreamsQuery
-import com.github.andreyasadchy.xtra.SearchVideosQuery
-import com.github.andreyasadchy.xtra.StreamPlaybackAccessTokenQuery
-import com.github.andreyasadchy.xtra.TeamLiveMembersQuery
-import com.github.andreyasadchy.xtra.TeamMembersQuery
-import com.github.andreyasadchy.xtra.TeamQuery
-import com.github.andreyasadchy.xtra.TopGamesQuery
-import com.github.andreyasadchy.xtra.TopStreamsQuery
-import com.github.andreyasadchy.xtra.UserAboutQuery
-import com.github.andreyasadchy.xtra.UserBadgesQuery
-import com.github.andreyasadchy.xtra.UserChannelPageQuery
-import com.github.andreyasadchy.xtra.UserCheerEmotesQuery
-import com.github.andreyasadchy.xtra.UserClipsQuery
-import com.github.andreyasadchy.xtra.UserEmotesQuery
-import com.github.andreyasadchy.xtra.UserFollowedGamesQuery
-import com.github.andreyasadchy.xtra.UserFollowedStreamsQuery
-import com.github.andreyasadchy.xtra.UserFollowedUsersQuery
-import com.github.andreyasadchy.xtra.UserFollowedVideosQuery
-import com.github.andreyasadchy.xtra.UserMessageClickedQuery
-import com.github.andreyasadchy.xtra.UserQuery
-import com.github.andreyasadchy.xtra.UserResultIDQuery
-import com.github.andreyasadchy.xtra.UserResultLoginQuery
-import com.github.andreyasadchy.xtra.UserVideosQuery
-import com.github.andreyasadchy.xtra.UsersLastBroadcastQuery
-import com.github.andreyasadchy.xtra.UsersStreamQuery
-import com.github.andreyasadchy.xtra.UsersTypeQuery
-import com.github.andreyasadchy.xtra.VideoPlaybackAccessTokenQuery
-import com.github.andreyasadchy.xtra.VideoQuery
+import com.github.andreyasadchy.xtra.graphql.BadgesQuery
+import com.github.andreyasadchy.xtra.graphql.ClipUrlsQuery
+import com.github.andreyasadchy.xtra.graphql.GameBoxArtQuery
+import com.github.andreyasadchy.xtra.graphql.GameClipsQuery
+import com.github.andreyasadchy.xtra.graphql.GameQuery
+import com.github.andreyasadchy.xtra.graphql.GameStreamsQuery
+import com.github.andreyasadchy.xtra.graphql.GameVideosQuery
+import com.github.andreyasadchy.xtra.graphql.SearchChannelsQuery
+import com.github.andreyasadchy.xtra.graphql.SearchGamesQuery
+import com.github.andreyasadchy.xtra.graphql.SearchStreamsQuery
+import com.github.andreyasadchy.xtra.graphql.SearchVideosQuery
+import com.github.andreyasadchy.xtra.graphql.SelfFollowingGameQuery
+import com.github.andreyasadchy.xtra.graphql.SelfFollowingUserQuery
+import com.github.andreyasadchy.xtra.graphql.StreamPlaybackAccessTokenQuery
+import com.github.andreyasadchy.xtra.graphql.TagQuery
+import com.github.andreyasadchy.xtra.graphql.TeamLiveMembersQuery
+import com.github.andreyasadchy.xtra.graphql.TeamMembersQuery
+import com.github.andreyasadchy.xtra.graphql.TeamQuery
+import com.github.andreyasadchy.xtra.graphql.TopGamesQuery
+import com.github.andreyasadchy.xtra.graphql.TopStreamsQuery
+import com.github.andreyasadchy.xtra.graphql.UserAboutQuery
+import com.github.andreyasadchy.xtra.graphql.UserBadgesQuery
+import com.github.andreyasadchy.xtra.graphql.UserChannelPageQuery
+import com.github.andreyasadchy.xtra.graphql.UserCheerEmotesQuery
+import com.github.andreyasadchy.xtra.graphql.UserClipsQuery
+import com.github.andreyasadchy.xtra.graphql.UserEmotesQuery
+import com.github.andreyasadchy.xtra.graphql.UserFollowedGamesQuery
+import com.github.andreyasadchy.xtra.graphql.UserFollowedStreamsQuery
+import com.github.andreyasadchy.xtra.graphql.UserFollowedUsersQuery
+import com.github.andreyasadchy.xtra.graphql.UserFollowedVideosQuery
+import com.github.andreyasadchy.xtra.graphql.UserMessageClickedQuery
+import com.github.andreyasadchy.xtra.graphql.UserQuery
+import com.github.andreyasadchy.xtra.graphql.UserResultIDQuery
+import com.github.andreyasadchy.xtra.graphql.UserResultLoginQuery
+import com.github.andreyasadchy.xtra.graphql.UserVideosQuery
+import com.github.andreyasadchy.xtra.graphql.UsersLastBroadcastQuery
+import com.github.andreyasadchy.xtra.graphql.UsersStreamQuery
+import com.github.andreyasadchy.xtra.graphql.UsersTypeQuery
+import com.github.andreyasadchy.xtra.graphql.VideoPlaybackAccessTokenQuery
+import com.github.andreyasadchy.xtra.graphql.VideoQuery
+import com.github.andreyasadchy.xtra.graphql.type.BadgeImageSize
+import com.github.andreyasadchy.xtra.graphql.type.BroadcastType
+import com.github.andreyasadchy.xtra.graphql.type.ClipsPeriod
+import com.github.andreyasadchy.xtra.graphql.type.Language
+import com.github.andreyasadchy.xtra.graphql.type.StreamSort
+import com.github.andreyasadchy.xtra.graphql.type.VideoSort
 import com.github.andreyasadchy.xtra.model.gql.ErrorResponse
 import com.github.andreyasadchy.xtra.model.gql.channel.ChannelClipsResponse
 import com.github.andreyasadchy.xtra.model.gql.channel.ChannelSuggestedResponse
@@ -68,8 +77,6 @@ import com.github.andreyasadchy.xtra.model.gql.followed.FollowedChannelsResponse
 import com.github.andreyasadchy.xtra.model.gql.followed.FollowedGamesResponse
 import com.github.andreyasadchy.xtra.model.gql.followed.FollowedStreamsResponse
 import com.github.andreyasadchy.xtra.model.gql.followed.FollowedVideosResponse
-import com.github.andreyasadchy.xtra.model.gql.followed.FollowingGameResponse
-import com.github.andreyasadchy.xtra.model.gql.followed.FollowingUserResponse
 import com.github.andreyasadchy.xtra.model.gql.game.GameClipsResponse
 import com.github.andreyasadchy.xtra.model.gql.game.GameStreamsResponse
 import com.github.andreyasadchy.xtra.model.gql.game.GameVideosResponse
@@ -82,14 +89,9 @@ import com.github.andreyasadchy.xtra.model.gql.search.SearchStreamTagsResponse
 import com.github.andreyasadchy.xtra.model.gql.search.SearchVideosResponse
 import com.github.andreyasadchy.xtra.model.gql.stream.StreamsResponse
 import com.github.andreyasadchy.xtra.model.gql.stream.ViewerCountResponse
+import com.github.andreyasadchy.xtra.model.gql.tag.TagResponse
 import com.github.andreyasadchy.xtra.model.gql.video.VideoGamesResponse
 import com.github.andreyasadchy.xtra.model.gql.video.VideoMessagesResponse
-import com.github.andreyasadchy.xtra.type.BadgeImageSize
-import com.github.andreyasadchy.xtra.type.BroadcastType
-import com.github.andreyasadchy.xtra.type.ClipsPeriod
-import com.github.andreyasadchy.xtra.type.Language
-import com.github.andreyasadchy.xtra.type.StreamSort
-import com.github.andreyasadchy.xtra.type.VideoSort
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
@@ -143,7 +145,7 @@ class GraphQLRepository @Inject constructor(
         }
         when {
             networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                val response = suspendCoroutine { continuation ->
                     httpEngine.get().newUrlRequestBuilder("https://gql.twitch.tv/gql/", cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).apply {
                         headers.forEach { addHeader(it.key, it.value) }
                         addHeader("Content-Type", "application/json")
@@ -167,7 +169,7 @@ class GraphQLRepository @Inject constructor(
                         query.parseResponse(it)
                     }
                 } else {
-                    val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                    val response = suspendCoroutine { continuation ->
                         cronetEngine.get().newUrlRequestBuilder("https://gql.twitch.tv/gql/", getByteArrayCronetCallback(continuation), cronetExecutor).apply {
                             headers.forEach { addHeader(it.key, it.value) }
                             addHeader("Content-Type", "application/json")
@@ -197,7 +199,7 @@ class GraphQLRepository @Inject constructor(
     private suspend fun sendPersistedQuery(networkLibrary: String?, headers: Map<String, String>, body: String): String = withContext(Dispatchers.IO) {
         when {
             networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                val response = suspendCoroutine { continuation ->
                     httpEngine.get().newUrlRequestBuilder("https://gql.twitch.tv/gql/", cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).apply {
                         headers.forEach { addHeader(it.key, it.value) }
                         addHeader("Content-Type", "application/json")
@@ -216,7 +218,7 @@ class GraphQLRepository @Inject constructor(
                     }.build().start()
                     request.future.get().responseBody as String
                 } else {
-                    val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                    val response = suspendCoroutine { continuation ->
                         cronetEngine.get().newUrlRequestBuilder("https://gql.twitch.tv/gql/", getByteArrayCronetCallback(continuation), cronetExecutor).apply {
                             headers.forEach { addHeader(it.key, it.value) }
                             addHeader("Content-Type", "application/json")
@@ -246,6 +248,15 @@ class GraphQLRepository @Inject constructor(
 
     suspend fun loadQueryClipUrls(networkLibrary: String?, headers: Map<String, String>, slug: String): ApolloResponse<ClipUrlsQuery.Data> = withContext(Dispatchers.IO) {
         val query = ClipUrlsQuery(slug)
+        sendQuery(networkLibrary, headers, query)
+    }
+
+    suspend fun loadQueryGame(networkLibrary: String?, headers: Map<String, String>, id: String? = null, slug: String? = null, name: String? = null): ApolloResponse<GameQuery.Data> = withContext(Dispatchers.IO) {
+        val query = GameQuery(
+            id = if (!id.isNullOrBlank()) Optional.Present(id) else Optional.Absent,
+            slug = if (!slug.isNullOrBlank()) Optional.Present(slug) else Optional.Absent,
+            name = if (!name.isNullOrBlank()) Optional.Present(name) else Optional.Absent,
+        )
         sendQuery(networkLibrary, headers, query)
     }
 
@@ -334,8 +345,32 @@ class GraphQLRepository @Inject constructor(
         sendQuery(networkLibrary, headers, query)
     }
 
+    suspend fun loadQueryFollowingGame(networkLibrary: String?, headers: Map<String, String>, id: String?, slug: String?, name: String?): ApolloResponse<SelfFollowingGameQuery.Data> = withContext(Dispatchers.IO) {
+        val query = SelfFollowingGameQuery(
+            id = if (!id.isNullOrBlank()) Optional.Present(id) else Optional.Absent,
+            slug = if (!slug.isNullOrBlank()) Optional.Present(slug) else Optional.Absent,
+            name = if (!name.isNullOrBlank()) Optional.Present(name) else Optional.Absent,
+        )
+        sendQuery(networkLibrary, headers, query)
+    }
+
+    suspend fun loadQueryFollowingUser(networkLibrary: String?, headers: Map<String, String>, id: String?, login: String?): ApolloResponse<SelfFollowingUserQuery.Data> = withContext(Dispatchers.IO) {
+        val query = SelfFollowingUserQuery(
+            id = if (!id.isNullOrBlank()) Optional.Present(id) else Optional.Absent,
+            login = if (!login.isNullOrBlank()) Optional.Present(login) else Optional.Absent,
+        )
+        sendQuery(networkLibrary, headers, query)
+    }
+
     suspend fun loadQueryStreamPlaybackAccessToken(networkLibrary: String?, headers: Map<String, String>, login: String, platform: String, playerType: String): ApolloResponse<StreamPlaybackAccessTokenQuery.Data> = withContext(Dispatchers.IO) {
         val query = StreamPlaybackAccessTokenQuery(login, platform, playerType)
+        sendQuery(networkLibrary, headers, query)
+    }
+
+    suspend fun loadQueryTag(networkLibrary: String?, headers: Map<String, String>, id: String): ApolloResponse<TagQuery.Data> = withContext(Dispatchers.IO) {
+        val query = TagQuery(
+            id = id
+        )
         sendQuery(networkLibrary, headers, query)
     }
 
@@ -611,6 +646,22 @@ class GraphQLRepository @Inject constructor(
             }
         }.toString()
         json.decodeFromString<ClipVideoResponse>(sendPersistedQuery(networkLibrary, headers, body))
+    }
+
+    suspend fun loadTag(networkLibrary: String?, headers: Map<String, String>, id: String): TagResponse = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            putJsonObject("extensions") {
+                putJsonObject("persistedQuery") {
+                    put("sha256Hash", "bb28b8b7b08b55ce39d25ba8bfb0aa6c9fad53b8a89f8b4377f59db405c3fb26")
+                    put("version", 1)
+                }
+            }
+            put("operationName", "TagHandlerTag")
+            putJsonObject("variables") {
+                put("id", id)
+            }
+        }.toString()
+        json.decodeFromString<TagResponse>(sendPersistedQuery(networkLibrary, headers, body))
     }
 
     suspend fun loadTopGames(networkLibrary: String?, headers: Map<String, String>, tags: List<String>?, limit: Int?, cursor: String?): GamesResponse = withContext(Dispatchers.IO) {
@@ -1257,38 +1308,6 @@ class GraphQLRepository @Inject constructor(
             }
         }.toString()
         json.decodeFromString<ErrorResponse>(sendPersistedQuery(networkLibrary, headers, body))
-    }
-
-    suspend fun loadFollowingUser(networkLibrary: String?, headers: Map<String, String>, userLogin: String?): FollowingUserResponse = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            putJsonObject("extensions") {
-                putJsonObject("persistedQuery") {
-                    put("sha256Hash", "834a75e1c06cffada00f0900664a5033e392f6fb655fae8d2e25b21b340545a9")
-                    put("version", 1)
-                }
-            }
-            put("operationName", "ChannelSupportButtons")
-            putJsonObject("variables") {
-                put("channelLogin", userLogin)
-            }
-        }.toString()
-        json.decodeFromString<FollowingUserResponse>(sendPersistedQuery(networkLibrary, headers, body))
-    }
-
-    suspend fun loadFollowingGame(networkLibrary: String?, headers: Map<String, String>, gameName: String?): FollowingGameResponse = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            putJsonObject("extensions") {
-                putJsonObject("persistedQuery") {
-                    put("sha256Hash", "cfeda60899b6b867b2d7f30c8556778c4a9cc8268bd1aadd9f88134a0f642a02")
-                    put("version", 1)
-                }
-            }
-            put("operationName", "FollowGameButton_Game")
-            putJsonObject("variables") {
-                put("name", gameName)
-            }
-        }.toString()
-        json.decodeFromString<FollowingGameResponse>(sendPersistedQuery(networkLibrary, headers, body))
     }
 
     suspend fun loadChannelPointsContext(networkLibrary: String?, headers: Map<String, String>, channelLogin: String?): ChannelPointContextResponse = withContext(Dispatchers.IO) {

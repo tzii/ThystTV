@@ -22,7 +22,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.view.Menu
+import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -31,6 +33,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.core.content.res.use
 import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.ViewCompat
@@ -65,23 +68,18 @@ import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.ui.common.Scrollable
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
+import com.github.andreyasadchy.xtra.ui.games.GamesFragmentDirections
 import com.github.andreyasadchy.xtra.ui.player.ExoPlayerFragment
 import com.github.andreyasadchy.xtra.ui.player.Media3Fragment
 import com.github.andreyasadchy.xtra.ui.player.MediaPlayerFragment
 import com.github.andreyasadchy.xtra.ui.player.PlayerFragment
 import com.github.andreyasadchy.xtra.ui.team.TeamFragmentDirections
+import com.github.andreyasadchy.xtra.ui.top.TopStreamsFragmentDirections
 import com.github.andreyasadchy.xtra.util.C
-import com.github.andreyasadchy.xtra.util.DisplayUtils
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.applyTheme
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
-import com.github.andreyasadchy.xtra.util.gone
-import com.github.andreyasadchy.xtra.util.isInPortraitOrientation
-import com.github.andreyasadchy.xtra.util.isLightTheme
-import com.github.andreyasadchy.xtra.util.isNetworkAvailable
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.shortToast
-import com.github.andreyasadchy.xtra.util.toast
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.google.android.material.color.MaterialColors
 import dagger.hilt.android.AndroidEntryPoint
@@ -170,7 +168,7 @@ class MainActivity : AppCompatActivity() {
         applyTheme()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setNavBarColor(isInPortraitOrientation)
+        setNavBarColor(resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
         val ignoreCutouts = prefs.getBoolean(C.UI_DRAW_BEHIND_CUTOUTS, false)
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
             val insets = if (ignoreCutouts) {
@@ -204,27 +202,39 @@ class MainActivity : AppCompatActivity() {
 
         var initialized = savedInstanceState != null
         initNavigation()
-        if (!initialized && !isNetworkAvailable) {
-            initialized = true
-            shortToast(R.string.no_connection)
+        val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (!initialized) {
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+            val isNetworkAvailable = networkCapabilities != null
+                    && networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    && networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            if (!isNetworkAvailable) {
+                initialized = true
+                Toast.makeText(this, R.string.no_connection, Toast.LENGTH_SHORT).show()
+            }
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.checkNetworkStatus.collectLatest {
                     if (it) {
-                        val online = isNetworkAvailable
-                        if (viewModel.isNetworkAvailable.value != online) {
-                            viewModel.isNetworkAvailable.value = online
+                        val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+                        val networkCapabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+                        val isNetworkAvailable = networkCapabilities != null
+                                && networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                                && networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                        if (viewModel.isNetworkAvailable.value != isNetworkAvailable) {
+                            viewModel.isNetworkAvailable.value = isNetworkAvailable
                             if (initialized) {
-                                shortToast(if (online) R.string.connection_restored else R.string.no_connection)
+                                Toast.makeText(this@MainActivity, if (isNetworkAvailable) R.string.connection_restored else R.string.no_connection, Toast.LENGTH_SHORT).show()
                             } else {
                                 initialized = true
                             }
-                            if (online) {
+                            if (isNetworkAvailable) {
                                 if (!TwitchApiHelper.checkedValidation && prefs.getBoolean(C.VALIDATE_TOKENS, true)) {
                                     viewModel.validate(
                                         prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
                                         TwitchApiHelper.getGQLHeaders(this@MainActivity, true),
+                                        prefs.getString(C.GQL_CLIENT_ID_WEB, "kimne78kx3ncx6brgo4mv6wki5h1ko"),
                                         tokenPrefs().getString(C.GQL_TOKEN_WEB, null)?.takeIf { it.isNotBlank() }?.let { TwitchApiHelper.addTokenPrefixGQL(it) },
                                         TwitchApiHelper.getHelixHeaders(this@MainActivity),
                                         this@MainActivity.tokenPrefs().getString(C.USER_ID, null),
@@ -267,7 +277,7 @@ class MainActivity : AppCompatActivity() {
                                             putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
                                         }
                                     } catch (e: ActivityNotFoundException) {
-                                        toast(R.string.no_browser_found)
+                                        Toast.makeText(this@MainActivity, R.string.no_browser_found, Toast.LENGTH_LONG).show()
                                     }
                                 } else {
                                     viewModel.downloadUpdate(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), it)
@@ -283,7 +293,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         connectivityManager.registerNetworkCallback(
             NetworkRequest.Builder().apply {
                 addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -302,6 +311,110 @@ class MainActivity : AppCompatActivity() {
         )
         restorePlayerFragment()
         handleIntent(intent)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.video.collectLatest { pair ->
+                    val video = pair?.first
+                    val offset = pair?.second
+                    if (video != null) {
+                        if (!video.id.isNullOrBlank()) {
+                            playerFragment?.let {
+                                it.minimize()
+                                it.close()
+                                closePlayer()
+                            }
+                            startVideo(video, offset, offset != null)
+                            if (prefs.getBoolean(C.PLAYER_USE_VIDEOPOSITIONS, true)) {
+                                video.id.toLongOrNull()?.let { id ->
+                                    viewModel.savePosition(id, offset ?: 0)
+                                }
+                            }
+                        }
+                        viewModel.video.value = null
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.clip.collectLatest { clip ->
+                    if (clip != null) {
+                        if (!clip.id.isNullOrBlank()) {
+                            startClip(clip)
+                        }
+                        viewModel.clip.value = null
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.user.collectLatest { user ->
+                    if (user != null) {
+                        if (!user.channelId.isNullOrBlank() || !user.channelLogin.isNullOrBlank()) {
+                            playerFragment?.minimize()
+                            navController.navigate(
+                                ChannelPagerFragmentDirections.actionGlobalChannelPagerFragment(
+                                    channelId = user.channelId,
+                                    channelLogin = user.channelLogin,
+                                    channelName = user.channelName,
+                                    channelLogo = user.channelLogo,
+                                )
+                            )
+                        }
+                        viewModel.user.value = null
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.game.collectLatest { pair ->
+                    if (pair != null) {
+                        val game = pair.first
+                        val tag = pair.second
+                        if (game != null) {
+                            playerFragment?.minimize()
+                            navController.navigate(
+                                if (prefs.getBoolean(C.UI_GAMEPAGER, true)) {
+                                    GamePagerFragmentDirections.actionGlobalGamePagerFragment(
+                                        gameId = game.gameId,
+                                        gameSlug = game.gameSlug,
+                                        gameName = game.gameName,
+                                        boxArt = game.boxArt,
+                                        tags = tag?.let { arrayOf(it) },
+                                    )
+                                } else {
+                                    GameMediaFragmentDirections.actionGlobalGameMediaFragment(
+                                        gameId = game.gameId,
+                                        gameSlug = game.gameSlug,
+                                        gameName = game.gameName,
+                                        boxArt = game.boxArt,
+                                        tags = tag?.let { arrayOf(it) },
+                                    )
+                                }
+                            )
+                        }
+                        viewModel.game.value = null
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.tag.collectLatest { tag ->
+                    if (tag != null) {
+                        playerFragment?.minimize()
+                        navController.navigate(
+                            GamesFragmentDirections.actionGlobalGamesFragment(
+                                tags = arrayOf(tag)
+                            )
+                        )
+                        viewModel.tag.value = null
+                    }
+                }
+            }
+        }
         if (prefs.getBoolean(C.LIVE_NOTIFICATIONS_ENABLED, false)) {
             WorkManager.getInstance(this).enqueueUniquePeriodicWork(
                 "live_notifications",
@@ -327,10 +440,16 @@ class MainActivity : AppCompatActivity() {
                 window.navigationBarColor = if (isPortrait && binding.navBarContainer.isVisible) {
                     Color.TRANSPARENT
                 } else {
+                    val isLightTheme = obtainStyledAttributes(intArrayOf(androidx.appcompat.R.attr.isLightTheme)).use {
+                        it.getBoolean(0, false)
+                    }
                     ContextCompat.getColor(this, if (!isLightTheme) R.color.darkScrim else R.color.lightScrim)
                 }
             }
             else -> {
+                val isLightTheme = obtainStyledAttributes(intArrayOf(androidx.appcompat.R.attr.isLightTheme)).use {
+                    it.getBoolean(0, false)
+                }
                 @Suppress("DEPRECATION")
                 if (!isLightTheme) {
                     window.navigationBarColor = if (isPortrait && binding.navBarContainer.isVisible) {
@@ -397,157 +516,130 @@ class MainActivity : AppCompatActivity() {
     private fun handleIntent(intent: Intent?) {
         when (intent?.action) {
             Intent.ACTION_VIEW -> {
-                val url = intent.data.toString()
-                when {
-                    url.contains("twitch.tv/videos/") -> {
-                        val id = url.substringAfter("twitch.tv/videos/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
-                        val offset = url.substringAfter("?t=").takeIf { it.isNotBlank() }?.let { (TwitchApiHelper.getDuration(it) ?: 0) * 1000 }
-                        if (!id.isNullOrBlank()) {
-                            viewModel.loadVideo(
-                                id,
-                                offset,
-                                prefs.getBoolean(C.PLAYER_USE_VIDEOPOSITIONS, true),
-                                prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
-                                TwitchApiHelper.getGQLHeaders(this),
-                                TwitchApiHelper.getHelixHeaders(this),
-                                prefs.getBoolean(C.ENABLE_INTEGRITY, false),
-                            )
-                            lifecycleScope.launch {
-                                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                                    viewModel.video.collectLatest { video ->
-                                        if (video != null) {
-                                            if (!video.id.isNullOrBlank()) {
-                                                startVideo(video, offset, offset != null)
-                                            }
-                                            viewModel.video.value = null
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    url.contains("/clip/") -> {
-                        val id = url.substringAfter("/clip/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
-                        if (!id.isNullOrBlank()) {
-                            viewModel.loadClip(
-                                id,
-                                prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
-                                TwitchApiHelper.getGQLHeaders(this),
-                                TwitchApiHelper.getHelixHeaders(this),
-                                prefs.getBoolean(C.ENABLE_INTEGRITY, false),
-                            )
-                            lifecycleScope.launch {
-                                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                                    viewModel.clip.collectLatest { clip ->
-                                        if (clip != null) {
-                                            if (!clip.id.isNullOrBlank()) {
-                                                startClip(clip)
-                                            }
-                                            viewModel.clip.value = null
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    url.contains("clips.twitch.tv/") -> {
-                        val id = url.substringAfter("clips.twitch.tv/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
-                        if (!id.isNullOrBlank()) {
-                            viewModel.loadClip(
-                                id,
-                                prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
-                                TwitchApiHelper.getHelixHeaders(this),
-                                TwitchApiHelper.getGQLHeaders(this),
-                                prefs.getBoolean(C.ENABLE_INTEGRITY, false),
-                            )
-                            lifecycleScope.launch {
-                                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                                    viewModel.clip.collectLatest { clip ->
-                                        if (clip != null) {
-                                            if (!clip.id.isNullOrBlank()) {
-                                                startClip(clip)
-                                            }
-                                            viewModel.clip.value = null
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    url.contains("twitch.tv/directory/category/") -> {
-                        val slug = url.substringAfter("twitch.tv/directory/category/").takeIf { it.isNotBlank() }?.substringBefore("/")
-                        if (!slug.isNullOrBlank()) {
-                            playerFragment?.minimize()
-                            navController.navigate(
-                                if (prefs.getBoolean(C.UI_GAMEPAGER, true)) {
-                                    GamePagerFragmentDirections.actionGlobalGamePagerFragment(
-                                        gameSlug = slug
-                                    )
-                                } else {
-                                    GameMediaFragmentDirections.actionGlobalGameMediaFragment(
-                                        gameSlug = slug
-                                    )
-                                }
-                            )
-                        }
-                    }
-                    url.contains("twitch.tv/directory/game/") -> {
-                        val name = url.substringAfter("twitch.tv/directory/game/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
-                        if (!name.isNullOrBlank()) {
-                            playerFragment?.minimize()
-                            navController.navigate(
-                                if (prefs.getBoolean(C.UI_GAMEPAGER, true)) {
-                                    GamePagerFragmentDirections.actionGlobalGamePagerFragment(
-                                        gameName = Uri.decode(name)
-                                    )
-                                } else {
-                                    GameMediaFragmentDirections.actionGlobalGameMediaFragment(
-                                        gameName = Uri.decode(name)
-                                    )
-                                }
-                            )
-                        }
-                    }
-                    url.contains("twitch.tv/team/") -> {
-                        val teamName = url.substringAfter("twitch.tv/team/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
-                        if (!teamName.isNullOrBlank()) {
-                            playerFragment?.minimize()
-                            navController.navigate(
-                                TeamFragmentDirections.actionGlobalTeamFragment(
-                                    teamName = teamName
+                val url = intent.data?.toString()
+                if (url != null) {
+                    when {
+                        url.contains("twitch.tv/videos/") -> {
+                            val id = url.substringAfter("twitch.tv/videos/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            val offset = url.substringAfter("?t=", "").takeIf { it.isNotBlank() }?.let { (TwitchApiHelper.getDuration(it) ?: 0) * 1000 }
+                            if (!id.isNullOrBlank()) {
+                                viewModel.loadVideo(
+                                    id,
+                                    offset,
+                                    prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                    TwitchApiHelper.getGQLHeaders(this),
+                                    TwitchApiHelper.getHelixHeaders(this),
+                                    prefs.getBoolean(C.ENABLE_INTEGRITY, false),
                                 )
+                            }
+                        }
+                        url.contains("/clip/") -> {
+                            val id = url.substringAfter("/clip/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            if (!id.isNullOrBlank()) {
+                                viewModel.loadClip(
+                                    id,
+                                    prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                    TwitchApiHelper.getGQLHeaders(this),
+                                    TwitchApiHelper.getHelixHeaders(this),
+                                    prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+                                )
+                            }
+                        }
+                        url.contains("clips.twitch.tv/") -> {
+                            val id = url.substringAfter("clips.twitch.tv/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            if (!id.isNullOrBlank()) {
+                                viewModel.loadClip(
+                                    id,
+                                    prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                    TwitchApiHelper.getHelixHeaders(this),
+                                    TwitchApiHelper.getGQLHeaders(this),
+                                    prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+                                )
+                            }
+                        }
+                        url.contains("twitch.tv/directory/category/") -> {
+                            val slug = url.substringAfter("twitch.tv/directory/category/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            val tag = url.substringAfter("?tl=", "").takeIf { it.isNotBlank() }?.substringBefore("&")
+                            if (!slug.isNullOrBlank()) {
+                                viewModel.loadGame(
+                                    gameSlug = slug,
+                                    tag = tag?.let { Uri.decode(it) },
+                                    networkLibrary = prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                    gqlHeaders = TwitchApiHelper.getGQLHeaders(this),
+                                    helixHeaders = TwitchApiHelper.getHelixHeaders(this),
+                                    enableIntegrity = prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+                                )
+                            }
+                        }
+                        url.contains("twitch.tv/directory/game/") -> {
+                            val name = url.substringAfter("twitch.tv/directory/game/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            val tag = url.substringAfter("?tl=", "").takeIf { it.isNotBlank() }?.substringBefore("&")
+                            if (!name.isNullOrBlank()) {
+                                viewModel.loadGame(
+                                    gameName = Uri.decode(name),
+                                    tag = tag?.let { Uri.decode(it) },
+                                    networkLibrary = prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                    gqlHeaders = TwitchApiHelper.getGQLHeaders(this),
+                                    helixHeaders = TwitchApiHelper.getHelixHeaders(this),
+                                    enableIntegrity = prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+                                )
+                            }
+                        }
+                        url.contains("twitch.tv/directory/all/tags/") -> {
+                            val tag = url.substringAfter("twitch.tv/directory/all/tags/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            if (!tag.isNullOrBlank()) {
+                                playerFragment?.minimize()
+                                navController.navigate(
+                                    TopStreamsFragmentDirections.actionGlobalTopFragment(
+                                        tags = arrayOf(Uri.decode(tag))
+                                    )
+                                )
+                            }
+                        }
+                        url.contains("twitch.tv/directory/all") -> {
+                            playerFragment?.minimize()
+                            navController.navigate(
+                                TopStreamsFragmentDirections.actionGlobalTopFragment()
                             )
                         }
-                    }
-                    else -> {
-                        val login = url.substringAfter("twitch.tv/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
-                        if (!login.isNullOrBlank()) {
-                            viewModel.loadUser(
-                                login,
-                                prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
-                                TwitchApiHelper.getGQLHeaders(this),
-                                TwitchApiHelper.getHelixHeaders(this),
-                                prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+                        url.contains("twitch.tv/directory/tags/") -> {
+                            val tagId = url.substringAfter("twitch.tv/directory/tags/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            if (!tagId.isNullOrBlank()) {
+                                viewModel.loadTag(
+                                    tagId,
+                                    prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                    TwitchApiHelper.getGQLHeaders(this),
+                                    prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+                                )
+                            }
+                        }
+                        url.contains("twitch.tv/directory") -> {
+                            playerFragment?.minimize()
+                            navController.navigate(
+                                GamesFragmentDirections.actionGlobalGamesFragment()
                             )
-                            lifecycleScope.launch {
-                                repeatOnLifecycle(Lifecycle.State.STARTED) {
-                                    viewModel.user.collectLatest { user ->
-                                        if (user != null) {
-                                            if (!user.channelId.isNullOrBlank() || !user.channelLogin.isNullOrBlank()) {
-                                                playerFragment?.minimize()
-                                                navController.navigate(
-                                                    ChannelPagerFragmentDirections.actionGlobalChannelPagerFragment(
-                                                        channelId = user.channelId,
-                                                        channelLogin = user.channelLogin,
-                                                        channelName = user.channelName,
-                                                        channelLogo = user.channelLogo,
-                                                    )
-                                                )
-                                            }
-                                            viewModel.user.value = null
-                                        }
-                                    }
-                                }
+                        }
+                        url.contains("twitch.tv/team/") -> {
+                            val teamName = url.substringAfter("twitch.tv/team/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            if (!teamName.isNullOrBlank()) {
+                                playerFragment?.minimize()
+                                navController.navigate(
+                                    TeamFragmentDirections.actionGlobalTeamFragment(
+                                        teamName = Uri.decode(teamName)
+                                    )
+                                )
+                            }
+                        }
+                        else -> {
+                            val login = url.substringAfter("twitch.tv/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                            if (!login.isNullOrBlank()) {
+                                viewModel.loadUser(
+                                    login,
+                                    prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                    TwitchApiHelper.getGQLHeaders(this),
+                                    TwitchApiHelper.getHelixHeaders(this),
+                                    prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+                                )
                             }
                         }
                     }
@@ -570,14 +662,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             INTENT_LIVE_NOTIFICATION -> {
-                startStream(
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        intent.getParcelableExtra(KEY_VIDEO, Stream::class.java)!!
-                    } else {
-                        @Suppress("DEPRECATION")
-                        intent.getParcelableExtra(KEY_VIDEO)!!
-                    }
-                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(KEY_VIDEO, Stream::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(KEY_VIDEO)
+                }?.let {
+                    startStream(it)
+                }
             }
             INTENT_OPEN_DOWNLOADS_TAB -> {
                 binding.navBar.selectedItemId = if (prefs.getBoolean(C.UI_SAVEDPAGER, true)) {
@@ -587,14 +679,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             INTENT_OPEN_DOWNLOADED_VIDEO -> {
-                startOfflineVideo(
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        intent.getParcelableExtra(KEY_VIDEO, OfflineVideo::class.java)!!
-                    } else {
-                        @Suppress("DEPRECATION")
-                        intent.getParcelableExtra(KEY_VIDEO)!!
-                    }
-                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(KEY_VIDEO, OfflineVideo::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(KEY_VIDEO)
+                }?.let {
+                    startOfflineVideo(it)
+                }
             }
             INTENT_OPEN_PLAYER -> playerFragment?.maximize() //TODO if was closed need to reopen
         }
@@ -827,7 +919,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             } else {
-                binding.navBarContainer.gone()
+                binding.navBarContainer.visibility = View.GONE
             }
             setupWithNavController(navController)
             setOnItemSelectedListener {
@@ -865,7 +957,10 @@ class MainActivity : AppCompatActivity() {
         }
         if (version < 1) {
             prefs.edit {
-                putInt(C.LANDSCAPE_CHAT_WIDTH, DisplayUtils.calculateLandscapeWidthByPercent(this@MainActivity, 30))
+                val width = resources.displayMetrics.widthPixels
+                val height = resources.displayMetrics.heightPixels
+                val chatWidth = ((if (height > width) height else width) * (30 / 100f)).toInt()
+                putInt(C.LANDSCAPE_CHAT_WIDTH, chatWidth)
                 if (resources.getBoolean(R.bool.isTablet)) {
                     putString(C.PORTRAIT_COLUMN_COUNT, "2")
                     putString(C.LANDSCAPE_COLUMN_COUNT, "3")
@@ -982,7 +1077,14 @@ class MainActivity : AppCompatActivity() {
                             "1:${if (defaultSavedPage == "1") "1" else "0"}:1"
                     putString(C.UI_SAVED_TABS, list)
                 }
-                putInt(C.SETTINGS_VERSION, 11)
+            }
+        }
+        if (version < 12) {
+            prefs.edit {
+                if (!prefs.getBoolean("ui_theme_rounded_corners", true)) {
+                    putString(C.UI_THEME_ROUNDED_CORNERS, "2")
+                }
+                putInt(C.SETTINGS_VERSION, 12)
             }
         }
     }

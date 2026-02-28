@@ -31,7 +31,6 @@ import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.prefs
-import com.github.andreyasadchy.xtra.util.visible
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -139,9 +138,9 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
                     sort = sortValues?.videoSort,
                     order = sortValues?.videoType,
                 )
-                viewModel.sortText.value = requireContext().getString(
+                viewModel.sortText.value = getString(
                     R.string.sort_and_order,
-                    requireContext().getString(
+                    getString(
                         when (viewModel.sort) {
                             BookmarksSortDialog.SORT_EXPIRES_AT -> R.string.deletion_date
                             BookmarksSortDialog.SORT_CREATED_AT -> R.string.creation_date
@@ -149,7 +148,7 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
                             else -> R.string.saved_date
                         }
                     ),
-                    requireContext().getString(
+                    getString(
                         when (viewModel.order) {
                             BookmarksSortDialog.ORDER_DESC -> R.string.descending
                             BookmarksSortDialog.ORDER_ASC -> R.string.ascending
@@ -279,7 +278,7 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
     }
 
     override fun setupSortBar(sortBar: SortBarBinding) {
-        sortBar.root.visible()
+        sortBar.root.visibility = View.VISIBLE
         sortBar.root.setOnClickListener {
             BookmarksSortDialog.newInstance(
                 sort = viewModel.sort,
@@ -301,7 +300,7 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
                 if (changed) {
                     adapter.submitList(emptyList())
                     viewModel.setFilter(sort, order)
-                    viewModel.sortText.value = requireContext().getString(R.string.sort_and_order, sortText, orderText)
+                    viewModel.sortText.value = getString(R.string.sort_and_order, sortText, orderText)
                 }
                 if (saveDefault) {
                     val item = viewModel.getSortChannel("bookmarks")?.apply {

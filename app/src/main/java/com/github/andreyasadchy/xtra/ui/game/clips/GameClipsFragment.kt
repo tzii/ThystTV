@@ -31,8 +31,6 @@ import com.github.andreyasadchy.xtra.ui.common.Sortable
 import com.github.andreyasadchy.xtra.ui.common.VideosSortDialog
 import com.github.andreyasadchy.xtra.ui.download.DownloadDialog
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentArgs
-import com.github.andreyasadchy.xtra.util.gone
-import com.github.andreyasadchy.xtra.util.visible
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -90,10 +88,10 @@ class GameClipsFragment : PagedListFragment(), Scrollable, Sortable, VideosSortD
                     period = sortValues?.clipPeriod,
                     languages = sortValues?.clipLanguages?.split(',')?.toTypedArray(),
                 )
-                viewModel.sortText.value = requireContext().getString(
+                viewModel.sortText.value = getString(
                     R.string.sort_and_period,
-                    requireContext().getString(R.string.view_count),
-                    requireContext().getString(
+                    getString(R.string.view_count),
+                    getString(
                         when (viewModel.period) {
                             VideosSortDialog.PERIOD_DAY -> R.string.today
                             VideosSortDialog.PERIOD_WEEK -> R.string.this_week
@@ -104,7 +102,7 @@ class GameClipsFragment : PagedListFragment(), Scrollable, Sortable, VideosSortD
                     )
                 )
                 viewModel.filtersText.value = if (viewModel.languages.isNotEmpty()) {
-                    requireContext().resources.getQuantityString(R.plurals.languages, viewModel.languages.size, viewModel.languages.joinToString())
+                    resources.getQuantityString(R.plurals.languages, viewModel.languages.size, viewModel.languages.joinToString())
                 } else null
             }
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -117,7 +115,7 @@ class GameClipsFragment : PagedListFragment(), Scrollable, Sortable, VideosSortD
     }
 
     override fun setupSortBar(sortBar: SortBarBinding) {
-        sortBar.root.visible()
+        sortBar.root.visibility = View.VISIBLE
         sortBar.root.setOnClickListener {
             viewLifecycleOwner.lifecycleScope.launch {
                 VideosSortDialog.newInstance(
@@ -139,10 +137,10 @@ class GameClipsFragment : PagedListFragment(), Scrollable, Sortable, VideosSortD
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.filtersText.collectLatest {
                     if (it != null) {
-                        sortBar.filtersText.visible()
+                        sortBar.filtersText.visibility = View.VISIBLE
                         sortBar.filtersText.text = it
                     } else {
-                        sortBar.filtersText.gone()
+                        sortBar.filtersText.visibility = View.GONE
                     }
                 }
             }
@@ -153,12 +151,12 @@ class GameClipsFragment : PagedListFragment(), Scrollable, Sortable, VideosSortD
         if ((parentFragment as? FragmentHost)?.currentFragment == this) {
             viewLifecycleOwner.lifecycleScope.launch {
                 if (changed) {
-                    binding.scrollTop.gone()
+                    binding.scrollTop.visibility = View.GONE
                     pagingAdapter.submitData(PagingData.empty())
                     viewModel.setFilter(period, languages)
-                    viewModel.sortText.value = requireContext().getString(R.string.sort_and_period, sortText, periodText)
+                    viewModel.sortText.value = getString(R.string.sort_and_period, sortText, periodText)
                     viewModel.filtersText.value = if (languages.isNotEmpty()) {
-                        requireContext().resources.getQuantityString(R.plurals.languages, languages.size, languages.joinToString())
+                        resources.getQuantityString(R.plurals.languages, languages.size, languages.joinToString())
                     } else null
                 }
                 if (saveSort) {

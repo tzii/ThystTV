@@ -1,7 +1,6 @@
 package com.github.andreyasadchy.xtra.ui.channel
 
 import android.net.http.HttpEngine
-import android.net.http.UrlResponseInfo
 import android.os.Build
 import android.os.ext.SdkExtensions
 import androidx.lifecycle.SavedStateHandle
@@ -92,7 +91,6 @@ class ChannelPagerViewModel @Inject constructor(
                             gameId = it.stream?.game?.id,
                             gameSlug = it.stream?.game?.slug,
                             gameName = it.stream?.game?.displayName,
-                            type = it.stream?.type,
                             title = it.stream?.title,
                             viewerCount = it.stream?.viewersCount,
                             startedAt = it.stream?.createdAt?.toString(),
@@ -135,7 +133,6 @@ class ChannelPagerViewModel @Inject constructor(
                                     channelName = it.channelName,
                                     gameId = it.gameId,
                                     gameName = it.gameName,
-                                    type = it.type,
                                     title = it.title,
                                     viewerCount = it.viewerCount,
                                     startedAt = it.startedAt,
@@ -270,11 +267,17 @@ class ChannelPagerViewModel @Inject constructor(
             viewModelScope.launch {
                 try {
                     if (!channelId.isNullOrBlank()) {
-                        if (setting == 0 && !gqlHeaders[C.HEADER_TOKEN].isNullOrBlank() && userId != channelId) {
-                            val response = try {
-                                if (gqlHeaders[C.HEADER_TOKEN].isNullOrBlank() || channelLogin == null) throw Exception()
-                                val follower = graphQLRepository.loadFollowingUser(networkLibrary, gqlHeaders, channelLogin).data?.user?.self?.follower
-                                Pair(follower != null, follower?.disableNotifications == false)
+                        if (setting == 0 && !userId.isNullOrBlank() && userId != channelId) {
+                            try {
+                                if (gqlHeaders[C.HEADER_TOKEN].isNullOrBlank()) throw Exception()
+                                val follower = graphQLRepository.loadQueryFollowingUser(
+                                    networkLibrary = networkLibrary,
+                                    headers = gqlHeaders,
+                                    id = channelId,
+                                    login = channelLogin.takeIf { channelId.isBlank() },
+                                ).data?.user?.self?.follower
+                                _isFollowing.value = follower?.followedAt != null
+                                _notificationsEnabled.value = follower?.notificationSettings?.isEnabled == true
                             } catch (e: Exception) {
                                 val following = helixRepository.getUserFollows(
                                     networkLibrary = networkLibrary,
@@ -282,13 +285,8 @@ class ChannelPagerViewModel @Inject constructor(
                                     userId = userId,
                                     targetId = channelId,
                                 ).data.firstOrNull()?.channelId == channelId
-                                Pair(following, null)
-                            }
-                            _isFollowing.value = response.first
-                            _notificationsEnabled.value = if (response.first && response.second != null) {
-                                response.second
-                            } else {
-                                notificationUsersRepository.getByUserId(channelId) != null
+                                _isFollowing.value = following
+                                _notificationsEnabled.value = notificationUsersRepository.getByUserId(channelId) != null
                             }
                         } else {
                             _isFollowing.value = localFollowsChannel.getFollowByUserId(channelId) != null
@@ -392,7 +390,7 @@ class ChannelPagerViewModel @Inject constructor(
                             try {
                                 when {
                                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                        val response = suspendCoroutine<Pair<UrlResponseInfo, ByteArray>> { continuation ->
+                                        val response = suspendCoroutine { continuation ->
                                             httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                                         }
                                         if (response.first.httpStatusCode in 200..299) {
@@ -412,7 +410,7 @@ class ChannelPagerViewModel @Inject constructor(
                                                 }
                                             }
                                         } else {
-                                            val response = suspendCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
+                                            val response = suspendCoroutine { continuation ->
                                                 cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                                             }
                                             if (response.first.httpStatusCode in 200..299) {
