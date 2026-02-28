@@ -84,6 +84,8 @@ CHANGELOG.md
 
 # Temporary/accidental files
 nul
+/*_diff.txt
+/staged_diff.diff
 
 # IDE and editor files
 *.swp
