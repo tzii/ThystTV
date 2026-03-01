@@ -57,6 +57,14 @@ fun Context.convertPixelsToDp(pixels: Float) = TypedValue.applyDimension(TypedVa
 val Context.displayDensity
     get() = this.resources.displayMetrics.density
 
+fun SharedPreferences.getSafeBoolean(key: String, defValue: Boolean): Boolean {
+    return try {
+        getBoolean(key, defValue)
+    } catch (e: ClassCastException) {
+        getString(key, defValue.toString())?.toBoolean() ?: defValue
+    }
+}
+
 fun Activity.applyTheme() {
     // On Android 15, wrong language is used when multiple languages are set in device settings
     if (Build.VERSION.SDK_INT == Build.VERSION_CODES.VANILLA_ICE_CREAM) {
@@ -69,7 +77,7 @@ fun Activity.applyTheme() {
             }
         )
     }
-    val theme = if (prefs().getBoolean(C.UI_THEME_FOLLOW_SYSTEM, false)) {
+    val theme = if (prefs().getSafeBoolean(C.UI_THEME_FOLLOW_SYSTEM, false)) {
         when (resources.configuration.uiMode.and(Configuration.UI_MODE_NIGHT_MASK)) {
             Configuration.UI_MODE_NIGHT_YES -> prefs().getString(C.UI_THEME_DARK_ON, "0")!!
             else -> prefs().getString(C.UI_THEME_DARK_OFF, "2")!!
@@ -77,8 +85,8 @@ fun Activity.applyTheme() {
     } else {
         prefs().getString(C.THEME, "0")!!
     }
-    if (prefs().getBoolean(C.UI_THEME_MATERIAL3, true)) {
-        if (prefs().getBoolean(C.UI_THEME_ROUNDED_CORNERS, true)) {
+    if (prefs().getSafeBoolean(C.UI_THEME_MATERIAL3, true)) {
+        if (prefs().getSafeBoolean(C.UI_THEME_ROUNDED_CORNERS, true)) {
             setTheme(
                 when (theme) {
                     "4" -> R.style.DarkTheme
