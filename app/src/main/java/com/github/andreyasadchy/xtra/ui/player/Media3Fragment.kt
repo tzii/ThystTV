@@ -434,8 +434,11 @@ class Media3Fragment : PlayerFragment() {
                 changeQuality(viewModel.previousQuality)
             }
             player?.sendCustomCommand(
-                SessionCommand(PlaybackService.GET_SLEEP_TIMER, Bundle.EMPTY),
-                Bundle.EMPTY
+                SessionCommand(
+                    PlaybackService.SET_SLEEP_TIMER, Bundle().apply {
+                        putLong(PlaybackService.DURATION, -1L)
+                    }
+                ), Bundle.EMPTY
             )?.let { result ->
                 result.addListener({
                     if (result.get().resultCode == SessionResult.RESULT_SUCCESS) {

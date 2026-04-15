@@ -243,7 +243,6 @@ class PlaybackService : MediaSessionService() {
                             add(SessionCommand(GET_ERROR_CODE, Bundle.EMPTY))
                             add(SessionCommand(GET_MEDIA_PLAYLIST, Bundle.EMPTY))
                             add(SessionCommand(GET_MULTIVARIANT_PLAYLIST, Bundle.EMPTY))
-                            add(SessionCommand(GET_SLEEP_TIMER, Bundle.EMPTY))
                         }.build()
                         return MediaSession.ConnectionResult.accept(sessionCommands, connectionResult.availablePlayerCommands)
                     }
@@ -633,11 +632,6 @@ class PlaybackService : MediaSessionService() {
                                     putStringArray(RESULT, (session.player.currentManifest as? HlsManifest)?.multivariantPlaylist?.tags?.toTypedArray())
                                 }))
                             }
-                            GET_SLEEP_TIMER -> {
-                                Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS, Bundle().apply {
-                                    putLong(RESULT, sleepTimerEndTime)
-                                }))
-                            }
                             else -> super.onCustomCommand(session, controller, customCommand, args)
                         }
                     }
@@ -785,7 +779,6 @@ class PlaybackService : MediaSessionService() {
         const val GET_ERROR_CODE = "getErrorCode"
         const val GET_MEDIA_PLAYLIST = "getMediaPlaylist"
         const val GET_MULTIVARIANT_PLAYLIST = "getMultivariantPlaylist"
-        const val GET_SLEEP_TIMER = "getSleepTimer"
 
         const val RESULT = "result"
         const val URI = "uri"
