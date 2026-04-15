@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
     - name: Checkout sources
       uses: actions/checkout@v4
@@ -37,6 +39,8 @@ jobs:
   build-debug:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/heads/copilot/')
+    permissions:
+      contents: read
     steps:
     - name: Checkout sources
       uses: actions/checkout@v4
