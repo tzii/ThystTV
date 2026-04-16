@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -35,6 +36,20 @@ jobs:
       - name: Run Unit Tests
         run: ./gradlew test
 
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore app/debug-keystore.jks \
+            -storepass 123456 \
+            -keypass 123456 \
+            -alias debug \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
@@ -43,4 +58,5 @@ jobs:
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 7
