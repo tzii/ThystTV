@@ -5,63 +5,56 @@ on:
     branches: [ "master", "copilot/**" ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:
 
 jobs:
-  test:
+  test-and-build-debug:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
-    - name: Checkout sources
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-    
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
-    
-    - name: Run Unit Tests
-      run: ./gradlew test
-    
-    - name: Upload Test Reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-reports
-        path: app/build/reports/tests/
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  build-debug:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/heads/copilot/')
-    permissions:
-      contents: read
-    steps:
-    - name: Checkout sources
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
 
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
+      - name: Run Unit Tests
+        run: ./gradlew test
 
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore app/debug-keystore.jks \
+            -storepass 123456 \
+            -keypass 123456 \
+            -alias debug \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
 
-    - name: Upload Debug APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: debug-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
-        retention-days: 7
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload Test Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
