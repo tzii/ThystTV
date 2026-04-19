@@ -631,6 +631,7 @@ class Media3Fragment : PlayerFragment() {
 
     override fun setPlaybackSpeed(speed: Float) {
         player?.setPlaybackSpeed(speed)
+        updatePlaybackSpeedUi(speed)
     }
 
     override fun changeVolume(volume: Float) {

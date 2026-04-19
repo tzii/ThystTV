@@ -613,6 +613,7 @@ class MediaPlayerFragment : PlayerFragment() {
         params.speed = speed
         player?.playbackParams = params
         chatFragment?.updateSpeed(speed)
+        updatePlaybackSpeedUi(speed)
     }
 
     override fun changeVolume(volume: Float) {

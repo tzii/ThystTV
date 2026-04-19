@@ -99,6 +99,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import java.util.Locale
 
 @OptIn(UnstableApi::class)
 @AndroidEntryPoint
@@ -188,6 +189,43 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     open fun startAudioOnly() {}
     open fun downloadVideo() {}
     open fun close() {}
+
+    protected fun formatPlaybackSpeed(speed: Float?): String? {
+        if (speed == null) return null
+        val rounded = ((speed * 100).toInt() / 100f)
+        return if (rounded % 1f == 0f) {
+            String.format(Locale.US, "%.0fx", rounded)
+        } else if ((rounded * 10f) % 1f == 0f) {
+            String.format(Locale.US, "%.1fx", rounded)
+        } else {
+            String.format(Locale.US, "%.2fx", rounded)
+        }
+    }
+
+    protected fun updatePlaybackSpeedUi(speed: Float? = getCurrentSpeed() ?: requireContext().prefs().getFloat(C.PLAYER_SPEED, 1f)) {
+        val formattedSpeed = formatPlaybackSpeed(speed) ?: return
+        with(binding.playerControls) {
+            speed.text = formattedSpeed
+            speed.contentDescription = getString(R.string.playback_speed) + ": " + formattedSpeed
+        }
+        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setSpeed(formattedSpeed)
+    }
+
+    private fun applyMinimizedPlayerVisualState() {
+        binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        binding.playerLayout.setBackgroundColor(
+            MaterialColors.getColor(binding.playerLayout, com.google.android.material.R.attr.colorSurface)
+        )
+    }
+
+    private fun applyMaximizedPlayerVisualState() {
+        binding.aspectRatioFrameLayout.resizeMode = if (isPortrait) {
+            AspectRatioFrameLayout.RESIZE_MODE_FIT
+        } else {
+            resizeMode
+        }
+        binding.playerLayout.setBackgroundColor(Color.BLACK)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         videoType = requireArguments().getString(KEY_TYPE)
@@ -884,6 +922,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 } else {
                     if (requireContext().prefs().getBoolean(C.PLAYER_SPEEDBUTTON, true)) {
                         speed.visibility = View.VISIBLE
+                        updatePlaybackSpeedUi()
                         speed.setOnClickListener { showSpeedDialog() }
                     }
                 }
@@ -1177,7 +1216,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         slidingLayout.translationY = 0f - scaledYDiff - ((insets?.top ?: 0) * minimizedScaleY) + newY
                     }
                 }
-                aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                if (isMaximized) {
+                    applyMaximizedPlayerVisualState()
+                } else {
+                    applyMinimizedPlayerVisualState()
+                }
                 aspectRatioFrameLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                     gravity = Gravity.NO_GRAVITY
                 }
@@ -1255,7 +1298,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         slidingLayout.translationY = 0f - scaledYDiff - ((insets?.top ?: 0) * minimizedScaleY) + newY
                     }
                 }
-                aspectRatioFrameLayout.resizeMode = resizeMode
+                if (isMaximized) {
+                    applyMaximizedPlayerVisualState()
+                } else {
+                    applyMinimizedPlayerVisualState()
+                }
                 aspectRatioFrameLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                     gravity = Gravity.CENTER
                 }
@@ -2187,6 +2234,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             backPressedCallback.remove()
             useController = false
             hideController(true)
+            applyMinimizedPlayerVisualState()
             fun animate() {
                 val (minimizedScaleX, minimizedScaleY) = getScaleValues()
                 val windowInsets = ViewCompat.getRootWindowInsets(requireView())
@@ -2255,6 +2303,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 chatFragment?.toggleBackPressedCallback(true)
             }
             useController = true
+            applyMaximizedPlayerVisualState()
             if (!controllerHideOnTouch) {
                 showController(true)
                 updateProgress()
@@ -2394,7 +2443,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     speeds.getOrNull(index)?.toFloatOrNull()?.let { speed ->
                         setPlaybackSpeed(speed)
                         requireContext().prefs().edit { putFloat(C.PLAYER_SPEED, speed) }
-                        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setSpeed(speed.toString())
+                        updatePlaybackSpeedUi(speed)
                     }
                 }
             }

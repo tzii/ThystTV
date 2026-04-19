@@ -89,6 +89,63 @@ class PlayerGestureHelperTest {
     }
 
     @Test
+    fun `calculateResponsiveSeekPosition keeps small drags precise`() {
+        val duration = 7200_000L // 2 hours
+        val currentPosition = 1800_000L // 30 minutes
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 50f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        val seekDelta = newPosition - currentPosition
+        assertTrue(seekDelta in 60_000L..360_000L)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition allows major seek on long vod`() {
+        val duration = 7200_000L // 2 hours
+        val currentPosition = 1800_000L // 30 minutes
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        val seekFraction = (newPosition - currentPosition).toFloat() / duration.toFloat()
+        assertTrue(seekFraction in 0.10f..0.25f)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition is symmetric and clamped`() {
+        val duration = 14_400_000L // 4 hours
+
+        val beforeStart = helper.calculateResponsiveSeekPosition(
+            currentPosition = 30_000L,
+            duration = duration,
+            gestureDelta = -1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+        assertEquals(0L, beforeStart)
+
+        val pastEnd = helper.calculateResponsiveSeekPosition(
+            currentPosition = duration - 30_000L,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+        assertEquals(duration, pastEnd)
+    }
+
+    @Test
     fun `isHorizontalSwipe detects horizontal swipes`() {
         assertTrue(helper.isHorizontalSwipe(100f, 20f, 50f))
         assertFalse(helper.isHorizontalSwipe(30f, 20f, 50f)) // Below threshold

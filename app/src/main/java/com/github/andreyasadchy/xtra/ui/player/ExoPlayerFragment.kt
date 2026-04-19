@@ -677,6 +677,7 @@ class ExoPlayerFragment : PlayerFragment() {
 
     override fun setPlaybackSpeed(speed: Float) {
         player?.setPlaybackSpeed(speed)
+        updatePlaybackSpeedUi(speed)
     }
 
     override fun changeVolume(volume: Float) {

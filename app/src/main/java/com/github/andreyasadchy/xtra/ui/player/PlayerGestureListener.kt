@@ -201,10 +201,14 @@ class PlayerGestureListener(
 
         if (isSeek) {
             if (duration > 0) {
-                // Seek logic: 90 seconds per screen width swipe, adjusted by sensitivity
-                val baseSeekSeconds = 90
-                val seekAmount = (percentX * baseSeekSeconds * 1000 * sensitivity).toLong()
-                val newPosition = (startPosition + seekAmount).coerceIn(0, duration)
+                val newPosition = helper.calculateResponsiveSeekPosition(
+                    currentPosition = startPosition,
+                    duration = duration,
+                    gestureDelta = e2.x - gestureStartX,
+                    screenWidth = callback.screenWidth,
+                    sensitivity = sensitivity
+                )
+                val seekAmount = newPosition - startPosition
                 callback.seek(newPosition)
 
                 icon.setImageResource(if (seekAmount > 0) R.drawable.baseline_add_black_24 else R.drawable.baseline_remove_black_24)

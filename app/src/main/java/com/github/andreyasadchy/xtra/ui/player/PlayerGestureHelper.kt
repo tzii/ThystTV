@@ -4,6 +4,9 @@
  import android.media.AudioManager
  import android.provider.Settings
  import android.view.WindowManager
+ import kotlin.math.abs
+ import kotlin.math.pow
+ import kotlin.math.sign
  import kotlin.math.max
  import kotlin.math.min
  
@@ -85,17 +88,69 @@
       * @param seekMultiplier Multiplier for seek sensitivity (default 1.0)
       * @return New seek position in milliseconds
       */
-     fun calculateSeekPosition(
-         currentPosition: Long,
-         duration: Long,
-         gestureDelta: Float,
+    fun calculateSeekPosition(
+        currentPosition: Long,
+        duration: Long,
+        gestureDelta: Float,
          screenWidth: Int,
          seekMultiplier: Float = 1f
      ): Long {
          val seekPercentage = gestureDelta / screenWidth
-         val seekDelta = (duration * seekPercentage * seekMultiplier).toLong()
-         return (currentPosition + seekDelta).coerceIn(0, duration)
-     }
+        val seekDelta = (duration * seekPercentage * seekMultiplier).toLong()
+        return (currentPosition + seekDelta).coerceIn(0, duration)
+    }
+
+    /**
+     * Calculates a duration-aware seek position for gesture scrubbing.
+     *
+     * Small drags stay precise, while larger drags accelerate enough to move
+     * through major sections of longer VoDs.
+     */
+    fun calculateResponsiveSeekPosition(
+        currentPosition: Long,
+        duration: Long,
+        gestureDelta: Float,
+        screenWidth: Int,
+        sensitivity: Float = 1f
+    ): Long {
+        if (duration <= 0L || screenWidth <= 0) {
+            return currentPosition.coerceIn(0L, duration.coerceAtLeast(0L))
+        }
+
+        val normalizedDrag = (gestureDelta / screenWidth.toFloat()).coerceIn(-1f, 1f)
+        val dragDistance = abs(normalizedDrag)
+        if (dragDistance == 0f) return currentPosition.coerceIn(0L, duration)
+
+        val durationMinutes = duration / 60_000f
+        val baseMaxFraction = when {
+            durationMinutes <= 10f -> 0.06f
+            durationMinutes <= 30f -> 0.10f
+            durationMinutes <= 60f -> 0.14f
+            durationMinutes <= 120f -> 0.18f
+            durationMinutes <= 240f -> 0.22f
+            else -> 0.25f
+        }
+        val sensitivityScale = when {
+            sensitivity <= 0.5f -> 0.8f
+            sensitivity >= 2f -> 1.2f
+            else -> 0.8f + (((sensitivity - 0.5f) / 1.5f) * 0.4f)
+        }
+        val maxSeekFraction = (baseMaxFraction * sensitivityScale).coerceIn(0.05f, 0.30f)
+        val fineControlFraction = min(maxSeekFraction * 0.2f, 0.04f)
+        val fineControlThreshold = 0.15f
+
+        val effectiveSeekFraction = if (dragDistance <= fineControlThreshold) {
+            (dragDistance / fineControlThreshold) * fineControlFraction
+        } else {
+            val acceleratedProgress = ((dragDistance - fineControlThreshold) / (1f - fineControlThreshold))
+                .coerceIn(0f, 1f)
+                .pow(1.15f)
+            fineControlFraction + (acceleratedProgress * (maxSeekFraction - fineControlFraction))
+        }
+
+        val seekDelta = (duration * effectiveSeekFraction * sign(normalizedDrag)).toLong()
+        return (currentPosition + seekDelta).coerceIn(0L, duration)
+    }
  
      /**
       * Determines if a touch event is a horizontal swipe (for seeking)
