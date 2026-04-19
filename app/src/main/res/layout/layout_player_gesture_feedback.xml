@@ -8,18 +8,21 @@
 
     <LinearLayout
         android:id="@+id/feedbackContainer"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
         android:paddingVertical="8dp"
         android:background="@drawable/bg_gesture_feedback"
         android:animateLayoutChanges="true"
+        android:minWidth="180dp"
+        android:maxWidth="420dp"
+        app:layout_constrainedWidth="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintWidth_percent="0.25">
+        app:layout_constraintTop_toTopOf="parent">
 
         <ImageView
             android:id="@+id/feedbackIcon"
@@ -48,6 +51,8 @@
             android:layout_marginStart="12dp"
             android:gravity="end"
             android:minWidth="48dp"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textColor="@android:color/white"
             android:textSize="14sp"
             android:textStyle="bold"

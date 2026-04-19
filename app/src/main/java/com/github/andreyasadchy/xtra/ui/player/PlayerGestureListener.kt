@@ -6,7 +6,9 @@ import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.github.andreyasadchy.xtra.R
 import com.google.android.material.progressindicator.LinearProgressIndicator
@@ -155,11 +157,16 @@ class PlayerGestureListener(
         val percentX = (e2.x - gestureStartX) / width // Left to Right is positive
         
         val feedback = callback.getGestureFeedbackView()
+        val container = feedback.findViewById<LinearLayout>(R.id.feedbackContainer)
         val icon = feedback.findViewById<ImageView>(R.id.feedbackIcon)
         val progress = feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)
         val text = feedback.findViewById<TextView>(R.id.feedbackText)
 
         if (isBrightness) {
+            progress.visibility = View.VISIBLE
+            text.maxLines = 1
+            container.minimumWidth = dpToPx(180)
+            container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             val rawBrightness = startBrightness + percentY
             val isAuto = rawBrightness < 0.05f
             val newBrightness = if (isAuto) -1f else rawBrightness.coerceIn(0.05f, 1.0f)
@@ -184,6 +191,10 @@ class PlayerGestureListener(
         }
         
         if (isVolume) {
+            progress.visibility = View.VISIBLE
+            text.maxLines = 1
+            container.minimumWidth = dpToPx(180)
+            container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val newVolume = (startVolume + (percentY * maxVolume)).toInt().coerceIn(0, maxVolume)
@@ -201,6 +212,10 @@ class PlayerGestureListener(
 
         if (isSeek) {
             if (duration > 0) {
+                progress.visibility = View.GONE
+                text.maxLines = 1
+                container.minimumWidth = 0
+                container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
                 val newPosition = helper.calculateResponsiveSeekPosition(
                     currentPosition = startPosition,
                     duration = duration,
@@ -217,15 +232,16 @@ class PlayerGestureListener(
                 feedback.removeCallbacks(callback.getHideGestureRunnable())
                 feedback.postDelayed(callback.getHideGestureRunnable(), 800)
                 
-                progress.progress = ((newPosition.toFloat() / duration.toFloat()) * 100).toInt()
                 text.text = "${helper.formatDuration(newPosition)} / ${helper.formatDuration(duration)}"
-                // Adjust text width for long duration strings if needed
-                text.layoutParams.width = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
             }
             return true
         }
 
         if (isSpeed) {
+            progress.visibility = View.VISIBLE
+            text.maxLines = 1
+            container.minimumWidth = dpToPx(180)
+            container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             // Speed logic: 0.05x increments
             // Swipe full width = 1.0x change, adjusted by sensitivity
             val speedChange = (percentX * 2.0f * sensitivity)
@@ -250,6 +266,10 @@ class PlayerGestureListener(
         }
 
         return false
+    }
+
+    private fun dpToPx(value: Int): Int {
+        return (value * context.resources.displayMetrics.density).toInt()
     }
 
     override fun onSingleTapUp(e: MotionEvent): Boolean {
