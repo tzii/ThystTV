@@ -202,8 +202,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
-    protected fun updatePlaybackSpeedUi(speed: Float? = getCurrentSpeed() ?: requireContext().prefs().getFloat(C.PLAYER_SPEED, 1f)) {
-        val formattedSpeed = formatPlaybackSpeed(speed) ?: return
+    protected fun updatePlaybackSpeedUi(playbackSpeed: Float? = getCurrentSpeed() ?: requireContext().prefs().getFloat(C.PLAYER_SPEED, 1f)) {
+        val formattedSpeed = formatPlaybackSpeed(playbackSpeed) ?: return
         with(binding.playerControls) {
             speed.text = formattedSpeed
             speed.contentDescription = getString(R.string.playback_speed) + ": " + formattedSpeed
