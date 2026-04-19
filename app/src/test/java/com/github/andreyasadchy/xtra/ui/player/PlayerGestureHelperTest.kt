@@ -102,7 +102,7 @@ class PlayerGestureHelperTest {
         )
 
         val seekDelta = newPosition - currentPosition
-        assertTrue(seekDelta in 60_000L..360_000L)
+        assertTrue(seekDelta in 60_000L..240_000L)
     }
 
     @Test
@@ -119,7 +119,40 @@ class PlayerGestureHelperTest {
         )
 
         val seekFraction = (newPosition - currentPosition).toFloat() / duration.toFloat()
-        assertTrue(seekFraction in 0.10f..0.25f)
+        assertTrue(seekFraction in 0.15f..0.22f)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition lets short clips traverse quickly`() {
+        val duration = 30_000L // 30 seconds
+        val currentPosition = 5_000L
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        assertTrue(newPosition in 26_000L..30_000L)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition keeps ultra long vods meaningful but bounded`() {
+        val duration = 172_800_000L // 48 hours
+        val currentPosition = 86_400_000L // midpoint
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        val seekFraction = (newPosition - currentPosition).toFloat() / duration.toFloat()
+        assertTrue(seekFraction in 0.035f..0.05f)
     }
 
     @Test

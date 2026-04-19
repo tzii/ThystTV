@@ -123,28 +123,33 @@
 
         val durationMinutes = duration / 60_000f
         val baseMaxFraction = when {
-            durationMinutes <= 10f -> 0.06f
-            durationMinutes <= 30f -> 0.10f
-            durationMinutes <= 60f -> 0.14f
+            durationMinutes <= 1f -> 1.0f
+            durationMinutes <= 5f -> 0.70f
+            durationMinutes <= 30f -> 0.35f
             durationMinutes <= 120f -> 0.18f
-            durationMinutes <= 240f -> 0.22f
-            else -> 0.25f
+            durationMinutes <= 480f -> 0.10f
+            durationMinutes <= 1440f -> 0.06f
+            else -> 0.04f
         }
         val sensitivityScale = when {
-            sensitivity <= 0.5f -> 0.8f
+            sensitivity <= 0.5f -> 0.85f
             sensitivity >= 2f -> 1.2f
-            else -> 0.8f + (((sensitivity - 0.5f) / 1.5f) * 0.4f)
+            else -> 0.85f + (((sensitivity - 0.5f) / 1.5f) * 0.35f)
         }
-        val maxSeekFraction = (baseMaxFraction * sensitivityScale).coerceIn(0.05f, 0.30f)
-        val fineControlFraction = min(maxSeekFraction * 0.2f, 0.04f)
-        val fineControlThreshold = 0.15f
+        val maxSeekFraction = (baseMaxFraction * sensitivityScale).coerceIn(0.04f, 1.0f)
+        val fineControlThreshold = 0.10f
+        val fineControlFraction = when {
+            durationMinutes <= 5f -> min(maxSeekFraction * 0.25f, 0.18f)
+            durationMinutes <= 120f -> min(maxSeekFraction * 0.18f, 0.04f)
+            else -> min(maxSeekFraction * 0.15f, 0.02f)
+        }
 
         val effectiveSeekFraction = if (dragDistance <= fineControlThreshold) {
             (dragDistance / fineControlThreshold) * fineControlFraction
         } else {
             val acceleratedProgress = ((dragDistance - fineControlThreshold) / (1f - fineControlThreshold))
                 .coerceIn(0f, 1f)
-                .pow(1.15f)
+                .pow(0.85f)
             fineControlFraction + (acceleratedProgress * (maxSeekFraction - fineControlFraction))
         }
 
