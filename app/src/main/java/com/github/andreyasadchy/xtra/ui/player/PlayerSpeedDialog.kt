@@ -14,6 +14,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.chip.Chip
 import com.google.android.material.slider.Slider
+import kotlin.math.abs
 import java.util.Locale
 
 class PlayerSpeedDialog : BottomSheetDialogFragment() {
@@ -78,10 +79,13 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
                 val chip = Chip(requireContext()).apply {
                     text = if (speed == 1.0f) "${speedStr}x (${getString(R.string.speed_normal)})" else "${speedStr}x"
                     isCheckable = true
-                    isChecked = kotlin.math.abs(speed - currentSpeed) < 0.01f
+                    isChecked = abs(speed - currentSpeed) < 0.01f
+                    isClickable = true
+                    isFocusable = true
                     setOnClickListener {
                         speedSlider.value = speed
                         saveSpeed(speed)
+                        dismiss()
                     }
                 }
                 speedChipGroup.addView(chip)
@@ -101,7 +105,7 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
             val chipSpeedStr = chipText.split("x")[0]
             val chipSpeed = chipSpeedStr.toFloatOrNull()
             
-            if (chipSpeed != null && kotlin.math.abs(chipSpeed - speed) < 0.01f) {
+            if (chipSpeed != null && abs(chipSpeed - speed) < 0.01f) {
                 chip.isChecked = true
             } else {
                 chip.isChecked = false

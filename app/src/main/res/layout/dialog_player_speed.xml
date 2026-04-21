@@ -19,16 +19,15 @@
         android:textAppearance="?attr/textAppearanceTitleLarge"
         android:textStyle="bold" />
 
-    <!-- Current Speed Display -->
     <TextView
         android:id="@+id/currentSpeedText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:text="1.00x"
-        android:textSize="32sp"
+        android:textSize="24sp"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="4dp" />
 
     <!-- Slider Row -->
     <LinearLayout
@@ -36,7 +35,8 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="16dp">
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="8dp">
 
         <ImageButton
             android:id="@+id/btnDecreaseSpeed"
@@ -67,24 +67,16 @@
             android:contentDescription="@string/speed_increase" />
     </LinearLayout>
 
-    <!-- Preset Chips -->
-    <HorizontalScrollView
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/speedChipGroup"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:paddingTop="16dp"
-        android:paddingBottom="16dp"
-        android:clipToPadding="false"
-        android:paddingHorizontal="16dp">
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/speedChipGroup"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:singleLine="true"
-            app:singleSelection="true">
-            
-        </com.google.android.material.chip.ChipGroup>
-    </HorizontalScrollView>
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        app:singleLine="false"
+        app:singleSelection="true"
+        app:chipSpacingHorizontal="8dp"
+        app:chipSpacingVertical="8dp" />
 
 </LinearLayout>

@@ -123,6 +123,23 @@ class PlayerGestureHelperTest {
     }
 
     @Test
+    fun `calculateResponsiveSeekPosition is more aggressive on multi hour vods`() {
+        val duration = 16_200_000L // 4h30m
+        val currentPosition = 8_100_000L
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        val seekMinutes = (newPosition - currentPosition) / 60_000L
+        assertTrue(seekMinutes in 35L..50L)
+    }
+
+    @Test
     fun `calculateResponsiveSeekPosition lets short clips traverse quickly`() {
         val duration = 30_000L // 30 seconds
         val currentPosition = 5_000L
@@ -152,7 +169,7 @@ class PlayerGestureHelperTest {
         )
 
         val seekFraction = (newPosition - currentPosition).toFloat() / duration.toFloat()
-        assertTrue(seekFraction in 0.035f..0.05f)
+        assertTrue(seekFraction in 0.07f..0.09f)
     }
 
     @Test

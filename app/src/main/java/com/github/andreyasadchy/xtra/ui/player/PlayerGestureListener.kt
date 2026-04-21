@@ -165,7 +165,7 @@ class PlayerGestureListener(
         if (isBrightness) {
             progress.visibility = View.VISIBLE
             text.maxLines = 1
-            container.minimumWidth = dpToPx(180)
+            container.minimumWidth = dpToPx(148)
             container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             val rawBrightness = startBrightness + percentY
             val isAuto = rawBrightness < 0.05f
@@ -193,7 +193,7 @@ class PlayerGestureListener(
         if (isVolume) {
             progress.visibility = View.VISIBLE
             text.maxLines = 1
-            container.minimumWidth = dpToPx(180)
+            container.minimumWidth = dpToPx(148)
             container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
@@ -238,9 +238,9 @@ class PlayerGestureListener(
         }
 
         if (isSpeed) {
-            progress.visibility = View.VISIBLE
+            progress.visibility = View.GONE
             text.maxLines = 1
-            container.minimumWidth = dpToPx(180)
+            container.minimumWidth = 0
             container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             // Speed logic: 0.05x increments
             // Swipe full width = 1.0x change, adjusted by sensitivity
@@ -258,9 +258,6 @@ class PlayerGestureListener(
             feedback.removeCallbacks(callback.getHideGestureRunnable())
             feedback.postDelayed(callback.getHideGestureRunnable(), 800)
             
-            // Map 0.25-4.0 to 0-100 progress
-            val progressVal = ((newSpeed - 0.25f) / (4.0f - 0.25f) * 100).toInt()
-            progress.progress = progressVal
             text.text = "%.2fx".format(newSpeed)
             return true
         }

@@ -202,20 +202,23 @@
 
         <TextView
             android:id="@+id/speed"
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_gravity="center_vertical"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/bg_player_speed_chip"
+            android:layout_marginStart="0dp"
+            android:layout_marginEnd="0dp"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
             android:gravity="center"
-            android:minWidth="48dp"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
+            android:includeFontPadding="false"
+            android:minWidth="0dp"
+            android:paddingLeft="0dp"
+            android:paddingRight="0dp"
             android:text="1x"
             android:textAllCaps="false"
             android:textColor="@android:color/white"
-            android:textSize="13sp"
+            android:textSize="11sp"
             android:textStyle="bold"
             android:visibility="gone"
             tools:text="1x"
@@ -443,13 +446,16 @@
 
     <TextView
         android:id="@+id/position"
-        android:layout_width="55sp"
+        android:layout_width="72dp"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_marginStart="7dp"
         android:layout_marginBottom="10dp"
         android:background="@android:color/transparent"
         android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:singleLine="true"
         android:textColor="@android:color/white"
         tools:text="12:16" />
 
@@ -472,12 +478,16 @@
 
     <TextView
         android:id="@+id/duration"
-        android:layout_width="wrap_content"
+        android:layout_width="72dp"
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
         android:layout_marginEnd="10dp"
         android:layout_marginBottom="10dp"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:singleLine="true"
         android:textColor="@android:color/white"
         tools:text="1:12:16" />
 
