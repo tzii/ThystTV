@@ -127,9 +127,9 @@
             durationMinutes <= 5f -> 0.70f
             durationMinutes <= 30f -> 0.35f
             durationMinutes <= 120f -> 0.18f
-            durationMinutes <= 480f -> 0.15f
-            durationMinutes <= 1440f -> 0.10f
-            else -> 0.08f
+            durationMinutes <= 480f -> 0.22f
+            durationMinutes <= 1440f -> 0.16f
+            else -> 0.12f
         }
         val sensitivityScale = when {
             sensitivity <= 0.5f -> 0.85f
@@ -141,7 +141,7 @@
         val fineControlFraction = when {
             durationMinutes <= 5f -> min(maxSeekFraction * 0.25f, 0.18f)
             durationMinutes <= 120f -> min(maxSeekFraction * 0.18f, 0.04f)
-            else -> min(maxSeekFraction * 0.16f, 0.03f)
+            else -> min(maxSeekFraction * 0.18f, 0.04f)
         }
 
         val effectiveSeekFraction = if (dragDistance <= fineControlThreshold) {

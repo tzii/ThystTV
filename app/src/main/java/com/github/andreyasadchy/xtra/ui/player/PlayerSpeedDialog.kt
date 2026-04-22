@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.edit
 import androidx.core.os.bundleOf
+import androidx.core.view.children
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.DialogPlayerSpeedBinding
 import com.github.andreyasadchy.xtra.util.C
@@ -82,6 +83,7 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
                     isChecked = abs(speed - currentSpeed) < 0.01f
                     isClickable = true
                     isFocusable = true
+                    minimumHeight = (resources.displayMetrics.density * 36f).toInt()
                     setOnClickListener {
                         speedSlider.value = speed
                         saveSpeed(speed)
@@ -98,9 +100,9 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
         binding.currentSpeedText.text = formattedSpeed
         
         // Update chip selection visually
-        for (i in 0 until binding.speedChipGroup.childCount) {
-            val chip = binding.speedChipGroup.getChildAt(i) as? Chip
-            val chipText = chip?.text?.toString() ?: continue
+        binding.speedChipGroup.children.forEach { child ->
+            val chip = child as? Chip ?: return@forEach
+            val chipText = chip.text?.toString() ?: return@forEach
             // Extract number part from "1.0x (Normal)"
             val chipSpeedStr = chipText.split("x")[0]
             val chipSpeed = chipSpeedStr.toFloatOrNull()

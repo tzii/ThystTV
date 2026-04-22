@@ -136,7 +136,7 @@ class PlayerGestureHelperTest {
         )
 
         val seekMinutes = (newPosition - currentPosition) / 60_000L
-        assertTrue(seekMinutes in 35L..50L)
+        assertTrue(seekMinutes in 50L..70L)
     }
 
     @Test
@@ -169,7 +169,7 @@ class PlayerGestureHelperTest {
         )
 
         val seekFraction = (newPosition - currentPosition).toFloat() / duration.toFloat()
-        assertTrue(seekFraction in 0.07f..0.09f)
+        assertTrue(seekFraction in 0.11f..0.13f)
     }
 
     @Test
