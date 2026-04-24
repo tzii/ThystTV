@@ -1,9 +1,15 @@
 package com.github.andreyasadchy.xtra.ui.player
 
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.content.edit
 import androidx.core.os.bundleOf
 import androidx.core.view.children
@@ -13,15 +19,19 @@ import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.google.android.material.chip.Chip
 import com.google.android.material.slider.Slider
-import kotlin.math.abs
 import java.util.Locale
+import kotlin.math.abs
 
 class PlayerSpeedDialog : BottomSheetDialogFragment() {
 
     companion object {
         private const val SPEED = "speed"
+        private const val MIN_SPEED = 0.25f
+        private const val MAX_SPEED = 8.0f
+        private const val MAX_PRESET_SPEED = 4.0f
+        private const val SPEED_STEP = 0.05f
+        private const val DEFAULT_PRESETS = "0.25\n0.5\n0.75\n1.0\n1.25\n1.5\n1.75\n2.0\n3.0\n4.0\n8.0"
 
         fun newInstance(speed: Float?): PlayerSpeedDialog {
             return PlayerSpeedDialog().apply {
@@ -32,6 +42,7 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
 
     private var _binding: DialogPlayerSpeedBinding? = null
     private val binding get() = _binding!!
+    private var selectedSpeed = 1f
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = DialogPlayerSpeedBinding.inflate(inflater, container, false)
@@ -40,20 +51,39 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        dialog?.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        dialog?.window?.setDimAmount(0f)
+
+        val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+        bottomSheet?.apply {
+            background = ColorDrawable(Color.TRANSPARENT)
+            backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+            layoutParams = layoutParams.apply {
+                width = ViewGroup.LayoutParams.WRAP_CONTENT
+                height = ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            (layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
+            (layoutParams as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams)?.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        }
+
         val behavior = BottomSheetBehavior.from(view.parent as View)
         behavior.skipCollapsed = true
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
 
         with(binding) {
-            val currentSpeed = arguments?.getFloat(SPEED) ?: 1f
-            updateSpeedDisplay(currentSpeed)
-            speedSlider.value = currentSpeed
+            speedPanel.layoutParams = speedPanel.layoutParams.apply {
+                width = getPanelWidth()
+            }
+            selectedSpeed = arguments?.getFloat(SPEED) ?: 1f
+            speedSlider.value = selectedSpeed.coerceIn(MIN_SPEED, MAX_SPEED)
+            buildPresetRows(loadSpeedPresets())
+            updateSpeedDisplay(selectedSpeed)
 
             speedSlider.addOnChangeListener { _, value, _ ->
-                updateSpeedDisplay(value)
-                (parentFragment as? PlayerFragment)?.setPlaybackSpeed(value)
+                applySpeed(value, save = false)
             }
-            
+
             speedSlider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
                 override fun onStartTrackingTouch(slider: Slider) {}
 
@@ -63,56 +93,127 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
             })
 
             btnDecreaseSpeed.setOnClickListener {
-                val newValue = (speedSlider.value - 0.05f).coerceAtLeast(0.25f)
-                speedSlider.value = newValue
-                saveSpeed(newValue)
+                applySpeed((selectedSpeed - SPEED_STEP).coerceAtLeast(MIN_SPEED))
             }
 
             btnIncreaseSpeed.setOnClickListener {
-                val newValue = (speedSlider.value + 0.05f).coerceAtMost(4.0f)
-                speedSlider.value = newValue
-                saveSpeed(newValue)
-            }
-
-            val speedList = requireContext().prefs().getString(C.PLAYER_SPEED_LIST, "0.25\n0.5\n0.75\n1.0\n1.25\n1.5\n1.75\n2.0\n3.0\n4.0\n8.0")?.split("\n")
-            speedList?.forEach { speedStr ->
-                val speed = speedStr.toFloatOrNull() ?: return@forEach
-                val chip = Chip(requireContext()).apply {
-                    text = if (speed == 1.0f) "${speedStr}x (${getString(R.string.speed_normal)})" else "${speedStr}x"
-                    isCheckable = true
-                    isChecked = abs(speed - currentSpeed) < 0.01f
-                    isClickable = true
-                    isFocusable = true
-                    minimumHeight = (resources.displayMetrics.density * 36f).toInt()
-                    setOnClickListener {
-                        speedSlider.value = speed
-                        saveSpeed(speed)
-                        dismiss()
-                    }
-                }
-                speedChipGroup.addView(chip)
+                applySpeed((selectedSpeed + SPEED_STEP).coerceAtMost(MAX_SPEED))
             }
         }
     }
 
+    private fun loadSpeedPresets(): List<Float> {
+        val saved = requireContext()
+            .prefs()
+            .getString(C.PLAYER_SPEED_LIST, DEFAULT_PRESETS)
+            ?.split("\n")
+            ?.mapNotNull { it.toFloatOrNull() }
+            .orEmpty()
+        val defaults = DEFAULT_PRESETS.split("\n").mapNotNull { it.toFloatOrNull() }
+        return (saved + defaults)
+            .distinct()
+            .sorted()
+            .filter { it in MIN_SPEED..MAX_PRESET_SPEED }
+    }
+
+    private fun buildPresetRows(speeds: List<Float>) {
+        val density = resources.displayMetrics.density
+        val panelWidth = getPanelWidth()
+        val presetsPerRow = if (panelWidth < density * 460f) 3 else 5
+        val horizontalGap = (density * 7f).toInt()
+        val rowAvailableWidth = panelWidth - (density * 32f).toInt()
+        val presetWidth = ((rowAvailableWidth - (horizontalGap * (presetsPerRow - 1))) / presetsPerRow)
+        binding.speedPresetRows.removeAllViews()
+
+        speeds.chunked(presetsPerRow).forEachIndexed { index, rowSpeeds ->
+            val row = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER
+            }
+            if (index > 0) {
+                row.layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = (density * 8f).toInt()
+                }
+            }
+
+            rowSpeeds.forEachIndexed { chipIndex, speed ->
+                val preset = TextView(requireContext()).apply {
+                    text = formatPreset(speed)
+                    background = requireContext().getDrawable(R.drawable.bg_player_speed_preset)
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    isClickable = true
+                    isFocusable = true
+                    minHeight = (density * 36f).toInt()
+                    minWidth = (density * 72f).toInt()
+                    setTextColor(Color.WHITE)
+                    textSize = 17f
+                    setOnClickListener {
+                        applySpeed(speed)
+                        dismiss()
+                    }
+                }
+
+                row.addView(
+                    preset,
+                    LinearLayout.LayoutParams(
+                        presetWidth,
+                        (density * 38f).toInt()
+                    ).apply {
+                        if (chipIndex > 0) {
+                            marginStart = horizontalGap
+                        }
+                    }
+                )
+            }
+
+            binding.speedPresetRows.addView(row)
+        }
+    }
+
+    private fun formatPreset(speed: Float): String {
+        return if (speed % 1f == 0f) {
+            speed.toInt().toString() + ".0"
+        } else {
+            speed.toString()
+        }
+    }
+
+    private fun applySpeed(speed: Float, save: Boolean = true) {
+        selectedSpeed = speed
+        updateSpeedDisplay(speed)
+        (parentFragment as? PlayerFragment)?.setPlaybackSpeed(speed)
+        if (binding.speedSlider.value != speed) {
+            binding.speedSlider.value = speed
+        }
+        if (save) {
+            saveSpeed(speed)
+        }
+    }
+
     private fun updateSpeedDisplay(speed: Float) {
-        val formattedSpeed = String.format(Locale.US, "%.2fx", speed)
-        binding.currentSpeedText.text = formattedSpeed
-        
-        // Update chip selection visually
-        binding.speedChipGroup.children.forEach { child ->
-            val chip = child as? Chip ?: return@forEach
-            val chipText = chip.text?.toString() ?: return@forEach
-            // Extract number part from "1.0x (Normal)"
-            val chipSpeedStr = chipText.split("x")[0]
-            val chipSpeed = chipSpeedStr.toFloatOrNull()
-            
-            if (chipSpeed != null && abs(chipSpeed - speed) < 0.01f) {
-                chip.isChecked = true
-            } else {
-                chip.isChecked = false
+        selectedSpeed = speed
+        binding.currentSpeedText.text = String.format(Locale.US, "%.2fx", speed)
+
+        binding.speedPresetRows.children.forEach { row ->
+            (row as? ViewGroup)?.children?.forEach { child ->
+                val preset = child as? TextView ?: return@forEach
+                val presetSpeed = preset.text
+                    ?.toString()
+                    ?.toFloatOrNull()
+                preset.isSelected = presetSpeed != null && abs(presetSpeed - speed) < 0.01f
             }
         }
+    }
+
+    private fun getPanelWidth(): Int {
+        val density = resources.displayMetrics.density
+        val maxWidth = (density * 500f).toInt()
+        val horizontalMargin = (density * 40f).toInt()
+        return (resources.displayMetrics.widthPixels - horizontalMargin).coerceAtMost(maxWidth)
     }
 
     private fun saveSpeed(speed: Float) {

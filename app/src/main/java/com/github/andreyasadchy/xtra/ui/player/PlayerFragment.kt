@@ -211,6 +211,25 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setSpeed(formattedSpeed)
     }
 
+    private fun updateQuickPlayerControls() {
+        with(binding.playerControls) {
+            if (requireContext().prefs().getBoolean(C.PLAYER_SETTINGS, true)) {
+                quality.visibility = View.VISIBLE
+                quality.setOnClickListener { showQualityDialog() }
+            } else {
+                quality.visibility = View.GONE
+            }
+
+            if (videoType != STREAM && requireContext().prefs().getBoolean(C.PLAYER_SPEEDBUTTON, true)) {
+                speed.visibility = View.VISIBLE
+                updatePlaybackSpeedUi()
+                speed.setOnClickListener { showSpeedDialog() }
+            } else {
+                speed.visibility = View.GONE
+            }
+        }
+    }
+
     private fun applyMinimizedPlayerVisualState() {
         binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         binding.playerLayout.setBackgroundColor(
@@ -1334,6 +1353,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         toggleFloatingChat.visibility = View.GONE
                 }
             }
+            updateQuickPlayerControls()
         }
     }
 
@@ -1410,13 +1430,24 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun showQualityDialog() {
         val qualities = getQualityMap()
         if (!qualities.isNullOrEmpty()) {
-            RadioButtonDialogFragment.newInstance(
-                REQUEST_CODE_QUALITY,
-                qualities.keys,
-                qualities.values.map { it.name.toString() }.toTypedArray(),
-                qualities.values.indexOf(viewModel.quality)
+            val audioOnly = qualities.entries.find { it.value.name == AUDIO_ONLY_QUALITY }
+            val videoQualities = qualities.filterValues { it.name != AUDIO_ONLY_QUALITY }
+            PlayerQualityDialog.newInstance(
+                videoQualities.keys,
+                videoQualities.values.map { it.name.toString() }.toTypedArray(),
+                videoQualities.values.indexOf(viewModel.quality),
+                audioOnly?.key,
+                audioOnly?.value?.name,
+                viewModel.quality?.name == AUDIO_ONLY_QUALITY
             ).show(childFragmentManager, "closeOnPip")
         }
+    }
+
+    fun selectQualityByName(name: String?) {
+        viewModel.userHasChangedQuality = true
+        changeQuality(viewModel.qualities?.find { it.name == name })
+        changePlayerMode()
+        setQualityText()
     }
 
     fun showSpeedDialog() {
