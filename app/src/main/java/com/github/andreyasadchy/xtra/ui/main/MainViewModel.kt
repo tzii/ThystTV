@@ -18,12 +18,14 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.github.andreyasadchy.xtra.BuildConfig
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.model.VideoPosition
 import com.github.andreyasadchy.xtra.model.ui.Clip
 import com.github.andreyasadchy.xtra.model.ui.Game
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.model.ui.Tag
+import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.model.ui.User
 import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.repository.AuthRepository
@@ -37,6 +39,7 @@ import com.github.andreyasadchy.xtra.ui.login.LoginActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import dagger.Lazy
@@ -49,10 +52,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.chromium.net.CronetEngine
@@ -96,7 +95,7 @@ class MainViewModel @Inject constructor(
     val game = MutableStateFlow<Pair<Game?, String?>?>(null)
     val tag = MutableStateFlow<Tag?>(null)
 
-    val updateUrl = MutableSharedFlow<String?>()
+    val updateUrl = MutableSharedFlow<UpdateInfo?>()
 
     fun loadVideo(videoId: String?, offset: Long?, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean) {
         if (video.value == null) {
@@ -884,7 +883,7 @@ class MainViewModel @Inject constructor(
         TwitchApiHelper.checkedValidation = true
     }
 
-    fun checkUpdates(networkLibrary: String?, url: String, lastChecked: Long) {
+    fun checkUpdates(networkLibrary: String?, url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             updateUrl.emit(
                 try {
@@ -914,15 +913,7 @@ class MainViewModel @Inject constructor(
                             }
                         }
                     }
-                    response["assets"]?.jsonArray?.find {
-                        it.jsonObject.getValue("content_type").jsonPrimitive.contentOrNull == "application/vnd.android.package-archive"
-                    }?.jsonObject?.let { obj ->
-                        obj.getValue("updated_at").jsonPrimitive.contentOrNull?.let { TwitchApiHelper.parseIso8601DateUTC(it) }?.let {
-                            if (it > lastChecked) {
-                                obj.getValue("browser_download_url").jsonPrimitive.contentOrNull
-                            } else null
-                        }
-                    }
+                    UpdateUtils.getAvailableUpdate(response, BuildConfig.VERSION_NAME)
                 } catch (e: Exception) {
                     null
                 }

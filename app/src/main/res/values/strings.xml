@@ -589,11 +589,16 @@
     <string name="no_updates_found">No updates found</string>
     <string name="update_available">Update available</string>
     <string name="update_message">Download latest update?</string>
+    <string name="update_release_message" translatable="false">%1$s\n%2$s\n\n%3$s</string>
     <string name="update_url">Update check URL</string>
     <string name="update_using_browser">Open update link in browser</string>
     <string name="auto_check_updates">Check for updates on startup</string>
     <string name="update_check_frequency">Update check frequency</string>
     <string name="update_check_frequency_summary">Every %s days</string>
+    <string name="later" translatable="false">Later</string>
+    <string name="view_on_github" translatable="false">View on GitHub</string>
+    <string name="unknown" translatable="false">Unknown</string>
+    <string name="no_release_notes" translatable="false">No release notes provided.</string>
     <string name="notification_live_channel_title">Live notifications</string>
     <string name="live_notification">%s is live</string>
     <string name="live_notifications">Live notifications</string>

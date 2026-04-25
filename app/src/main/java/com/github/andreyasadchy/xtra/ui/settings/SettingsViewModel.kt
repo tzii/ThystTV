@@ -21,8 +21,10 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.github.andreyasadchy.xtra.BuildConfig
 import com.github.andreyasadchy.xtra.db.AppDatabase
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
+import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.repository.GraphQLRepository
 import com.github.andreyasadchy.xtra.repository.HelixRepository
 import com.github.andreyasadchy.xtra.repository.NotificationUsersRepository
@@ -35,6 +37,7 @@ import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
 import com.github.andreyasadchy.xtra.util.m3u8.PlaylistUtils
 import com.github.andreyasadchy.xtra.util.m3u8.Segment
@@ -47,10 +50,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.chromium.net.CronetEngine
@@ -83,7 +82,7 @@ class SettingsViewModel @Inject constructor(
     private val json: Json,
 ) : ViewModel() {
 
-    val updateUrl = MutableSharedFlow<String?>()
+    val updateUrl = MutableSharedFlow<UpdateInfo?>()
 
     fun deletePositions() {
         viewModelScope.launch {
@@ -271,7 +270,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun checkUpdates(networkLibrary: String?, url: String, lastChecked: Long) {
+    fun checkUpdates(networkLibrary: String?, url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             updateUrl.emit(
                 try {
@@ -301,15 +300,7 @@ class SettingsViewModel @Inject constructor(
                             }
                         }
                     }
-                    response["assets"]?.jsonArray?.find {
-                        it.jsonObject.getValue("content_type").jsonPrimitive.contentOrNull == "application/vnd.android.package-archive"
-                    }?.jsonObject?.let { obj ->
-                        obj.getValue("updated_at").jsonPrimitive.contentOrNull?.let { TwitchApiHelper.parseIso8601DateUTC(it) }?.let {
-                            if (it > lastChecked) {
-                                obj.getValue("browser_download_url").jsonPrimitive.contentOrNull
-                            } else null
-                        }
-                    }
+                    UpdateUtils.getAvailableUpdate(response, BuildConfig.VERSION_NAME)
                 } catch (e: Exception) {
                     null
                 }

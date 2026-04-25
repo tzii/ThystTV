@@ -62,6 +62,7 @@ import com.github.andreyasadchy.xtra.databinding.ActivityMainBinding
 import com.github.andreyasadchy.xtra.model.ui.Clip
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.model.ui.Stream
+import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
@@ -77,6 +78,7 @@ import com.github.andreyasadchy.xtra.ui.team.TeamFragmentDirections
 import com.github.andreyasadchy.xtra.ui.top.TopStreamsFragmentDirections
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.applyTheme
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.prefs
@@ -248,8 +250,7 @@ class MainActivity : AppCompatActivity() {
                                 ) {
                                     viewModel.checkUpdates(
                                         prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
-                                        prefs.getString(C.UPDATE_URL, null) ?: "https://api.github.com/repos/crackededed/xtra/releases/tags/latest",
-                                        tokenPrefs().getLong(C.UPDATE_LAST_CHECKED, 0)
+                                        UpdateUtils.resolveReleaseApiUrl(prefs.getString(C.UPDATE_URL, null))
                                     )
                                 }
                             }
@@ -263,32 +264,7 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.updateUrl.collectLatest {
                     if (it != null) {
-                        getAlertDialogBuilder()
-                            .setTitle(getString(R.string.update_available))
-                            .setMessage(getString(R.string.update_message))
-                            .setPositiveButton(getString(R.string.yes)) { _, _ ->
-                                if (prefs.getBoolean(C.UPDATE_USE_BROWSER, false)) {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_VIEW, it.toUri()).apply {
-                                            addCategory(Intent.CATEGORY_BROWSABLE)
-                                        }
-                                        startActivity(intent)
-                                        tokenPrefs().edit {
-                                            putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
-                                        }
-                                    } catch (e: ActivityNotFoundException) {
-                                        Toast.makeText(this@MainActivity, R.string.no_browser_found, Toast.LENGTH_LONG).show()
-                                    }
-                                } else {
-                                    viewModel.downloadUpdate(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), it)
-                                }
-                            }
-                            .setNegativeButton(getString(R.string.no)) { _, _ ->
-                                tokenPrefs().edit {
-                                    putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
-                                }
-                            }
-                            .show()
+                        showUpdateDialog(it)
                     }
                 }
             }
@@ -494,6 +470,55 @@ class MainActivity : AppCompatActivity() {
             },
             ActivityOptions.makeCustomAnimation(this, 0, 0).toBundle()
         )
+    }
+
+    private fun showUpdateDialog(updateInfo: UpdateInfo) {
+        getAlertDialogBuilder()
+            .setTitle(getString(R.string.update_available))
+            .setMessage(getUpdateMessage(updateInfo))
+            .setPositiveButton(getString(R.string.download)) { _, _ ->
+                if (prefs.getBoolean(C.UPDATE_USE_BROWSER, false)) {
+                    openUpdateUrl(updateInfo.downloadUrl, markChecked = true)
+                } else {
+                    tokenPrefs().edit {
+                        putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                    }
+                    viewModel.downloadUpdate(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), updateInfo.downloadUrl)
+                }
+            }
+            .setNegativeButton(getString(R.string.later)) { _, _ ->
+                tokenPrefs().edit {
+                    putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                }
+            }
+            .setNeutralButton(getString(R.string.view_on_github)) { _, _ ->
+                updateInfo.releaseUrl?.let { openUpdateUrl(it, markChecked = false) }
+            }
+            .show()
+    }
+
+    private fun getUpdateMessage(updateInfo: UpdateInfo): String {
+        val releaseDate = updateInfo.publishedAt?.substringBefore("T")?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.unknown)
+        val releaseNotes = updateInfo.releaseNotes?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.no_release_notes)
+        return getString(R.string.update_release_message, updateInfo.tagName, releaseDate, releaseNotes)
+    }
+
+    private fun openUpdateUrl(url: String, markChecked: Boolean) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+            }
+            startActivity(intent)
+            if (markChecked) {
+                tokenPrefs().edit {
+                    putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                }
+            }
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.no_browser_found, Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onUserLeaveHint() {

@@ -63,9 +63,11 @@ import com.github.andreyasadchy.xtra.SettingsNavGraphDirections
 import com.github.andreyasadchy.xtra.databinding.ActivitySettingsBinding
 import com.github.andreyasadchy.xtra.model.ui.SettingsDragListItem
 import com.github.andreyasadchy.xtra.model.ui.SettingsSearchItem
+import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.applyTheme
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.prefs
@@ -406,8 +408,7 @@ class SettingsActivity : AppCompatActivity() {
             findPreference<Preference>("check_updates")?.setOnPreferenceClickListener {
                 viewModel.checkUpdates(
                     requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
-                    requireContext().prefs().getString(C.UPDATE_URL, null) ?: "https://api.github.com/repos/crackededed/xtra/releases/tags/latest",
-                    requireContext().tokenPrefs().getLong(C.UPDATE_LAST_CHECKED, 0)
+                    UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
                 )
                 true
             }
@@ -480,33 +481,61 @@ class SettingsActivity : AppCompatActivity() {
 
                                 }
                             }
-                            requireActivity().getAlertDialogBuilder()
-                                .setTitle(getString(R.string.update_available))
-                                .setMessage(getString(R.string.update_message))
-                                .setPositiveButton(getString(R.string.yes)) { _, _ ->
-                                    if (requireContext().prefs().getBoolean(C.UPDATE_USE_BROWSER, false)) {
-                                        try {
-                                            val intent = Intent(Intent.ACTION_VIEW, it.toUri()).apply {
-                                                addCategory(Intent.CATEGORY_BROWSABLE)
-                                            }
-                                            startActivity(intent)
-                                            requireContext().tokenPrefs().edit {
-                                                putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
-                                            }
-                                        } catch (e: ActivityNotFoundException) {
-                                            Toast.makeText(requireContext(), R.string.no_browser_found, Toast.LENGTH_LONG).show()
-                                        }
-                                    } else {
-                                        viewModel.downloadUpdate(requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), it)
-                                    }
-                                }
-                                .setNegativeButton(getString(R.string.no), null)
-                                .show()
+                            showUpdateDialog(it)
                         } else {
                             Toast.makeText(requireContext(), R.string.no_updates_found, Toast.LENGTH_LONG).show()
                         }
                     }
                 }
+            }
+        }
+
+        private fun showUpdateDialog(updateInfo: UpdateInfo) {
+            requireActivity().getAlertDialogBuilder()
+                .setTitle(getString(R.string.update_available))
+                .setMessage(getUpdateMessage(updateInfo))
+                .setPositiveButton(getString(R.string.download)) { _, _ ->
+                    if (requireContext().prefs().getBoolean(C.UPDATE_USE_BROWSER, false)) {
+                        openUpdateUrl(updateInfo.downloadUrl, markChecked = true)
+                    } else {
+                        requireContext().tokenPrefs().edit {
+                            putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                        }
+                        viewModel.downloadUpdate(requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), updateInfo.downloadUrl)
+                    }
+                }
+                .setNegativeButton(getString(R.string.later)) { _, _ ->
+                    requireContext().tokenPrefs().edit {
+                        putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                    }
+                }
+                .setNeutralButton(getString(R.string.view_on_github)) { _, _ ->
+                    updateInfo.releaseUrl?.let { openUpdateUrl(it, markChecked = false) }
+                }
+                .show()
+        }
+
+        private fun getUpdateMessage(updateInfo: UpdateInfo): String {
+            val releaseDate = updateInfo.publishedAt?.substringBefore("T")?.takeIf { it.isNotBlank() }
+                ?: getString(R.string.unknown)
+            val releaseNotes = updateInfo.releaseNotes?.takeIf { it.isNotBlank() }
+                ?: getString(R.string.no_release_notes)
+            return getString(R.string.update_release_message, updateInfo.tagName, releaseDate, releaseNotes)
+        }
+
+        private fun openUpdateUrl(url: String, markChecked: Boolean) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                }
+                startActivity(intent)
+                if (markChecked) {
+                    requireContext().tokenPrefs().edit {
+                        putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                    }
+                }
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(requireContext(), R.string.no_browser_found, Toast.LENGTH_LONG).show()
             }
         }
     }
