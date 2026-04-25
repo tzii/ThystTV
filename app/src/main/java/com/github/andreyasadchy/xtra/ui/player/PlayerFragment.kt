@@ -1430,59 +1430,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun showQualityDialog() {
         val qualities = getQualityMap()
         if (!qualities.isNullOrEmpty()) {
-            val videoQualities = linkedMapOf<CharSequence, VideoQuality>()
-            val modeQualities = linkedMapOf<String, Pair<CharSequence, String>>()
-            qualities.forEach { (label, quality) ->
-                val modeName = getSpecialQualityMode(label, quality)
-                if (modeName != null) {
-                    val tag = quality.name ?: return@forEach
-                    val existing = modeQualities[modeName]
-                    if (existing == null || tag == modeName) {
-                        modeQualities[modeName] = label to tag
-                    }
-                } else {
-                    videoQualities[label] = quality
-                }
-            }
-            val orderedModes = listOf(AUDIO_ONLY_QUALITY, CHAT_ONLY_QUALITY)
-                .mapNotNull { modeQualities[it] }
-            PlayerQualityDialog.newInstance(
-                videoQualities.keys,
-                videoQualities.values.map { it.name.toString() }.toTypedArray(),
-                videoQualities.values.indexOf(viewModel.quality),
-                orderedModes.map { it.first },
-                orderedModes.map { it.second }.toTypedArray(),
-                orderedModes.indexOfFirst { it.second == viewModel.quality?.name }
+            RadioButtonDialogFragment.newInstance(
+                REQUEST_CODE_QUALITY,
+                qualities.keys,
+                qualities.values.map { it.name.toString() }.toTypedArray(),
+                qualities.values.indexOf(viewModel.quality)
             ).show(childFragmentManager, "closeOnPip")
         }
-    }
-
-    private fun getSpecialQualityMode(label: CharSequence, quality: VideoQuality): String? {
-        val normalizedName = quality.name?.normalizeQualityMode()
-        if (normalizedName == AUDIO_ONLY_QUALITY || normalizedName == CHAT_ONLY_QUALITY) {
-            return normalizedName
-        }
-
-        val normalizedLabel = label.toString().normalizeQualityMode()
-        return when (normalizedLabel) {
-            AUDIO_ONLY_QUALITY, getString(R.string.audio_only).normalizeQualityMode() -> AUDIO_ONLY_QUALITY
-            CHAT_ONLY_QUALITY, getString(R.string.chat_only).normalizeQualityMode() -> CHAT_ONLY_QUALITY
-            else -> null
-        }
-    }
-
-    private fun String.normalizeQualityMode(): String {
-        return trim()
-            .lowercase(Locale.US)
-            .replace("-", "_")
-            .replace(" ", "_")
-    }
-
-    fun selectQualityByName(name: String?) {
-        viewModel.userHasChangedQuality = true
-        changeQuality(viewModel.qualities?.find { it.name == name })
-        changePlayerMode()
-        setQualityText()
     }
 
     fun showSpeedDialog() {
