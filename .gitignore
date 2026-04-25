@@ -51,6 +51,7 @@ Thumbs.db
 .opencode/
 .gradle-user/
 .kotlin/
+.superpowers/
 
 ### Fastlane local artifacts
 fastlane/report.xml
