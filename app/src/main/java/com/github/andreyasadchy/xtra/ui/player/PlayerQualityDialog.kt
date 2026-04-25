@@ -24,26 +24,26 @@ class PlayerQualityDialog : BottomSheetDialogFragment() {
         private const val LABELS = "labels"
         private const val TAGS = "tags"
         private const val CHECKED = "checked"
-        private const val AUDIO_LABEL = "audio_label"
-        private const val AUDIO_TAG = "audio_tag"
-        private const val AUDIO_CHECKED = "audio_checked"
+        private const val MODE_LABELS = "mode_labels"
+        private const val MODE_TAGS = "mode_tags"
+        private const val MODE_CHECKED = "mode_checked"
 
         fun newInstance(
             labels: Collection<CharSequence>,
             tags: Array<String>,
             checkedIndex: Int,
-            audioLabel: CharSequence?,
-            audioTag: String?,
-            audioChecked: Boolean
+            modeLabels: Collection<CharSequence>,
+            modeTags: Array<String>,
+            checkedModeIndex: Int
         ): PlayerQualityDialog {
             return PlayerQualityDialog().apply {
                 arguments = bundleOf(
                     LABELS to ArrayList(labels),
                     TAGS to tags,
                     CHECKED to checkedIndex,
-                    AUDIO_LABEL to audioLabel,
-                    AUDIO_TAG to audioTag,
-                    AUDIO_CHECKED to audioChecked
+                    MODE_LABELS to ArrayList(modeLabels),
+                    MODE_TAGS to modeTags,
+                    MODE_CHECKED to checkedModeIndex
                 )
             }
         }
@@ -68,14 +68,14 @@ class PlayerQualityDialog : BottomSheetDialogFragment() {
         val labels = requireArguments().getCharSequenceArrayList(LABELS).orEmpty()
         val tags = requireArguments().getStringArray(TAGS)?.toList().orEmpty()
         val checkedIndex = requireArguments().getInt(CHECKED, -1)
-        val audioLabel = requireArguments().getCharSequence(AUDIO_LABEL)
-        val audioTag = requireArguments().getString(AUDIO_TAG)
-        val audioChecked = requireArguments().getBoolean(AUDIO_CHECKED, false)
+        val modeLabels = requireArguments().getCharSequenceArrayList(MODE_LABELS).orEmpty()
+        val modeTags = requireArguments().getStringArray(MODE_TAGS)?.toList().orEmpty()
+        val checkedModeIndex = requireArguments().getInt(MODE_CHECKED, -1)
         binding.qualityPanel.layoutParams = binding.qualityPanel.layoutParams.apply {
             width = getPanelWidth()
         }
         buildQualityRows(labels, tags, checkedIndex)
-        bindAudioOnlyOption(audioLabel, audioTag, audioChecked)
+        buildModeRows(modeLabels, modeTags, checkedModeIndex)
     }
 
     private fun makeSheetFloat() {
@@ -155,15 +155,70 @@ class PlayerQualityDialog : BottomSheetDialogFragment() {
         }
     }
 
-    private fun bindAudioOnlyOption(label: CharSequence?, tag: String?, checked: Boolean) {
-        with(binding.audioOnlyOption) {
-            isVisible = !label.isNullOrBlank() && !tag.isNullOrBlank()
-            text = label
-            isSelected = checked
-            setOnClickListener {
-                (parentFragment as? PlayerFragment)?.selectQualityByName(tag)
-                dismiss()
+    private fun buildModeRows(labels: List<CharSequence>, tags: List<String>, checkedIndex: Int) {
+        val validLabels = labels.take(tags.size)
+        binding.qualityModeRows.removeAllViews()
+        binding.qualityModeRows.isVisible = validLabels.isNotEmpty()
+        if (validLabels.isEmpty()) {
+            return
+        }
+
+        val density = resources.displayMetrics.density
+        val panelWidth = getPanelWidth()
+        val modesPerRow = if (panelWidth < density * 360f || validLabels.size == 1) 1 else 2
+        val horizontalGap = (density * 8f).toInt()
+        val rowAvailableWidth = panelWidth - (density * 32f).toInt()
+        val optionWidth = ((rowAvailableWidth - (horizontalGap * (modesPerRow - 1))) / modesPerRow)
+
+        validLabels.chunked(modesPerRow).forEachIndexed { rowIndex, rowLabels ->
+            val row = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
             }
+            if (rowIndex > 0) {
+                row.layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = (density * 8f).toInt()
+                }
+            }
+
+            rowLabels.forEachIndexed { columnIndex, label ->
+                val optionIndex = rowIndex * modesPerRow + columnIndex
+                val option = TextView(requireContext()).apply {
+                    text = label
+                    background = requireContext().getDrawable(R.drawable.bg_player_speed_preset)
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    isClickable = true
+                    isFocusable = true
+                    isSelected = optionIndex == checkedIndex
+                    maxLines = 1
+                    minHeight = (density * 36f).toInt()
+                    setTextColor(Color.WHITE)
+                    textSize = 15f
+                    setOnClickListener {
+                        (parentFragment as? PlayerFragment)?.selectQualityByName(tags.getOrNull(optionIndex))
+                        dismiss()
+                    }
+                }
+
+                row.addView(
+                    option,
+                    LinearLayout.LayoutParams(
+                        optionWidth,
+                        (density * 38f).toInt()
+                    ).apply {
+                        if (columnIndex > 0) {
+                            marginStart = horizontalGap
+                        }
+                    }
+                )
+            }
+
+            binding.qualityModeRows.addView(row)
         }
     }
 
