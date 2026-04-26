@@ -1440,10 +1440,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     fun showSpeedDialog() {
-        val speed = getCurrentSpeed()
-        if (speed != null) {
-            PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
-        }
+        val speed = PlayerSpeedDialogState.initialSpeed(
+            currentSpeed = getCurrentSpeed(),
+            savedSpeed = requireContext().prefs().getFloat(C.PLAYER_SPEED, 1f)
+        )
+        PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
     }
 
     fun showVolumeDialog() {

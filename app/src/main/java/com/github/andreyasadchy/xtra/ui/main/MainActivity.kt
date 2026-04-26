@@ -500,7 +500,7 @@ class MainActivity : AppCompatActivity() {
     private fun getUpdateMessage(updateInfo: UpdateInfo): String {
         val releaseDate = updateInfo.publishedAt?.substringBefore("T")?.takeIf { it.isNotBlank() }
             ?: getString(R.string.unknown)
-        val releaseNotes = updateInfo.releaseNotes?.takeIf { it.isNotBlank() }
+        val releaseNotes = updateInfo.releaseNotes?.takeIf { it.isNotBlank() }?.let(UpdateUtils::formatReleaseNotes)
             ?: getString(R.string.no_release_notes)
         return getString(R.string.update_release_message, updateInfo.tagName, releaseDate, releaseNotes)
     }

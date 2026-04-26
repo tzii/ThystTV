@@ -97,6 +97,38 @@ class UpdateUtilsTest {
         assertEquals(customUrl, UpdateUtils.resolveReleaseApiUrl(customUrl))
     }
 
+    @Test
+    fun `release notes formatter converts github markdown to dialog text`() {
+        val markdown = """
+            ## app [2.5.1](https://github.com/ReVanced/revanced-manager/compare/v2.5.0...v2.5.1) (2026-03-24)
+
+            ### Bug Fixes
+
+            * Don't show update screen when there's no update ([f10cda0](https://github.com/ReVanced/revanced-manager/commit/f10cda0bc6ab82eb3085ebee8e05f0dd90b477b6))
+            * Update screen padding ([6ba6a6e](https://github.com/ReVanced/revanced-manager/commit/6ba6a6e28bb6a2c228d251e18c9246e291dc1316))
+        """.trimIndent()
+
+        assertEquals(
+            """
+            app 2.5.1 (2026-03-24)
+
+            Bug Fixes
+
+            ${"\u2022"} Don't show update screen when there's no update (f10cda0)
+            ${"\u2022"} Update screen padding (6ba6a6e)
+            """.trimIndent(),
+            UpdateUtils.formatReleaseNotes(markdown)
+        )
+    }
+
+    @Test
+    fun `release notes formatter removes common markdown emphasis and code`() {
+        assertEquals(
+            "Added custom URL handling and updater prompt polish.",
+            UpdateUtils.formatReleaseNotes("Added **custom URL** handling and `updater prompt` polish.")
+        )
+    }
+
     private fun releaseJson(
         tagName: String,
         name: String = "ThystTV $tagName",

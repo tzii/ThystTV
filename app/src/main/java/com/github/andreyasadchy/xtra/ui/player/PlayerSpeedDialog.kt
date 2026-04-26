@@ -1,15 +1,18 @@
 package com.github.andreyasadchy.xtra.ui.player
 
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.app.Dialog
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
+import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.fragment.app.DialogFragment
 import androidx.core.content.edit
 import androidx.core.os.bundleOf
 import androidx.core.view.children
@@ -17,13 +20,11 @@ import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.DialogPlayerSpeedBinding
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
-import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.slider.Slider
 import java.util.Locale
 import kotlin.math.abs
 
-class PlayerSpeedDialog : BottomSheetDialogFragment() {
+class PlayerSpeedDialog : DialogFragment() {
 
     companion object {
         private const val SPEED = "speed"
@@ -44,6 +45,13 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
     private val binding get() = _binding!!
     private var selectedSpeed = 1f
 
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        return Dialog(requireContext()).apply {
+            requestWindowFeature(Window.FEATURE_NO_TITLE)
+            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        }
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = DialogPlayerSpeedBinding.inflate(inflater, container, false)
         return binding.root
@@ -54,22 +62,6 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
 
         dialog?.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog?.window?.setDimAmount(0f)
-
-        val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
-        bottomSheet?.apply {
-            background = ColorDrawable(Color.TRANSPARENT)
-            backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
-            layoutParams = layoutParams.apply {
-                width = ViewGroup.LayoutParams.WRAP_CONTENT
-                height = ViewGroup.LayoutParams.WRAP_CONTENT
-            }
-            (layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-            (layoutParams as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams)?.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-        }
-
-        val behavior = BottomSheetBehavior.from(view.parent as View)
-        behavior.skipCollapsed = true
-        behavior.state = BottomSheetBehavior.STATE_EXPANDED
 
         with(binding) {
             speedPanel.layoutParams = speedPanel.layoutParams.apply {
@@ -99,6 +91,16 @@ class PlayerSpeedDialog : BottomSheetDialogFragment() {
             btnIncreaseSpeed.setOnClickListener {
                 applySpeed((selectedSpeed + SPEED_STEP).coerceAtMost(MAX_SPEED))
             }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setDimAmount(0f)
+            setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT)
         }
     }
 

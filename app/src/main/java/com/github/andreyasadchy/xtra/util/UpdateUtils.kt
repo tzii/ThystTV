@@ -11,6 +11,11 @@ object UpdateUtils {
 
     const val DEFAULT_RELEASE_API_URL = "https://api.github.com/repos/tzii/ThystTV/releases/latest"
     private const val LEGACY_XTRA_RELEASE_API_URL = "https://api.github.com/repos/crackededed/xtra/releases/tags/latest"
+    private val markdownLink = Regex("""\[([^\]]+)]\(([^)]+)\)""")
+    private val headingPrefix = Regex("""^#{1,6}\s+""")
+    private val unorderedListPrefix = Regex("""^\s*[-*+]\s+""")
+    private val orderedListPrefix = Regex("""^\s*\d+[.)]\s+""")
+    private val emphasisMarkers = Regex("""(\*\*|__|\*|_|`)""")
 
     fun resolveReleaseApiUrl(preferredUrl: String?): String {
         return preferredUrl
@@ -54,6 +59,26 @@ object UpdateUtils {
             }
         }
         return false
+    }
+
+    fun formatReleaseNotes(releaseNotes: String): String {
+        return releaseNotes
+            .lineSequence()
+            .map { line ->
+                var formatted = line.trimEnd()
+                    .replace(markdownLink) { match -> match.groupValues[1] }
+                formatted = headingPrefix.replace(formatted, "")
+                formatted = if (unorderedListPrefix.containsMatchIn(formatted)) {
+                    unorderedListPrefix.replace(formatted, "\u2022 ")
+                } else {
+                    orderedListPrefix.replace(formatted, "")
+                }
+                formatted = formatted.replace(emphasisMarkers, "")
+                formatted.trimEnd()
+            }
+            .joinToString("\n")
+            .replace(Regex("""\n{3,}"""), "\n\n")
+            .trim()
     }
 
     private fun normalizeVersionName(version: String): String {
