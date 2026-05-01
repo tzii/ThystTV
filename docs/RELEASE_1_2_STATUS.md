@@ -12,6 +12,7 @@ Branch: `release/1.2-prep`
 - Screenshots are still missing from the README and site. This is now one of the clearest remaining visual gaps before 1.2 feels polished.
 - The app already has an update-checking path, but it still needs ThystTV-specific polish: the default update source should point to ThystTV releases, update detection should compare release versions instead of relying only on asset timestamps, and the changelog/release notes should be visible in-app.
 - The latest Xtra upstream commits were reviewed at a high level and should not be merged blindly. Several are broad network/player/data-source refactors that could easily regress the player work already done on this branch.
+- The detailed upstream commit ledger for this branch is in `docs/RELEASE_1_2_UPSTREAM_COMMITS.md`.
 
 ## Latest Xtra commits reviewed
 

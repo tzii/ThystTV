@@ -31,6 +31,8 @@ That means:
 - list the retest areas
 - note any manual conflict resolution
 
+For the current 1.2 branch ledger, see `docs/RELEASE_1_2_UPSTREAM_COMMITS.md`.
+
 ## Minimum retest areas
 - live stream playback
 - VoD playback
