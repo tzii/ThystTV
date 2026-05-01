@@ -81,6 +81,13 @@ object UpdateUtils {
             .trim()
     }
 
+    fun downloadProgressPercent(bytesRead: Long, totalBytes: Long?): Int? {
+        val total = totalBytes?.takeIf { it > 0L } ?: return null
+        return ((bytesRead.coerceAtLeast(0L).toDouble() / total) * 100)
+            .toInt()
+            .coerceIn(0, 100)
+    }
+
     private fun normalizeVersionName(version: String): String {
         return version.trim()
             .removePrefix("v")

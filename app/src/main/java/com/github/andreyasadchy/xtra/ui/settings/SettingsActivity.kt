@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.ext.SdkExtensions
 import android.provider.Settings
+import android.text.format.Formatter
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -22,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SearchView
@@ -61,6 +63,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.SettingsNavGraphDirections
 import com.github.andreyasadchy.xtra.databinding.ActivitySettingsBinding
+import com.github.andreyasadchy.xtra.databinding.DialogUpdateDownloadBinding
 import com.github.andreyasadchy.xtra.model.ui.SettingsDragListItem
 import com.github.andreyasadchy.xtra.model.ui.SettingsSearchItem
 import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
@@ -255,6 +258,8 @@ class SettingsActivity : AppCompatActivity() {
         private val viewModel: SettingsViewModel by activityViewModels()
         private var backupResultLauncher: ActivityResultLauncher<Intent>? = null
         private var restoreResultLauncher: ActivityResultLauncher<Intent>? = null
+        private var updateDownloadDialogBinding: DialogUpdateDownloadBinding? = null
+        private var updateDownloadDialog: AlertDialog? = null
 
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
@@ -488,6 +493,22 @@ class SettingsActivity : AppCompatActivity() {
                     }
                 }
             }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.updateProgress.collectLatest { bytesRead ->
+                        updateDownloadDialogBinding?.let { binding ->
+                            updateDownloadDialogText(binding, bytesRead)
+                        }
+                    }
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.closeUpdateDialog.collectLatest {
+                        updateDownloadDialog?.dismiss()
+                    }
+                }
+            }
         }
 
         private fun showUpdateDialog(updateInfo: UpdateInfo) {
@@ -501,7 +522,7 @@ class SettingsActivity : AppCompatActivity() {
                         requireContext().tokenPrefs().edit {
                             putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
                         }
-                        viewModel.downloadUpdate(requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), updateInfo.downloadUrl)
+                        showUpdateDownloadDialog(updateInfo.downloadUrl)
                     }
                 }
                 .setNegativeButton(getString(R.string.later)) { _, _ ->
@@ -513,6 +534,39 @@ class SettingsActivity : AppCompatActivity() {
                     updateInfo.releaseUrl?.let { openUpdateUrl(it, markChecked = false) }
                 }
                 .show()
+        }
+
+        private fun showUpdateDownloadDialog(downloadUrl: String) {
+            val binding = DialogUpdateDownloadBinding.inflate(layoutInflater)
+            updateDownloadDialogBinding = binding
+            updateDownloadDialogText(binding, 0L)
+            viewModel.downloadUpdate(requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), downloadUrl)
+            updateDownloadDialog = requireActivity().getAlertDialogBuilder()
+                .setView(binding.root)
+                .setNegativeButton(getString(android.R.string.cancel), null)
+                .setOnDismissListener {
+                    viewModel.updateJob?.cancel()
+                    updateDownloadDialogBinding = null
+                    updateDownloadDialog = null
+                }
+                .show()
+        }
+
+        private fun updateDownloadDialogText(binding: DialogUpdateDownloadBinding, bytesRead: Long) {
+            val size = viewModel.updateSize
+            val percent = UpdateUtils.downloadProgressPercent(bytesRead, size)
+            if (size != null && percent != null) {
+                binding.textView.text = getString(
+                    R.string.downloading_update_progress,
+                    Formatter.formatFileSize(requireContext(), bytesRead),
+                    Formatter.formatFileSize(requireContext(), size),
+                )
+                binding.progressBar.isIndeterminate = false
+                binding.progressBar.progress = percent
+            } else {
+                binding.textView.text = getString(R.string.downloading_update)
+                binding.progressBar.isIndeterminate = true
+            }
         }
 
         private fun getUpdateMessage(updateInfo: UpdateInfo): String {

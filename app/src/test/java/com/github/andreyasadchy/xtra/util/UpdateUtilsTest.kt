@@ -129,6 +129,19 @@ class UpdateUtilsTest {
         )
     }
 
+    @Test
+    fun `download progress percent clamps to valid range`() {
+        assertEquals(0, UpdateUtils.downloadProgressPercent(0, 100))
+        assertEquals(42, UpdateUtils.downloadProgressPercent(42, 100))
+        assertEquals(100, UpdateUtils.downloadProgressPercent(150, 100))
+    }
+
+    @Test
+    fun `download progress percent returns null without known total`() {
+        assertNull(UpdateUtils.downloadProgressPercent(42, null))
+        assertNull(UpdateUtils.downloadProgressPercent(42, 0))
+    }
+
     private fun releaseJson(
         tagName: String,
         name: String = "ThystTV $tagName",

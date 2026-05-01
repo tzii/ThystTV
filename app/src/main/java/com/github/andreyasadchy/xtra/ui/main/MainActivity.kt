@@ -21,6 +21,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.text.format.Formatter
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
@@ -29,6 +30,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.OptIn
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
@@ -59,6 +61,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.ActivityMainBinding
+import com.github.andreyasadchy.xtra.databinding.DialogUpdateDownloadBinding
 import com.github.andreyasadchy.xtra.model.ui.Clip
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.model.ui.Stream
@@ -141,6 +144,8 @@ class MainActivity : AppCompatActivity() {
     var settingsResultLauncher: ActivityResultLauncher<Intent>? = null
     var loginResultLauncher: ActivityResultLauncher<Intent>? = null
     var logoutResultLauncher: ActivityResultLauncher<Intent>? = null
+    private var updateDownloadDialogBinding: DialogUpdateDownloadBinding? = null
+    private var updateDownloadDialog: AlertDialog? = null
 
     //Lifecycle methods
 
@@ -266,6 +271,22 @@ class MainActivity : AppCompatActivity() {
                     if (it != null) {
                         showUpdateDialog(it)
                     }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.updateProgress.collectLatest { bytesRead ->
+                    updateDownloadDialogBinding?.let { binding ->
+                        updateDownloadDialogText(binding, bytesRead)
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.closeUpdateDialog.collectLatest {
+                    updateDownloadDialog?.dismiss()
                 }
             }
         }
@@ -483,7 +504,7 @@ class MainActivity : AppCompatActivity() {
                     tokenPrefs().edit {
                         putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
                     }
-                    viewModel.downloadUpdate(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), updateInfo.downloadUrl)
+                    showUpdateDownloadDialog(updateInfo.downloadUrl)
                 }
             }
             .setNegativeButton(getString(R.string.later)) { _, _ ->
@@ -495,6 +516,39 @@ class MainActivity : AppCompatActivity() {
                 updateInfo.releaseUrl?.let { openUpdateUrl(it, markChecked = false) }
             }
             .show()
+    }
+
+    private fun showUpdateDownloadDialog(downloadUrl: String) {
+        val binding = DialogUpdateDownloadBinding.inflate(layoutInflater)
+        updateDownloadDialogBinding = binding
+        updateDownloadDialogText(binding, 0L)
+        viewModel.downloadUpdate(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), downloadUrl)
+        updateDownloadDialog = getAlertDialogBuilder()
+            .setView(binding.root)
+            .setNegativeButton(getString(android.R.string.cancel), null)
+            .setOnDismissListener {
+                viewModel.updateJob?.cancel()
+                updateDownloadDialogBinding = null
+                updateDownloadDialog = null
+            }
+            .show()
+    }
+
+    private fun updateDownloadDialogText(binding: DialogUpdateDownloadBinding, bytesRead: Long) {
+        val size = viewModel.updateSize
+        val percent = UpdateUtils.downloadProgressPercent(bytesRead, size)
+        if (size != null && percent != null) {
+            binding.textView.text = getString(
+                R.string.downloading_update_progress,
+                Formatter.formatFileSize(this, bytesRead),
+                Formatter.formatFileSize(this, size),
+            )
+            binding.progressBar.isIndeterminate = false
+            binding.progressBar.progress = percent
+        } else {
+            binding.textView.text = getString(R.string.downloading_update)
+            binding.progressBar.isIndeterminate = true
+        }
     }
 
     private fun getUpdateMessage(updateInfo: UpdateInfo): String {

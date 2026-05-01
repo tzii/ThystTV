@@ -590,6 +590,8 @@
     <string name="update_available">Update available</string>
     <string name="update_message">Download latest update?</string>
     <string name="update_release_message" translatable="false">%1$s\n%2$s\n\n%3$s</string>
+    <string name="downloading_update">Downloading update...</string>
+    <string name="downloading_update_progress">Downloading update: %1$s / %2$s</string>
     <string name="update_url">Update check URL</string>
     <string name="update_using_browser">Open update link in browser</string>
     <string name="auto_check_updates">Check for updates on startup</string>

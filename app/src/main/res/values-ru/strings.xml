@@ -568,6 +568,8 @@
     <string name="no_updates_found">Обновления не найдены</string>
     <string name="update_available">Доступно обновление</string>
     <string name="update_message">Скачать последнее обновление?</string>
+    <string name="downloading_update">Загрузка обновления...</string>
+    <string name="downloading_update_progress">Загрузка обновления: %1$s / %2$s</string>
     <string name="update_url">Адрес проверки обновления</string>
     <string name="update_using_browser">Открыть адрес обновления в браузере</string>
     <string name="auto_check_updates">Проверять обновления при запуске</string>

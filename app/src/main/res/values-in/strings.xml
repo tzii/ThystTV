@@ -569,6 +569,8 @@
     <string name="no_updates_found">No updates found</string>
     <string name="update_available">Update available</string>
     <string name="update_message">Download latest update?</string>
+    <string name="downloading_update">Mengunduh pembaruan...</string>
+    <string name="downloading_update_progress">Mengunduh pembaruan: %1$s / %2$s</string>
     <string name="update_url">Update check url</string>
     <string name="update_using_browser">Open update link in browser</string>
     <string name="auto_check_updates">Check for updates on startup</string>

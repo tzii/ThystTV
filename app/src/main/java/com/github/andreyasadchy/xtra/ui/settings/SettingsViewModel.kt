@@ -45,6 +45,7 @@ import dagger.Lazy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -52,9 +53,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.chromium.net.CronetEngine
 import org.chromium.net.apihelpers.RedirectHandlers
 import org.chromium.net.apihelpers.UrlRequestCallbacks
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -83,6 +86,10 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     val updateUrl = MutableSharedFlow<UpdateInfo?>()
+    val updateProgress = MutableSharedFlow<Long>()
+    val closeUpdateDialog = MutableSharedFlow<Unit>()
+    var updateSize: Long? = null
+    var updateJob: Job? = null
 
     fun deletePositions() {
         viewModelScope.launch {
@@ -309,7 +316,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun downloadUpdate(networkLibrary: String?, url: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        updateJob?.cancel()
+        updateSize = null
+        updateJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val response = when {
                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
@@ -317,6 +326,8 @@ class SettingsViewModel @Inject constructor(
                             httpEngine.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                         }
                         if (response.first.httpStatusCode in 200..299) {
+                            updateSize = response.first.headers.asMap["Content-Length"]?.firstOrNull()?.toLongOrNull()
+                            updateProgress.emit(response.second.size.toLong())
                             response.second
                         } else null
                     }
@@ -326,13 +337,18 @@ class SettingsViewModel @Inject constructor(
                             cronetEngine.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
                             val response = request.future.get()
                             if (response.urlResponseInfo.httpStatusCode in 200..299) {
-                                response.responseBody as ByteArray
+                                (response.responseBody as ByteArray).also {
+                                    updateSize = response.urlResponseInfo.allHeaders["Content-Length"]?.firstOrNull()?.toLongOrNull()
+                                    updateProgress.emit(it.size.toLong())
+                                }
                             } else null
                         } else {
                             val response = suspendCancellableCoroutine { continuation ->
                                 cronetEngine.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                             }
                             if (response.first.httpStatusCode in 200..299) {
+                                updateSize = response.first.allHeaders["Content-Length"]?.firstOrNull()?.toLongOrNull()
+                                updateProgress.emit(response.second.size.toLong())
                                 response.second
                             } else null
                         }
@@ -340,7 +356,7 @@ class SettingsViewModel @Inject constructor(
                     else -> {
                         okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
                             if (response.isSuccessful) {
-                                response.body.bytes()
+                                readUpdateResponseBody(response)
                             } else null
                         }
                     }
@@ -368,7 +384,28 @@ class SettingsViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
 
+            } finally {
+                updateJob = null
+                closeUpdateDialog.emit(Unit)
             }
+        }
+    }
+
+    private suspend fun readUpdateResponseBody(response: Response): ByteArray {
+        updateSize = response.body.contentLength().takeIf { it > 0L }
+        return ByteArrayOutputStream(updateSize?.takeIf { it <= Int.MAX_VALUE }?.toInt() ?: 32 * 1024).use { output ->
+            response.body.byteStream().use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var totalRead = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    output.write(buffer, 0, read)
+                    totalRead += read
+                    updateProgress.emit(totalRead)
+                }
+            }
+            output.toByteArray()
         }
     }
 
