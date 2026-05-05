@@ -513,6 +513,7 @@ Implemented after the speed menu theming pass:
 - Kept the existing quality change path by routing selection through `changeQuality`, `changePlayerMode`, and `setQualityText`.
 - Split video quality chips from audio/chat-only chips so utility modes are not mixed into the resolution list.
 - Confirmed the dialog is shared by livestream and VOD/player flows because both open the same `PlayerFragment.showQualityDialog()` surface and then delegate selection to the active player engine's `changeQuality` implementation.
+- Normalized VOD-provided utility variants such as `Audio Only` so they do not appear as video quality chips or duplicate the canonical audio/chat-only section.
 - Verified with `assembleDebug`.
 
 ## Recommended Commit Sequence

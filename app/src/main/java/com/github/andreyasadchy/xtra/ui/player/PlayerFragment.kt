@@ -1403,7 +1403,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 codec == "avc1" || codec == "mp4a" || codec.isNullOrBlank()
             }
             qualities.associateBy { quality ->
-                when (quality.name) {
+                when (normalizeQualityName(quality.name)) {
                     "auto" -> getString(R.string.auto)
                     "source" -> getString(R.string.source)
                     "audio_only" -> getString(R.string.audio_only)
@@ -1440,9 +1440,22 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     fun selectQuality(qualityName: String?) {
         viewModel.userHasChangedQuality = true
-        changeQuality(viewModel.qualities?.find { it.name == qualityName })
+        val normalizedQualityName = normalizeQualityName(qualityName)
+        changeQuality(
+            viewModel.qualities?.find { it.name == qualityName }
+                ?: viewModel.qualities?.find { normalizeQualityName(it.name) == normalizedQualityName }
+        )
         changePlayerMode()
         setQualityText()
+    }
+
+    private fun normalizeQualityName(name: String?): String {
+        return name
+            ?.trim()
+            ?.lowercase(Locale.US)
+            ?.replace(' ', '_')
+            ?.replace('-', '_')
+            .orEmpty()
     }
 
     fun showSpeedDialog() {

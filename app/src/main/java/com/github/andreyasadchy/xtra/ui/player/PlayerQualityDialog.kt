@@ -24,6 +24,7 @@ import androidx.core.view.setPadding
 import androidx.fragment.app.DialogFragment
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.DialogPlayerQualityBinding
+import java.util.Locale
 
 class PlayerQualityDialog : DialogFragment() {
 
@@ -96,10 +97,26 @@ class PlayerQualityDialog : DialogFragment() {
         val tags = requireArguments().getStringArray(TAGS).orEmpty()
         val selected = requireArguments().getString(SELECTED)
         val entries = labels.zip(tags).map { (label, tag) ->
-            QualityEntry(label = label.toString(), tag = tag)
+            val mode = UtilityMode.from(tag, label.toString())
+            QualityEntry(
+                label = when (mode) {
+                    UtilityMode.AudioOnly -> getString(R.string.audio_only)
+                    UtilityMode.ChatOnly -> getString(R.string.chat_only)
+                    null -> label.toString()
+                },
+                tag = mode?.canonicalTag ?: tag,
+                mode = mode
+            )
         }
         val videoEntries = entries.filterNot { it.isAudioChatMode }
-        val audioChatEntries = entries.filter { it.isAudioChatMode }
+        val audioChatEntries = entries
+            .filter { it.isAudioChatMode }
+            .groupBy { it.mode }
+            .values
+            .map { modeEntries ->
+                modeEntries.firstOrNull { it.tag.normalizedQualityName() == it.mode?.canonicalTag } ?: modeEntries.first()
+            }
+            .sortedBy { it.mode?.order ?: Int.MAX_VALUE }
 
         binding.qualityRows.removeAllViews()
         addSection(R.string.video_quality, videoEntries, selected)
@@ -143,7 +160,7 @@ class PlayerQualityDialog : DialogFragment() {
 
             rowEntries.forEachIndexed { chipIndex, entry ->
                 row.addView(
-                    qualityChip(entry, entry.tag == selected),
+                    qualityChip(entry, entry.isSelected(selected)),
                     LinearLayout.LayoutParams(
                         chipWidth,
                         ViewGroup.LayoutParams.WRAP_CONTENT
@@ -280,8 +297,30 @@ class PlayerQualityDialog : DialogFragment() {
     private data class QualityEntry(
         val label: String,
         val tag: String,
+        val mode: UtilityMode?,
     ) {
-        val isAudioChatMode = tag == AUDIO_ONLY || tag == CHAT_ONLY
+        val isAudioChatMode = mode != null
+
+        fun isSelected(selected: String?): Boolean {
+            return tag == selected || (mode != null && mode == UtilityMode.from(selected, selected))
+        }
+    }
+
+    private enum class UtilityMode(val canonicalTag: String, val order: Int) {
+        AudioOnly(PlayerQualityDialog.AUDIO_ONLY, 0),
+        ChatOnly(PlayerQualityDialog.CHAT_ONLY, 1);
+
+        companion object {
+            fun from(tag: String?, label: String?): UtilityMode? {
+                return when {
+                    tag.normalizedQualityName() == PlayerQualityDialog.AUDIO_ONLY ||
+                        label.normalizedQualityName() == PlayerQualityDialog.AUDIO_ONLY -> AudioOnly
+                    tag.normalizedQualityName() == PlayerQualityDialog.CHAT_ONLY ||
+                        label.normalizedQualityName() == PlayerQualityDialog.CHAT_ONLY -> ChatOnly
+                    else -> null
+                }
+            }
+        }
     }
 
     private data class QualityDialogColors(
@@ -294,4 +333,13 @@ class PlayerQualityDialog : DialogFragment() {
         val selectedChip: Int,
         val handle: Int,
     )
+}
+
+private fun String?.normalizedQualityName(): String {
+    return this
+        ?.trim()
+        ?.lowercase(Locale.US)
+        ?.replace(' ', '_')
+        ?.replace('-', '_')
+        .orEmpty()
 }
