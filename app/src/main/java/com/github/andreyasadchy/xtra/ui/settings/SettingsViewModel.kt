@@ -24,6 +24,7 @@ import androidx.work.WorkManager
 import com.github.andreyasadchy.xtra.BuildConfig
 import com.github.andreyasadchy.xtra.db.AppDatabase
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
+import com.github.andreyasadchy.xtra.model.ui.ReleaseInfo
 import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.repository.GraphQLRepository
 import com.github.andreyasadchy.xtra.repository.HelixRepository
@@ -86,6 +87,8 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     val updateUrl = MutableSharedFlow<UpdateInfo?>()
+    val latestReleaseInfo = MutableSharedFlow<ReleaseInfo?>(replay = 1)
+    val changelogReleases = MutableSharedFlow<List<ReleaseInfo>?>(replay = 1)
     val updateProgress = MutableSharedFlow<Long>()
     val closeUpdateDialog = MutableSharedFlow<Unit>()
     var updateSize: Long? = null
@@ -281,37 +284,71 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             updateUrl.emit(
                 try {
-                    val response = when {
-                        networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                            val response = suspendCancellableCoroutine { continuation ->
-                                httpEngine.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
-                            }
-                            json.decodeFromString<JsonObject>(String(response.second))
-                        }
-                        networkLibrary == "Cronet" && cronetEngine != null -> {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                val request = UrlRequestCallbacks.forStringBody(RedirectHandlers.alwaysFollow())
-                                cronetEngine.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
-                                val response = request.future.get().responseBody as String
-                                json.decodeFromString<JsonObject>(response)
-                            } else {
-                                val response = suspendCancellableCoroutine { continuation ->
-                                    cronetEngine.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
-                                }
-                                json.decodeFromString<JsonObject>(String(response.second))
-                            }
-                        }
-                        else -> {
-                            okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                                json.decodeFromString<JsonObject>(response.body.string())
-                            }
-                        }
-                    }
-                    UpdateUtils.getAvailableUpdate(response, BuildConfig.VERSION_NAME)
+                    UpdateUtils.getAvailableUpdate(loadReleaseResponse(networkLibrary, url), BuildConfig.VERSION_NAME)
                 } catch (e: Exception) {
                     null
                 }
             )
+        }
+    }
+
+    fun loadLatestRelease(networkLibrary: String?, url: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            latestReleaseInfo.emit(
+                try {
+                    UpdateUtils.getReleaseInfo(loadReleaseResponse(networkLibrary, url))
+                } catch (e: Exception) {
+                    null
+                }
+            )
+        }
+    }
+
+    fun loadChangelogReleases(networkLibrary: String?, url: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            changelogReleases.emit(
+                try {
+                    UpdateUtils.getReleaseInfos(loadReleaseListResponse(networkLibrary, url))
+                } catch (e: Exception) {
+                    null
+                }
+            )
+        }
+    }
+
+    private suspend fun loadReleaseResponse(networkLibrary: String?, url: String): JsonObject {
+        return json.decodeFromString<JsonObject>(loadResponseBody(networkLibrary, url))
+    }
+
+    private suspend fun loadReleaseListResponse(networkLibrary: String?, url: String): List<JsonObject> {
+        return json.decodeFromString<List<JsonObject>>(loadResponseBody(networkLibrary, url))
+    }
+
+    private suspend fun loadResponseBody(networkLibrary: String?, url: String): String {
+        return when {
+            networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
+                val response = suspendCancellableCoroutine { continuation ->
+                    httpEngine.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
+                }
+                String(response.second)
+            }
+            networkLibrary == "Cronet" && cronetEngine != null -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    val request = UrlRequestCallbacks.forStringBody(RedirectHandlers.alwaysFollow())
+                    cronetEngine.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
+                    request.future.get().responseBody as String
+                } else {
+                    val response = suspendCancellableCoroutine { continuation ->
+                        cronetEngine.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
+                    }
+                    String(response.second)
+                }
+            }
+            else -> {
+                okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                    response.body.string()
+                }
+            }
         }
     }
 

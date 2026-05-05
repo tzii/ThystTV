@@ -47,6 +47,30 @@ class UpdateUtilsTest {
     }
 
     @Test
+    fun `release parser keeps release notes even without apk asset`() {
+        val release = releaseJson(
+            tagName = "v1.2.0",
+            body = "## Changes\n\n- Built in changelog",
+            assets = """
+                [
+                  {
+                    "name": "notes.txt",
+                    "content_type": "text/plain",
+                    "browser_download_url": "https://example.com/notes.txt"
+                  }
+                ]
+            """.trimIndent()
+        )
+
+        val releaseInfo = UpdateUtils.getReleaseInfo(release)
+
+        assertNotNull(releaseInfo)
+        assertEquals("v1.2.0", releaseInfo!!.tagName)
+        assertEquals("## Changes\n\n- Built in changelog", releaseInfo.releaseNotes)
+        assertNull(releaseInfo.downloadUrl)
+    }
+
+    @Test
     fun `release parser selects apk asset and preserves metadata`() {
         val release = releaseJson(
             tagName = "v1.2.0",
@@ -95,6 +119,14 @@ class UpdateUtilsTest {
         val customUrl = "https://example.com/releases/latest"
 
         assertEquals(customUrl, UpdateUtils.resolveReleaseApiUrl(customUrl))
+    }
+
+    @Test
+    fun `releases api url resolver converts latest endpoint to releases list`() {
+        assertEquals(
+            "https://api.github.com/repos/tzii/ThystTV/releases",
+            UpdateUtils.resolveReleasesApiUrl("https://api.github.com/repos/tzii/ThystTV/releases/latest")
+        )
     }
 
     @Test

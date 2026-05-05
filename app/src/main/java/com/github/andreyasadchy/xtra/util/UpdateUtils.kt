@@ -1,5 +1,6 @@
 package com.github.andreyasadchy.xtra.util
 
+import com.github.andreyasadchy.xtra.model.ui.ReleaseInfo
 import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -10,6 +11,7 @@ import kotlinx.serialization.json.jsonPrimitive
 object UpdateUtils {
 
     const val DEFAULT_RELEASE_API_URL = "https://api.github.com/repos/tzii/ThystTV/releases/latest"
+    const val DEFAULT_RELEASES_API_URL = "https://api.github.com/repos/tzii/ThystTV/releases"
     private const val LEGACY_XTRA_RELEASE_API_URL = "https://api.github.com/repos/crackededed/xtra/releases/tags/latest"
     private val markdownLink = Regex("""\[([^\]]+)]\(([^)]+)\)""")
     private val headingPrefix = Regex("""^#{1,6}\s+""")
@@ -23,9 +25,18 @@ object UpdateUtils {
             ?: DEFAULT_RELEASE_API_URL
     }
 
-    fun getAvailableUpdate(release: JsonObject, installedVersion: String): UpdateInfo? {
+    fun resolveReleasesApiUrl(preferredUrl: String?): String {
+        val latestUrl = resolveReleaseApiUrl(preferredUrl)
+        return when {
+            latestUrl.endsWith("/releases/latest", ignoreCase = true) -> latestUrl.removeSuffix("/latest")
+            "/releases/tags/" in latestUrl -> latestUrl.substringBefore("/releases/tags/") + "/releases"
+            latestUrl == DEFAULT_RELEASE_API_URL -> DEFAULT_RELEASES_API_URL
+            else -> DEFAULT_RELEASES_API_URL
+        }
+    }
+
+    fun getReleaseInfo(release: JsonObject): ReleaseInfo? {
         val tagName = release["tag_name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return null
-        if (!isVersionNewer(tagName, installedVersion)) return null
         val downloadUrl = release["assets"]?.jsonArray
             ?.firstNotNullOfOrNull { asset ->
                 val obj = asset.jsonObject
@@ -34,9 +45,8 @@ object UpdateUtils {
                 if (isApk) obj["browser_download_url"]?.jsonPrimitive?.contentOrNull else null
             }
             ?.takeIf { it.isNotBlank() }
-            ?: return null
 
-        return UpdateInfo(
+        return ReleaseInfo(
             versionName = normalizeVersionName(tagName),
             tagName = tagName,
             title = release["name"]?.jsonPrimitive?.contentOrNull,
@@ -45,6 +55,16 @@ object UpdateUtils {
             releaseUrl = release["html_url"]?.jsonPrimitive?.contentOrNull,
             downloadUrl = downloadUrl
         )
+    }
+
+    fun getReleaseInfos(releases: List<JsonObject>): List<ReleaseInfo> {
+        return releases.mapNotNull(::getReleaseInfo)
+    }
+
+    fun getAvailableUpdate(release: JsonObject, installedVersion: String): UpdateInfo? {
+        return getReleaseInfo(release)
+            ?.takeIf { isVersionNewer(it.tagName, installedVersion) }
+            ?.toUpdateInfo()
     }
 
     fun isVersionNewer(candidateVersion: String, installedVersion: String): Boolean {

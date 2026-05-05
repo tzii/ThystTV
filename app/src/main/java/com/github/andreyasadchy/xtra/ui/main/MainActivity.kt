@@ -22,9 +22,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.text.format.Formatter
+import android.text.method.LinkMovementMethod
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,6 +44,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.FragmentTransaction
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -88,6 +91,8 @@ import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.google.android.material.color.MaterialColors
 import dagger.hilt.android.AndroidEntryPoint
+import io.noties.markwon.Markwon
+import io.noties.markwon.linkify.LinkifyPlugin
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.Timer
@@ -496,7 +501,7 @@ class MainActivity : AppCompatActivity() {
     private fun showUpdateDialog(updateInfo: UpdateInfo) {
         getAlertDialogBuilder()
             .setTitle(getString(R.string.update_available))
-            .setMessage(getUpdateMessage(updateInfo))
+            .setView(createUpdateMarkdownView(updateInfo))
             .setPositiveButton(getString(R.string.download)) { _, _ ->
                 if (prefs.getBoolean(C.UPDATE_USE_BROWSER, false)) {
                     openUpdateUrl(updateInfo.downloadUrl, markChecked = true)
@@ -516,6 +521,20 @@ class MainActivity : AppCompatActivity() {
                 updateInfo.releaseUrl?.let { openUpdateUrl(it, markChecked = false) }
             }
             .show()
+    }
+
+    private fun createUpdateMarkdownView(updateInfo: UpdateInfo): View {
+        val textView = TextView(this).apply {
+            setPadding(48, 24, 48, 24)
+        }
+        Markwon.builder(this)
+            .usePlugin(LinkifyPlugin.create())
+            .build()
+            .setMarkdown(textView, getUpdateMarkdown(updateInfo))
+        textView.movementMethod = LinkMovementMethod.getInstance()
+        return NestedScrollView(this).apply {
+            addView(textView)
+        }
     }
 
     private fun showUpdateDownloadDialog(downloadUrl: String) {
@@ -551,12 +570,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getUpdateMessage(updateInfo: UpdateInfo): String {
+    private fun getUpdateMarkdown(updateInfo: UpdateInfo): String {
         val releaseDate = updateInfo.publishedAt?.substringBefore("T")?.takeIf { it.isNotBlank() }
             ?: getString(R.string.unknown)
-        val releaseNotes = updateInfo.releaseNotes?.takeIf { it.isNotBlank() }?.let(UpdateUtils::formatReleaseNotes)
+        val releaseNotes = updateInfo.releaseNotes?.takeIf { it.isNotBlank() }
             ?: getString(R.string.no_release_notes)
-        return getString(R.string.update_release_message, updateInfo.tagName, releaseDate, releaseNotes)
+        return "## ${updateInfo.tagName}\n\n$releaseDate\n\n$releaseNotes"
     }
 
     private fun openUpdateUrl(url: String, markChecked: Boolean) {
