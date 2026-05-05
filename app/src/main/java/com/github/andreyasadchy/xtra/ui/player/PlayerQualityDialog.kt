@@ -2,12 +2,13 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import android.app.Dialog
 import android.content.Context
-import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -105,22 +106,54 @@ class PlayerQualityDialog : DialogFragment() {
         if (audioChatEntries.isNotEmpty()) {
             addSection(R.string.audio_chat_modes, audioChatEntries, selected)
         }
-        constrainScrollHeight(entries.size)
+        constrainScrollHeight(videoEntries.size, audioChatEntries.size)
     }
 
     private fun addSection(titleRes: Int, entries: List<QualityEntry>, selected: String?) {
         if (entries.isEmpty()) return
 
         binding.qualityRows.addView(sectionLabel(getString(titleRes)))
-        entries.forEachIndexed { index, entry ->
-            binding.qualityRows.addView(qualityRow(entry, entry.tag == selected), LinearLayout.LayoutParams(
+        addChipGrid(entries, selected)
+    }
+
+    private fun addChipGrid(entries: List<QualityEntry>, selected: String?) {
+        val panelWidth = getPanelWidth()
+        val horizontalGap = dp(7f)
+        val rowAvailableWidth = panelWidth - dp(32f)
+        val minChipWidth = if (entries.any { it.isAudioChatMode }) dp(132f) else dp(92f)
+        val maxChipsPerRow = if (entries.any { it.isAudioChatMode }) 2 else if (panelWidth < dp(460f)) 3 else 4
+        val chipsPerRow = ((rowAvailableWidth + horizontalGap) / (minChipWidth + horizontalGap))
+            .coerceIn(1, maxChipsPerRow)
+            .coerceAtMost(entries.size)
+        val chipWidth = (rowAvailableWidth - horizontalGap * (chipsPerRow - 1)) / chipsPerRow
+
+        entries.chunked(chipsPerRow).forEachIndexed { rowIndex, rowEntries ->
+            val row = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+            binding.qualityRows.addView(row, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                if (index > 0) {
+                if (rowIndex > 0) {
                     topMargin = dp(8f)
                 }
             })
+
+            rowEntries.forEachIndexed { chipIndex, entry ->
+                row.addView(
+                    qualityChip(entry, entry.tag == selected),
+                    LinearLayout.LayoutParams(
+                        chipWidth,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        if (chipIndex > 0) {
+                            marginStart = horizontalGap
+                        }
+                    }
+                )
+            }
         }
     }
 
@@ -131,36 +164,27 @@ class PlayerQualityDialog : DialogFragment() {
             textSize = 12f
             isAllCaps = true
             includeFontPadding = false
-            setPadding(0, if (binding.qualityRows.childCount == 0) 0 else dp(14f), 0, dp(8f))
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, if (binding.qualityRows.childCount == 0) 0 else dp(16f), 0, dp(8f))
         }
     }
 
-    private fun qualityRow(entry: QualityEntry, selected: Boolean): View {
-        val context = requireContext()
-        return LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_VERTICAL
+    private fun qualityChip(entry: QualityEntry, selected: Boolean): TextView {
+        return TextView(requireContext()).apply {
+            text = entry.label
+            setTextColor(if (selected) colors.selectedText else colors.onPanel)
+            textSize = if (entry.isAudioChatMode) 15f else 16f
+            setTypeface(typeface, if (selected) Typeface.BOLD else Typeface.NORMAL)
+            includeFontPadding = false
+            gravity = Gravity.CENTER
+            maxLines = 2
+            ellipsize = TextUtils.TruncateAt.END
+            minHeight = if (entry.isAudioChatMode) dp(42f) else dp(38f)
             isSelected = selected
             isClickable = true
             isFocusable = true
-            minimumHeight = dp(48f)
-            background = rowBackground(colors.row, colors.selectedRow)
-            setPadding(dp(14f), dp(9f), dp(14f), dp(9f))
-            addView(TextView(context).apply {
-                text = entry.label
-                setTextColor(if (selected) colors.selectedText else colors.onPanel)
-                textSize = 17f
-                includeFontPadding = false
-            })
-            entry.subtitleRes?.let { subtitleRes ->
-                addView(TextView(context).apply {
-                    text = getString(subtitleRes)
-                    setTextColor(colors.secondaryText)
-                    textSize = 12f
-                    includeFontPadding = false
-                    setPadding(0, dp(5f), 0, 0)
-                })
-            }
+            background = chipBackground(colors.chip, colors.selectedChip)
+            setPadding(dp(8f), dp(7f), dp(8f), dp(7f))
             setOnClickListener {
                 (parentFragment as? PlayerFragment)?.selectQuality(entry.tag)
                 dismiss()
@@ -168,8 +192,13 @@ class PlayerQualityDialog : DialogFragment() {
         }
     }
 
-    private fun constrainScrollHeight(entryCount: Int) {
-        val estimatedHeight = dp(72f) + entryCount * dp(58f)
+    private fun constrainScrollHeight(videoEntryCount: Int, audioChatEntryCount: Int) {
+        val panelWidth = getPanelWidth()
+        val videoPerRow = if (panelWidth < dp(460f)) 3 else 4
+        val videoRows = if (videoEntryCount == 0) 0 else (videoEntryCount + videoPerRow - 1) / videoPerRow
+        val audioRows = if (audioChatEntryCount == 0) 0 else (audioChatEntryCount + 1) / 2
+        val sectionCount = listOf(videoEntryCount, audioChatEntryCount).count { it > 0 }
+        val estimatedHeight = dp(34f) * sectionCount + dp(46f) * (videoRows + audioRows) + dp(24f)
         val maxHeight = (resources.displayMetrics.heightPixels * 0.52f).toInt().coerceAtMost(dp(430f))
         binding.qualityScroll.layoutParams = binding.qualityScroll.layoutParams.apply {
             height = if (estimatedHeight > maxHeight) maxHeight else ViewGroup.LayoutParams.WRAP_CONTENT
@@ -196,8 +225,8 @@ class PlayerQualityDialog : DialogFragment() {
             selectedText = if (lightPanel) onPanel else Color.WHITE,
             secondaryText = ColorUtils.setAlphaComponent(onPanel, if (lightPanel) 150 else 178),
             panelStroke = ColorUtils.blendARGB(panel, onPanel, strokeAlpha),
-            row = ColorUtils.blendARGB(panel, onPanel, rowBlend),
-            selectedRow = ColorUtils.blendARGB(panel, primary, selectedBlend),
+            chip = ColorUtils.blendARGB(panel, onPanel, rowBlend),
+            selectedChip = ColorUtils.blendARGB(panel, primary, selectedBlend),
             handle = ColorUtils.setAlphaComponent(onPanel, if (lightPanel) 96 else 128),
         )
     }
@@ -219,10 +248,10 @@ class PlayerQualityDialog : DialogFragment() {
         }
     }
 
-    private fun rowBackground(normalColor: Int, selectedColor: Int): StateListDrawable {
+    private fun chipBackground(normalColor: Int, selectedColor: Int): StateListDrawable {
         return StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_selected), roundedDrawable(selectedColor, 13f))
-            addState(intArrayOf(), roundedDrawable(normalColor, 13f))
+            addState(intArrayOf(android.R.attr.state_selected), roundedDrawable(selectedColor, 18f))
+            addState(intArrayOf(), roundedDrawable(normalColor, 18f))
         }
     }
 
@@ -253,11 +282,6 @@ class PlayerQualityDialog : DialogFragment() {
         val tag: String,
     ) {
         val isAudioChatMode = tag == AUDIO_ONLY || tag == CHAT_ONLY
-        val subtitleRes = when (tag) {
-            AUDIO_ONLY -> R.string.audio_only_quality_summary
-            CHAT_ONLY -> R.string.chat_only_quality_summary
-            else -> null
-        }
     }
 
     private data class QualityDialogColors(
@@ -266,8 +290,8 @@ class PlayerQualityDialog : DialogFragment() {
         val selectedText: Int,
         val secondaryText: Int,
         val panelStroke: Int,
-        val row: Int,
-        val selectedRow: Int,
+        val chip: Int,
+        val selectedChip: Int,
         val handle: Int,
     )
 }

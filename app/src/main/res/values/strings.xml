@@ -43,7 +43,7 @@
     <string name="audio_only">Audio only</string>
     <string name="chat_only">Chat only</string>
     <string name="video_quality">Video quality</string>
-    <string name="audio_chat_modes">Audio and chat modes</string>
+    <string name="audio_chat_modes">Audio / chat only</string>
     <string name="audio_only_quality_summary">Keep audio playback without video</string>
     <string name="chat_only_quality_summary">Keep chat visible without video playback</string>
     <string name="select_quality">Select quality</string>
