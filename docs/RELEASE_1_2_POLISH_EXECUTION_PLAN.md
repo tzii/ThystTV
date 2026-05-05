@@ -21,7 +21,7 @@ The 1.2 branch already contains several preparation commits:
 - Markwon dependencies are already available and now used for update/changelog markdown rendering.
 - Changelog/updater settings, the launcher icon background retune, themed playback speed dialog, and the latest Xtra selective-sync ledger pass are implemented.
 - A previous custom playback quality dialog attempt was reverted because portrait behavior was not reliable enough; the next implementation should reuse the now-verified themed speed dialog approach.
-- `docs/RELEASE_1_2_UPSTREAM_COMMITS.md` tracks the 2026-05-05 upstream Xtra pass through `377bfac1`.
+- `docs/RELEASE_1_2_UPSTREAM_COMMITS.md` tracks the 2026-05-05 upstream Xtra pass through `377bfac1`; a refresh after the update-sheet work confirmed upstream is still at the same head.
 - README screenshot references and local docs screenshot assets exist in the working tree, but final screenshots are still waiting on the user's album.
 
 Important working tree note after the 2026-05-05 pass:
@@ -37,7 +37,7 @@ Important working tree note after the 2026-05-05 pass:
 | 2. New website | Waiting | Blocked on screenshot album and final website direction. |
 | 3. New README with screenshots and banner | Waiting | Blocked on screenshot album and final banner. |
 | 4. Launcher icon background fix | Done | Background retuned to a muted lavender/purple palette that keeps foreground contrast without feeling detached from the logo. |
-| 5. Selective Xtra sync | Done for current upstream | Upstream `377bfac1` reviewed; no new code accepted beyond already-ported updater progress and unraid message-id work. |
+| 5. Selective Xtra sync | Done for current upstream | Upstream `377bfac1` refreshed again; no new commits since the last pass and no new code accepted beyond already-ported updater progress and unraid message-id work. |
 | 6. Playback quality menu | Done | Custom themed quality menu uses speed-dialog-style chips and separates video qualities from audio/chat-only modes. |
 | Playback speed menu theming | Done | Speed panel, slider, handle, buttons, and presets now follow the active light/dark app theme. |
 
@@ -453,6 +453,13 @@ Defer commits when they:
 
 The 2026-05-05 pass confirmed upstream head `377bfac1`. No additional upstream commits were accepted for 1.2 because the remaining candidates are broad rewrites, player-risky dependency/query changes, or low-value cleanup. The ledger documents the decision.
 
+Refresh after update-sheet testing:
+
+- `git fetch upstream` completed successfully.
+- `upstream/master` is still `377bfac17ff67f49f58593f79f17850693277aa0`.
+- `git cherry -v release/1.2-prep upstream/master` is unchanged from the earlier 2026-05-05 pass.
+- No additional Xtra code is recommended for 1.2 at this point.
+
 ## Workstream 6: New Playback Quality Menu
 
 ### Goal
@@ -532,6 +539,39 @@ Implemented after the speed menu theming pass:
 10. `docs: refresh readme banner and screenshots`
 
 Website and README commits should wait until the screenshot album is available.
+
+## Remaining Release Checklist
+
+### Blocked On User Assets
+
+- Website refresh: waiting for screenshot album and final website direction.
+- README refresh: waiting for screenshot album and final banner or website-derived banner.
+
+### Release Inputs Needed
+
+- Final 1.2 version name and version code.
+- Final 1.2 release date.
+- Final release notes text, or approval to derive release notes from the current plan and commit history.
+
+### Final QA Before Release
+
+- Updater prompt in light and dark themes.
+- Updater download/install flow.
+- Changelog markdown rendering with headings, lists, links, and long release notes.
+- Playback quality on livestream and VOD.
+- Playback speed menu in light and dark themes.
+- Launcher icon in launcher, app info, and small icon contexts.
+- Final `./gradlew.bat testDebugUnitTest`.
+- Final `./gradlew.bat assembleDebug`.
+
+### Already Completed
+
+- Changelog/updater settings feature.
+- Polished update prompt sheet.
+- Launcher icon background fix.
+- Current selective Xtra sync review.
+- Playback speed theming.
+- Playback quality chip menu.
 
 ## Test Matrix
 

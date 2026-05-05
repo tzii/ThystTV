@@ -8,6 +8,8 @@ Upstream remote: `upstream` -> `https://github.com/crackededed/Xtra.git`
 
 Latest verified upstream head: `377bfac17ff67f49f58593f79f17850693277aa0` (`rename files`)
 
+Most recent refresh: 2026-05-05 after the update-sheet polish work. `git fetch upstream` completed successfully and `upstream/master` was still `377bfac17ff67f49f58593f79f17850693277aa0`.
+
 This file tracks how the current 1.2 release branch relates to recent upstream Xtra commits. ThystTV is not blindly merging upstream because several changes overlap with ThystTV-specific player, updater, and release-note work.
 
 ## How to refresh this view
@@ -54,6 +56,34 @@ In `git cherry` output:
 ```
 
 No additional upstream code was accepted in this pass. The only user-facing upstream item needed for 1.2, updater download progress, is already manually covered by ThystTV's `c35c1876` implementation. The remaining commits are either cleanup-only, broad architecture churn, player-risky, or already documented as post-1.2 work.
+
+## 2026-05-05 refresh after update-sheet polish
+
+`git ls-remote https://github.com/crackededed/Xtra.git refs/heads/master refs/heads/main` returned:
+
+```text
+377bfac17ff67f49f58593f79f17850693277aa0 refs/heads/master
+```
+
+`git cherry -v release/1.2-prep upstream/master` remained unchanged:
+
+```text
++ a25b9310 replace bundleOf
+- e3bcad57 Update strings.xml (#908)
++ b35c869b WIP player changes
+- 9d630ce4 fix stream download quality
+- 579f87ac update proguard
++ 7df2806e query updates
++ 06fd811b downgrade exoplayer
++ 1be85689 remove debug api setting
++ 90035c15 integrity SharedFlow
++ 628ba784 show update download progress
++ 8eb4a669 okhttp executeAsync
+- 582f58ef update unraid message id
++ 377bfac1 rename files
+```
+
+Decision: no new upstream commits landed since the previous pass, so there is nothing new to accept for 1.2. Keep the current selective-sync decision unchanged.
 
 ## Reviewed and deferred
 
