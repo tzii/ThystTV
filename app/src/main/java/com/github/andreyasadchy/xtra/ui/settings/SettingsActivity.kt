@@ -73,6 +73,7 @@ import com.github.andreyasadchy.xtra.model.ui.SettingsDragListItem
 import com.github.andreyasadchy.xtra.model.ui.SettingsSearchItem
 import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
+import com.github.andreyasadchy.xtra.ui.common.UpdateAvailableDialog
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.UpdateUtils
@@ -591,10 +592,11 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         private fun showUpdateDialog(updateInfo: UpdateInfo) {
-            requireActivity().getAlertDialogBuilder()
-                .setTitle(getString(R.string.update_available))
-                .setView(createUpdateMarkdownView(updateInfo))
-                .setPositiveButton(getString(R.string.download)) { _, _ ->
+            UpdateAvailableDialog.show(
+                context = requireContext(),
+                inflater = layoutInflater,
+                updateInfo = updateInfo,
+                onDownload = {
                     if (requireContext().prefs().getBoolean(C.UPDATE_USE_BROWSER, false)) {
                         openUpdateUrl(updateInfo.downloadUrl, markChecked = true)
                     } else {
@@ -603,27 +605,14 @@ class SettingsActivity : AppCompatActivity() {
                         }
                         showUpdateDownloadDialog(updateInfo.downloadUrl)
                     }
-                }
-                .setNegativeButton(getString(R.string.later)) { _, _ ->
+                },
+                onLater = {
                     requireContext().tokenPrefs().edit {
                         putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
                     }
-                }
-                .setNeutralButton(getString(R.string.view_on_github)) { _, _ ->
-                    updateInfo.releaseUrl?.let { openUpdateUrl(it, markChecked = false) }
-                }
-                .show()
-        }
-
-        private fun createUpdateMarkdownView(updateInfo: UpdateInfo): View {
-            val textView = TextView(requireContext()).apply {
-                setPadding(48, 24, 48, 24)
-                setTextIsSelectable(true)
-            }
-            renderMarkdown(textView, getUpdateMarkdown(updateInfo))
-            return NestedScrollView(requireContext()).apply {
-                addView(textView)
-            }
+                },
+                onGithub = { url -> openUpdateUrl(url, markChecked = false) }
+            )
         }
 
         private fun showUpdateDownloadDialog(downloadUrl: String) {
@@ -657,14 +646,6 @@ class SettingsActivity : AppCompatActivity() {
                 binding.textView.text = getString(R.string.downloading_update)
                 binding.progressBar.isIndeterminate = true
             }
-        }
-
-        private fun getUpdateMarkdown(updateInfo: UpdateInfo): String {
-            val releaseDate = updateInfo.publishedAt?.substringBefore("T")?.takeIf { it.isNotBlank() }
-                ?: getString(R.string.unknown)
-            val releaseNotes = updateInfo.releaseNotes?.takeIf { it.isNotBlank() }
-                ?: getString(R.string.no_release_notes)
-            return "## ${updateInfo.tagName}\n\n$releaseDate\n\n$releaseNotes"
         }
 
         private fun openUpdateUrl(url: String, markChecked: Boolean) {
@@ -1642,29 +1623,18 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         private fun showUpdateDialog(updateInfo: UpdateInfo) {
-            requireActivity().getAlertDialogBuilder()
-                .setTitle(getString(R.string.update_available))
-                .setView(createUpdateMarkdownView(updateInfo))
-                .setPositiveButton(getString(R.string.download)) { _, _ -> startUpdate(updateInfo) }
-                .setNegativeButton(getString(R.string.later)) { _, _ ->
+            UpdateAvailableDialog.show(
+                context = requireContext(),
+                inflater = layoutInflater,
+                updateInfo = updateInfo,
+                onDownload = { startUpdate(updateInfo) },
+                onLater = {
                     requireContext().tokenPrefs().edit {
                         putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
                     }
-                }
-                .setNeutralButton(getString(R.string.view_on_github)) { _, _ ->
-                    updateInfo.releaseUrl?.let { openUpdateUrl(it, markChecked = false) }
-                }
-                .show()
-        }
-
-        private fun createUpdateMarkdownView(updateInfo: UpdateInfo): View {
-            val textView = TextView(requireContext()).apply {
-                setPadding(48, 24, 48, 24)
-            }
-            renderMarkdown(textView, updateInfo.toReleaseInfo().let { buildReleaseMarkdown(requireContext(), it) })
-            return NestedScrollView(requireContext()).apply {
-                addView(textView)
-            }
+                },
+                onGithub = { url -> openUpdateUrl(url, markChecked = false) }
+            )
         }
 
         private fun startUpdate(updateInfo: UpdateInfo) {

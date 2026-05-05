@@ -33,7 +33,7 @@ Important working tree note after the 2026-05-05 pass:
 
 | Workstream | Status | Notes |
 | --- | --- | --- |
-| 1. Changelog and updater settings | Done | Settings now has updater/changelog/about/new-version flows, Markwon markdown rendering, GitHub releases loading, and bundled fallback changelog. |
+| 1. Changelog and updater settings | Done | Settings now has updater/changelog/about/new-version flows, Markwon markdown rendering, GitHub releases loading, bundled fallback changelog, and a polished update prompt sheet. |
 | 2. New website | Waiting | Blocked on screenshot album and final website direction. |
 | 3. New README with screenshots and banner | Waiting | Blocked on screenshot album and final banner. |
 | 4. Launcher icon background fix | Done | Background retuned to a muted lavender/purple palette that keeps foreground contrast without feeling detached from the logo. |
@@ -243,6 +243,7 @@ Implemented on 2026-05-05:
 - Added a `ReleaseInfo` model for GitHub release metadata.
 - Added a changelog screen backed by GitHub releases and bundled markdown fallback.
 - Switched update prompts and changelog content to Markwon rendering.
+- Replaced the default update AlertDialog with a bottom update sheet that keeps actions fixed, constrains release-note scrolling, and adds the animated squiggle divider inspired by MetroList.
 - Preserved existing download progress and update install/browser fallback behavior.
 - Verified with `UpdateUtilsTest` and `assembleDebug`.
 
@@ -514,6 +515,7 @@ Implemented after the speed menu theming pass:
 - Split video quality chips from audio/chat-only chips so utility modes are not mixed into the resolution list.
 - Confirmed the dialog is shared by livestream and VOD/player flows because both open the same `PlayerFragment.showQualityDialog()` surface and then delegate selection to the active player engine's `changeQuality` implementation.
 - Normalized VOD-provided utility variants such as `Audio Only` so they do not appear as video quality chips or duplicate the canonical audio/chat-only section.
+- Kept VOD chat-only out of scope. ThystTV supports VOD chat replay, but `chat_only` remains stream-only because adding it for VOD would be a playback behavior change rather than a menu-only fix.
 - Verified with `assembleDebug`.
 
 ## Recommended Commit Sequence
