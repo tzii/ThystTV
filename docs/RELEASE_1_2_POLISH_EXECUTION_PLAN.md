@@ -38,7 +38,7 @@ Important working tree note after the 2026-05-05 pass:
 | 3. New README with screenshots and banner | Waiting | Blocked on screenshot album and final banner. |
 | 4. Launcher icon background fix | Done | Background retuned to a muted lavender/purple palette that keeps foreground contrast without feeling detached from the logo. |
 | 5. Selective Xtra sync | Done for current upstream | Upstream `377bfac1` reviewed; no new code accepted beyond already-ported updater progress and unraid message-id work. |
-| 6. Playback quality menu | Next | Build a custom themed menu using the playback speed dialog pattern, with clear separation between video qualities and audio/chat-only options. |
+| 6. Playback quality menu | Done | Custom themed quality menu uses the speed dialog pattern and separates video qualities from audio/chat-only modes. |
 | Playback speed menu theming | Done | Speed panel, slider, handle, buttons, and presets now follow the active light/dark app theme. |
 
 ## Research Summary
@@ -503,6 +503,16 @@ Suggested menu content:
 - Selecting a quality updates playback exactly as before.
 - Dialog does not overflow or render off-screen in portrait.
 - Dialog does not regress playback speed menu behavior.
+
+### Completion Notes
+
+Implemented after the speed menu theming pass:
+
+- Added a dedicated `PlayerQualityDialog` with themed surfaces, rows, and selection state.
+- Replaced the generic radio quality picker in `PlayerFragment.showQualityDialog()`.
+- Kept the existing quality change path by routing selection through `changeQuality`, `changePlayerMode`, and `setQualityText`.
+- Split video quality rows from audio/chat-only modes so utility modes are not mixed into the resolution list.
+- Verified with `assembleDebug`.
 
 ## Recommended Commit Sequence
 

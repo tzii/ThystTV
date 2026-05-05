@@ -1430,13 +1430,19 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun showQualityDialog() {
         val qualities = getQualityMap()
         if (!qualities.isNullOrEmpty()) {
-            RadioButtonDialogFragment.newInstance(
-                REQUEST_CODE_QUALITY,
+            PlayerQualityDialog.newInstance(
                 qualities.keys,
                 qualities.values.map { it.name.toString() }.toTypedArray(),
-                qualities.values.indexOf(viewModel.quality)
+                viewModel.quality?.name
             ).show(childFragmentManager, "closeOnPip")
         }
+    }
+
+    fun selectQuality(qualityName: String?) {
+        viewModel.userHasChangedQuality = true
+        changeQuality(viewModel.qualities?.find { it.name == qualityName })
+        changePlayerMode()
+        setQualityText()
     }
 
     fun showSpeedDialog() {
@@ -2454,10 +2460,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override fun onChange(requestCode: Int, index: Int, text: CharSequence, tag: String?) {
         when (requestCode) {
             REQUEST_CODE_QUALITY -> {
-                viewModel.userHasChangedQuality = true
-                changeQuality(viewModel.qualities?.find { it.name == tag })
-                changePlayerMode()
-                setQualityText()
+                selectQuality(tag)
             }
             REQUEST_CODE_SPEED -> {
                 requireContext().prefs().getString(C.PLAYER_SPEED_LIST, "0.25\n0.5\n0.75\n1.0\n1.25\n1.5\n1.75\n2.0\n3.0\n4.0\n8.0")?.split("\n")?.let { speeds ->
