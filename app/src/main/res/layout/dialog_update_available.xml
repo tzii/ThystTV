@@ -115,38 +115,71 @@
                 </androidx.core.widget.NestedScrollView>
             </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/downloadButton"
-                style="@style/MaterialElevatedButton"
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="18dp"
-                android:text="@string/download" />
+                android:layout_height="104dp"
+                android:layout_marginTop="14dp">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:orientation="horizontal">
+                <LinearLayout
+                    android:id="@+id/secondaryActions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:gravity="start"
+                    android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/laterButton"
-                    style="@style/MaterialButton"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_weight="1"
-                    android:text="@string/later" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/githubButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="18dp"
+                        android:text="@string/view_on_github"
+                        android:textAllCaps="false"
+                        android:textColor="?attr/colorOnSurface"
+                        app:backgroundTint="@android:color/transparent"
+                        app:cornerRadius="22dp"
+                        app:icon="@drawable/baseline_open_in_new_24"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconTint="?attr/colorOnSurface"
+                        app:strokeColor="?attr/colorOutline" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/githubButton"
-                    style="@style/MaterialButton"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/view_on_github" />
-            </LinearLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/laterButton"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="4dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="18dp"
+                        android:text="@string/later"
+                        android:textAllCaps="false"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        app:cornerRadius="22dp" />
+                </LinearLayout>
+
+                <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+                    android:id="@+id/downloadButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="56dp"
+                    android:layout_gravity="bottom|end"
+                    android:minWidth="96dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="24dp"
+                    android:text="@string/download"
+                    android:textAllCaps="false"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    app:backgroundTint="?attr/colorPrimaryContainer"
+                    app:elevation="6dp"
+                    app:icon="@drawable/baseline_file_download_24"
+                    app:iconPadding="10dp"
+                    app:iconTint="?attr/colorOnPrimaryContainer"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Large" />
+            </FrameLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 </FrameLayout>
