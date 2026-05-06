@@ -65,6 +65,7 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
         dailyAverageText = "0m",
         weekChangeText = "",
         todayTimeText = "0m",
+        rangeTotalLabelText = "",
         weekTotalText = "0m",
     )
     private var streakCard = StatsDashboardItem.Streak(
@@ -92,7 +93,7 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.screenTime.collectLatest { screenTimes ->
-                        screenTimeCard = buildScreenTimeCard(screenTimes)
+                        screenTimeCard = buildScreenTimeCard(screenTimes, viewModel.timeRange.value)
                         renderDashboard()
                     }
                 }
@@ -128,6 +129,14 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
                         renderDashboard()
                     }
                 }
+                launch {
+                    viewModel.timeRange.collectLatest { timeRange ->
+                        binding.syncRangeChip(timeRange)
+                        screenTimeCard = buildScreenTimeCard(viewModel.screenTime.value, timeRange)
+                        favoriteChannelsCard = buildFavoriteChannelsCard()
+                        renderDashboard()
+                    }
+                }
             }
         }
     }
@@ -154,13 +163,6 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
             toolbar.menu.findItem(R.id.login).title = if (isLoggedIn) getString(R.string.log_out) else getString(R.string.log_in)
             toolbar.setOnMenuItemClickListener { menuItem ->
                 when (menuItem.itemId) {
-                    R.id.refreshStats -> {
-                        viewModel.refresh()
-                        statsRecyclerView.post {
-                            appBar.isLifted = statsRecyclerView.canScrollVertically(-1)
-                        }
-                        true
-                    }
                     R.id.settings -> {
                         activity.settingsResultLauncher?.launch(Intent(activity, SettingsActivity::class.java))
                         true
@@ -183,6 +185,14 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
                         true
                     }
                     else -> false
+                }
+            }
+            rangeChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+                val checkedId = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
+                when (checkedId) {
+                    R.id.range7Days -> viewModel.setTimeRange(StatsTimeRange.LAST_7_DAYS)
+                    R.id.range30Days -> viewModel.setTimeRange(StatsTimeRange.LAST_30_DAYS)
+                    R.id.rangeAllTime -> viewModel.setTimeRange(StatsTimeRange.ALL_TIME)
                 }
             }
 
@@ -277,6 +287,7 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
             dailyAverageText = "0m",
             weekChangeText = getString(R.string.stats_week_trend_none),
             todayTimeText = "0m",
+            rangeTotalLabelText = getString(R.string.last_7_days),
             weekTotalText = "0m",
         )
         streakCard = StatsDashboardItem.Streak("0", "0")
@@ -288,6 +299,27 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
     }
 
     private fun buildFavoriteChannelsCard(): StatsDashboardItem.FavoriteChannels {
+        if (viewModel.timeRange.value != StatsTimeRange.ALL_TIME) {
+            val maxWatchSeconds = streamerLoyalty.maxOfOrNull { it.totalWatchSeconds } ?: 0L
+            return StatsDashboardItem.FavoriteChannels(
+                channels = streamerLoyalty.mapNotNull { loyalty ->
+                    val channelId = loyalty.channelId ?: return@mapNotNull null
+                    val channelName = loyalty.channelName ?: loyalty.channelLogin ?: return@mapNotNull null
+                    FavoriteChannelRow(
+                        channelId = channelId,
+                        channelName = channelName,
+                        totalSecondsWatched = loyalty.totalWatchSeconds,
+                        sessionCount = loyalty.sessionCount,
+                        loyaltyScore = loyalty.loyaltyScore.toInt(),
+                        watchTimeProgress = if (maxWatchSeconds > 0L) {
+                            loyalty.totalWatchSeconds.toFloat() / maxWatchSeconds.toFloat()
+                        } else {
+                            0f
+                        },
+                    )
+                },
+            )
+        }
         return StatsDashboardItem.FavoriteChannels(
             channels = StatsDataHelper.buildFavoriteChannels(
                 topStreams = topStreams,
@@ -296,7 +328,7 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
         )
     }
 
-    private fun buildScreenTimeCard(screenTimes: List<ScreenTime>): StatsDashboardItem.ScreenTime {
+    private fun buildScreenTimeCard(screenTimes: List<ScreenTime>, timeRange: StatsTimeRange): StatsDashboardItem.ScreenTime {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val today = sdf.format(Date())
         val timeMap = screenTimes.associateBy { it.date }
@@ -304,16 +336,32 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
         val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
         val chartData = mutableListOf<DailyBarChartView.DayData>()
 
-        var weekTotalSeconds = 0L
-        calendar.add(Calendar.DAY_OF_YEAR, -6)
+        val days = timeRange.days
+        var rangeTotalSeconds = 0L
+        val rangeDays = days ?: screenTimes.map { it.date }.distinct().size.coerceAtLeast(1)
 
-        repeat(7) {
-            val dateStr = sdf.format(calendar.time)
-            val seconds = timeMap[dateStr]?.totalSeconds ?: 0L
-            weekTotalSeconds += seconds
-            val label = if (dateStr == today) "Today" else dayFormat.format(calendar.time)
-            chartData.add(DailyBarChartView.DayData(label, seconds))
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        if (days != null) {
+            calendar.add(Calendar.DAY_OF_YEAR, -(days - 1))
+            repeat(days) { index ->
+                val dateStr = sdf.format(calendar.time)
+                val seconds = timeMap[dateStr]?.totalSeconds ?: 0L
+                rangeTotalSeconds += seconds
+                val label = buildChartLabel(dateStr, today, calendar, dayFormat, index, days)
+                chartData.add(DailyBarChartView.DayData(label, seconds))
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+            }
+        } else {
+            screenTimes.sortedBy { it.date }.forEachIndexed { index, screenTime ->
+                rangeTotalSeconds += screenTime.totalSeconds
+                val parsedDate = runCatching { sdf.parse(screenTime.date) }.getOrNull()
+                calendar.time = parsedDate ?: Date()
+                chartData.add(
+                    DailyBarChartView.DayData(
+                        label = buildChartLabel(screenTime.date, today, calendar, dayFormat, index, screenTimes.size),
+                        seconds = screenTime.totalSeconds,
+                    ),
+                )
+            }
         }
 
         var previousWeekTotalSeconds = 0L
@@ -326,19 +374,61 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
             calendar.add(Calendar.DAY_OF_YEAR, 1)
         }
 
-        val avgSeconds = if (chartData.isNotEmpty()) weekTotalSeconds / 7 else 0L
+        val avgSeconds = if (rangeDays > 0) rangeTotalSeconds / rangeDays else 0L
         val todaySeconds = timeMap[today]?.totalSeconds ?: 0L
 
         return StatsDashboardItem.ScreenTime(
             chartData = chartData,
             dailyAverageText = formatDurationShort(avgSeconds),
-            weekChangeText = buildWeekTrendText(
-                currentWeekSeconds = weekTotalSeconds,
-                previousWeekSeconds = previousWeekTotalSeconds,
-            ),
+            weekChangeText = if (timeRange == StatsTimeRange.LAST_7_DAYS) {
+                buildWeekTrendText(
+                    currentWeekSeconds = rangeTotalSeconds,
+                    previousWeekSeconds = previousWeekTotalSeconds,
+                )
+            } else {
+                getRangeLabel(timeRange)
+            },
             todayTimeText = formatDurationShort(todaySeconds),
-            weekTotalText = formatDurationShort(weekTotalSeconds),
+            rangeTotalLabelText = getRangeLabel(timeRange),
+            weekTotalText = formatDurationShort(rangeTotalSeconds),
         )
+    }
+
+    private fun buildChartLabel(
+        date: String,
+        today: String,
+        calendar: Calendar,
+        dayFormat: SimpleDateFormat,
+        index: Int,
+        count: Int,
+    ): String {
+        return when {
+            date == today -> getString(R.string.today)
+            count <= 7 -> dayFormat.format(calendar.time)
+            index == 0 || index == count - 1 || index % 7 == 0 -> {
+                SimpleDateFormat("M/d", Locale.getDefault()).format(calendar.time)
+            }
+            else -> ""
+        }
+    }
+
+    private fun getRangeLabel(timeRange: StatsTimeRange): String {
+        return when (timeRange) {
+            StatsTimeRange.LAST_7_DAYS -> getString(R.string.last_7_days)
+            StatsTimeRange.LAST_30_DAYS -> getString(R.string.last_30_days)
+            StatsTimeRange.ALL_TIME -> getString(R.string.stats_all_time)
+        }
+    }
+
+    private fun FragmentStatsBinding.syncRangeChip(timeRange: StatsTimeRange) {
+        val checkedId = when (timeRange) {
+            StatsTimeRange.LAST_7_DAYS -> R.id.range7Days
+            StatsTimeRange.LAST_30_DAYS -> R.id.range30Days
+            StatsTimeRange.ALL_TIME -> R.id.rangeAllTime
+        }
+        if (rangeChipGroup.checkedChipId != checkedId) {
+            rangeChipGroup.check(checkedId)
+        }
     }
 
     private fun buildStreakCard(streak: WatchStreak?): StatsDashboardItem.Streak {

@@ -61,6 +61,7 @@ class StatsDashboardAdapter : ListAdapter<StatsDashboardItem, RecyclerView.ViewH
             binding.dailyAverageText.text = item.dailyAverageText
             binding.weekChangeText.text = item.weekChangeText
             binding.todayTimeText.text = item.todayTimeText
+            binding.weekTotalLabel.text = item.rangeTotalLabelText
             binding.weekTotalText.text = item.weekTotalText
             binding.dailyBarChart.setData(item.chartData, animate = false)
         }

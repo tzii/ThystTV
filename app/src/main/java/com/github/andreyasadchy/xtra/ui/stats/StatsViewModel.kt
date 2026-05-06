@@ -21,6 +21,12 @@ import java.util.Calendar
 import java.util.Locale
 import javax.inject.Inject
 
+enum class StatsTimeRange(val days: Int?) {
+    LAST_7_DAYS(7),
+    LAST_30_DAYS(30),
+    ALL_TIME(null),
+}
+
 @HiltViewModel
 class StatsViewModel @Inject constructor(
     private val repository: StatsRepository
@@ -52,6 +58,9 @@ class StatsViewModel @Inject constructor(
     // Streamer loyalty
     private val _streamerLoyalty = MutableStateFlow<List<StreamerLoyalty>>(emptyList())
     val streamerLoyalty: StateFlow<List<StreamerLoyalty>> = _streamerLoyalty.asStateFlow()
+
+    private val _timeRange = MutableStateFlow(StatsTimeRange.LAST_7_DAYS)
+    val timeRange: StateFlow<StatsTimeRange> = _timeRange.asStateFlow()
     
     init {
         loadEnhancedAnalytics()
@@ -59,19 +68,38 @@ class StatsViewModel @Inject constructor(
     
     private fun loadEnhancedAnalytics() {
         viewModelScope.launch {
-            val calendar = Calendar.getInstance()
-            val endDate = dateFormat.format(calendar.time)
-            calendar.add(Calendar.DAY_OF_YEAR, -30)
-            val startDate = dateFormat.format(calendar.time)
+            val (startDate, endDate) = getDateRange(_timeRange.value)
             
             _categoryBreakdown.value = repository.getCategoryBreakdown(startDate, endDate)
             _hourlyBreakdown.value = repository.getHourlyBreakdown(startDate, endDate)
             _monthlySummary.value = repository.getMonthlySummary(12)
-            _streamerLoyalty.value = repository.getStreamerLoyalty(10)
+            _streamerLoyalty.value = if (_timeRange.value == StatsTimeRange.ALL_TIME) {
+                repository.getStreamerLoyalty(10)
+            } else {
+                repository.getStreamerLoyalty(10, startDate, endDate)
+            }
         }
+    }
+
+    fun setTimeRange(timeRange: StatsTimeRange) {
+        if (_timeRange.value == timeRange) return
+        _timeRange.value = timeRange
+        loadEnhancedAnalytics()
     }
     
     fun refresh() {
         loadEnhancedAnalytics()
+    }
+
+    private fun getDateRange(timeRange: StatsTimeRange): Pair<String, String> {
+        val calendar = Calendar.getInstance()
+        val endDate = dateFormat.format(calendar.time)
+        val days = timeRange.days
+        return if (days != null) {
+            calendar.add(Calendar.DAY_OF_YEAR, -(days - 1))
+            dateFormat.format(calendar.time) to endDate
+        } else {
+            "0000-01-01" to endDate
+        }
     }
 }

@@ -69,8 +69,12 @@ class StatsRepository @Inject constructor(
     
     // Streamer Loyalty
     
-    suspend fun getStreamerLoyalty(limit: Int = 20): List<StreamerLoyalty> {
-        val rawData = watchSessionDao.getStreamerLoyaltyData(limit)
+    suspend fun getStreamerLoyalty(limit: Int = 20, startDate: String? = null, endDate: String? = null): List<StreamerLoyalty> {
+        val rawData = if (startDate != null && endDate != null) {
+            watchSessionDao.getStreamerLoyaltyData(startDate, endDate, limit)
+        } else {
+            watchSessionDao.getStreamerLoyaltyData(limit)
+        }
         if (rawData.isEmpty()) return emptyList()
         
         val maxWatchSeconds = rawData.maxOfOrNull { it.totalWatchSeconds } ?: 1L
