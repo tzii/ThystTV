@@ -53,18 +53,36 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/checkUpdatesButton"
-                        style="@style/MaterialElevatedButton"
+                        style="@style/Widget.MaterialComponents.Button"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/check_updates" />
+                        android:layout_height="48dp"
+                        android:text="@string/check_updates"
+                        android:textAllCaps="false"
+                        android:textColor="?attr/colorOnPrimaryContainer"
+                        app:backgroundTint="?attr/colorPrimaryContainer"
+                        app:cornerRadius="24dp"
+                        app:elevation="0dp"
+                        app:icon="@drawable/baseline_sync_24"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconTint="?attr/colorOnPrimaryContainer" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/updateSettingsButton"
-                        style="@style/MaterialButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/update_settings" />
+                        android:layout_height="48dp"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/update_settings"
+                        android:textAllCaps="false"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        app:backgroundTint="@android:color/transparent"
+                        app:cornerRadius="24dp"
+                        app:icon="@drawable/baseline_tune_24"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconTint="?attr/colorOnSurfaceVariant"
+                        app:strokeColor="?attr/colorOutlineVariant" />
 
                 </LinearLayout>
 
@@ -137,18 +155,36 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/downloadUpdateButton"
-                        style="@style/MaterialElevatedButton"
+                        style="@style/Widget.MaterialComponents.Button"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/download" />
+                        android:layout_height="48dp"
+                        android:text="@string/download"
+                        android:textAllCaps="false"
+                        android:textColor="?attr/colorOnPrimaryContainer"
+                        app:backgroundTint="?attr/colorPrimaryContainer"
+                        app:cornerRadius="24dp"
+                        app:elevation="0dp"
+                        app:icon="@drawable/baseline_file_download_24"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconTint="?attr/colorOnPrimaryContainer" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/viewOnGithubButton"
-                        style="@style/MaterialButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/view_on_github" />
+                        android:layout_height="48dp"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/view_on_github"
+                        android:textAllCaps="false"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        app:backgroundTint="@android:color/transparent"
+                        app:cornerRadius="24dp"
+                        app:icon="@drawable/baseline_open_in_new_24"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconTint="?attr/colorOnSurfaceVariant"
+                        app:strokeColor="?attr/colorOutlineVariant" />
 
                 </LinearLayout>
 

@@ -138,18 +138,18 @@
                         android:paddingEnd="18dp"
                         android:text="@string/view_on_github"
                         android:textAllCaps="false"
-                        android:textColor="?attr/colorOnSurface"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         app:backgroundTint="@android:color/transparent"
                         app:cornerRadius="22dp"
                         app:icon="@drawable/baseline_open_in_new_24"
                         app:iconGravity="textStart"
                         app:iconPadding="8dp"
-                        app:iconTint="?attr/colorOnSurface"
-                        app:strokeColor="?attr/colorOutline" />
+                        app:iconTint="?attr/colorOnSurfaceVariant"
+                        app:strokeColor="?attr/colorOutlineVariant" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/laterButton"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="44dp"
                         android:layout_marginTop="4dp"
@@ -159,11 +159,14 @@
                         android:text="@string/later"
                         android:textAllCaps="false"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        app:cornerRadius="22dp" />
+                        app:backgroundTint="@android:color/transparent"
+                        app:cornerRadius="22dp"
+                        app:strokeColor="?attr/colorOutlineVariant" />
                 </LinearLayout>
 
-                <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/downloadButton"
+                    style="@style/Widget.MaterialComponents.Button"
                     android:layout_width="wrap_content"
                     android:layout_height="56dp"
                     android:layout_gravity="bottom|end"
@@ -174,11 +177,12 @@
                     android:textAllCaps="false"
                     android:textColor="?attr/colorOnPrimaryContainer"
                     app:backgroundTint="?attr/colorPrimaryContainer"
-                    app:elevation="6dp"
+                    app:cornerRadius="28dp"
+                    app:elevation="0dp"
                     app:icon="@drawable/baseline_file_download_24"
+                    app:iconGravity="textStart"
                     app:iconPadding="10dp"
-                    app:iconTint="?attr/colorOnPrimaryContainer"
-                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Large" />
+                    app:iconTint="?attr/colorOnPrimaryContainer" />
             </FrameLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
