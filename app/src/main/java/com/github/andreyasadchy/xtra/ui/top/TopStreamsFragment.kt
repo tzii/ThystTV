@@ -57,6 +57,8 @@ class TopStreamsFragment : PagedListFragment(), Scrollable, StreamsSortDialog.On
     private val args: GamePagerFragmentArgs by navArgs()
     private val viewModel: TopStreamsViewModel by viewModels()
     private lateinit var pagingAdapter: PagingDataAdapter<Stream, out RecyclerView.ViewHolder>
+    private var topStreamsScrollListener: RecyclerView.OnScrollListener? = null
+    private var topStreamsLayoutChangeListener: View.OnLayoutChangeListener? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentGamesBinding.inflate(inflater, container, false)
@@ -102,15 +104,19 @@ class TopStreamsFragment : PagedListFragment(), Scrollable, StreamsSortDialog.On
             if (requireContext().prefs().getBoolean(C.UI_THEME_APPBAR_LIFT, true)) {
                 recyclerViewLayout.recyclerView.let {
                     appBar.setLiftOnScrollTargetView(it)
-                    it.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                    val scrollListener = object : RecyclerView.OnScrollListener() {
                         override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                             super.onScrolled(recyclerView, dx, dy)
                             appBar.isLifted = recyclerView.canScrollVertically(-1)
                         }
-                    })
-                    it.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                    }
+                    topStreamsScrollListener = scrollListener
+                    it.addOnScrollListener(scrollListener)
+                    val layoutChangeListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
                         appBar.isLifted = it.canScrollVertically(-1)
                     }
+                    topStreamsLayoutChangeListener = layoutChangeListener
+                    it.addOnLayoutChangeListener(layoutChangeListener)
                 }
             } else {
                 appBar.setLiftable(false)
@@ -334,6 +340,18 @@ class TopStreamsFragment : PagedListFragment(), Scrollable, StreamsSortDialog.On
     }
 
     override fun onDestroyView() {
+        _binding?.let { binding ->
+            topStreamsScrollListener?.let { binding.recyclerViewLayout.recyclerView.removeOnScrollListener(it) }
+            topStreamsLayoutChangeListener?.let { binding.recyclerViewLayout.recyclerView.removeOnLayoutChangeListener(it) }
+            ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
+            binding.toolbar.setOnMenuItemClickListener(null)
+            binding.sortBar.root.setOnClickListener(null)
+            binding.recyclerViewLayout.scrollTop.setOnClickListener(null)
+            binding.recyclerViewLayout.swipeRefresh.setOnRefreshListener(null)
+            binding.recyclerViewLayout.recyclerView.adapter = null
+        }
+        topStreamsScrollListener = null
+        topStreamsLayoutChangeListener = null
         super.onDestroyView()
         _binding = null
     }

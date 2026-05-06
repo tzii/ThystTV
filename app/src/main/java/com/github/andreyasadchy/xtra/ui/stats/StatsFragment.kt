@@ -189,14 +189,9 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
                     else -> false
                 }
             }
-            rangeButtonGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-                if (!isChecked) return@addOnButtonCheckedListener
-                when (checkedId) {
-                    R.id.range7Days -> viewModel.setTimeRange(StatsTimeRange.LAST_7_DAYS)
-                    R.id.range30Days -> viewModel.setTimeRange(StatsTimeRange.LAST_30_DAYS)
-                    R.id.rangeAllTime -> viewModel.setTimeRange(StatsTimeRange.ALL_TIME)
-                }
-            }
+            range7Days.setOnClickListener { viewModel.setTimeRange(StatsTimeRange.LAST_7_DAYS) }
+            range30Days.setOnClickListener { viewModel.setTimeRange(StatsTimeRange.LAST_30_DAYS) }
+            rangeAllTime.setOnClickListener { viewModel.setTimeRange(StatsTimeRange.ALL_TIME) }
 
             if (requireContext().prefs().getBoolean(C.UI_THEME_APPBAR_LIFT, true)) {
                 appBar.setLiftOnScrollTargetView(statsRecyclerView)
@@ -409,9 +404,10 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
         count: Int,
     ): String {
         return when {
-            date == today -> getString(R.string.today)
+            count <= 7 && date == today -> getString(R.string.today)
             count <= 7 -> dayFormat.format(calendar.time)
-            index == 0 || index == count - 1 || index % 7 == 0 -> {
+            index == count - 1 -> SimpleDateFormat("M/d", Locale.getDefault()).format(calendar.time)
+            index == 0 || index % 7 == 0 -> {
                 SimpleDateFormat("M/d", Locale.getDefault()).format(calendar.time)
             }
             else -> ""
@@ -427,14 +423,9 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
     }
 
     private fun FragmentStatsBinding.syncRangeChip(timeRange: StatsTimeRange) {
-        val checkedId = when (timeRange) {
-            StatsTimeRange.LAST_7_DAYS -> R.id.range7Days
-            StatsTimeRange.LAST_30_DAYS -> R.id.range30Days
-            StatsTimeRange.ALL_TIME -> R.id.rangeAllTime
-        }
-        if (rangeButtonGroup.checkedButtonId != checkedId) {
-            rangeButtonGroup.check(checkedId)
-        }
+        range7Days.isChecked = timeRange == StatsTimeRange.LAST_7_DAYS
+        range30Days.isChecked = timeRange == StatsTimeRange.LAST_30_DAYS
+        rangeAllTime.isChecked = timeRange == StatsTimeRange.ALL_TIME
     }
 
     private fun buildStreakCard(streak: WatchStreak?): StatsDashboardItem.Streak {
@@ -497,7 +488,9 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
         binding?.let { binding ->
             statsScrollListener?.let { binding.statsRecyclerView.removeOnScrollListener(it) }
             statsLayoutChangeListener?.let { binding.statsRecyclerView.removeOnLayoutChangeListener(it) }
-            binding.rangeButtonGroup.clearOnButtonCheckedListeners()
+            binding.range7Days.setOnClickListener(null)
+            binding.range30Days.setOnClickListener(null)
+            binding.rangeAllTime.setOnClickListener(null)
             binding.toolbar.setOnMenuItemClickListener(null)
             binding.statsRecyclerView.adapter = null
         }
