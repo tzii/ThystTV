@@ -347,7 +347,7 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
                 val dateStr = sdf.format(calendar.time)
                 val seconds = timeMap[dateStr]?.totalSeconds ?: 0L
                 rangeTotalSeconds += seconds
-                val label = buildChartLabel(dateStr, today, calendar, dayFormat, index, days)
+                val label = buildChartLabel(dateStr, today, calendar, dayFormat, index, days, timeRange)
                 chartData.add(DailyBarChartView.DayData(label, seconds))
                 calendar.add(Calendar.DAY_OF_YEAR, 1)
             }
@@ -358,7 +358,7 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
                 calendar.time = parsedDate ?: Date()
                 chartData.add(
                     DailyBarChartView.DayData(
-                        label = buildChartLabel(screenTime.date, today, calendar, dayFormat, index, screenTimes.size),
+                        label = buildChartLabel(screenTime.date, today, calendar, dayFormat, index, screenTimes.size, timeRange),
                         seconds = screenTime.totalSeconds,
                     ),
                 )
@@ -402,14 +402,15 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
         dayFormat: SimpleDateFormat,
         index: Int,
         count: Int,
+        timeRange: StatsTimeRange,
     ): String {
         return when {
             count <= 7 && date == today -> getString(R.string.today)
             count <= 7 -> dayFormat.format(calendar.time)
-            index == count - 1 -> SimpleDateFormat("M/d", Locale.getDefault()).format(calendar.time)
-            index == 0 || index % 7 == 0 -> {
+            timeRange == StatsTimeRange.LAST_30_DAYS && (index == 0 || index == count / 2 || index == count - 1) ->
                 SimpleDateFormat("M/d", Locale.getDefault()).format(calendar.time)
-            }
+            timeRange == StatsTimeRange.ALL_TIME && (index == 0 || index == count / 2 || index == count - 1) ->
+                SimpleDateFormat("M/d", Locale.getDefault()).format(calendar.time)
             else -> ""
         }
     }
