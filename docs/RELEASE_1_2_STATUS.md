@@ -1,6 +1,6 @@
 # ThystTV 1.2 Prep Status
 
-Last updated: 2026-04-25
+Last updated: 2026-05-06
 
 Branch: `release/1.2-prep`
 
@@ -13,6 +13,7 @@ Branch: `release/1.2-prep`
 - The app already has an update-checking path, but it still needs ThystTV-specific polish: the default update source should point to ThystTV releases, update detection should compare release versions instead of relying only on asset timestamps, and the changelog/release notes should be visible in-app.
 - The latest Xtra upstream commits were reviewed at a high level and should not be merged blindly. Several are broad network/player/data-source refactors that could easily regress the player work already done on this branch.
 - The detailed upstream commit ledger for this branch is in `docs/RELEASE_1_2_UPSTREAM_COMMITS.md`.
+- Issue #5 player crash investigation is now tied to a specific fix: the reporter's LogFox files were downloaded and reviewed from `C:\Users\tizzi\AppData\Local\Temp\thysttv-issue-5`. They did not contain a clear ThystTV `FATAL EXCEPTION`; the concrete repeated signal was Android 15/Nubia `AudioTrack` `setVolume()` binder warnings while Media3 player fragments were being recreated. The targeted 1.2 fix is to port upstream Xtra `06fd811b`'s Media3/ExoPlayer downgrade from `1.10.0` to `1.9.3`, with the matching HLS parser compatibility rollback.
 
 ## Latest Xtra commits reviewed
 
@@ -20,7 +21,7 @@ Branch: `release/1.2-prep`
 - `628ba784` - show update download progress: relevant to the planned updater work, but bundled with large network utility changes.
 - `90035c15` - integrity SharedFlow: broad UI/view-model refactor, not a quick safe cherry-pick.
 - `1be85689` - remove debug API setting: probably useful, but still touches many data sources and localized settings strings.
-- `06fd811b` - downgrade ExoPlayer: player dependency risk; should be tested separately before taking.
+- `06fd811b` - downgrade ExoPlayer: accepted on 2026-05-06 as the focused fix candidate for issue #5 after reviewing the attached logs.
 - `7df2806e` - query updates: very large generated/schema/player/network change set; defer unless we intentionally do an upstream-sync pass.
 
 ## Recommended next steps
@@ -43,3 +44,4 @@ Before merging 1.2 into `master`, verify:
 - minimized-player layout on phone and tablet aspect ratios
 - README/site screenshots render correctly on GitHub
 - update checker points to ThystTV releases, not upstream Xtra
+- issue #5 soak test: run live playback and VoD playback for at least 30-60 minutes on the latest debug APK, then check LogFox/logcat for `AudioTrack` binder spam, app process death, or `AndroidRuntime` fatal exceptions

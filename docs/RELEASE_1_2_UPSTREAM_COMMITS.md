@@ -1,6 +1,6 @@
 # ThystTV 1.2 Upstream Commit Status
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 
 Branch: `release/1.2-prep`
 
@@ -8,7 +8,7 @@ Upstream remote: `upstream` -> `https://github.com/crackededed/Xtra.git`
 
 Latest verified upstream head: `377bfac17ff67f49f58593f79f17850693277aa0` (`rename files`)
 
-Most recent refresh: 2026-05-05 after the update-sheet polish work. `git fetch upstream` completed successfully and `upstream/master` was still `377bfac17ff67f49f58593f79f17850693277aa0`.
+Most recent refresh: 2026-05-06 during the issue #5 player crash investigation. `git fetch upstream` completed successfully and `upstream/master` was still `377bfac17ff67f49f58593f79f17850693277aa0`.
 
 This file tracks how the current 1.2 release branch relates to recent upstream Xtra commits. ThystTV is not blindly merging upstream because several changes overlap with ThystTV-specific player, updater, and release-note work.
 
@@ -32,6 +32,7 @@ In `git cherry` output:
 | `9d630ce4` - fix stream download quality | Present | Patch-equivalent on `release/1.2-prep`. |
 | `579f87ac` - update proguard | Present | Patch-equivalent on `release/1.2-prep`. |
 | `582f58ef` - update unraid message id | Ported | Applied on this branch as `373203e1`. |
+| `06fd811b` - downgrade exoplayer | Ported | Accepted on 2026-05-06 as a targeted fix candidate for ThystTV issue #5. ThystTV kept its own app id/version and took only the Media3 `1.10.0` -> `1.9.3` downgrade plus the HLS parser compatibility rollback. |
 
 ## Manually ported or partially ported
 
@@ -56,6 +57,27 @@ In `git cherry` output:
 ```
 
 No additional upstream code was accepted in this pass. The only user-facing upstream item needed for 1.2, updater download progress, is already manually covered by ThystTV's `c35c1876` implementation. The remaining commits are either cleanup-only, broad architecture churn, player-risky, or already documented as post-1.2 work.
+
+## 2026-05-06 issue #5 focused sync
+
+ThystTV issue #5 reports random player crashes in `v1.1.6` that did not happen in `v1.1.3`. The attached LogFox files were downloaded and checked locally under `C:\Users\tizzi\AppData\Local\Temp\thysttv-issue-5`.
+
+Findings:
+
+- The logs do not show a clean ThystTV `FATAL EXCEPTION` stack.
+- The strongest repeated signal is Android 15/Nubia framework `AudioTrack` binder warnings: `Unable to retrieve AudioTrack pointer for setVolume()`.
+- Those warnings occur while Media3 player fragments/codecs are being torn down and recreated.
+- `v1.1.3` used Media3 `1.9.2`; `v1.1.6` moved to Media3 `1.10.0`; upstream later committed `06fd811b` to downgrade ExoPlayer/Media3 to `1.9.3`.
+
+Decision: accept the narrow upstream dependency rollback now. Do not accept `b35c869b` WIP player changes or the broad `7df2806e` query/update churn for this issue.
+
+Verification:
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+Result: passed on 2026-05-06.
 
 ## 2026-05-05 refresh after update-sheet polish
 
@@ -92,7 +114,7 @@ Decision: no new upstream commits landed since the previous pass, so there is no
 | `a25b9310` - replace bundleOf | Defer / optional cleanup | Low user value for 1.2. Safe-looking cleanup, but not release-critical. |
 | `b35c869b` - WIP player changes | Defer | WIP player work is high risk for the 1.2 player polish already on this branch. |
 | `7df2806e` - query updates | Defer | Very broad generated/schema/player/network change set. Needs a dedicated upstream-sync pass. |
-| `06fd811b` - downgrade exoplayer | Defer | Player dependency change. Only take with a focused playback regression pass. |
+| `06fd811b` - downgrade exoplayer | Accepted | Ported as the focused issue #5 fix candidate after log review and a successful debug build. |
 | `1be85689` - remove debug api setting | Defer | Removes the debug API selector but also renames data-source concepts and touches many localized strings. Not worth mixing into the 1.2 updater/icon branch. |
 | `90035c15` - integrity SharedFlow | Defer | Broad UI/view-model refactor. Not a safe release-branch cherry-pick. |
 | `8eb4a669` - okhttp executeAsync | Defer for 1.2 | Useful direction, but not safe to cherry-pick. It depends on upstream network utility structure that ThystTV does not currently have, touches auth/GQL/Helix/player/download/updater paths, includes unrelated build/version changes, and has at least one response-close concern in the upstream patch. If taken, do a manual minimal port in a separate commit. |
