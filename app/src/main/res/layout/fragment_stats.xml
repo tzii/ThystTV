@@ -22,52 +22,34 @@
             app:menu="@menu/stats_menu"
             app:title="@string/stats" />
 
-        <HorizontalScrollView
-            android:id="@+id/rangeScrollView"
-            android:layout_width="match_parent"
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/rangeButtonGroup"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:clipToPadding="false"
-            android:paddingHorizontal="@dimen/stats_page_padding"
-            android:paddingBottom="8dp"
-            android:scrollbars="none"
+            android:layout_marginStart="@dimen/stats_page_padding"
+            android:layout_marginBottom="8dp"
+            android:checkedButton="@id/range7Days"
+            app:selectionRequired="true"
+            app:singleSelection="true"
             app:layout_scrollFlags="scroll|enterAlways">
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/rangeChipGroup"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:selectionRequired="true"
-                app:singleLine="true"
-                app:singleSelection="true">
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/range7Days"
+                style="@style/StatsRangeButton"
+                android:checked="true"
+                android:text="@string/stats_range_7_days" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/range7Days"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="@string/stats_range_7_days"
-                    app:checkedIconVisible="false" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/range30Days"
+                style="@style/StatsRangeButton"
+                android:text="@string/stats_range_30_days" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/range30Days"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_range_30_days"
-                    app:checkedIconVisible="false" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/rangeAllTime"
+                style="@style/StatsRangeButton"
+                android:text="@string/stats_range_all_time" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/rangeAllTime"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_range_all_time"
-                    app:checkedIconVisible="false" />
-
-            </com.google.android.material.chip.ChipGroup>
-
-        </HorizontalScrollView>
+        </com.google.android.material.button.MaterialButtonToggleGroup>
 
     </com.google.android.material.appbar.AppBarLayout>
 

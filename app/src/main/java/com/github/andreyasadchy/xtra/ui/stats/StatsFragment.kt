@@ -59,6 +59,8 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
     private var binding: FragmentStatsBinding? = null
     private lateinit var dashboardAdapter: StatsDashboardAdapter
     private lateinit var widthTier: WidthTier
+    private var statsScrollListener: RecyclerView.OnScrollListener? = null
+    private var statsLayoutChangeListener: View.OnLayoutChangeListener? = null
 
     private var screenTimeCard = StatsDashboardItem.ScreenTime(
         chartData = emptyList(),
@@ -187,8 +189,8 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
                     else -> false
                 }
             }
-            rangeChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
-                val checkedId = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
+            rangeButtonGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+                if (!isChecked) return@addOnButtonCheckedListener
                 when (checkedId) {
                     R.id.range7Days -> viewModel.setTimeRange(StatsTimeRange.LAST_7_DAYS)
                     R.id.range30Days -> viewModel.setTimeRange(StatsTimeRange.LAST_30_DAYS)
@@ -198,15 +200,19 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
 
             if (requireContext().prefs().getBoolean(C.UI_THEME_APPBAR_LIFT, true)) {
                 appBar.setLiftOnScrollTargetView(statsRecyclerView)
-                statsRecyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                val scrollListener = object : RecyclerView.OnScrollListener() {
                     override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                         super.onScrolled(recyclerView, dx, dy)
                         appBar.isLifted = recyclerView.canScrollVertically(-1)
                     }
-                })
-                statsRecyclerView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                }
+                statsScrollListener = scrollListener
+                statsRecyclerView.addOnScrollListener(scrollListener)
+                val layoutChangeListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
                     appBar.isLifted = statsRecyclerView.canScrollVertically(-1)
                 }
+                statsLayoutChangeListener = layoutChangeListener
+                statsRecyclerView.addOnLayoutChangeListener(layoutChangeListener)
             } else {
                 appBar.setLiftable(false)
                 appBar.background = null
@@ -426,8 +432,8 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
             StatsTimeRange.LAST_30_DAYS -> R.id.range30Days
             StatsTimeRange.ALL_TIME -> R.id.rangeAllTime
         }
-        if (rangeChipGroup.checkedChipId != checkedId) {
-            rangeChipGroup.check(checkedId)
+        if (rangeButtonGroup.checkedButtonId != checkedId) {
+            rangeButtonGroup.check(checkedId)
         }
     }
 
@@ -488,6 +494,15 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        binding?.let { binding ->
+            statsScrollListener?.let { binding.statsRecyclerView.removeOnScrollListener(it) }
+            statsLayoutChangeListener?.let { binding.statsRecyclerView.removeOnLayoutChangeListener(it) }
+            binding.rangeButtonGroup.clearOnButtonCheckedListeners()
+            binding.toolbar.setOnMenuItemClickListener(null)
+            binding.statsRecyclerView.adapter = null
+        }
+        statsScrollListener = null
+        statsLayoutChangeListener = null
         binding = null
     }
 }
