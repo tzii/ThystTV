@@ -34,7 +34,6 @@ import com.github.andreyasadchy.xtra.ui.adaptive.WidthTier
 import com.github.andreyasadchy.xtra.ui.common.Scrollable
 import com.github.andreyasadchy.xtra.ui.login.LoginActivity
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
-import com.github.andreyasadchy.xtra.ui.search.SearchPagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.settings.SettingsActivity
 import com.github.andreyasadchy.xtra.ui.view.DailyBarChartView
 import com.github.andreyasadchy.xtra.ui.view.DashboardSpacingItemDecoration
@@ -155,10 +154,6 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
             toolbar.menu.findItem(R.id.login).title = if (isLoggedIn) getString(R.string.log_out) else getString(R.string.log_in)
             toolbar.setOnMenuItemClickListener { menuItem ->
                 when (menuItem.itemId) {
-                    R.id.search -> {
-                        findNavController().navigate(SearchPagerFragmentDirections.actionGlobalSearchPagerFragment())
-                        true
-                    }
                     R.id.refreshStats -> {
                         viewModel.refresh()
                         statsRecyclerView.post {
