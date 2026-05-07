@@ -20,11 +20,23 @@ local.properties
 captures/
 
 ### Signing / secrets
+*.jks
 debug-keystore.jks
 release-keystore.jks
 *.keystore
 release.keystore
 keystore.properties
+*.p12
+*.pem
+*.key
+
+### Environment / private local data
+.env
+.env.*
+.private/
+ops-private/
+release-private/
+crashlogs-private/
 
 ### Logs / temp output
 *.log
