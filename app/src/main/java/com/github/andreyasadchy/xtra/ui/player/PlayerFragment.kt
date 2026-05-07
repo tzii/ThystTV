@@ -2899,12 +2899,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             // Start with drag handle hidden (synced with player controls)
             binding.dragHandleZone.alpha = if (binding.playerControls.root.isVisible) 1f else 0f
             restoreFloatingChatPosition()
-            // Apply transparency to the container background using theme-aware colors
+            // Floating chat overlays video, so keep the surface dark in every app theme.
             val transparency = prefs.getInt(C.FLOATING_CHAT_TRANSPARENCY, 0)
             val alpha = (transparency * 255 / 100).coerceIn(0, 255)
-            val surfaceColor = MaterialColors.getColor(binding.floatingChatContainer, com.google.android.material.R.attr.colorSurface)
-            val themedColor = ColorUtils.setAlphaComponent(surfaceColor, alpha)
-            binding.floatingChatContainer.setBackgroundColor(themedColor)
+            binding.floatingChatContainer.setBackgroundColor(ColorUtils.setAlphaComponent(Color.BLACK, alpha))
         } else {
             // Hide with fade-out animation
             binding.floatingChatRoot.animate().alpha(0f).setDuration(200)
