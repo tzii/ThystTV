@@ -8,6 +8,8 @@ No unreleased changes yet.
 
 ## [1.2.0] - 2026-05-08
 
+Major milestone release with the new ThystTV updater/changelog flow, custom quality and speed dialogs, local stats range filters, refreshed README/GitHub Pages assets, release automation, and focused upstream Xtra fixes.
+
 See `docs/release-notes/1.2.0.md`.
 
 ## [1.1.6] - 2026-04-19
