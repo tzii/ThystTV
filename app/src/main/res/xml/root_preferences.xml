@@ -122,17 +122,41 @@
         app:iconSpaceReserved="false"
         app:singleLineTitle="false" />
 
-    <Preference
-        android:key="check_updates"
-        android:title="@string/check_updates"
-        app:iconSpaceReserved="false"
-        app:singleLineTitle="false" />
+    <PreferenceCategory
+        android:title="@string/system_about"
+        app:iconSpaceReserved="false">
 
-    <Preference
-        android:key="update_settings"
-        android:title="@string/update_settings"
-        app:iconSpaceReserved="false"
-        app:singleLineTitle="false" />
+        <Preference
+            android:key="update_settings"
+            android:title="@string/updater"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <Preference
+            android:key="changelog_settings"
+            android:title="@string/changelog"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <Preference
+            android:key="check_updates"
+            android:title="@string/check_updates"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <Preference
+            android:key="about_settings"
+            android:title="@string/about"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <Preference
+            android:key="new_version_available"
+            android:title="@string/new_version_available"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+    </PreferenceCategory>
 
     <Preference
         android:key="backup_settings"

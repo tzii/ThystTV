@@ -18,12 +18,14 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.github.andreyasadchy.xtra.BuildConfig
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.model.VideoPosition
 import com.github.andreyasadchy.xtra.model.ui.Clip
 import com.github.andreyasadchy.xtra.model.ui.Game
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.model.ui.Tag
+import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.model.ui.User
 import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.repository.AuthRepository
@@ -37,27 +39,27 @@ import com.github.andreyasadchy.xtra.ui.login.LoginActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import dagger.Lazy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.chromium.net.CronetEngine
 import org.chromium.net.apihelpers.RedirectHandlers
 import org.chromium.net.apihelpers.UrlRequestCallbacks
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Timer
@@ -96,7 +98,11 @@ class MainViewModel @Inject constructor(
     val game = MutableStateFlow<Pair<Game?, String?>?>(null)
     val tag = MutableStateFlow<Tag?>(null)
 
-    val updateUrl = MutableSharedFlow<String?>()
+    val updateUrl = MutableSharedFlow<UpdateInfo?>()
+    val updateProgress = MutableSharedFlow<Long>()
+    val closeUpdateDialog = MutableSharedFlow<Unit>()
+    var updateSize: Long? = null
+    var updateJob: Job? = null
 
     fun loadVideo(videoId: String?, offset: Long?, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean) {
         if (video.value == null) {
@@ -884,7 +890,7 @@ class MainViewModel @Inject constructor(
         TwitchApiHelper.checkedValidation = true
     }
 
-    fun checkUpdates(networkLibrary: String?, url: String, lastChecked: Long) {
+    fun checkUpdates(networkLibrary: String?, url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             updateUrl.emit(
                 try {
@@ -914,15 +920,7 @@ class MainViewModel @Inject constructor(
                             }
                         }
                     }
-                    response["assets"]?.jsonArray?.find {
-                        it.jsonObject.getValue("content_type").jsonPrimitive.contentOrNull == "application/vnd.android.package-archive"
-                    }?.jsonObject?.let { obj ->
-                        obj.getValue("updated_at").jsonPrimitive.contentOrNull?.let { TwitchApiHelper.parseIso8601DateUTC(it) }?.let {
-                            if (it > lastChecked) {
-                                obj.getValue("browser_download_url").jsonPrimitive.contentOrNull
-                            } else null
-                        }
-                    }
+                    UpdateUtils.getAvailableUpdate(response, BuildConfig.VERSION_NAME)
                 } catch (e: Exception) {
                     null
                 }
@@ -932,7 +930,9 @@ class MainViewModel @Inject constructor(
     }
 
     fun downloadUpdate(networkLibrary: String?, url: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        updateJob?.cancel()
+        updateSize = null
+        updateJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val response = when {
                     networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
@@ -940,6 +940,8 @@ class MainViewModel @Inject constructor(
                             httpEngine.get().newUrlRequestBuilder(url, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
                         }
                         if (response.first.httpStatusCode in 200..299) {
+                            updateSize = response.first.headers.asMap["Content-Length"]?.firstOrNull()?.toLongOrNull()
+                            updateProgress.emit(response.second.size.toLong())
                             response.second
                         } else null
                     }
@@ -949,13 +951,18 @@ class MainViewModel @Inject constructor(
                             cronetEngine.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).build().start()
                             val response = request.future.get()
                             if (response.urlResponseInfo.httpStatusCode in 200..299) {
-                                response.responseBody as ByteArray
+                                (response.responseBody as ByteArray).also {
+                                    updateSize = response.urlResponseInfo.allHeaders["Content-Length"]?.firstOrNull()?.toLongOrNull()
+                                    updateProgress.emit(it.size.toLong())
+                                }
                             } else null
                         } else {
                             val response = suspendCancellableCoroutine { continuation ->
                                 cronetEngine.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
                             }
                             if (response.first.httpStatusCode in 200..299) {
+                                updateSize = response.first.allHeaders["Content-Length"]?.firstOrNull()?.toLongOrNull()
+                                updateProgress.emit(response.second.size.toLong())
                                 response.second
                             } else null
                         }
@@ -963,7 +970,7 @@ class MainViewModel @Inject constructor(
                     else -> {
                         okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
                             if (response.isSuccessful) {
-                                response.body.bytes()
+                                readUpdateResponseBody(response)
                             } else null
                         }
                     }
@@ -991,7 +998,28 @@ class MainViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
 
+            } finally {
+                updateJob = null
+                closeUpdateDialog.emit(Unit)
             }
+        }
+    }
+
+    private suspend fun readUpdateResponseBody(response: Response): ByteArray {
+        updateSize = response.body.contentLength().takeIf { it > 0L }
+        return ByteArrayOutputStream(updateSize?.takeIf { it <= Int.MAX_VALUE }?.toInt() ?: 32 * 1024).use { output ->
+            response.body.byteStream().use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var totalRead = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    output.write(buffer, 0, read)
+                    totalRead += read
+                    updateProgress.emit(totalRead)
+                }
+            }
+            output.toByteArray()
         }
     }
 

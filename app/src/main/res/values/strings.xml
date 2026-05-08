@@ -42,6 +42,10 @@
     <string name="source">Source</string>
     <string name="audio_only">Audio only</string>
     <string name="chat_only">Chat only</string>
+    <string name="video_quality">Video quality</string>
+    <string name="audio_chat_modes">Audio / chat only</string>
+    <string name="audio_only_quality_summary">Keep audio playback without video</string>
+    <string name="chat_only_quality_summary">Keep chat visible without video playback</string>
     <string name="select_quality">Select quality</string>
     <string name="download">Download</string>
     <string name="downloading">Downloading...</string>
@@ -585,15 +589,33 @@
     <string name="backup_settings">Backup settings and data</string>
     <string name="restore_settings">Restore settings and data</string>
     <string name="share">Share</string>
+    <string name="system_about">System &amp; About</string>
     <string name="check_updates">Check for updates</string>
+    <string name="updater">Updater</string>
+    <string name="changelog">Changelog</string>
+    <string name="latest_release">Latest release</string>
+    <string name="bundled_changelog">Bundled changelog</string>
+    <string name="current_version">Current version %s</string>
+    <string name="checking_for_updates">Checking for updates...</string>
+    <string name="latest_release_unavailable">Could not load the latest release. Showing the bundled changelog below.</string>
+    <string name="latest_release_installed">You are on the latest release.</string>
+    <string name="new_version_available">New version available</string>
+    <string name="about_thysttv_message">ThystTV %s\n\nA Twitch client based on Xtra, with ThystTV branding, player polish, and built-in update support.</string>
     <string name="no_updates_found">No updates found</string>
     <string name="update_available">Update available</string>
     <string name="update_message">Download latest update?</string>
+    <string name="update_release_message" translatable="false">%1$s\n%2$s\n\n%3$s</string>
+    <string name="downloading_update">Downloading update...</string>
+    <string name="downloading_update_progress">Downloading update: %1$s / %2$s</string>
     <string name="update_url">Update check URL</string>
     <string name="update_using_browser">Open update link in browser</string>
     <string name="auto_check_updates">Check for updates on startup</string>
     <string name="update_check_frequency">Update check frequency</string>
     <string name="update_check_frequency_summary">Every %s days</string>
+    <string name="later" translatable="false">Later</string>
+    <string name="view_on_github" translatable="false">View on GitHub</string>
+    <string name="unknown" translatable="false">Unknown</string>
+    <string name="no_release_notes" translatable="false">No release notes provided.</string>
     <string name="notification_live_channel_title">Live notifications</string>
     <string name="live_notification">%s is live</string>
     <string name="live_notifications">Live notifications</string>
@@ -753,6 +775,11 @@
     <string name="screen_time" translatable="false">Screen Time</string>
     <string name="daily_average" translatable="false">daily average</string>
     <string name="last_7_days" translatable="false">Last 7 days</string>
+    <string name="last_30_days" translatable="false">Last 30 days</string>
+    <string name="stats_all_time" translatable="false">All time</string>
+    <string name="stats_range_7_days" translatable="false">7 days</string>
+    <string name="stats_range_30_days" translatable="false">30 days</string>
+    <string name="stats_range_all_time" translatable="false">All</string>
     <string name="current_streak" translatable="false">Current streak</string>
     <string name="longest_streak" translatable="false">Longest streak</string>
     <string name="categories_watched" translatable="false">Categories Watched</string>

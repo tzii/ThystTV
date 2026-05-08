@@ -941,6 +941,9 @@ class ChatViewModel @Inject constructor(
                     onRewardMessage(chatMessage, networkLibrary, isLoggedIn, accountId, channelId)
                 } else {
                     onChatMessage(chatMessage, networkLibrary, isLoggedIn, accountId, channelId)
+                    if (chatMessage.msgId == "unraid" && !hideRaid.value) {
+                        hideRaid.value = true
+                    }
                 }
             }
         }
@@ -972,7 +975,7 @@ class ChatViewModel @Inject constructor(
                 val chatMessage = result.first
                 val messageId = result.second
                 onMessage(chatMessage)
-                if (messageId == "unraid_success") {
+                if (messageId == "unraid") {
                     if (!hideRaid.value) {
                         hideRaid.value = true
                     }
@@ -1007,7 +1010,7 @@ class ChatViewModel @Inject constructor(
             val chatMessage = result.first
             val messageId = result.second
             onMessage(chatMessage)
-            if (messageId == "unraid_success") {
+            if (messageId == "unraid") {
                 if (!hideRaid.value) {
                     hideRaid.value = true
                 }

@@ -18,9 +18,10 @@
  import org.junit.Assert.assertTrue
  import org.junit.Before
  import org.junit.Test
- import org.mockito.kotlin.any
- import org.mockito.kotlin.mock
- import org.mockito.kotlin.whenever
+import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
  
  @OptIn(ExperimentalCoroutinesApi::class)
  class StatsViewModelTest {
@@ -51,7 +52,7 @@
          whenever(repository.getCategoryBreakdown(any(), any())).thenReturn(emptyList())
          whenever(repository.getHourlyBreakdown(any(), any())).thenReturn(emptyList())
          whenever(repository.getMonthlySummary(any())).thenReturn(emptyList())
-         whenever(repository.getStreamerLoyalty(any())).thenReturn(emptyList())
+         whenever(repository.getStreamerLoyalty(any(), anyOrNull(), anyOrNull())).thenReturn(emptyList())
          
         val viewModel = StatsViewModel(repository)
          testDispatcher.scheduler.advanceUntilIdle()
@@ -69,7 +70,7 @@
         whenever(repository.getCategoryBreakdown(any(), any())).thenReturn(categories)
          whenever(repository.getHourlyBreakdown(any(), any())).thenReturn(emptyList())
          whenever(repository.getMonthlySummary(any())).thenReturn(emptyList())
-         whenever(repository.getStreamerLoyalty(any())).thenReturn(emptyList())
+         whenever(repository.getStreamerLoyalty(any(), anyOrNull(), anyOrNull())).thenReturn(emptyList())
          
         val viewModel = StatsViewModel(repository)
          testDispatcher.scheduler.advanceUntilIdle()
@@ -85,7 +86,7 @@
          whenever(repository.getCategoryBreakdown(any(), any())).thenReturn(emptyList())
         whenever(repository.getHourlyBreakdown(any(), any())).thenReturn(hourly)
          whenever(repository.getMonthlySummary(any())).thenReturn(emptyList())
-         whenever(repository.getStreamerLoyalty(any())).thenReturn(emptyList())
+         whenever(repository.getStreamerLoyalty(any(), anyOrNull(), anyOrNull())).thenReturn(emptyList())
          
         val viewModel = StatsViewModel(repository)
          testDispatcher.scheduler.advanceUntilIdle()
@@ -103,7 +104,7 @@
          whenever(repository.getCategoryBreakdown(any(), any())).thenReturn(emptyList())
          whenever(repository.getHourlyBreakdown(any(), any())).thenReturn(emptyList())
          whenever(repository.getMonthlySummary(any())).thenReturn(emptyList())
-        whenever(repository.getStreamerLoyalty(any())).thenReturn(loyalty)
+        whenever(repository.getStreamerLoyalty(any(), anyOrNull(), anyOrNull())).thenReturn(loyalty)
          
         val viewModel = StatsViewModel(repository)
          testDispatcher.scheduler.advanceUntilIdle()
@@ -112,12 +113,13 @@
         assertEquals(100f, viewModel.streamerLoyalty.value[0].loyaltyScore)
      }
  
+    @Test
     fun `empty data returns empty lists`() = runTest {
         setupDefaultMocks()
          whenever(repository.getCategoryBreakdown(any(), any())).thenReturn(emptyList())
          whenever(repository.getHourlyBreakdown(any(), any())).thenReturn(emptyList())
          whenever(repository.getMonthlySummary(any())).thenReturn(emptyList())
-        whenever(repository.getStreamerLoyalty(any())).thenReturn(emptyList())
+        whenever(repository.getStreamerLoyalty(any(), anyOrNull(), anyOrNull())).thenReturn(emptyList())
          
         val viewModel = StatsViewModel(repository)
          testDispatcher.scheduler.advanceUntilIdle()

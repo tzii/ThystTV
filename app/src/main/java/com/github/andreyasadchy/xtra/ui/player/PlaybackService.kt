@@ -601,9 +601,8 @@ class PlaybackService : MediaSessionService() {
                             GET_QUALITIES -> {
                                 val playlist = (session.player.currentManifest as? HlsManifest)?.multivariantPlaylist
                                 val list = playlist?.variants?.mapIndexedNotNull { index, variant ->
-                                    val name = variant.format.label?.takeIf { it.isNotBlank() }
-                                        ?: playlist.videos.find { it.groupId == variant.videoGroupId }?.name?.takeIf { it.isNotBlank() }
-                                        ?: index.toString()
+                                    val videoName = playlist.videos.find { it.groupId == variant.videoGroupId }?.name
+                                    val name = variant.format.toReadableQualityName(videoName, variant.url.toString(), index.toString())
                                     VideoQuality(name, variant.format.codecs, variant.url.toString())
                                 }
                                 Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS, Bundle().apply {

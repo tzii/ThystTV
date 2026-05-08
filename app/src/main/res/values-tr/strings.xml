@@ -569,6 +569,8 @@
     <string name="no_updates_found">Güncelleme bulunamadı</string>
     <string name="update_available">Güncelleme mevcut</string>
     <string name="update_message">En son güncelleme indirilsin mi?</string>
+    <string name="downloading_update">Güncelleme indiriliyor...</string>
+    <string name="downloading_update_progress">Güncelleme indiriliyor: %1$s / %2$s</string>
     <string name="update_url">Güncelleme kontrol URL\'si</string>
     <string name="update_using_browser">Güncelleme bağlantısını tarayıcıda aç</string>
     <string name="auto_check_updates">Başlangıçta güncellemeleri kontrol et</string>

@@ -568,6 +568,8 @@
     <string name="no_updates_found">沒有發現更新</string>
     <string name="update_available">更新可用</string>
     <string name="update_message">下載最新的更新？</string>
+    <string name="downloading_update">正在下載更新...</string>
+    <string name="downloading_update_progress">正在下載更新：%1$s / %2$s</string>
     <string name="update_url">更新檢查 URL</string>
     <string name="update_using_browser">在瀏覽器開啟更新連結</string>
     <string name="auto_check_updates">在啟動時檢查更新</string>

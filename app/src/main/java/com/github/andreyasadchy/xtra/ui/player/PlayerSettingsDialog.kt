@@ -52,11 +52,21 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
         val arguments = requireArguments()
         val videoType = arguments.getString(TYPE)
         with(binding) {
-            if (videoType != PlayerFragment.STREAM && requireContext().prefs().getBoolean(C.PLAYER_MENU_SPEED, false)) {
+            val showSpeedMenu = PlayerSpeedControls.shouldShowSpeedMenu(
+                videoType = videoType,
+                speedButtonEnabled = requireContext().prefs().getBoolean(C.PLAYER_SPEEDBUTTON, true),
+                menuSpeedEnabled = requireContext().prefs().getBoolean(C.PLAYER_MENU_SPEED, false)
+            )
+            if (showSpeedMenu) {
                 menuSpeed.visibility = View.VISIBLE
                 menuSpeed.setOnClickListener {
-                    (parentFragment as? PlayerFragment)?.showSpeedDialog()
+                    val playerFragment = parentFragment as? PlayerFragment
                     dismiss()
+                    playerFragment?.view?.post {
+                        if (playerFragment.isAdded) {
+                            playerFragment.showSpeedDialog()
+                        }
+                    }
                 }
                 setSpeed(arguments.getString(SPEED))
             }

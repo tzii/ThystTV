@@ -568,6 +568,8 @@
     <string name="no_updates_found">Non se atoparon actualizacións</string>
     <string name="update_available">Actualización dispoñible</string>
     <string name="update_message">Descargar a última actualización?</string>
+    <string name="downloading_update">Descargando actualización...</string>
+    <string name="downloading_update_progress">Descargando actualización: %1$s / %2$s</string>
     <string name="update_url">URL de comprobación de actualizacións</string>
     <string name="update_using_browser">Abrir ligazón de actualización no navegador</string>
     <string name="auto_check_updates">Buscar actualizacións ao iniciar</string>

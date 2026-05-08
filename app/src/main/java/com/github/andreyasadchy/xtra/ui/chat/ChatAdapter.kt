@@ -1,5 +1,6 @@
 package com.github.andreyasadchy.xtra.ui.chat
 
+import android.graphics.Color
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.LayerDrawable
 import android.text.Spannable
@@ -80,6 +81,7 @@ class ChatAdapter(
 ) : RecyclerView.Adapter<ChatAdapter.ViewHolder>() {
 
     var translateAllMessages = false
+    var useDarkOverlay = false
     private var selectedMessage: ChatMessage? = null
     private val random = Random()
     private val userColors = HashMap<String, Int>()
@@ -99,7 +101,7 @@ class ChatAdapter(
         } ?: return
         val result = ChatAdapterUtils.prepareChatMessage(
             chatMessage, holder.textView, enableTimestamps, timestampFormat, firstMsgVisibility, firstChatMsg, redeemedChatMsg, redeemedNoMsg,
-            rewardChatMsg, replyMessage, null, useRandomColors, random, useReadableColors, isLightTheme, nameDisplay, useBoldNames, showNamePaints,
+            rewardChatMsg, replyMessage, null, useRandomColors, random, useReadableColors, effectiveIsLightTheme(), nameDisplay, useBoldNames, showNamePaints,
             namePaints, showStvBadges, stvBadges, showPersonalEmotes, personalEmoteSets, stvUsers, enableOverlayEmotes, showSystemMessageEmotes,
             loggedInUser, chatUrl, getEmoteBytes, userColors, savedColors, translateAllMessages, translateMessage, showLanguageDownloadDialog,
             true, localTwitchEmotes, thirdPartyEmotes, globalBadges, channelBadges, cheerEmotes, savedLocalTwitchEmotes, savedLocalBadges,
@@ -109,7 +111,7 @@ class ChatAdapter(
         ChatAdapterUtils.loadImages(
             fragment, holder.textView, { holder.bind(chatMessage, it) }, result.images, result.imagePaint, result.userName, result.userNameStartIndex,
             backgroundColor, imageLibrary, result.builder, result.translated, emoteSize, badgeSize, emoteQuality, animateGifs, enableOverlayEmotes,
-            chatMessage, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, true
+            chatMessage, savedColors, useReadableColors, effectiveIsLightTheme(), showLanguageDownloadDialog, true
         )
     }
 
@@ -124,7 +126,7 @@ class ChatAdapter(
                 }
             )
             if (!chatMessage.translationFailed) {
-                ChatAdapterUtils.addTranslation(chatMessage, builder, builder.length, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, true)
+                ChatAdapterUtils.addTranslation(chatMessage, builder, builder.length, savedColors, useReadableColors, effectiveIsLightTheme(), showLanguageDownloadDialog, true)
             }
             item.text = builder
         }
@@ -158,6 +160,8 @@ class ChatAdapter(
     override fun getItemCount(): Int = synchronized(messages) {
         messages.size
     }
+
+    private fun effectiveIsLightTheme() = isLightTheme && !useDarkOverlay
 
     override fun onViewAttachedToWindow(holder: ViewHolder) {
         super.onViewAttachedToWindow(holder)
@@ -231,11 +235,23 @@ class ChatAdapter(
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
         val textView = itemView as TextView
+        private val defaultTextColors = textView.textColors
+        private val defaultLinkTextColors = textView.linkTextColors
+        private val defaultHighlightColor = textView.highlightColor
 
         fun bind(chatMessage: ChatMessage, formattedMessage: SpannableStringBuilder) {
             textView.apply {
                 text = formattedMessage
                 textSize = messageTextSize
+                if (useDarkOverlay) {
+                    setTextColor(FLOATING_CHAT_TEXT_COLOR)
+                    setLinkTextColor(FLOATING_CHAT_LINK_COLOR)
+                    highlightColor = FLOATING_CHAT_LINK_HIGHLIGHT_COLOR
+                } else {
+                    setTextColor(defaultTextColors)
+                    setLinkTextColor(defaultLinkTextColors)
+                    highlightColor = defaultHighlightColor
+                }
                 if (useHighVisibility) {
                     setShadowLayer(6f, 2f, 2f, android.graphics.Color.BLACK)
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -268,5 +284,11 @@ class ChatAdapter(
                 }
             }
         }
+    }
+
+    private companion object {
+        val FLOATING_CHAT_TEXT_COLOR = Color.WHITE
+        val FLOATING_CHAT_LINK_COLOR = 0xFF4FC3F7.toInt()
+        val FLOATING_CHAT_LINK_HIGHLIGHT_COLOR = 0x334FC3F7
     }
 }

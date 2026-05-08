@@ -1,4 +1,4 @@
-name: CI Build
+name: CI
 
 on:
   push:
@@ -7,29 +7,49 @@ on:
     branches: [ "master" ]
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout sources
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-    
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
-    
-    - name: Run Unit Tests
-      run: ./gradlew test
-    
-    - name: Upload Test Reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-reports
-        path: app/build/reports/tests/
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair \
+            -alias debug \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storetype JKS \
+            -keystore app/debug-keystore.jks \
+            -storepass 123456 \
+            -keypass 123456 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Build debug
+        run: ./gradlew assembleDebug
+
+      - name: Run unit tests
+        run: ./gradlew test
+
+      - name: Run lint
+        run: ./gradlew lintDebug
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/

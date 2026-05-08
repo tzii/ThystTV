@@ -99,6 +99,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import java.util.Locale
 
 @OptIn(UnstableApi::class)
 @AndroidEntryPoint
@@ -188,6 +189,62 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     open fun startAudioOnly() {}
     open fun downloadVideo() {}
     open fun close() {}
+
+    protected fun formatPlaybackSpeed(speed: Float?): String? {
+        if (speed == null) return null
+        val rounded = ((speed * 100).toInt() / 100f)
+        return if (rounded % 1f == 0f) {
+            String.format(Locale.US, "%.0fx", rounded)
+        } else if ((rounded * 10f) % 1f == 0f) {
+            String.format(Locale.US, "%.1fx", rounded)
+        } else {
+            String.format(Locale.US, "%.2fx", rounded)
+        }
+    }
+
+    protected fun updatePlaybackSpeedUi(playbackSpeed: Float? = getCurrentSpeed() ?: requireContext().prefs().getFloat(C.PLAYER_SPEED, 1f)) {
+        val formattedSpeed = formatPlaybackSpeed(playbackSpeed) ?: return
+        with(binding.playerControls) {
+            speed.text = formattedSpeed
+            speed.contentDescription = getString(R.string.playback_speed) + ": " + formattedSpeed
+        }
+        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setSpeed(formattedSpeed)
+    }
+
+    private fun updateQuickPlayerControls() {
+        with(binding.playerControls) {
+            if (requireContext().prefs().getBoolean(C.PLAYER_SETTINGS, true)) {
+                quality.visibility = View.VISIBLE
+                quality.setOnClickListener { showQualityDialog() }
+            } else {
+                quality.visibility = View.GONE
+            }
+
+            if (videoType != STREAM && requireContext().prefs().getBoolean(C.PLAYER_SPEEDBUTTON, true)) {
+                speed.visibility = View.VISIBLE
+                updatePlaybackSpeedUi()
+                speed.setOnClickListener { showSpeedDialog() }
+            } else {
+                speed.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun applyMinimizedPlayerVisualState() {
+        binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        binding.playerLayout.setBackgroundColor(
+            MaterialColors.getColor(binding.playerLayout, com.google.android.material.R.attr.colorSurface)
+        )
+    }
+
+    private fun applyMaximizedPlayerVisualState() {
+        binding.aspectRatioFrameLayout.resizeMode = if (isPortrait) {
+            AspectRatioFrameLayout.RESIZE_MODE_FIT
+        } else {
+            resizeMode
+        }
+        binding.playerLayout.setBackgroundColor(Color.BLACK)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         videoType = requireArguments().getString(KEY_TYPE)
@@ -884,6 +941,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 } else {
                     if (requireContext().prefs().getBoolean(C.PLAYER_SPEEDBUTTON, true)) {
                         speed.visibility = View.VISIBLE
+                        updatePlaybackSpeedUi()
                         speed.setOnClickListener { showSpeedDialog() }
                     }
                 }
@@ -1177,7 +1235,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         slidingLayout.translationY = 0f - scaledYDiff - ((insets?.top ?: 0) * minimizedScaleY) + newY
                     }
                 }
-                aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                if (isMaximized) {
+                    applyMaximizedPlayerVisualState()
+                } else {
+                    applyMinimizedPlayerVisualState()
+                }
                 aspectRatioFrameLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                     gravity = Gravity.NO_GRAVITY
                 }
@@ -1255,7 +1317,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         slidingLayout.translationY = 0f - scaledYDiff - ((insets?.top ?: 0) * minimizedScaleY) + newY
                     }
                 }
-                aspectRatioFrameLayout.resizeMode = resizeMode
+                if (isMaximized) {
+                    applyMaximizedPlayerVisualState()
+                } else {
+                    applyMinimizedPlayerVisualState()
+                }
                 aspectRatioFrameLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                     gravity = Gravity.CENTER
                 }
@@ -1287,6 +1353,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         toggleFloatingChat.visibility = View.GONE
                 }
             }
+            updateQuickPlayerControls()
         }
     }
 
@@ -1335,8 +1402,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 val codec = it.codecs?.substringBefore('.')
                 codec == "avc1" || codec == "mp4a" || codec.isNullOrBlank()
             }
-            qualities.associateBy { quality ->
-                when (quality.name) {
+            qualities.filterNot { quality ->
+                quality.name.isNumericQualityFallback()
+            }.associateBy { quality ->
+                when (normalizeQualityName(quality.name)) {
                     "auto" -> getString(R.string.auto)
                     "source" -> getString(R.string.source)
                     "audio_only" -> getString(R.string.audio_only)
@@ -1363,20 +1432,40 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun showQualityDialog() {
         val qualities = getQualityMap()
         if (!qualities.isNullOrEmpty()) {
-            RadioButtonDialogFragment.newInstance(
-                REQUEST_CODE_QUALITY,
+            PlayerQualityDialog.newInstance(
                 qualities.keys,
                 qualities.values.map { it.name.toString() }.toTypedArray(),
-                qualities.values.indexOf(viewModel.quality)
+                viewModel.quality?.name
             ).show(childFragmentManager, "closeOnPip")
         }
     }
 
+    fun selectQuality(qualityName: String?) {
+        viewModel.userHasChangedQuality = true
+        val normalizedQualityName = normalizeQualityName(qualityName)
+        changeQuality(
+            viewModel.qualities?.find { it.name == qualityName }
+                ?: viewModel.qualities?.find { normalizeQualityName(it.name) == normalizedQualityName }
+        )
+        changePlayerMode()
+        setQualityText()
+    }
+
+    private fun normalizeQualityName(name: String?): String {
+        return name
+            ?.trim()
+            ?.lowercase(Locale.US)
+            ?.replace(' ', '_')
+            ?.replace('-', '_')
+            .orEmpty()
+    }
+
     fun showSpeedDialog() {
-        val speed = getCurrentSpeed()
-        if (speed != null) {
-            PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
-        }
+        val speed = PlayerSpeedDialogState.initialSpeed(
+            currentSpeed = getCurrentSpeed(),
+            savedSpeed = requireContext().prefs().getFloat(C.PLAYER_SPEED, 1f)
+        )
+        PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
     }
 
     fun showVolumeDialog() {
@@ -1612,6 +1701,20 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             gameSlug = requireArguments().getString(KEY_GAME_SLUG),
             gameName = requireArguments().getString(KEY_GAME_NAME),
         )
+    }
+
+    protected fun updateAvailableQualities(qualities: List<VideoQuality>?): Boolean {
+        val selectableQualities = qualities?.toSelectableQualities(includeChatOnly = videoType == STREAM) ?: return false
+        if (!selectableQualities.shouldReplaceCurrentQualities(viewModel.qualities)) {
+            return false
+        }
+        viewModel.qualities = selectableQualities
+        setDefaultQuality()
+        changePlayerMode()
+        if (viewModel.quality?.name == AUDIO_ONLY_QUALITY) {
+            changeQuality(viewModel.quality)
+        }
+        return true
     }
 
     protected fun setDefaultQuality() {
@@ -2187,6 +2290,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             backPressedCallback.remove()
             useController = false
             hideController(true)
+            applyMinimizedPlayerVisualState()
             fun animate() {
                 val (minimizedScaleX, minimizedScaleY) = getScaleValues()
                 val windowInsets = ViewCompat.getRootWindowInsets(requireView())
@@ -2255,6 +2359,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 chatFragment?.toggleBackPressedCallback(true)
             }
             useController = true
+            applyMaximizedPlayerVisualState()
             if (!controllerHideOnTouch) {
                 showController(true)
                 updateProgress()
@@ -2384,17 +2489,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override fun onChange(requestCode: Int, index: Int, text: CharSequence, tag: String?) {
         when (requestCode) {
             REQUEST_CODE_QUALITY -> {
-                viewModel.userHasChangedQuality = true
-                changeQuality(viewModel.qualities?.find { it.name == tag })
-                changePlayerMode()
-                setQualityText()
+                selectQuality(tag)
             }
             REQUEST_CODE_SPEED -> {
                 requireContext().prefs().getString(C.PLAYER_SPEED_LIST, "0.25\n0.5\n0.75\n1.0\n1.25\n1.5\n1.75\n2.0\n3.0\n4.0\n8.0")?.split("\n")?.let { speeds ->
                     speeds.getOrNull(index)?.toFloatOrNull()?.let { speed ->
                         setPlaybackSpeed(speed)
                         requireContext().prefs().edit { putFloat(C.PLAYER_SPEED, speed) }
-                        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setSpeed(speed.toString())
+                        updatePlaybackSpeedUi(speed)
                     }
                 }
             }
@@ -2813,12 +2915,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             // Start with drag handle hidden (synced with player controls)
             binding.dragHandleZone.alpha = if (binding.playerControls.root.isVisible) 1f else 0f
             restoreFloatingChatPosition()
-            // Apply transparency to the container background using theme-aware colors
+            // Floating chat overlays video, so keep the surface dark in every app theme.
             val transparency = prefs.getInt(C.FLOATING_CHAT_TRANSPARENCY, 0)
             val alpha = (transparency * 255 / 100).coerceIn(0, 255)
-            val surfaceColor = MaterialColors.getColor(binding.floatingChatContainer, com.google.android.material.R.attr.colorSurface)
-            val themedColor = ColorUtils.setAlphaComponent(surfaceColor, alpha)
-            binding.floatingChatContainer.setBackgroundColor(themedColor)
+            binding.floatingChatContainer.setBackgroundColor(ColorUtils.setAlphaComponent(Color.BLACK, alpha))
         } else {
             // Hide with fade-out animation
             binding.floatingChatRoot.animate().alpha(0f).setDuration(200)
