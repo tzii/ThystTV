@@ -1,14 +1,14 @@
 # ThystTV 1.2 Upstream Commit Status
 
-Last updated: 2026-05-06
+Last updated: 2026-05-08
 
 Branch: `release/1.2-prep`
 
 Upstream remote: `upstream` -> `https://github.com/crackededed/Xtra.git`
 
-Latest verified upstream head: `377bfac17ff67f49f58593f79f17850693277aa0` (`rename files`)
+Latest verified upstream head: `71d1222c3602d3e5977ac32d050c9bd21fa8900b` (`WIP player changes`)
 
-Most recent refresh: 2026-05-06 during the issue #5 player crash investigation. `git fetch upstream` completed successfully and `upstream/master` was still `377bfac17ff67f49f58593f79f17850693277aa0`.
+Most recent refresh: 2026-05-08 during the final 1.2 release sweep. `git fetch upstream` completed successfully and `upstream/master` had moved from `377bfac1` to `71d1222c`.
 
 This file tracks how the current 1.2 release branch relates to recent upstream Xtra commits. ThystTV is not blindly merging upstream because several changes overlap with ThystTV-specific player, updater, and release-note work.
 
@@ -33,6 +33,7 @@ In `git cherry` output:
 | `579f87ac` - update proguard | Present | Patch-equivalent on `release/1.2-prep`. |
 | `582f58ef` - update unraid message id | Ported | Applied on this branch as `373203e1`. |
 | `06fd811b` - downgrade exoplayer | Ported | Accepted on 2026-05-06 as a targeted fix candidate for ThystTV issue #5. ThystTV kept its own app id/version and took only the Media3 `1.10.0` -> `1.9.3` downgrade plus the HLS parser compatibility rollback. |
+| `88bc97b4` - update unraid message type | Adapted | Accepted on 2026-05-08 as a narrow chat compatibility fix. ThystTV kept its current notice parser and only added the new hide-raid behavior for parsed messages with `msgId == "unraid"`. |
 
 ## Manually ported or partially ported
 
@@ -40,9 +41,29 @@ In `git cherry` output:
 | --- | --- | --- |
 | `628ba784` - show update download progress | Partially ported | The useful updater download-progress behavior was manually implemented as `c35c1876` while preserving ThystTV release-note/changelog behavior. Do not cherry-pick the upstream commit directly because it also carries broader network utility changes that conflict with our updater work. |
 
+## 2026-05-08 release sweep
+
+`git cherry -v release/1.2-prep upstream/master` now shows four newer upstream commits after the previously reviewed `377bfac1` head:
+
+```text
++ 08e29b1c German translation, further translation (#936)
++ 88bc97b4 update unraid message type
++ bd5656c5 remove hilt
++ 71d1222c WIP player changes
+```
+
+Decision for 1.2:
+
+- `08e29b1c` can be deferred. It is a German translation update and has low release risk, but it is not required for the 1.2 player/updater/site release gate.
+- `88bc97b4` was manually adapted for 1.2 as a small chat compatibility change.
+- `bd5656c5` is deferred. It removes Hilt and touches dependency injection, repositories, view models, player services, and download workers. This is far too broad for the release branch.
+- `71d1222c` is deferred. It is another broad WIP player/service change and conflicts with the 1.2 focus on stabilizing the existing player polish.
+
+No broad upstream merge should happen before `v1.2.0`.
+
 ## 2026-05-05 selective sync pass
 
-`git cherry -v release/1.2-prep upstream/master` still shows the same remaining upstream candidates:
+At the time, `git cherry -v release/1.2-prep upstream/master` still showed the same remaining upstream candidates:
 
 ```text
 + a25b9310 replace bundleOf

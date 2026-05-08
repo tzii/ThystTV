@@ -107,6 +107,8 @@ class PlayerQualityDialog : DialogFragment() {
                 tag = mode?.canonicalTag ?: tag,
                 mode = mode
             )
+        }.filterNot { entry ->
+            entry.mode == null && (entry.label.isNumericQualityFallback() || entry.tag.isNumericQualityFallback())
         }
         val videoEntries = entries.filterNot { it.isAudioChatMode }
         val audioChatEntries = entries

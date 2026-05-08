@@ -4,16 +4,9 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
-### Added
-- Placeholder
+No unreleased changes yet.
 
-### Changed
-- Placeholder
-
-### Fixed
-- Placeholder
-
-## [1.2.0] - YYYY-MM-DD
+## [1.2.0] - 2026-05-08
 
 See `docs/release-notes/1.2.0.md`.
 

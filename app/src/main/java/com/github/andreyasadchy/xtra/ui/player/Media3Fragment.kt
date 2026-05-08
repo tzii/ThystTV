@@ -206,33 +206,8 @@ class Media3Fragment : PlayerFragment() {
                                             }
                                         }
                                     }
-                                    if (list != null) {
-                                        viewModel.qualities = list.asSequence()
-                                            .sortedByDescending {
-                                                it.name?.substringAfter("p", "")?.takeWhile { it.isDigit() }?.toIntOrNull()
-                                            }
-                                            .sortedByDescending {
-                                                it.name?.substringBefore("p", "")?.takeWhile { it.isDigit() }?.toIntOrNull()
-                                            }
-                                            .sortedByDescending {
-                                                it.name == "source"
-                                            }
-                                            .toMutableList().apply {
-                                                add(0, VideoQuality(AUTO_QUALITY))
-                                                if (find { it.name == AUDIO_ONLY_QUALITY } == null) {
-                                                    add(VideoQuality(AUDIO_ONLY_QUALITY))
-                                                }
-                                                if (videoType == STREAM) {
-                                                    add(VideoQuality(CHAT_ONLY_QUALITY))
-                                                }
-                                            }
-                                        setDefaultQuality()
-                                        changePlayerMode()
-                                        if (viewModel.quality?.name == AUDIO_ONLY_QUALITY) {
-                                            changeQuality(viewModel.quality)
-                                        }
-                                    }
-                                    if (reason == Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE) {
+                                    updateAvailableQualities(list)
+                                    if (list != null || reason == Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE) {
                                         viewModel.updateQualities = false
                                     }
                                 }

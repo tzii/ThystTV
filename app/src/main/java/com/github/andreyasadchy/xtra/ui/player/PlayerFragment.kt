@@ -1402,7 +1402,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 val codec = it.codecs?.substringBefore('.')
                 codec == "avc1" || codec == "mp4a" || codec.isNullOrBlank()
             }
-            qualities.associateBy { quality ->
+            qualities.filterNot { quality ->
+                quality.name.isNumericQualityFallback()
+            }.associateBy { quality ->
                 when (normalizeQualityName(quality.name)) {
                     "auto" -> getString(R.string.auto)
                     "source" -> getString(R.string.source)
@@ -1699,6 +1701,20 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             gameSlug = requireArguments().getString(KEY_GAME_SLUG),
             gameName = requireArguments().getString(KEY_GAME_NAME),
         )
+    }
+
+    protected fun updateAvailableQualities(qualities: List<VideoQuality>?): Boolean {
+        val selectableQualities = qualities?.toSelectableQualities(includeChatOnly = videoType == STREAM) ?: return false
+        if (!selectableQualities.shouldReplaceCurrentQualities(viewModel.qualities)) {
+            return false
+        }
+        viewModel.qualities = selectableQualities
+        setDefaultQuality()
+        changePlayerMode()
+        if (viewModel.quality?.name == AUDIO_ONLY_QUALITY) {
+            changeQuality(viewModel.quality)
+        }
+        return true
     }
 
     protected fun setDefaultQuality() {
