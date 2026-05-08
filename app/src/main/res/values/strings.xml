@@ -42,10 +42,10 @@
     <string name="source">Source</string>
     <string name="audio_only">Audio only</string>
     <string name="chat_only">Chat only</string>
-    <string name="video_quality">Video quality</string>
-    <string name="audio_chat_modes">Audio / chat only</string>
-    <string name="audio_only_quality_summary">Keep audio playback without video</string>
-    <string name="chat_only_quality_summary">Keep chat visible without video playback</string>
+    <string name="video_quality" translatable="false">Video quality</string>
+    <string name="audio_chat_modes" translatable="false">Audio / chat only</string>
+    <string name="audio_only_quality_summary" translatable="false">Keep audio playback without video</string>
+    <string name="chat_only_quality_summary" translatable="false">Keep chat visible without video playback</string>
     <string name="select_quality">Select quality</string>
     <string name="download">Download</string>
     <string name="downloading">Downloading...</string>
@@ -589,18 +589,18 @@
     <string name="backup_settings">Backup settings and data</string>
     <string name="restore_settings">Restore settings and data</string>
     <string name="share">Share</string>
-    <string name="system_about">System &amp; About</string>
+    <string name="system_about" translatable="false">System &amp; About</string>
     <string name="check_updates">Check for updates</string>
-    <string name="updater">Updater</string>
-    <string name="changelog">Changelog</string>
-    <string name="latest_release">Latest release</string>
-    <string name="bundled_changelog">Bundled changelog</string>
-    <string name="current_version">Current version %s</string>
-    <string name="checking_for_updates">Checking for updates...</string>
-    <string name="latest_release_unavailable">Could not load the latest release. Showing the bundled changelog below.</string>
-    <string name="latest_release_installed">You are on the latest release.</string>
-    <string name="new_version_available">New version available</string>
-    <string name="about_thysttv_message">ThystTV %s\n\nA Twitch client based on Xtra, with ThystTV branding, player polish, and built-in update support.</string>
+    <string name="updater" translatable="false">Updater</string>
+    <string name="changelog" translatable="false">Changelog</string>
+    <string name="latest_release" translatable="false">Latest release</string>
+    <string name="bundled_changelog" translatable="false">Bundled changelog</string>
+    <string name="current_version" translatable="false">Current version %s</string>
+    <string name="checking_for_updates" translatable="false">Checking for updates...</string>
+    <string name="latest_release_unavailable" translatable="false">Could not load the latest release. Showing the bundled changelog below.</string>
+    <string name="latest_release_installed" translatable="false">You are on the latest release.</string>
+    <string name="new_version_available" translatable="false">New version available</string>
+    <string name="about_thysttv_message" translatable="false">ThystTV %s\n\nA Twitch client based on Xtra, with ThystTV branding, player polish, and built-in update support.</string>
     <string name="no_updates_found">No updates found</string>
     <string name="update_available">Update available</string>
     <string name="update_message">Download latest update?</string>
