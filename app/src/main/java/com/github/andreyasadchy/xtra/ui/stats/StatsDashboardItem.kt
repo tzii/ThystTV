@@ -12,6 +12,7 @@ sealed interface StatsDashboardItem {
         val dailyAverageText: String,
         val weekChangeText: String,
         val todayTimeText: String,
+        val rangeTotalLabelText: String,
         val weekTotalText: String,
     ) : StatsDashboardItem {
         override val cardType = StatsCardType.SCREEN_TIME

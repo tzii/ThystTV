@@ -1,162 +1,180 @@
-# ThystTV
-
 <p align="center">
-  <img src="docs/images/ic_launcher_foreground.svg" width="128" height="128" />
+  <img src="docs/images/readme/app-icon.svg" width="112" height="112" alt="ThystTV app icon">
 </p>
 
-A fork of [Xtra](https://github.com/crackededed/Xtra) with additional features focused on viewer experience, playback UX, local stats, and accessibility.
+<h1 align="center">ThystTV</h1>
 
-> **Current focus:** polishing the app, fixing player and stats regressions, improving large-screen layouts, cleaning up the repo, and staying aligned with upstream Xtra.
->
-> **Upstream sync note:** ThystTV currently uses a selective upstream-sync approach. Some upstream Xtra fixes are cherry-picked and conflict-resolved locally so GitHub can still show the fork as "behind" even when those safe changes are already present here. The main intentionally deferred upstream area is the unstable player rewrite, which is being kept out until it can be integrated without breaking ThystTV-specific behavior.
+<p align="center">
+  A better Twitch client for Android, focused on player polish, floating chat, local viewing stats, and large-screen comfort.
+</p>
 
-## Current Branch
+<p align="center">
+  <a href="https://github.com/tzii/ThystTV/tree/release/1.2-prep"><img alt="release branch" src="https://img.shields.io/badge/branch-release%2F1.2--prep-9850ee?style=for-the-badge"></a>
+  <a href="https://github.com/tzii/ThystTV/blob/release/1.2-prep/LICENSE"><img alt="license AGPL-3.0" src="https://img.shields.io/github/license/tzii/ThystTV?style=for-the-badge"></a>
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-93.9%25-7f52ff?style=for-the-badge&logo=kotlin&logoColor=white">
+  <img alt="Stars" src="https://img.shields.io/github/stars/tzii/ThystTV?style=for-the-badge">
+</p>
 
-`fix/stats-layout-and-player-regressions`
+<p align="center">
+  <a href="#screenshots">Screenshots</a>
+  ·
+  <a href="#what-thysttv-adds">Features</a>
+  ·
+  <a href="#build-from-source">Build</a>
+  ·
+  <a href="#credit">Credit</a>
+</p>
 
-## To Do
+---
 
-### Player & Gesture Polish
-- [ ] Make seek gestures much more responsive for VoD scrubbing
-- [ ] Refine remaining gesture edge cases during active interactions
-- [ ] Re-check playback speed UI polish on-device
-- [ ] Test gesture behavior thoroughly on-device
-- [ ] Re-verify brightness behavior on phone and tablet after the recent fixes
+## What is ThystTV?
 
-### Stats & Large-Screen Layout
-- [x] Fix major stats card/layout issues on phone, tablet, and rotation paths
-- [x] Finish the adaptive stats dashboard migration cleanup
-- [x] Move stats adaptation fully to width-based behavior
-- [ ] Switch adaptive sizing logic from `screenWidthDp` tiers to proper window-size-class handling
-- [x] Use the canonical dashboard path instead of legacy screen-specific stats layouts
-- [x] Verify compact / medium / expanded dashboard behavior
-- [x] Verify rotation-driven dashboard re-layout while the stats screen is already open
-- [ ] Verify split-screen and resized window behavior on large screens
-- [ ] Do a final wide-tablet polish pass after more real-device screenshots
+**ThystTV** is a third-party Twitch client for Android. It is based on [Xtra](https://github.com/crackededed/Xtra), with ThystTV-specific work aimed at making the viewing experience cleaner, faster, and more comfortable on phones, tablets, and large displays.
 
-### Visual & UI Cleanup
-- [ ] Fix app icon cropping / masking issues on Android launchers
-- [ ] Add updated screenshots to the README
-- [ ] Add updated screenshots to the project site
-- [ ] Refresh visuals so the repo better reflects the current app UI
+The current focus is the `release/1.2-prep` branch: player refinement, better floating chat behavior, local watch-history insights, repo polish, and a more complete project presentation.
 
-### Repo Cleanup & Maintenance
-- [ ] Delete temporary screenshots folder
-- [ ] Clean up repo structure and temporary assets
-- [ ] Review branch leftovers from the stats/player refactor
-- [ ] Improve overall project organization
+> ThystTV is a fork of Xtra. A lot of credit goes to the Xtra project for the foundation this app builds on.
 
-### Upstream Sync
-- [ ] Sync with the latest useful upstream Xtra changes
-- [ ] Re-check ThystTV-specific features after upstream sync
-- [ ] Make sure custom player, stats, and floating chat behavior still work correctly
+## Project status
 
-### Testing
-- [x] Run and pass unit tests for adaptive stats behavior
-- [x] Run and pass unit tests for brightness / floating-chat state helpers
-- [ ] Run and pass broader gesture behavior tests
-- [x] Build debug successfully
-- [ ] Build release successfully
-- [ ] Do proper manual regression testing on phone and tablet layouts
+| Area | Current detail |
+|---|---|
+| Repository | [`tzii/ThystTV`](https://github.com/tzii/ThystTV) |
+| Active branch | [`release/1.2-prep`](https://github.com/tzii/ThystTV/tree/release/1.2-prep) |
+| Release target | `1.2.0` |
+| License | [GNU AGPL-3.0](LICENSE) |
+| Primary language | Kotlin, with Java components |
 
-## Progress So Far
+## Screenshots
 
-### Gesture System
-- [x] Tap sensitivity after scroll fixed
-- [x] Gesture zone boundaries configurable
-- [x] Minimize gesture conflicts improved
-- [x] Optional haptic feedback added
-- [x] Gesture settings integrated into Settings
-- [x] Brightness restore logic improved when leaving fullscreen / minimizing
-- [x] Gesture helper and player state unit tests added
-- [x] Gesture architecture documentation added
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <strong>Popular streams</strong><br><br>
+      <img src="docs/images/readme/popular.png" alt="Popular streams tab in ThystTV" width="260">
+    </td>
+    <td width="34%" align="center">
+      <strong>Full-screen player</strong><br><br>
+      <img src="docs/images/readme/player.png" alt="Full-screen player with floating chat overlay" width="430">
+    </td>
+    <td width="33%" align="center">
+      <strong>Local stats</strong><br><br>
+      <img src="docs/images/readme/stats.png" alt="Local stats dashboard in ThystTV" width="260">
+    </td>
+  </tr>
+</table>
 
-### Stats & Analytics
-- [x] Daily screen time tracking implemented
-- [x] Favorite channels card implemented with watch time as the primary ranking
-- [x] Watch streak tracking implemented
-- [x] Streamer loyalty scoring implemented
-- [x] Category breakdown, legends, and heatmaps implemented
-- [x] Adaptive stats dashboard refactor completed on the main stats path
-- [x] Dashboard span policy and adapter introduced
-- [x] Width-based stats resources introduced
-- [x] Short-height landscape card compositions added for screen time and categories
-- [x] Rotation refresh fixed so the dashboard re-lays out immediately on orientation change
-- [x] Loyalty and top-stream cards merged into a single full-width favorite-channels card
-- [x] Legacy `layout-sw600dp` / `layout-land` stats screen variants removed from the main path
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <strong>Playback speed</strong><br><br>
+      <img src="docs/images/readme/playback-speed.png" alt="Playback speed popup showing active speed controls" width="300">
+    </td>
+    <td width="34%" align="center">
+      <strong>Video quality</strong><br><br>
+      <img src="docs/images/readme/video-quality.png" alt="Video quality popup with quality and chat-only controls" width="300">
+    </td>
+    <td width="33%" align="center">
+      <strong>Updater changelog</strong><br><br>
+      <img src="docs/images/readme/changelog-update.jpg" alt="Updater dialog showing release changelog and download action" width="260">
+    </td>
+  </tr>
+</table>
 
-### Floating Chat
-- [x] Floating chat overlay implemented
-- [x] Opacity control and high-visibility mode implemented
-- [x] Drag / resize persistence implemented
-- [x] Fullscreen re-entry behavior improved to avoid empty sidebar + floating-chat conflicts
+## Floating chat
 
-## What's Different from Xtra?
+Floating chat is one of ThystTV's headline viewing upgrades. It keeps chat available during full-screen playback without forcing the player into a cramped split layout.
 
-| Feature | Xtra | ThystTV |
-|---------|------|---------|
-| Floating Chat Overlay | No | Yes |
-| Screen Time & Watch Stats | No | Yes |
-| Swipe Gesture Controls | No | Yes |
-| Watch Streak & Loyalty Metrics | No | Yes |
-| Adaptive Stats Dashboard Work | No | In progress |
+<p align="center">
+  <img src="docs/images/readme/floating-chat.png" alt="Full-screen playback with floating chat overlay" width="760">
+</p>
 
-## Key Features
+<p align="center">
+  <a href="docs/images/readme/floating-chat.mp4">Watch the floating chat demo video</a>
+</p>
 
-### Floating Chat
-- **Overlay Mode**: Keep up with chat while watching in full-screen
-- **Customizable**: Resize and move the chat window anywhere on screen
-- **Opacity Control**: Adjust transparency to balance stream and chat visibility
-- **High Visibility Mode**: Improve readability over bright video content
+## What ThystTV adds
 
-### Screen Time & Stats
-- **Daily Tracking**: Monitor your viewing time directly inside the app
-- **Top Channels**: See your most-watched channels and streamers
-- **Watch Streaks**: Track current and longest watch streaks
-- **Loyalty Metrics**: See which streamers you come back to most
-- **Privacy First**: All stats are stored locally on your device
-- **Easy Access**: Open stats from the dedicated tab
+### Player refinement
 
-### Gesture Controls
-- **Volume**: Slide up/down on the right half of the screen
-- **Brightness**: Slide up/down on the left half of the screen
-- **Seek** (VoD only): Horizontal swipe on the top half of the screen
-- **Playback Speed** (VoD only): Horizontal swipe on the bottom half of the screen
-- **Visual Feedback**: Real-time overlay while adjusting controls
-- **Edge Protection**: Gestures are limited in system gesture zones to reduce conflicts
-- **Chat Mode Cycle**: Double-tap cycles chat display modes (overlay, side-by-side, hidden)
+- Gesture-based playback controls for horizontal seek, playback speed, brightness, and volume.
+- Clearer feedback while interacting with the player.
+- Better visual handling for minimized player states.
+- VoD scrubbing improvements that scale with video duration.
 
-## Notes On The Current Stats Migration
+### Floating chat
 
-The stats screen is now driven by a dashboard-style `RecyclerView` with span-based card placement instead of the old stacked tablet layout path. The current branch includes:
+- Chat overlay designed for full-screen viewing.
+- A cleaner way to keep stream context visible while the video remains primary.
+- Better fit for phones, tablets, and wide layouts.
 
-- width tiers at `600dp` and `840dp`
-- dashboard span policy tests
-- width-based resource buckets for wide-card layouts
-- a base dashboard host layout for `StatsFragment`
-- short-height landscape compositions for screen time and categories
-- immediate adapter/layout refresh on rotation while staying on the stats screen
-- a merged `Favorite Channels` card that combines watch time, loyalty, sessions, and relative progress in one list
+### Local stats
 
-What is still left after this branch:
+- Watch-history and screen-time insights.
+- Category breakdowns and viewing patterns.
+- Favorite channel and session-focused views.
+- Stats stay local on the device.
 
-- switching width-tier detection to proper dynamic window-size-class handling
-- finishing verification under split-screen and arbitrary window resizing
-- tuning density and spans on real wide tablets after more screenshots
+### Updater and changelog
 
-## Building
+- In-app update checks with release details.
+- Changelog previews before downloading a new build.
+- Direct links to the GitHub release when more context is needed.
+
+### Large-screen comfort
+
+- Layout work for tablets and wider Android screens.
+- Player and browsing screens tuned to avoid cramped controls.
+- More polished presentation for the 1.2 release cycle.
+
+## Build from source
+
+Recommended local setup:
+
+- Android Studio, current stable release
+- JDK 21
+- Android SDK matching the project configuration
 
 ```bash
-# Debug build
 ./gradlew assembleDebug
-
-# Release build
-./gradlew assembleRelease
-
-# Run tests
 ./gradlew test
+./gradlew assembleRelease
 ```
+
+On Windows:
+
+```powershell
+.\gradlew.bat assembleDebug
+.\gradlew.bat test
+.\gradlew.bat assembleRelease
+```
+
+## Downloads
+
+The active release work is currently happening on [`release/1.2-prep`](https://github.com/tzii/ThystTV/tree/release/1.2-prep). Use the repository releases page when tagged builds are published.
+
+## Documentation
+
+- [Roadmap](docs/ROADMAP.md)
+- [Testing guide](docs/TESTING.md)
+- [Manual QA](docs/MANUAL_QA.md)
+- [Player notes](docs/PLAYER.md)
+- [Gesture system](docs/GESTURE_SYSTEM.md)
+- [Release process](docs/RELEASE_PROCESS.md)
+- [1.2 release plan](docs/RELEASE_1_2_PLAN.md)
+- [Upstream sync policy](docs/UPSTREAM_SYNC.md)
+- [Visual identity](docs/VISUAL_IDENTITY.md)
+
+## Contributing
+
+Contributions should stay focused, reviewable, and easy to test. For UI work, include screenshots. For player or gesture changes, include manual test notes for live playback, VoDs, orientation changes, and minimize/restore behavior.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a non-trivial pull request.
+
+## Credit
+
+ThystTV is based on [Xtra](https://github.com/crackededed/Xtra). The upstream project deserves major credit for the base client, architecture, and years of work that made this fork possible.
 
 ## License
 
-ThystTV is licensed under the [GNU Affero General Public License v3.0](LICENSE), same as the upstream Xtra project.
+ThystTV is licensed under the [GNU Affero General Public License v3.0](LICENSE).

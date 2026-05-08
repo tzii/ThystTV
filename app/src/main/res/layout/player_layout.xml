@@ -156,6 +156,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
+        android:gravity="center_vertical"
         android:layout_marginTop="5dp"
         android:layout_marginEnd="10dp">
 
@@ -199,14 +200,28 @@
             app:tint="@android:color/white"
             tools:visibility="visible" />
 
-        <ImageButton
+        <TextView
             android:id="@+id/speed"
-            android:layout_width="40dp"
+            android:layout_width="64dp"
             android:layout_height="40dp"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
             android:background="@android:color/transparent"
-            android:src="@drawable/exo_ic_speed"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:minWidth="0dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp"
+            android:text="1x"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
             android:visibility="gone"
-            app:tint="@android:color/white"
+            tools:text="1x"
             tools:visibility="visible" />
 
         <ImageButton
@@ -431,13 +446,16 @@
 
     <TextView
         android:id="@+id/position"
-        android:layout_width="55sp"
+        android:layout_width="72dp"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_marginStart="7dp"
         android:layout_marginBottom="10dp"
         android:background="@android:color/transparent"
         android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:singleLine="true"
         android:textColor="@android:color/white"
         tools:text="12:16" />
 
@@ -460,12 +478,16 @@
 
     <TextView
         android:id="@+id/duration"
-        android:layout_width="wrap_content"
+        android:layout_width="72dp"
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
         android:layout_marginEnd="10dp"
         android:layout_marginBottom="10dp"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:singleLine="true"
         android:textColor="@android:color/white"
         tools:text="1:12:16" />
 

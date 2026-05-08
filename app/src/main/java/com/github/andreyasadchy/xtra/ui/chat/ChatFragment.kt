@@ -206,7 +206,9 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                             editText.clearFocus()
                             ImageClickedDialog.newInstance(url, name, format, isAnimated, source, thirdParty, emoteId).show(this@ChatFragment.childFragmentManager, "imageDialog")
                         },
-                    )
+                    ).apply {
+                        useDarkOverlay = isFloatingMode
+                    }
                     recyclerView.let {
                         it.adapter = adapter
                         it.itemAnimator = null
@@ -948,8 +950,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     fun updateHighVisibility(isFloating: Boolean) {
         adapter?.let { chatAdapter ->
             val useHighVisibility = isFloating && requireContext().prefs().getBoolean(C.FLOATING_CHAT_HIGH_VISIBILITY, true)
-            if (chatAdapter.useHighVisibility != useHighVisibility) {
+            val useDarkOverlay = isFloating
+            if (chatAdapter.useHighVisibility != useHighVisibility || chatAdapter.useDarkOverlay != useDarkOverlay) {
                 chatAdapter.useHighVisibility = useHighVisibility
+                chatAdapter.useDarkOverlay = useDarkOverlay
                 chatAdapter.notifyDataSetChanged()
             }
         }

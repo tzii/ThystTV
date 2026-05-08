@@ -186,10 +186,12 @@ class DailyBarChartView @JvmOverloads constructor(
             barRect.set(barLeft, barTop, barRight, chartBottom)
             canvas.drawRoundRect(barRect, barCornerRadius, barCornerRadius, barPaint)
 
-            // Draw day label
-            val labelX = barLeft + barWidth / 2
-            val labelY = height - 12f
-            canvas.drawText(dayData.label, labelX, labelY, labelPaint)
+            if (dayData.label.isNotBlank()) {
+                val halfLabelWidth = labelPaint.measureText(dayData.label) / 2f
+                val labelX = (barLeft + barWidth / 2).coerceIn(leftMargin + halfLabelWidth, width - rightMargin - halfLabelWidth)
+                val labelY = height - 12f
+                canvas.drawText(dayData.label, labelX, labelY, labelPaint)
+            }
         }
     }
 }

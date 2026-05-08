@@ -91,10 +91,17 @@
     <fragment
         android:id="@+id/updateSettingsFragment"
         android:name="com.github.andreyasadchy.xtra.ui.settings.SettingsActivity$UpdateSettingsFragment"
-        android:label="@string/update_settings" />
+        android:label="@string/updater" />
     <action
         android:id="@+id/action_global_updateSettingsFragment"
         app:destination="@id/updateSettingsFragment" />
+    <fragment
+        android:id="@+id/changelogSettingsFragment"
+        android:name="com.github.andreyasadchy.xtra.ui.settings.SettingsActivity$ChangelogSettingsFragment"
+        android:label="@string/changelog" />
+    <action
+        android:id="@+id/action_global_changelogSettingsFragment"
+        app:destination="@id/changelogSettingsFragment" />
     <fragment
         android:id="@+id/debugSettingsFragment"
         android:name="com.github.andreyasadchy.xtra.ui.settings.SettingsActivity$DebugSettingsFragment"

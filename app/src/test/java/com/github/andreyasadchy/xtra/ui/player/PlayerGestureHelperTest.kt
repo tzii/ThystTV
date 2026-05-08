@@ -89,6 +89,113 @@ class PlayerGestureHelperTest {
     }
 
     @Test
+    fun `calculateResponsiveSeekPosition keeps small drags precise`() {
+        val duration = 7200_000L // 2 hours
+        val currentPosition = 1800_000L // 30 minutes
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 50f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        val seekDelta = newPosition - currentPosition
+        assertTrue(seekDelta in 60_000L..240_000L)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition allows major seek on long vod`() {
+        val duration = 7200_000L // 2 hours
+        val currentPosition = 1800_000L // 30 minutes
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        val seekFraction = (newPosition - currentPosition).toFloat() / duration.toFloat()
+        assertTrue(seekFraction in 0.15f..0.22f)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition is more aggressive on multi hour vods`() {
+        val duration = 16_200_000L // 4h30m
+        val currentPosition = 8_100_000L
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        val seekMinutes = (newPosition - currentPosition) / 60_000L
+        assertTrue(seekMinutes in 50L..70L)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition lets short clips traverse quickly`() {
+        val duration = 30_000L // 30 seconds
+        val currentPosition = 5_000L
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        assertTrue(newPosition in 26_000L..30_000L)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition keeps ultra long vods meaningful but bounded`() {
+        val duration = 172_800_000L // 48 hours
+        val currentPosition = 86_400_000L // midpoint
+
+        val newPosition = helper.calculateResponsiveSeekPosition(
+            currentPosition = currentPosition,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+
+        val seekFraction = (newPosition - currentPosition).toFloat() / duration.toFloat()
+        assertTrue(seekFraction in 0.11f..0.13f)
+    }
+
+    @Test
+    fun `calculateResponsiveSeekPosition is symmetric and clamped`() {
+        val duration = 14_400_000L // 4 hours
+
+        val beforeStart = helper.calculateResponsiveSeekPosition(
+            currentPosition = 30_000L,
+            duration = duration,
+            gestureDelta = -1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+        assertEquals(0L, beforeStart)
+
+        val pastEnd = helper.calculateResponsiveSeekPosition(
+            currentPosition = duration - 30_000L,
+            duration = duration,
+            gestureDelta = 1000f,
+            screenWidth = 1000,
+            sensitivity = 1f
+        )
+        assertEquals(duration, pastEnd)
+    }
+
+    @Test
     fun `isHorizontalSwipe detects horizontal swipes`() {
         assertTrue(helper.isHorizontalSwipe(100f, 20f, 50f))
         assertFalse(helper.isHorizontalSwipe(30f, 20f, 50f)) // Below threshold

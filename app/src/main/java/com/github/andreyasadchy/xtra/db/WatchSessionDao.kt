@@ -105,6 +105,19 @@
         LIMIT :limit
     """)
     suspend fun getStreamerLoyaltyData(limit: Int = 20): List<RawStreamerLoyalty>
+
+    @Query("""
+        SELECT channelId, channelName, channelLogin,
+               SUM(durationSeconds) as totalWatchSeconds,
+               COUNT(*) as sessionCount,
+               COUNT(DISTINCT date) as distinctDaysWatched
+        FROM watch_sessions
+        WHERE channelId IS NOT NULL AND date BETWEEN :startDate AND :endDate
+        GROUP BY channelId, channelName, channelLogin
+        ORDER BY totalWatchSeconds DESC
+        LIMIT :limit
+    """)
+    suspend fun getStreamerLoyaltyData(startDate: String, endDate: String, limit: Int = 20): List<RawStreamerLoyalty>
     
     // Flow version for streamer loyalty
     @Query("""

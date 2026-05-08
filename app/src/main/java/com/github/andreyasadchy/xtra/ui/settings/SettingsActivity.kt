@@ -6,12 +6,15 @@ import android.app.admin.DeviceAdminReceiver
 import android.app.admin.DevicePolicyManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.ext.SdkExtensions
 import android.provider.Settings
+import android.text.method.LinkMovementMethod
+import android.text.format.Formatter
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -22,6 +25,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SearchView
@@ -58,14 +62,21 @@ import androidx.preference.forEach
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.github.andreyasadchy.xtra.BuildConfig
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.SettingsNavGraphDirections
 import com.github.andreyasadchy.xtra.databinding.ActivitySettingsBinding
+import com.github.andreyasadchy.xtra.databinding.DialogUpdateDownloadBinding
+import com.github.andreyasadchy.xtra.databinding.FragmentChangelogSettingsBinding
+import com.github.andreyasadchy.xtra.model.ui.ReleaseInfo
 import com.github.andreyasadchy.xtra.model.ui.SettingsDragListItem
 import com.github.andreyasadchy.xtra.model.ui.SettingsSearchItem
+import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
+import com.github.andreyasadchy.xtra.ui.common.UpdateAvailableDialog
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.applyTheme
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.prefs
@@ -76,6 +87,8 @@ import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
 import dagger.hilt.android.AndroidEntryPoint
+import io.noties.markwon.Markwon
+import io.noties.markwon.linkify.LinkifyPlugin
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -83,6 +96,31 @@ import kotlinx.coroutines.launch
 import org.chromium.net.CronetProvider
 import java.util.Collections
 import java.util.Locale
+
+private fun renderMarkdown(textView: TextView, markdown: String) {
+    Markwon.builder(textView.context)
+        .usePlugin(LinkifyPlugin.create())
+        .build()
+        .setMarkdown(textView, markdown)
+    textView.movementMethod = LinkMovementMethod.getInstance()
+}
+
+private fun readRawText(context: Context, resId: Int): String {
+    return context.resources.openRawResource(resId)
+        .bufferedReader()
+        .use { it.readText() }
+}
+
+private fun releaseDate(releaseInfo: ReleaseInfo): String? {
+    return releaseInfo.publishedAt?.substringBefore("T")?.takeIf { it.isNotBlank() }
+}
+
+private fun buildReleaseMarkdown(context: Context, releaseInfo: ReleaseInfo): String {
+    val date = releaseDate(releaseInfo) ?: context.getString(R.string.unknown)
+    val releaseNotes = releaseInfo.releaseNotes?.takeIf { it.isNotBlank() }
+        ?: context.getString(R.string.no_release_notes)
+    return "## ${releaseInfo.tagName}\n\n$date\n\n$releaseNotes"
+}
 
 @AndroidEntryPoint
 class SettingsActivity : AppCompatActivity() {
@@ -253,6 +291,8 @@ class SettingsActivity : AppCompatActivity() {
         private val viewModel: SettingsViewModel by activityViewModels()
         private var backupResultLauncher: ActivityResultLauncher<Intent>? = null
         private var restoreResultLauncher: ActivityResultLauncher<Intent>? = null
+        private var updateDownloadDialogBinding: DialogUpdateDownloadBinding? = null
+        private var updateDownloadDialog: AlertDialog? = null
 
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
@@ -406,15 +446,33 @@ class SettingsActivity : AppCompatActivity() {
             findPreference<Preference>("check_updates")?.setOnPreferenceClickListener {
                 viewModel.checkUpdates(
                     requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
-                    requireContext().prefs().getString(C.UPDATE_URL, null) ?: "https://api.github.com/repos/crackededed/xtra/releases/tags/latest",
-                    requireContext().tokenPrefs().getLong(C.UPDATE_LAST_CHECKED, 0)
+                    UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
                 )
+                true
+            }
+            findPreference<Preference>("changelog_settings")?.setOnPreferenceClickListener {
+                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
+                findNavController().navigate(SettingsNavGraphDirections.actionGlobalChangelogSettingsFragment())
                 true
             }
             findPreference<Preference>("update_settings")?.setOnPreferenceClickListener {
                 requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
                 findNavController().navigate(SettingsNavGraphDirections.actionGlobalUpdateSettingsFragment())
                 true
+            }
+            findPreference<Preference>("about_settings")?.setOnPreferenceClickListener {
+                showAboutDialog()
+                true
+            }
+            findPreference<Preference>("new_version_available")?.apply {
+                isVisible = false
+                setOnPreferenceClickListener {
+                    viewModel.checkUpdates(
+                        requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
+                        UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
+                    )
+                    true
+                }
             }
             findPreference<Preference>("backup_settings")?.setOnPreferenceClickListener {
                 backupResultLauncher?.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
@@ -480,33 +538,129 @@ class SettingsActivity : AppCompatActivity() {
 
                                 }
                             }
-                            requireActivity().getAlertDialogBuilder()
-                                .setTitle(getString(R.string.update_available))
-                                .setMessage(getString(R.string.update_message))
-                                .setPositiveButton(getString(R.string.yes)) { _, _ ->
-                                    if (requireContext().prefs().getBoolean(C.UPDATE_USE_BROWSER, false)) {
-                                        try {
-                                            val intent = Intent(Intent.ACTION_VIEW, it.toUri()).apply {
-                                                addCategory(Intent.CATEGORY_BROWSABLE)
-                                            }
-                                            startActivity(intent)
-                                            requireContext().tokenPrefs().edit {
-                                                putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
-                                            }
-                                        } catch (e: ActivityNotFoundException) {
-                                            Toast.makeText(requireContext(), R.string.no_browser_found, Toast.LENGTH_LONG).show()
-                                        }
-                                    } else {
-                                        viewModel.downloadUpdate(requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), it)
-                                    }
-                                }
-                                .setNegativeButton(getString(R.string.no), null)
-                                .show()
+                            showUpdateDialog(it)
                         } else {
                             Toast.makeText(requireContext(), R.string.no_updates_found, Toast.LENGTH_LONG).show()
                         }
                     }
                 }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.latestReleaseInfo.collectLatest { releaseInfo ->
+                        val updateInfo = releaseInfo
+                            ?.takeIf { UpdateUtils.isVersionNewer(it.tagName, BuildConfig.VERSION_NAME) }
+                            ?.toUpdateInfo()
+                        findPreference<Preference>("new_version_available")?.apply {
+                            isVisible = updateInfo != null
+                            summary = updateInfo?.versionName
+                        }
+                    }
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.updateProgress.collectLatest { bytesRead ->
+                        updateDownloadDialogBinding?.let { binding ->
+                            updateDownloadDialogText(binding, bytesRead)
+                        }
+                    }
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.closeUpdateDialog.collectLatest {
+                        updateDownloadDialog?.dismiss()
+                    }
+                }
+            }
+            viewModel.loadLatestRelease(
+                requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
+                UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
+            )
+        }
+
+        private fun showAboutDialog() {
+            requireActivity().getAlertDialogBuilder()
+                .setTitle(getString(R.string.app_name))
+                .setMessage(getString(R.string.about_thysttv_message, BuildConfig.VERSION_NAME))
+                .setPositiveButton(getString(android.R.string.ok), null)
+                .setNeutralButton(getString(R.string.view_on_github)) { _, _ ->
+                    openUpdateUrl("https://github.com/tzii/ThystTV", markChecked = false)
+                }
+                .show()
+        }
+
+        private fun showUpdateDialog(updateInfo: UpdateInfo) {
+            UpdateAvailableDialog.show(
+                context = requireContext(),
+                inflater = layoutInflater,
+                updateInfo = updateInfo,
+                onDownload = {
+                    if (requireContext().prefs().getBoolean(C.UPDATE_USE_BROWSER, false)) {
+                        openUpdateUrl(updateInfo.downloadUrl, markChecked = true)
+                    } else {
+                        requireContext().tokenPrefs().edit {
+                            putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                        }
+                        showUpdateDownloadDialog(updateInfo.downloadUrl)
+                    }
+                },
+                onLater = {
+                    requireContext().tokenPrefs().edit {
+                        putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                    }
+                },
+                onGithub = { url -> openUpdateUrl(url, markChecked = false) }
+            )
+        }
+
+        private fun showUpdateDownloadDialog(downloadUrl: String) {
+            val binding = DialogUpdateDownloadBinding.inflate(layoutInflater)
+            updateDownloadDialogBinding = binding
+            updateDownloadDialogText(binding, 0L)
+            viewModel.downloadUpdate(requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), downloadUrl)
+            updateDownloadDialog = requireActivity().getAlertDialogBuilder()
+                .setView(binding.root)
+                .setNegativeButton(getString(android.R.string.cancel), null)
+                .setOnDismissListener {
+                    viewModel.updateJob?.cancel()
+                    updateDownloadDialogBinding = null
+                    updateDownloadDialog = null
+                }
+                .show()
+        }
+
+        private fun updateDownloadDialogText(binding: DialogUpdateDownloadBinding, bytesRead: Long) {
+            val size = viewModel.updateSize
+            val percent = UpdateUtils.downloadProgressPercent(bytesRead, size)
+            if (size != null && percent != null) {
+                binding.textView.text = getString(
+                    R.string.downloading_update_progress,
+                    Formatter.formatFileSize(requireContext(), bytesRead),
+                    Formatter.formatFileSize(requireContext(), size),
+                )
+                binding.progressBar.isIndeterminate = false
+                binding.progressBar.progress = percent
+            } else {
+                binding.textView.text = getString(R.string.downloading_update)
+                binding.progressBar.isIndeterminate = true
+            }
+        }
+
+        private fun openUpdateUrl(url: String, markChecked: Boolean) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                }
+                startActivity(intent)
+                if (markChecked) {
+                    requireContext().tokenPrefs().edit {
+                        putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                    }
+                }
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(requireContext(), R.string.no_browser_found, Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -1311,6 +1465,269 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
             (requireActivity() as? SettingsActivity)?.getSelectedSearchItem()?.let { scrollToPreference(it) }
+        }
+    }
+
+    class ChangelogSettingsFragment : Fragment() {
+
+        private val viewModel: SettingsViewModel by activityViewModels()
+        private var _binding: FragmentChangelogSettingsBinding? = null
+        private val binding get() = _binding!!
+        private var updateDownloadDialogBinding: DialogUpdateDownloadBinding? = null
+        private var updateDownloadDialog: AlertDialog? = null
+        private var latestUpdateInfo: UpdateInfo? = null
+
+        override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+            _binding = FragmentChangelogSettingsBinding.inflate(inflater, container, false)
+            return binding.root
+        }
+
+        override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+            super.onViewCreated(view, savedInstanceState)
+            val baseBottomPadding = binding.root.paddingBottom
+            ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
+                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+                binding.root.updatePadding(bottom = baseBottomPadding + insets.bottom)
+                WindowInsetsCompat.CONSUMED
+            }
+            requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.let { appBar ->
+                if (requireContext().prefs().getBoolean(C.UI_THEME_APPBAR_LIFT, true)) {
+                    appBar.setLiftOnScrollTargetView(binding.root)
+                    binding.root.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+                        appBar.isLifted = scrollY > 0
+                    }
+                    binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                        appBar.isLifted = binding.root.canScrollVertically(-1)
+                    }
+                } else {
+                    appBar.setLiftable(false)
+                    appBar.background = null
+                }
+            }
+
+            binding.updaterStatus.text = getString(R.string.current_version, BuildConfig.VERSION_NAME)
+            binding.latestReleaseTitle.text = getString(R.string.checking_for_updates)
+            binding.latestReleaseDate.text = ""
+            binding.latestReleaseStatus.text = ""
+            binding.latestReleaseNotes.text = ""
+            binding.downloadUpdateButton.visibility = View.GONE
+            binding.viewOnGithubButton.visibility = View.GONE
+            renderMarkdown(binding.bundledChangelog, readRawText(requireContext(), R.raw.thysttv_changelog))
+
+            binding.checkUpdatesButton.setOnClickListener {
+                binding.latestReleaseTitle.text = getString(R.string.checking_for_updates)
+                binding.latestReleaseStatus.text = ""
+                viewModel.checkUpdates(
+                    requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
+                    UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
+                )
+            }
+            binding.updateSettingsButton.setOnClickListener {
+                findNavController().navigate(SettingsNavGraphDirections.actionGlobalUpdateSettingsFragment())
+            }
+            binding.downloadUpdateButton.setOnClickListener {
+                latestUpdateInfo?.let(::startUpdate)
+            }
+            binding.viewOnGithubButton.setOnClickListener {
+                latestUpdateInfo?.releaseUrl
+                    ?.let { openUpdateUrl(it, markChecked = false) }
+                    ?: viewModel.latestReleaseInfo.replayCache.firstOrNull()?.releaseUrl?.let {
+                        openUpdateUrl(it, markChecked = false)
+                    }
+            }
+
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.latestReleaseInfo.collectLatest(::bindLatestRelease)
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.changelogReleases.collectLatest(::bindChangelogReleases)
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.updateUrl.collectLatest { updateInfo ->
+                        if (updateInfo != null) {
+                            latestUpdateInfo = updateInfo
+                            bindLatestRelease(updateInfo.toReleaseInfo())
+                            showUpdateDialog(updateInfo)
+                        } else {
+                            Toast.makeText(requireContext(), R.string.no_updates_found, Toast.LENGTH_LONG).show()
+                            viewModel.loadLatestRelease(
+                                requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
+                            )
+                        }
+                    }
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.updateProgress.collectLatest { bytesRead ->
+                        updateDownloadDialogBinding?.let { updateDownloadDialogText(it, bytesRead) }
+                    }
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.closeUpdateDialog.collectLatest {
+                        updateDownloadDialog?.dismiss()
+                    }
+                }
+            }
+
+            val networkLibrary = requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp")
+            val releaseUrl = requireContext().prefs().getString(C.UPDATE_URL, null)
+            viewModel.loadLatestRelease(networkLibrary, UpdateUtils.resolveReleaseApiUrl(releaseUrl))
+            viewModel.loadChangelogReleases(networkLibrary, UpdateUtils.resolveReleasesApiUrl(releaseUrl))
+        }
+
+        private fun bindLatestRelease(releaseInfo: ReleaseInfo?) {
+            if (releaseInfo == null) {
+                latestUpdateInfo = null
+                binding.latestReleaseTitle.text = getString(R.string.latest_release)
+                binding.latestReleaseDate.text = ""
+                binding.latestReleaseStatus.text = getString(R.string.latest_release_unavailable)
+                binding.latestReleaseNotes.text = ""
+                binding.downloadUpdateButton.visibility = View.GONE
+                binding.viewOnGithubButton.visibility = View.GONE
+                return
+            }
+
+            latestUpdateInfo = releaseInfo
+                .takeIf { UpdateUtils.isVersionNewer(it.tagName, BuildConfig.VERSION_NAME) }
+                ?.toUpdateInfo()
+            binding.latestReleaseTitle.text = releaseInfo.title?.takeIf { it.isNotBlank() } ?: releaseInfo.tagName
+            binding.latestReleaseDate.text = releaseDate(releaseInfo) ?: getString(R.string.unknown)
+            binding.latestReleaseStatus.text = if (UpdateUtils.isVersionNewer(releaseInfo.tagName, BuildConfig.VERSION_NAME)) {
+                getString(R.string.new_version_available)
+            } else {
+                getString(R.string.latest_release_installed)
+            }
+            renderMarkdown(
+                binding.latestReleaseNotes,
+                releaseInfo.releaseNotes?.takeIf { it.isNotBlank() } ?: getString(R.string.no_release_notes)
+            )
+            binding.downloadUpdateButton.visibility = if (latestUpdateInfo != null) View.VISIBLE else View.GONE
+            binding.viewOnGithubButton.visibility = if (releaseInfo.releaseUrl.isNullOrBlank()) View.GONE else View.VISIBLE
+        }
+
+        private fun bindChangelogReleases(releases: List<ReleaseInfo>?) {
+            val markdown = releases
+                ?.takeIf { it.isNotEmpty() }
+                ?.joinToString("\n\n---\n\n") { buildReleaseMarkdown(requireContext(), it) }
+                ?: readRawText(requireContext(), R.raw.thysttv_changelog)
+            renderMarkdown(binding.bundledChangelog, markdown)
+        }
+
+        private fun showUpdateDialog(updateInfo: UpdateInfo) {
+            UpdateAvailableDialog.show(
+                context = requireContext(),
+                inflater = layoutInflater,
+                updateInfo = updateInfo,
+                onDownload = { startUpdate(updateInfo) },
+                onLater = {
+                    requireContext().tokenPrefs().edit {
+                        putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                    }
+                },
+                onGithub = { url -> openUpdateUrl(url, markChecked = false) }
+            )
+        }
+
+        private fun startUpdate(updateInfo: UpdateInfo) {
+            if (requireContext().prefs().getBoolean(C.UPDATE_USE_BROWSER, false)) {
+                openUpdateUrl(updateInfo.downloadUrl, markChecked = true)
+            } else {
+                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                    !requireContext().packageManager.canRequestPackageInstalls()
+                ) {
+                    try {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            "package:${requireContext().packageName}".toUri()
+                        )
+                        startActivity(intent)
+                    } catch (e: ActivityNotFoundException) {
+
+                    }
+                }
+                requireContext().tokenPrefs().edit {
+                    putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                }
+                showUpdateDownloadDialog(updateInfo.downloadUrl)
+            }
+        }
+
+        private fun showUpdateDownloadDialog(downloadUrl: String) {
+            val binding = DialogUpdateDownloadBinding.inflate(layoutInflater)
+            updateDownloadDialogBinding = binding
+            updateDownloadDialogText(binding, 0L)
+            viewModel.downloadUpdate(requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), downloadUrl)
+            updateDownloadDialog = requireActivity().getAlertDialogBuilder()
+                .setView(binding.root)
+                .setNegativeButton(getString(android.R.string.cancel), null)
+                .setOnDismissListener {
+                    viewModel.updateJob?.cancel()
+                    updateDownloadDialogBinding = null
+                    updateDownloadDialog = null
+                }
+                .show()
+        }
+
+        private fun updateDownloadDialogText(binding: DialogUpdateDownloadBinding, bytesRead: Long) {
+            val size = viewModel.updateSize
+            val percent = UpdateUtils.downloadProgressPercent(bytesRead, size)
+            if (size != null && percent != null) {
+                binding.textView.text = getString(
+                    R.string.downloading_update_progress,
+                    Formatter.formatFileSize(requireContext(), bytesRead),
+                    Formatter.formatFileSize(requireContext(), size),
+                )
+                binding.progressBar.isIndeterminate = false
+                binding.progressBar.progress = percent
+            } else {
+                binding.textView.text = getString(R.string.downloading_update)
+                binding.progressBar.isIndeterminate = true
+            }
+        }
+
+        private fun openUpdateUrl(url: String, markChecked: Boolean) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                }
+                startActivity(intent)
+                if (markChecked) {
+                    requireContext().tokenPrefs().edit {
+                        putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                    }
+                }
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(requireContext(), R.string.no_browser_found, Toast.LENGTH_LONG).show()
+            }
+        }
+
+        private fun UpdateInfo.toReleaseInfo(): ReleaseInfo {
+            return ReleaseInfo(
+                versionName = versionName,
+                tagName = tagName,
+                title = title,
+                publishedAt = publishedAt,
+                releaseNotes = releaseNotes,
+                releaseUrl = releaseUrl,
+                downloadUrl = downloadUrl,
+            )
+        }
+
+        override fun onDestroyView() {
+            updateDownloadDialog?.dismiss()
+            updateDownloadDialogBinding = null
+            updateDownloadDialog = null
+            _binding = null
+            super.onDestroyView()
         }
     }
 

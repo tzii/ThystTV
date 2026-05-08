@@ -21,6 +21,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.text.format.Formatter
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
@@ -29,6 +30,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.OptIn
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
@@ -59,13 +61,16 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.ActivityMainBinding
+import com.github.andreyasadchy.xtra.databinding.DialogUpdateDownloadBinding
 import com.github.andreyasadchy.xtra.model.ui.Clip
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.model.ui.Stream
+import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.ui.common.Scrollable
+import com.github.andreyasadchy.xtra.ui.common.UpdateAvailableDialog
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.games.GamesFragmentDirections
@@ -77,6 +82,7 @@ import com.github.andreyasadchy.xtra.ui.team.TeamFragmentDirections
 import com.github.andreyasadchy.xtra.ui.top.TopStreamsFragmentDirections
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.applyTheme
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.prefs
@@ -139,6 +145,8 @@ class MainActivity : AppCompatActivity() {
     var settingsResultLauncher: ActivityResultLauncher<Intent>? = null
     var loginResultLauncher: ActivityResultLauncher<Intent>? = null
     var logoutResultLauncher: ActivityResultLauncher<Intent>? = null
+    private var updateDownloadDialogBinding: DialogUpdateDownloadBinding? = null
+    private var updateDownloadDialog: AlertDialog? = null
 
     //Lifecycle methods
 
@@ -248,8 +256,7 @@ class MainActivity : AppCompatActivity() {
                                 ) {
                                     viewModel.checkUpdates(
                                         prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
-                                        prefs.getString(C.UPDATE_URL, null) ?: "https://api.github.com/repos/crackededed/xtra/releases/tags/latest",
-                                        tokenPrefs().getLong(C.UPDATE_LAST_CHECKED, 0)
+                                        UpdateUtils.resolveReleaseApiUrl(prefs.getString(C.UPDATE_URL, null))
                                     )
                                 }
                             }
@@ -263,33 +270,24 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.updateUrl.collectLatest {
                     if (it != null) {
-                        getAlertDialogBuilder()
-                            .setTitle(getString(R.string.update_available))
-                            .setMessage(getString(R.string.update_message))
-                            .setPositiveButton(getString(R.string.yes)) { _, _ ->
-                                if (prefs.getBoolean(C.UPDATE_USE_BROWSER, false)) {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_VIEW, it.toUri()).apply {
-                                            addCategory(Intent.CATEGORY_BROWSABLE)
-                                        }
-                                        startActivity(intent)
-                                        tokenPrefs().edit {
-                                            putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
-                                        }
-                                    } catch (e: ActivityNotFoundException) {
-                                        Toast.makeText(this@MainActivity, R.string.no_browser_found, Toast.LENGTH_LONG).show()
-                                    }
-                                } else {
-                                    viewModel.downloadUpdate(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), it)
-                                }
-                            }
-                            .setNegativeButton(getString(R.string.no)) { _, _ ->
-                                tokenPrefs().edit {
-                                    putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
-                                }
-                            }
-                            .show()
+                        showUpdateDialog(it)
                     }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.updateProgress.collectLatest { bytesRead ->
+                    updateDownloadDialogBinding?.let { binding ->
+                        updateDownloadDialogText(binding, bytesRead)
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.closeUpdateDialog.collectLatest {
+                    updateDownloadDialog?.dismiss()
                 }
             }
         }
@@ -494,6 +492,79 @@ class MainActivity : AppCompatActivity() {
             },
             ActivityOptions.makeCustomAnimation(this, 0, 0).toBundle()
         )
+    }
+
+    private fun showUpdateDialog(updateInfo: UpdateInfo) {
+        UpdateAvailableDialog.show(
+            context = this,
+            inflater = layoutInflater,
+            updateInfo = updateInfo,
+            onDownload = {
+                if (prefs.getBoolean(C.UPDATE_USE_BROWSER, false)) {
+                    openUpdateUrl(updateInfo.downloadUrl, markChecked = true)
+                } else {
+                    tokenPrefs().edit {
+                        putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                    }
+                    showUpdateDownloadDialog(updateInfo.downloadUrl)
+                }
+            },
+            onLater = {
+                tokenPrefs().edit {
+                    putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                }
+            },
+            onGithub = { url -> openUpdateUrl(url, markChecked = false) }
+        )
+    }
+
+    private fun showUpdateDownloadDialog(downloadUrl: String) {
+        val binding = DialogUpdateDownloadBinding.inflate(layoutInflater)
+        updateDownloadDialogBinding = binding
+        updateDownloadDialogText(binding, 0L)
+        viewModel.downloadUpdate(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), downloadUrl)
+        updateDownloadDialog = getAlertDialogBuilder()
+            .setView(binding.root)
+            .setNegativeButton(getString(android.R.string.cancel), null)
+            .setOnDismissListener {
+                viewModel.updateJob?.cancel()
+                updateDownloadDialogBinding = null
+                updateDownloadDialog = null
+            }
+            .show()
+    }
+
+    private fun updateDownloadDialogText(binding: DialogUpdateDownloadBinding, bytesRead: Long) {
+        val size = viewModel.updateSize
+        val percent = UpdateUtils.downloadProgressPercent(bytesRead, size)
+        if (size != null && percent != null) {
+            binding.textView.text = getString(
+                R.string.downloading_update_progress,
+                Formatter.formatFileSize(this, bytesRead),
+                Formatter.formatFileSize(this, size),
+            )
+            binding.progressBar.isIndeterminate = false
+            binding.progressBar.progress = percent
+        } else {
+            binding.textView.text = getString(R.string.downloading_update)
+            binding.progressBar.isIndeterminate = true
+        }
+    }
+
+    private fun openUpdateUrl(url: String, markChecked: Boolean) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+            }
+            startActivity(intent)
+            if (markChecked) {
+                tokenPrefs().edit {
+                    putLong(C.UPDATE_LAST_CHECKED, System.currentTimeMillis())
+                }
+            }
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.no_browser_found, Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onUserLeaveHint() {
