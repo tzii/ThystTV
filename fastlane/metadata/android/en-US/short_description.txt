@@ -1,1 +1,1 @@
-Third-party Twitch client
+Polished third-party Twitch client: floating chat, gestures, local stats

@@ -1,3 +1,5 @@
+> **Frozen (historical).** This was the upstream ledger for the 1.2 release cycle, which shipped as `v1.2.0` on 2026-05-08. The `release/1.2-prep` branch no longer exists. The living ledger is [`UPSTREAM_SYNC_LEDGER.md`](UPSTREAM_SYNC_LEDGER.md).
+
 # ThystTV 1.2 Upstream Commit Status
 
 Last updated: 2026-05-08

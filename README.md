@@ -9,13 +9,16 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tzii/ThystTV/tree/release/1.2-prep"><img alt="release branch" src="https://img.shields.io/badge/branch-release%2F1.2--prep-9850ee?style=for-the-badge"></a>
-  <a href="https://github.com/tzii/ThystTV/blob/release/1.2-prep/LICENSE"><img alt="license AGPL-3.0" src="https://img.shields.io/github/license/tzii/ThystTV?style=for-the-badge"></a>
+  <a href="https://github.com/tzii/ThystTV/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/tzii/ThystTV?style=for-the-badge&color=9850ee"></a>
+  <a href="https://github.com/tzii/ThystTV/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/tzii/ThystTV/ci.yml?branch=master&style=for-the-badge&label=CI"></a>
+  <a href="https://github.com/tzii/ThystTV/blob/master/LICENSE"><img alt="license AGPL-3.0" src="https://img.shields.io/github/license/tzii/ThystTV?style=for-the-badge"></a>
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-93.9%25-7f52ff?style=for-the-badge&logo=kotlin&logoColor=white">
   <img alt="Stars" src="https://img.shields.io/github/stars/tzii/ThystTV?style=for-the-badge">
 </p>
 
 <p align="center">
+  <a href="#download--install">Download</a>
+  ·
   <a href="#screenshots">Screenshots</a>
   ·
   <a href="#what-thysttv-adds">Features</a>
@@ -31,7 +34,7 @@
 
 **ThystTV** is a third-party Twitch client for Android. It is based on [Xtra](https://github.com/crackededed/Xtra), with ThystTV-specific work aimed at making the viewing experience cleaner, faster, and more comfortable on phones, tablets, and large displays.
 
-The current focus is the `release/1.2-prep` branch: player refinement, better floating chat behavior, local watch-history insights, repo polish, and a more complete project presentation.
+The focus: player refinement, better floating chat behavior, local watch-history insights, large-screen comfort, and a trustworthy, well-documented release process.
 
 > ThystTV is a fork of Xtra. A lot of credit goes to the Xtra project for the foundation this app builds on.
 
@@ -40,8 +43,9 @@ The current focus is the `release/1.2-prep` branch: player refinement, better fl
 | Area | Current detail |
 |---|---|
 | Repository | [`tzii/ThystTV`](https://github.com/tzii/ThystTV) |
-| Active branch | [`release/1.2-prep`](https://github.com/tzii/ThystTV/tree/release/1.2-prep) |
-| Release target | `1.2.0` |
+| Active branch | [`master`](https://github.com/tzii/ThystTV) |
+| Latest release | [`v1.2.0`](https://github.com/tzii/ThystTV/releases/latest) |
+| Package name | `com.tzii.thysttv` ([how to verify builds](docs/APK_VERIFICATION.md)) |
 | License | [GNU AGPL-3.0](LICENSE) |
 | Primary language | Kotlin, with Java components |
 
@@ -149,9 +153,40 @@ On Windows:
 .\gradlew.bat assembleRelease
 ```
 
-## Downloads
+## Download & install
 
-The active release work is currently happening on [`release/1.2-prep`](https://github.com/tzii/ThystTV/tree/release/1.2-prep). Use the repository releases page when tagged builds are published.
+Official builds are published on **[GitHub Releases](https://github.com/tzii/ThystTV/releases)**.
+
+1. Download `ThystTV-X.Y.Z.apk` from the [latest release](https://github.com/tzii/ThystTV/releases/latest).
+2. Allow your browser/file manager to install unknown apps if Android asks.
+3. Install. Future official releases install over it (same signing key), and the optional in-app updater can check GitHub Releases for you (off by default, enable in Settings → Updater).
+
+ThystTV requires Android 6.0+ and installs alongside upstream Xtra (different package name).
+
+### Verify your download
+
+Every release is signed with the same ThystTV release key:
+
+```text
+Package:  com.tzii.thysttv
+SHA-256:  7F:8A:84:3B:92:56:1E:0F:FF:49:D7:75:89:F5:4D:95:16:9F:6B:73:9F:CF:23:5B:52:D4:CA:6B:8A:B7:1F:4A
+```
+
+```bash
+apksigner verify --print-certs ThystTV-X.Y.Z.apk
+```
+
+See **[docs/APK_VERIFICATION.md](docs/APK_VERIFICATION.md)** for keytool/AppVerifier instructions, per-release checksums, and signature-mismatch troubleshooting.
+
+### Privacy & local data
+
+ThystTV has no analytics and no tracking. Watch-history/stats data stays on your device; your Twitch login token is only used against Twitch's own APIs. The updater only contacts the GitHub Releases API, and only if you enable it.
+
+### Troubleshooting installs
+
+- **"App not installed" on update** — usually a corrupted download; re-download and check the checksum. If you previously installed a debug or self-built APK (different key), uninstall it first.
+- **Update refused after switching download source** — only mixes of *differently-signed* builds conflict; all official GitHub releases share one key.
+- More cases: [docs/APK_VERIFICATION.md](docs/APK_VERIFICATION.md#troubleshooting-app-not-installed--signature-mismatch).
 
 ## Documentation
 
@@ -161,8 +196,10 @@ The active release work is currently happening on [`release/1.2-prep`](https://g
 - [Player notes](docs/PLAYER.md)
 - [Gesture system](docs/GESTURE_SYSTEM.md)
 - [Release process](docs/RELEASE_PROCESS.md)
-- [1.2 release plan](docs/RELEASE_1_2_PLAN.md)
+- [APK verification](docs/APK_VERIFICATION.md)
+- [Distribution channels](docs/DISTRIBUTION.md)
 - [Upstream sync policy](docs/UPSTREAM_SYNC.md)
+- [Upstream sync ledger](docs/UPSTREAM_SYNC_LEDGER.md)
 - [Visual identity](docs/VISUAL_IDENTITY.md)
 
 ## Contributing

@@ -1,8 +1,0 @@
-<i>Twitch için Xtra</i>, mobil cihazlarda en iyi izleme ve sohbet deneyimini sağlamaya odaklanmış bir <a href='https://en.wikipedia.org/wiki/Twitch_(service)' target='_blank'>Twitch</a> istemcisidir:
-
-* BetterTTV ve FrankerFaceZ eklentileriyle popüler ifadeler için destek
-* Sohbet tekrarıyla VOD'ları ve klipleri izleme
-* Çevrimdışı izlemek için VOD'ları indirme
-* Resim içinde Resim moduyla uygulamanın dışında izlemeye devam edin
-* Yayını otomatik olarak durdurmak için uyku zamanlayıcısı
-* 3 farklı renk temasıyla özelleştirilebilir arayüz

@@ -9,8 +9,11 @@ Recommended flow:
 2. merge to `master`
 3. update `CHANGELOG.md`
 4. add `docs/release-notes/X.Y.Z.md`
-5. create tag `vX.Y.Z`
-6. let release workflow publish the APK and GitHub Release
+5. add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (short, ≤500 chars — IzzyOnDroid/F-Droid read it from the tagged commit)
+6. create tag `vX.Y.Z`
+7. let the release workflow publish the APK, its `.sha256` checksum, and the GitHub Release
+
+The workflow verifies the APK is signed with the official release certificate (pinned in `.github/workflows/release.yml`) and appends a verification footer to the release notes. See `docs/APK_VERIFICATION.md` and `docs/DISTRIBUTION.md`.
 
 ## Before release
 - version bump committed
@@ -30,6 +33,7 @@ Each release note should include:
 
 ## After release
 - verify the GitHub release page
-- verify APK artifact name
+- verify APK artifact name and that the `.sha256` checksum asset is attached
+- add the new APK checksum to the table in `docs/APK_VERIFICATION.md`
 - verify screenshots / site update if included
 - delete merged release branches
