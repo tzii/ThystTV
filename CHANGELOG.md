@@ -4,7 +4,9 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Fixed
+- Downloaded video thumbnails now update correctly when moving downloaded files (manual port from upstream Xtra `12a8fac5`).
+- Channel point reward cost in chat now uses locale-aware number formatting (manual port from upstream Xtra `12a8fac5`).
 
 ## [1.2.0] - 2026-05-08
 
