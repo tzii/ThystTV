@@ -238,7 +238,7 @@ class DownloadsViewModel @Inject internal constructor(
                     repository.updateVideo(video.apply {
                         thumbnail.let {
                             if (it == null || it == url || !File(it).exists()) {
-                                newVideoFileUri
+                                thumbnail = newVideoFileUri
                             }
                         }
                         url = newVideoFileUri
