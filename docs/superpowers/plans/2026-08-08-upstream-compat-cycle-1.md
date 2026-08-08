@@ -666,7 +666,7 @@ git commit -m "fix: update bookmark VOD retention policy"
 The exact GitHub attachment generated from the unchanged 2,450,831-byte repository MP4 is:
 
 ```text
-https://github.com/user-attachments/assets/dadbe18b-ffa5-4e88-af34-467bb72e545c
+https://github.com/user-attachments/assets/99d97579-3340-4200-8aa7-3cae0414560e
 ```
 
 The upload was completed through GitHub's README editor, and the editor was closed without saving changes to `master`.
@@ -744,7 +744,7 @@ Replace:
 with this exact Markdown and fallback block:
 
 ```markdown
-https://github.com/user-attachments/assets/dadbe18b-ffa5-4e88-af34-467bb72e545c
+https://github.com/user-attachments/assets/99d97579-3340-4200-8aa7-3cae0414560e
 
 <p align="center">
   <a href="docs/images/readme/floating-chat.mp4">Download the floating chat demo video</a>
