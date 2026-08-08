@@ -89,8 +89,10 @@ Floating chat is one of ThystTV's headline viewing upgrades. It keeps chat avail
   <img src="docs/images/readme/floating-chat.png" alt="Full-screen playback with floating chat overlay" width="760">
 </p>
 
+https://github.com/user-attachments/assets/99d97579-3340-4200-8aa7-3cae0414560e
+
 <p align="center">
-  <a href="docs/images/readme/floating-chat.mp4">Watch the floating chat demo video</a>
+  <a href="docs/images/readme/floating-chat.mp4">Download the floating chat demo video</a>
 </p>
 
 ## What ThystTV adds
