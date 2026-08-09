@@ -113,7 +113,6 @@ class BookmarksAdapter(
                     val durationSeconds = item.duration?.let { duration -> duration.toIntOrNull() ?: TwitchApiHelper.getDuration(duration) }
                     val position = item.videoId?.toLongOrNull()?.let { id -> positions?.find { it.id == id }?.position }
                     val ignore = ignored?.find { it.userId == item.userId } != null
-                    val userType = item.userType ?: item.userBroadcasterType
                     root.setOnClickListener {
                         (fragment.activity as MainActivity).startVideo(
                             Video(
@@ -154,13 +153,11 @@ class BookmarksAdapter(
                     } else {
                         date.visibility = View.GONE
                     }
-                    if (item.type?.lowercase() == "archive" && userType != null && item.createdAt != null && context.prefs().getBoolean(C.UI_BOOKMARK_TIME_LEFT, true) && !ignore) {
-                        val time = TwitchApiHelper.getVodTimeLeft(context, item.createdAt,
-                            when (userType.lowercase()) {
-                                "" -> 14
-                                "affiliate" -> 14
-                                else -> 60
-                            }
+                    if (item.type?.lowercase() == "archive" && item.createdAt != null && context.prefs().getBoolean(C.UI_BOOKMARK_TIME_LEFT, true) && !ignore) {
+                        val time = TwitchApiHelper.getVodTimeLeft(
+                            context,
+                            item.createdAt,
+                            vodRetentionDays(item.userType, item.userBroadcasterType)
                         )
                         if (!time.isNullOrBlank()) {
                             views.visibility = View.VISIBLE

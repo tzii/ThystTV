@@ -154,7 +154,7 @@ class PlayerRepository @Inject constructor(
                         }
                     }
                 }.build().newCall(Request.Builder().apply {
-                    url("https://gql.twitch.tv/gql/")
+                    url(TwitchEndpoints.GRAPHQL)
                     accessTokenHeaders.filterKeys { it == C.HEADER_CLIENT_ID || it == "X-Device-Id" }.forEach {
                         addHeader(it.key, it.value)
                     }
@@ -203,7 +203,7 @@ class PlayerRepository @Inject constructor(
                         }
                     }
                 }.build().newCall(Request.Builder().apply {
-                    url("https://gql.twitch.tv/gql/")
+                    url(TwitchEndpoints.GRAPHQL)
                     accessTokenHeaders.filterKeys { it == C.HEADER_CLIENT_ID || it == "X-Device-Id" }.forEach {
                         addHeader(it.key, it.value)
                     }

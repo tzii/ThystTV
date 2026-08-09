@@ -81,7 +81,7 @@ class SearchStreamsDataSource(
                     tags = it.freeformTags?.mapNotNull { tag -> tag.name },
                 )
             }
-        }
+        }.filterValidBroadcasters()
         offset = data.edges.lastOrNull()?.cursor?.toString()
         val nextPage = data.pageInfo?.hasNextPage != false
         return LoadResult.Page(
@@ -116,7 +116,7 @@ class SearchStreamsDataSource(
                     tags = it.tags,
                 )
             } else null
-        }
+        }.filterValidBroadcasters()
         offset = response.pagination?.cursor
         return LoadResult.Page(
             data = list,

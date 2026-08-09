@@ -162,33 +162,26 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
                     val sorted = if (viewModel.order == BookmarksSortDialog.ORDER_ASC) {
                         when (viewModel.sort) {
                             BookmarksSortDialog.SORT_EXPIRES_AT -> list.sortedWith(compareBy(nullsLast()) {
-                                if (it.type?.lowercase() == "archive") {
-                                    val userType = it.userType ?: it.userBroadcasterType
-                                    if (userType != null && it.createdAt != null) {
-                                        val time = TwitchApiHelper.parseIso8601DateUTC(it.createdAt)
-                                        val days = when (userType.lowercase()) {
-                                            "" -> 14
-                                            "affiliate" -> 14
-                                            else -> 60
+                                if (it.type?.lowercase() == "archive" && it.createdAt != null) {
+                                    val time = TwitchApiHelper.parseIso8601DateUTC(it.createdAt)
+                                    val days = vodRetentionDays(it.userType, it.userBroadcasterType)
+                                    if (time != null) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            val date = Instant.ofEpochMilli(time).plus(days.toLong(), ChronoUnit.DAYS)
+                                            val diff = Duration.between(Instant.now(), date)
+                                            if (!diff.isNegative) {
+                                                diff.seconds
+                                            } else null
+                                        } else {
+                                            val currentTime = Calendar.getInstance().time.time
+                                            val calendar = Calendar.getInstance()
+                                            calendar.timeInMillis = time
+                                            calendar.add(Calendar.DAY_OF_MONTH, days)
+                                            val diff = ((calendar.time.time - currentTime) / 1000)
+                                            if (diff >= 0) {
+                                                diff
+                                            } else null
                                         }
-                                        if (time != null) {
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                                val date = Instant.ofEpochMilli(time).plus(days.toLong(), ChronoUnit.DAYS)
-                                                val diff = Duration.between(Instant.now(), date)
-                                                if (!diff.isNegative) {
-                                                    diff.seconds
-                                                } else null
-                                            } else {
-                                                val currentTime = Calendar.getInstance().time.time
-                                                val calendar = Calendar.getInstance()
-                                                calendar.timeInMillis = time
-                                                calendar.add(Calendar.DAY_OF_MONTH, days)
-                                                val diff = ((calendar.time.time - currentTime) / 1000)
-                                                if (diff >= 0) {
-                                                    diff
-                                                } else null
-                                            }
-                                        } else null
                                     } else null
                                 } else null
                             })
@@ -200,33 +193,26 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
                     } else {
                         when (viewModel.sort) {
                             BookmarksSortDialog.SORT_EXPIRES_AT -> list.sortedWith(compareByDescending(nullsFirst()) {
-                                if (it.type?.lowercase() == "archive") {
-                                    val userType = it.userType ?: it.userBroadcasterType
-                                    if (userType != null && it.createdAt != null) {
-                                        val time = TwitchApiHelper.parseIso8601DateUTC(it.createdAt)
-                                        val days = when (userType.lowercase()) {
-                                            "" -> 14
-                                            "affiliate" -> 14
-                                            else -> 60
+                                if (it.type?.lowercase() == "archive" && it.createdAt != null) {
+                                    val time = TwitchApiHelper.parseIso8601DateUTC(it.createdAt)
+                                    val days = vodRetentionDays(it.userType, it.userBroadcasterType)
+                                    if (time != null) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            val date = Instant.ofEpochMilli(time).plus(days.toLong(), ChronoUnit.DAYS)
+                                            val diff = Duration.between(Instant.now(), date)
+                                            if (!diff.isNegative) {
+                                                diff.seconds
+                                            } else null
+                                        } else {
+                                            val currentTime = Calendar.getInstance().time.time
+                                            val calendar = Calendar.getInstance()
+                                            calendar.timeInMillis = time
+                                            calendar.add(Calendar.DAY_OF_MONTH, days)
+                                            val diff = ((calendar.time.time - currentTime) / 1000)
+                                            if (diff >= 0) {
+                                                diff
+                                            } else null
                                         }
-                                        if (time != null) {
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                                val date = Instant.ofEpochMilli(time).plus(days.toLong(), ChronoUnit.DAYS)
-                                                val diff = Duration.between(Instant.now(), date)
-                                                if (!diff.isNegative) {
-                                                    diff.seconds
-                                                } else null
-                                            } else {
-                                                val currentTime = Calendar.getInstance().time.time
-                                                val calendar = Calendar.getInstance()
-                                                calendar.timeInMillis = time
-                                                calendar.add(Calendar.DAY_OF_MONTH, days)
-                                                val diff = ((calendar.time.time - currentTime) / 1000)
-                                                if (diff >= 0) {
-                                                    diff
-                                                } else null
-                                            }
-                                        } else null
                                     } else null
                                 } else null
                             })

@@ -85,7 +85,7 @@ class StreamsDataSource(
                     tags = it.freeformTags?.mapNotNull { tag -> tag.name },
                 )
             }
-        }
+        }.filterValidBroadcasters()
         offset = items.lastOrNull()?.cursor?.toString()
         val nextPage = data.pageInfo?.hasNextPage != false
         return LoadResult.Page(
@@ -122,7 +122,7 @@ class StreamsDataSource(
                     tags = it.freeformTags?.mapNotNull { tag -> tag.name },
                 )
             }
-        }
+        }.filterValidBroadcasters()
         offset = items.lastOrNull()?.cursor
         val nextPage = data.pageInfo?.hasNextPage != false
         return LoadResult.Page(
@@ -165,7 +165,7 @@ class StreamsDataSource(
                 viewerCount = it.viewerCount,
                 tags = it.tags,
             )
-        }
+        }.filterValidBroadcasters()
         offset = response.pagination?.cursor
         return LoadResult.Page(
             data = list,

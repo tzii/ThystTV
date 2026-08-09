@@ -32,6 +32,7 @@ object ChatUtils {
                 userLogin = userLogin,
                 userName = prefixes["display-name"]?.replace("\\s", " "),
                 systemMsg = systemMsg ?: messageInfo,
+                msgId = prefixes["msg-id"],
                 timestamp = prefixes["tmi-sent-ts"]?.toLong(),
                 fullMsg = message
             )
