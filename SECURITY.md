@@ -35,3 +35,8 @@ Best effort:
 - reproduce and assess severity
 - fix privately where appropriate
 - publish a coordinated fix or release note when ready
+
+## Verifying official builds
+
+Official APKs are signed with the ThystTV release key. Package name, certificate
+fingerprint, and verification instructions: [docs/APK_VERIFICATION.md](docs/APK_VERIFICATION.md).

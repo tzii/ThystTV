@@ -1,8 +1,0 @@
-<i>Xtra untuk Twitch</i> adalah sebuah <a href='https://id.wikipedia.org/wiki/Twitch' target='_blank'>Twitch</a> klien yang berfokus untuk memberikan pengalaman menonton dan mengobrol terbaik di perangkat seluler:
-
-* Mendukung emote populer dengan menggunakan plugin BetterTTV dan FrankerFaceZ
-* Tonton VOD dan klip disertai dengan rekaman chat
-* Unduh VOD untuk ditonton offline
-* Lanjutkan menonton di luar aplikasi dengan menggunakan mode Picture-in-Picture
-* Waktu tidur untuk memberhentikan stream secara otomatis
-* Antarmuka yang dapat disesuaikan dengan 3 warna tema berbeda
