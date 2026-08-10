@@ -31,7 +31,6 @@ import com.github.andreyasadchy.xtra.model.misc.FfzResponse
 import com.github.andreyasadchy.xtra.model.misc.RecentMessagesResponse
 import com.github.andreyasadchy.xtra.model.misc.StvChannelResponse
 import com.github.andreyasadchy.xtra.model.misc.StvGlobalResponse
-import com.github.andreyasadchy.xtra.model.misc.StvResponse
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
@@ -635,41 +634,52 @@ class PlayerRepository @Inject constructor(
                 }
             }
         }
-        val set = response.emoteSet
-        Pair(set.id, parseStvEmotes(set.emotes, useWebp, Emote.CHANNEL_STV))
+        resolveStvChannelEmotes(response, useWebp) { setId ->
+            loadStvEmoteSet(networkLibrary, setId)
+        }
     }
 
-    private fun parseStvEmotes(response: List<StvResponse>, useWebp: Boolean, source: Int): List<Emote> {
-        return response.mapNotNull { emote ->
-            emote.name?.takeIf { it.isNotBlank() }?.let { name ->
-                emote.data?.let { data ->
-                    data.host?.let { host ->
-                        host.url?.takeIf { it.isNotBlank() }?.let { template ->
-                            val urls = host.files?.mapNotNull { file ->
-                                file.name?.takeIf { it.isNotBlank() &&
-                                        if (useWebp) {
-                                            file.format == "WEBP"
-                                        } else {
-                                            file.format == "GIF" || file.format == "PNG"
-                                        }
-                                }?.let { name ->
-                                    "https:${template}/${name}"
-                                }
-                            }
-                            Emote(
-                                name = name,
-                                url1x = urls?.getOrNull(0) ?: "https:${template}/1x.webp",
-                                url2x = urls?.getOrNull(1) ?: if (urls.isNullOrEmpty()) "https:${template}/2x.webp" else null,
-                                url3x = urls?.getOrNull(2) ?: if (urls.isNullOrEmpty()) "https:${template}/3x.webp" else null,
-                                url4x = urls?.getOrNull(3) ?: if (urls.isNullOrEmpty()) "https:${template}/4x.webp" else null,
-                                format = urls?.getOrNull(0)?.substringAfterLast(".") ?: "webp",
-                                isAnimated = data.animated != false,
-                                isOverlayEmote = emote.flags == 1,
-                                source = source,
-                            )
-                        }
-                    }
+    private suspend fun loadStvEmoteSet(networkLibrary: String?, setId: String): StvGlobalResponse {
+        val url = stvEmoteSetUrl(setId)
+        return when {
+            networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
+                val response = suspendCancellableCoroutine { continuation ->
+                    httpEngine.get().newUrlRequestBuilder(
+                        url,
+                        cronetExecutor,
+                        HttpEngineUtils.byteArrayUrlCallback(continuation),
+                    ).apply {
+                        addHeader("User-Agent", "ThystTV/" + BuildConfig.VERSION_NAME)
+                    }.build().start()
                 }
+                json.decodeFromString<StvGlobalResponse>(String(response.second))
+            }
+            networkLibrary == "Cronet" && cronetEngine != null -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    val request = UrlRequestCallbacks.forStringBody(RedirectHandlers.alwaysFollow())
+                    cronetEngine.get().newUrlRequestBuilder(url, request.callback, cronetExecutor).apply {
+                        addHeader("User-Agent", "ThystTV/" + BuildConfig.VERSION_NAME)
+                    }.build().start()
+                    json.decodeFromString<StvGlobalResponse>(request.future.get().responseBody as String)
+                } else {
+                    val response = suspendCancellableCoroutine { continuation ->
+                        cronetEngine.get().newUrlRequestBuilder(
+                            url,
+                            getByteArrayCronetCallback(continuation),
+                            cronetExecutor,
+                        ).apply {
+                            addHeader("User-Agent", "ThystTV/" + BuildConfig.VERSION_NAME)
+                        }.build().start()
+                    }
+                    json.decodeFromString<StvGlobalResponse>(String(response.second))
+                }
+            }
+            else -> okHttpClient.newCall(Request.Builder().apply {
+                url(url)
+                header("User-Agent", "ThystTV/" + BuildConfig.VERSION_NAME)
+            }.build()).execute().use { response ->
+                json.decodeFromString<StvGlobalResponse>(response.body.string())
             }
         }
     }
