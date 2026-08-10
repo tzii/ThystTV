@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import {
   assertCompleteReleaseNotes,
@@ -128,6 +129,24 @@ test("verifyPromotion rejects every mismatched field", () => {
     assert.throws(() => verifyPromotion(manifest, expected), new RegExp(`promotion mismatch: ${key}`));
   }
   assert.throws(() => verifyPromotion({ extra: true }, validManifestFields), /manifest schema mismatch/);
+});
+
+test("1.2.1 release metadata is finalized", () => {
+  const buildGradle = fs.readFileSync("app/build.gradle.kts", "utf8");
+  const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+  const bundledChangelog = fs.readFileSync("app/src/main/res/raw/thysttv_changelog.md", "utf8");
+  const releaseNotes = fs.readFileSync("docs/release-notes/1.2.1.md", "utf8");
+  const fastlaneNotes = fs.readFileSync("fastlane/metadata/android/en-US/changelogs/11.txt", "utf8");
+
+  assert.deepEqual(readVersionConfig(buildGradle), {
+    versionName: "1.2.1",
+    versionCode: 11,
+  });
+  assert.match(changelog, /^## \[1\.2\.1\] - \d{4}-\d{2}-\d{2}$/m);
+  assert.match(bundledChangelog, /^# ThystTV 1\.2\.1$/m);
+  assert.match(releaseNotes, /^# ThystTV 1\.2\.1$/m);
+  assert.doesNotMatch(releaseNotes, /TBD|TODO|placeholder|Release notes were not found/i);
+  assert.ok(fastlaneNotes.length <= 500);
 });
 
 test("release tag policy separates creation authority from immutable refs", () => {
