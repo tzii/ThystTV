@@ -257,9 +257,17 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
                 requireContext().prefs().getBoolean(C.ENABLE_INTEGRITY, false),
             )
         }
+        refreshVideos()
+    }
+
+    private fun refreshVideos() {
         val helixHeaders = TwitchApiHelper.getHelixHeaders(requireContext())
         if (!helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
-            viewModel.updateVideos(requireContext().filesDir.path, requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), helixHeaders)
+            viewModel.updateVideos(
+                requireContext().filesDir.path,
+                requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
+                helixHeaders,
+            )
         }
     }
 
@@ -308,6 +316,7 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
     }
 
     override fun onNetworkRestored() {
+        refreshVideos()
     }
 
     override fun onIntegrityDialogCallback(callback: String?) {

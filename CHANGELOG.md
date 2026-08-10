@@ -11,6 +11,7 @@ All notable changes to ThystTV should be documented here.
 - Twitch GraphQL and playback-token requests now use the canonical no-trailing-slash endpoint (manual port from upstream Xtra `345cff59`).
 - Downloaded video thumbnails now update correctly when moving downloaded files (manual port from upstream Xtra `12a8fac5`).
 - Channel point reward cost in chat now uses locale-aware number formatting (manual port from upstream Xtra `12a8fac5`).
+- Keep locally saved bookmarks and the Downloads tab reachable when bookmark metadata cannot refresh offline.
 
 ## [1.2.0] - 2026-05-08
 
