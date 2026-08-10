@@ -13,6 +13,7 @@ All notable changes to ThystTV should be documented here.
 - Channel point reward cost in chat now uses locale-aware number formatting (manual port from upstream Xtra `12a8fac5`).
 - Keep locally saved bookmarks and the Downloads tab reachable when bookmark metadata cannot refresh offline.
 - 7TV channel emotes now load from the referenced emote-set endpoint when the channel response omits or returns an empty embedded set (manual port from upstream Xtra `9c47305f`).
+- Partial video downloads now include the HLS segment that overlaps the requested start time (manual port from upstream Xtra `8a8b99c5`).
 
 ## [1.2.0] - 2026-05-08
 

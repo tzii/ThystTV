@@ -160,13 +160,11 @@ class VideoDownloadWorker @AssistedInject constructor(
                 }
             }
             val durations = playlist.segments.map { (it.duration * 1000f).toLong() }
-            val selection = selectVideoSegmentsLegacy(
-                durationsMs = durations,
-                targetDurationMs = playlist.targetDuration * 1000L,
-                fromMs = from,
-                toMs = to,
-            )
-            check(!selection.isEmpty)
+            val selection = selectVideoSegments(durations, from, to)
+            if (selection.isEmpty) {
+                offlineRepository.updateVideo(offlineVideo.apply { status = OfflineVideo.STATUS_PENDING })
+                return Result.failure()
+            }
             val fromIndex = requireNotNull(selection.startIndex)
             val toIndex = requireNotNull(selection.endIndex)
             val selectedIndexes = requireNotNull(selection.indexes)

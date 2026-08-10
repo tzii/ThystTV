@@ -17,49 +17,41 @@ internal data class VideoSegmentSelection(
     }
 }
 
-internal fun selectVideoSegmentsLegacy(
+internal fun selectVideoSegments(
     durationsMs: List<Long>,
-    targetDurationMs: Long,
     fromMs: Long,
     toMs: Long,
 ): VideoSegmentSelection {
-    require(durationsMs.isNotEmpty())
-    val relativeStartTimes = ArrayList<Long>(durationsMs.size)
-    var totalDuration = 0L
-    durationsMs.forEach { duration ->
-        relativeStartTimes += totalDuration
-        totalDuration += duration
-    }
-    val fromIndex = if (fromMs == 0L) 0 else {
-        val min = fromMs - targetDurationMs
-        relativeStartTimes.binarySearch { time ->
-            when {
-                time > fromMs -> 1
-                time < min -> -1
-                else -> 0
+    if (durationsMs.isEmpty() || fromMs >= toMs) return VideoSegmentSelection.Empty
+
+    var segmentStart = 0L
+    var firstIndex: Int? = null
+    var lastIndex: Int? = null
+    var sourceStart: Long? = null
+    var selectedDuration = 0L
+
+    durationsMs.forEachIndexed { index, duration ->
+        val segmentEnd = segmentStart + duration
+        if (segmentEnd > fromMs && segmentStart < toMs) {
+            if (firstIndex == null) {
+                firstIndex = index
+                sourceStart = segmentStart
             }
-        }.let { if (it < 0) -it else it }
+            lastIndex = index
+            selectedDuration += duration
+        }
+        segmentStart = segmentEnd
     }
-    val toIndex = if (toMs in relativeStartTimes.last()..totalDuration) {
-        relativeStartTimes.lastIndex
-    } else {
-        val max = toMs + targetDurationMs
-        relativeStartTimes.binarySearch { time ->
-            when {
-                time > max -> 1
-                time < toMs -> -1
-                else -> 0
-            }
-        }.let { if (it < 0) -it else it }
-    }
-    val indexes = fromIndex..toIndex
+
+    val start = firstIndex ?: return VideoSegmentSelection.Empty
+    val end = requireNotNull(lastIndex)
     return VideoSegmentSelection(
-        startIndex = fromIndex,
-        endIndex = toIndex,
-        indexes = indexes,
-        sourceStartPositionMs = relativeStartTimes[fromIndex],
-        selectedDurationMs = indexes.sumOf { durationsMs[it] },
-        segmentCount = indexes.count(),
+        startIndex = start,
+        endIndex = end,
+        indexes = start..end,
+        sourceStartPositionMs = sourceStart,
+        selectedDurationMs = selectedDuration,
+        segmentCount = end - start + 1,
     )
 }
 
