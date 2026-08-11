@@ -6,7 +6,54 @@ import test from "node:test";
 
 const buildGradle = fs.readFileSync("app/build.gradle.kts", "utf8");
 const ciWorkflow = fs.readFileSync(".github/workflows/ci.yml", "utf8");
+const debugWorkflow = fs.readFileSync(".github/workflows/debug-build.yml", "utf8");
 const workflow = fs.readFileSync(".github/workflows/release.yml", "utf8");
+const workflows = [
+  ["release", workflow],
+  ["CI", ciWorkflow],
+  ["debug build", debugWorkflow],
+];
+const permittedActions = new Set([
+  "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+  "actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961",
+  "gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+  "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+  "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+]);
+
+function actionSteps(workflowName, contents) {
+  return contents
+    .split(/(?=^ {6}- name: )/m)
+    .filter((block) => block.startsWith("      - name: "))
+    .map((block) => ({
+      workflowName,
+      stepName: block.match(/^ {6}- name:\s*([^\r\n]+)/m)?.[1] ?? "unnamed",
+      uses: block.match(/^\s*uses:\s*([^\s#]+)/m)?.[1],
+      block,
+    }))
+    .filter((step) => step.uses);
+}
+
+function actionInput(step, inputName) {
+  const withSection = step.block.match(
+    /^ {8}with:\s*\r?\n([\s\S]*?)(?=^ {8}\S|(?![\s\S]))/m,
+  )?.[1] ?? "";
+  return withSection.match(new RegExp(`^ {10}${inputName}:\\s*([^\\s#]+)`, "m"))?.[1];
+}
+
+function hasContentsReadPermission(contents) {
+  for (const indent of [0, 4]) {
+    const spaces = " ".repeat(indent);
+    const childSpaces = " ".repeat(indent + 2);
+    const blocks = contents.match(
+      new RegExp(`^${spaces}permissions:\\s*\\r?\\n(?:^${childSpaces}[^\\r\\n]+\\r?\\n?)*`, "gm"),
+    ) ?? [];
+    if (blocks.some((block) => new RegExp(`^${childSpaces}contents:\\s*read\\s*$`, "m").test(block))) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function releaseStepContaining(fragment) {
   return workflow
@@ -28,10 +75,56 @@ test("release signing never falls back to the debug key", () => {
   }
 });
 
-test("every action is pinned to a full commit SHA", () => {
-  const uses = [...workflow.matchAll(/^\s*uses:\s*([^\s#]+).*$/gm)].map((m) => m[1]);
-  assert.ok(uses.length >= 4);
-  for (const action of uses) assert.match(action, /^[^@]+@[0-9a-f]{40}$/);
+test("every build and release workflow action is on the exact allowlist", () => {
+  for (const [name, contents] of workflows) {
+    const steps = actionSteps(name, contents);
+    const uses = [...contents.matchAll(/^\s*uses:\s*([^\s#]+)/gm)].map((match) => match[1]);
+    assert.ok(uses.length > 0, `${name} workflow has no actions`);
+    assert.deepEqual(
+      steps.map((step) => step.uses),
+      uses,
+      `${name} workflow has an action outside a named step block`,
+    );
+    for (const step of steps) {
+      assert.ok(
+        permittedActions.has(step.uses),
+        `${name} step ${step.stepName} uses unapproved action: ${step.uses}`,
+      );
+    }
+  }
+});
+
+test("CI and debug workflows explicitly default to read-only contents", () => {
+  assert.ok(hasContentsReadPermission(ciWorkflow), "CI workflow must set contents: read");
+  assert.ok(hasContentsReadPermission(debugWorkflow), "debug workflow must set contents: read");
+});
+
+test("every checkout step disables persisted credentials", () => {
+  const checkouts = workflows
+    .flatMap(([name, contents]) => actionSteps(name, contents))
+    .filter((step) => step.uses === "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
+  assert.equal(checkouts.length, 4);
+  for (const step of checkouts) {
+    assert.equal(
+      actionInput(step, "persist-credentials"),
+      "false",
+      `${step.workflowName} step ${step.stepName} must disable persisted credentials`,
+    );
+  }
+});
+
+test("every Gradle setup step selects the basic cache provider", () => {
+  const gradleSteps = workflows
+    .flatMap(([name, contents]) => actionSteps(name, contents))
+    .filter((step) => step.uses === "gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb");
+  assert.equal(gradleSteps.length, 3);
+  for (const step of gradleSteps) {
+    assert.equal(
+      actionInput(step, "cache-provider"),
+      "basic",
+      `${step.workflowName} step ${step.stepName} must select the basic cache provider`,
+    );
+  }
 });
 
 test("workflow exposes the build-once promotion state machine", () => {
