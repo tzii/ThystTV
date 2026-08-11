@@ -158,7 +158,13 @@ jobs:
           }
           EOF
           node scripts/release/release-metadata.mjs manifest rc-fields.json release-bundle/rc-manifest.json
-          sha256sum release-bundle/rc-manifest.json > release-bundle/rc-manifest.json.sha256
+
+      - name: Write RC manifest checksum
+        working-directory: release-bundle
+        run: |
+          set -euo pipefail
+          sha256sum rc-manifest.json > rc-manifest.json.sha256
+          sha256sum --check rc-manifest.json.sha256
 
       - name: Upload RC bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -333,9 +339,6 @@ jobs:
           }
           EOF
           node scripts/release/release-metadata.mjs promotion release-bundle/rc-manifest.json promotion-expected.json
-
-      - name: Re-run branch gate tests
-        run: ./gradlew test lintDebug --no-daemon --console=plain
 
       - name: Publish exact-byte GitHub release
         env:

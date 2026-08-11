@@ -5,15 +5,18 @@ against the current IzzyOnDroid inclusion policy and F-Droid practices (checked 
 
 ## Current channel: GitHub Releases
 
-The release workflow (`.github/workflows/release.yml`) runs on `v*` tags and:
+The release workflow (`.github/workflows/release.yml`) has two modes:
 
-1. runs unit tests,
-2. builds and signs the release APK with the ThystTV release key,
-3. renames it to `ThystTV-X.Y.Z.apk`,
-4. verifies the APK is signed with the pinned official certificate (fails the release if not),
-5. generates `ThystTV-X.Y.Z.apk.sha256`,
-6. publishes the GitHub Release with the release notes from `docs/release-notes/X.Y.Z.md`
-   plus a verification footer.
+1. After release changes merge, a `workflow_dispatch` run on `master` binds the exact
+   post-merge commit, runs unit tests and lint, builds and signs the APK, verifies its package,
+   version, and pinned official signing certificate, then uploads an immutable RC bundle. The
+   bundle contains `ThystTV-X.Y.Z.apk`, its checksum, `rc-manifest.json`, and the manifest
+   checksum.
+2. Pushing an annotated `v*` tag promotes the approved RC. The tag binds the RC workflow run
+   and manifest digest; promotion downloads that exact bundle and independently verifies the
+   manifest, APK checksum, APK metadata, and signing certificate before publishing
+   `ThystTV-X.Y.Z.apk`, `ThystTV-X.Y.Z.apk.sha256`, and `rc-manifest.json`. Promotion does not
+   rebuild or re-sign the APK.
 
 Users verify builds via [`APK_VERIFICATION.md`](APK_VERIFICATION.md). The in-app updater
 checks GitHub Releases (opt-in).

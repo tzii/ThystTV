@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 const buildGradle = fs.readFileSync("app/build.gradle.kts", "utf8");
+const ciWorkflow = fs.readFileSync(".github/workflows/ci.yml", "utf8");
 const workflow = fs.readFileSync(".github/workflows/release.yml", "utf8");
+
+function releaseStepContaining(fragment) {
+  return workflow
+    .split(/(?=^ {6}- name: )/m)
+    .find((step) => step.startsWith("      - name: ") && step.includes(fragment));
+}
+
+function validateTemporaryRoot(root, workspace) {
+  assert.equal(path.dirname(root), workspace);
+  assert.match(path.basename(root), /^\.manifest-checksum-test-[A-Za-z0-9]+$/);
+}
 
 test("release signing never falls back to the debug key", () => {
   const releaseBlock = buildGradle.match(/release\s*\{[\s\S]*?\n\s{8}\}/)?.[0] ?? "";
@@ -53,13 +67,56 @@ test("promotion publishes verified bytes only", () => {
   assert.match(workflow, /--verify-tag/);
   const promotion = workflow.split(/^\s{2}promote_release:\s*$/m)[1] ?? "";
   assert.ok(promotion.length > 0, "promote_release job not found");
-  assert.doesNotMatch(promotion, /assembleRelease|KEYSTORE_BASE64|KEYSTORE_PASSWORD|KEY_ALIAS|KEY_PASSWORD/);
+  assert.doesNotMatch(
+    promotion,
+    /(?:\.\/)?gradlew|assembleRelease|KEYSTORE_BASE64|KEYSTORE_PASSWORD|KEY_ALIAS|KEY_PASSWORD/,
+  );
   assert.match(promotion, /Protect release tags/);
   assert.match(promotion, /Authorize release tag creation/);
   assert.match(promotion, /release-metadata\.mjs policy/);
   assert.match(promotion, /github\.actor[^\n]*tzii|tzii[^\n]*github\.actor/);
   assert.match(promotion, /release-bundle\/rc-manifest\.json/);
   assert.match(promotion, /178386212/);
+});
+
+test("manifest checksum is generated and verified with directory-stable paths", () => {
+  const checksumStep = releaseStepContaining("rc-manifest.json >");
+  assert.ok(checksumStep, "manifest checksum generation step not found");
+  const workingDirectory = checksumStep.match(/^\s*working-directory:\s*([^\s#]+)\s*$/m)?.[1] ?? ".";
+  const checksumCommand = checksumStep.match(/^\s*(sha256sum\s+[^\n]+rc-manifest\.json\.sha256)\s*$/m)?.[1];
+  assert.ok(checksumCommand, "manifest checksum generation command not found");
+
+  const promotion = workflow.split(/^\s{2}promote_release:\s*$/m)[1] ?? "";
+  const verifyCommand = promotion.match(/^\s*(\(cd release-bundle && sha256sum --check rc-manifest\.json\.sha256\))\s*$/m)?.[1];
+  assert.ok(verifyCommand, "manifest checksum verification command not found");
+
+  const workspace = process.cwd();
+  const root = fs.mkdtempSync(path.join(workspace, ".manifest-checksum-test-"));
+  validateTemporaryRoot(root, workspace);
+
+  try {
+    fs.mkdirSync(path.join(root, "release-bundle"));
+    fs.writeFileSync(path.join(root, "release-bundle", "rc-manifest.json"), '{"version":1}\n');
+    assert.match(workingDirectory, /^[A-Za-z0-9._/-]+$/);
+    const temporaryDirectory = path.basename(root);
+    const generated = spawnSync(
+      "bash",
+      ["-c", `cd ${temporaryDirectory}/${workingDirectory} && ${checksumCommand}`],
+      { cwd: workspace, encoding: "utf8" },
+    );
+    const verified = spawnSync(
+      "bash",
+      ["-c", `cd ${temporaryDirectory} && ${verifyCommand}`],
+      { cwd: workspace, encoding: "utf8" },
+    );
+
+    assert.equal(generated.status, 0, generated.stderr);
+    assert.equal(verified.status, 0, verified.stderr);
+    assert.match(verified.stdout, /rc-manifest\.json: OK/);
+  } finally {
+    validateTemporaryRoot(root, workspace);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("promotion reads the official signing certificate and attaches required assets", () => {
@@ -81,4 +138,12 @@ test("artifacts are never overwritten", () => {
 test("release notes cannot fall back to generated placeholder text", () => {
   assert.doesNotMatch(workflow, /Release notes were not found/);
   assert.match(workflow, /--notes-file "docs\/release-notes\/\$\{VERSION_NAME\}\.md"/);
+});
+
+test("PR CI runs repository contract tests and the release verifier syntax check", () => {
+  assert.match(
+    ciWorkflow,
+    /node --test docs\/site\.test\.js \.github\/workflows\/release\.test\.mjs scripts\/release\/\*\.test\.mjs/,
+  );
+  assert.match(ciWorkflow, /bash -n scripts\/release\/verify-apk\.sh/);
 });
