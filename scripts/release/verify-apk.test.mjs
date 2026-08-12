@@ -75,12 +75,13 @@ function runVerifier({
     const apksigner = bashUsesWindowsBatch && toolExtension === ".bat"
       ? [
           "@echo off",
+          'if "%1"=="--version" (echo 0.9& exit /b 0)',
           "type apksigner-output.txt",
           "type apksigner-stderr.txt 1>&2",
           `exit /b ${apksignerExit}`,
           "",
         ].join("\r\n")
-      : `#!/usr/bin/env bash\ncat apksigner-output.txt\ncat apksigner-stderr.txt >&2\nexit ${apksignerExit}\n`;
+      : `#!/usr/bin/env bash\nif [[ "$1" == "--version" ]]; then\n  echo 0.9\n  exit 0\nfi\ncat apksigner-output.txt\ncat apksigner-stderr.txt >&2\nexit ${apksignerExit}\n`;
 
     writeExecutable(
       path.join(androidHome, "cmdline-tools", "latest", "bin", `apkanalyzer${toolExtension}`),
@@ -157,6 +158,36 @@ test("does not treat a source stamp as an APK signer identity", () => {
 
   assert.notEqual(result.status, 0, result.stdout);
   assert.match(result.stderr, /expected exactly one signer certificate SHA-256 digest, found 0/);
+});
+
+test("redacts certificate values while diagnosing an unrecognized signer label", () => {
+  const secretDn = "CN=ThystTV Release,O=Private Signing";
+  const secretDigest = fakeDigest(expectedCertificate);
+  const result = runVerifier({
+    signerOutput: [
+      "Verifies",
+      "Verified using v3.1 scheme (APK Signature Scheme v3.1): true",
+      "Number of signers: 1",
+      `Signer #1 (minSdkVersion=35, maxSdkVersion=2147483647) certificate DN: ${secretDn}`,
+      `Signer #1 (minSdkVersion=35, maxSdkVersion=2147483647) certificate SHA-256 digest: ${secretDigest}`,
+    ].join("\n"),
+  });
+
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(result.stderr, /apksigner_version=0\.9/);
+  assert.match(result.stderr, /Verified using v3\.1 scheme .*: true/);
+  assert.match(result.stderr, /Number of signers: 1/);
+  assert.match(
+    result.stderr,
+    /Signer #1 \(minSdkVersion=35, maxSdkVersion=2147483647\) certificate DN: \[redacted\]/,
+  );
+  assert.match(
+    result.stderr,
+    /Signer #1 \(minSdkVersion=35, maxSdkVersion=2147483647\) certificate SHA-256 digest: \[redacted\]/,
+  );
+  assert.doesNotMatch(result.stderr, new RegExp(secretDn));
+  assert.doesNotMatch(result.stderr, new RegExp(secretDigest));
+  assert.doesNotMatch(result.stderr, new RegExp(expectedCertificate));
 });
 
 test("rejects APKs with multiple signer certificates", () => {
