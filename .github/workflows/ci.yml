@@ -19,16 +19,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run repository contract tests
-        run: |
-          node --test docs/site.test.js .github/workflows/release.test.mjs scripts/release/*.test.mjs
-          bash -n scripts/release/verify-apk.sh
-
       - name: Set up Java
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Run repository contract tests
+        run: |
+          node --test docs/site.test.js .github/workflows/release.test.mjs scripts/release/*.test.mjs
+          bash -n scripts/release/verify-apk.sh
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
@@ -50,6 +50,16 @@ jobs:
 
       - name: Build debug
         run: ./gradlew assembleDebug
+
+      - name: Verify structured APK signer integration
+        run: |
+          set -euo pipefail
+          apksigner_jar="$(find "$ANDROID_HOME/build-tools" -type f -path '*/lib/apksigner.jar' | sort -V | tail -n 1)"
+          signer_digest="$(java --class-path "$apksigner_jar" --source 21 scripts/release/VerifyApkSigner.java app/build/outputs/apk/debug/app-debug.apk)"
+          if [[ ! "$signer_digest" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "structured APK signer did not return one SHA-256 digest" >&2
+            exit 1
+          fi
 
       - name: Run unit tests
         run: ./gradlew test

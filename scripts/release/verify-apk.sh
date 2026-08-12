@@ -30,47 +30,32 @@ if [[ -z "$apkanalyzer" ]]; then
   exit 1
 fi
 
-apksigner="$(
-  find "$ANDROID_HOME/build-tools" -type f \( -name apksigner -o -name apksigner.bat \) 2>/dev/null |
+apksigner_jar="$(
+  find "$ANDROID_HOME/build-tools" -type f -path '*/lib/apksigner.jar' 2>/dev/null |
     sort -V |
     tail -n 1 || true
 )"
-if [[ -z "$apksigner" || ! -x "$apksigner" ]]; then
-  echo "apksigner not found (expected apksigner or apksigner.bat under $ANDROID_HOME/build-tools)" >&2
+if [[ -z "$apksigner_jar" || ! -f "$apksigner_jar" ]]; then
+  echo "apksigner.jar not found (expected under $ANDROID_HOME/build-tools/*/lib)" >&2
+  exit 1
+fi
+if ! command -v java >/dev/null 2>&1; then
+  echo "java not found" >&2
+  exit 1
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+structured_verifier="$script_dir/VerifyApkSigner.java"
+if [[ ! -f "$structured_verifier" ]]; then
+  echo "structured APK signer verifier not found: $structured_verifier" >&2
   exit 1
 fi
 
 actual_package="$("$apkanalyzer" manifest application-id "$APK_PATH")"
 actual_version_name="$("$apkanalyzer" manifest version-name "$APK_PATH")"
 actual_version_code="$("$apkanalyzer" manifest version-code "$APK_PATH")"
-signer_output="$("$apksigner" verify --print-certs "$APK_PATH")"
-mapfile -t signer_certificates < <(
-  printf '%s\n' "$signer_output" |
-    awk -F': ' '/^Signer (#[0-9]+|\(.*\)) certificate SHA-256 digest:/ {
-      digest = $2
-      gsub(/[[:space:]:]/, "", digest)
-      print tolower(digest)
-    }' |
-    sort -u
-)
-if [[ "${#signer_certificates[@]}" != "1" ]]; then
-  apksigner_version="$("$apksigner" --version 2>/dev/null | head -n 1 || true)"
-  printf 'apksigner_version=%s\n' "$apksigner_version" >&2
-  printf '%s\n' "$signer_output" |
-    awk '
-      /^(Verifies|Verified using |Number of signers:)/ {
-        print
-        next
-      }
-      /^(Signer|Source Stamp Signer).* certificate [^:]+:/ {
-        sub(/: .*/, ": [redacted]")
-        print
-      }
-    ' >&2
-  echo "expected exactly one signer certificate SHA-256 digest, found ${#signer_certificates[@]}" >&2
-  exit 1
-fi
-actual_certificate="${signer_certificates[0]}"
+actual_certificate="$(java --class-path "$apksigner_jar" --source 21 "$structured_verifier" "$APK_PATH")"
+actual_certificate="$(printf '%s' "$actual_certificate" | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
 expected_certificate="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
 apk_sha256="$(sha256sum "$APK_PATH" | awk '{print $1}')"
 

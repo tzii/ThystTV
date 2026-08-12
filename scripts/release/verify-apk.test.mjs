@@ -15,14 +15,6 @@ function fakeDigest(hex) {
   return hex.toUpperCase().match(/../g).join(":");
 }
 
-const oneSignerOutput = [
-  "WARNING: META-INF/services entry is not protected by the APK signature",
-  "Signer #1 certificate DN: CN=ThystTV Release",
-  `Signer #1 certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
-  "Signer #1 certificate SHA-1 digest: 00:11:22:33",
-  "Verified using v2 scheme (APK Signature Scheme v2): true",
-].join("\n");
-
 function writeExecutable(file, contents) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, contents, { mode: 0o755 });
@@ -35,9 +27,9 @@ function validateTemporaryRoot(root, workspace) {
 }
 
 function runVerifier({
-  signerOutput = oneSignerOutput,
-  signerStderr = "",
-  apksignerExit = 0,
+  structuredSignerOutput = expectedCertificate,
+  structuredSignerStderr = "",
+  structuredSignerExit = 0,
   pinnedCertificate = expectedCertificate,
   toolExtension = "",
 } = {}) {
@@ -50,8 +42,9 @@ function runVerifier({
     const apk = path.join(root, "candidate.apk");
     fs.writeFileSync(path.join(root, "verify-apk.sh"), verifierSource);
     fs.writeFileSync(apk, "test APK bytes");
-    fs.writeFileSync(path.join(root, "apksigner-output.txt"), `${signerOutput}\n`);
-    fs.writeFileSync(path.join(root, "apksigner-stderr.txt"), `${signerStderr}\n`);
+    fs.writeFileSync(path.join(root, "structured-signer-output.txt"), `${structuredSignerOutput}\n`);
+    fs.writeFileSync(path.join(root, "structured-signer-stderr.txt"), `${structuredSignerStderr}\n`);
+    fs.writeFileSync(path.join(root, "VerifyApkSigner.java"), "// test placeholder; fake java intercepts this source file\n");
 
     const apkanalyzer = bashUsesWindowsBatch && toolExtension === ".bat"
       ? [
@@ -72,24 +65,15 @@ function runVerifier({
           "",
         ].join("\r\n")
       : `#!/usr/bin/env bash\ncase "$2" in\n  application-id) echo com.tzii.thysttv ;;\n  version-name) echo 1.2.1 ;;\n  version-code) echo 11 ;;\n  *) exit 2 ;;\nesac\n`;
-    const apksigner = bashUsesWindowsBatch && toolExtension === ".bat"
-      ? [
-          "@echo off",
-          'if "%1"=="--version" (echo 0.9& exit /b 0)',
-          "type apksigner-output.txt",
-          "type apksigner-stderr.txt 1>&2",
-          `exit /b ${apksignerExit}`,
-          "",
-        ].join("\r\n")
-      : `#!/usr/bin/env bash\nif [[ "$1" == "--version" ]]; then\n  echo 0.9\n  exit 0\nfi\ncat apksigner-output.txt\ncat apksigner-stderr.txt >&2\nexit ${apksignerExit}\n`;
-
     writeExecutable(
       path.join(androidHome, "cmdline-tools", "latest", "bin", `apkanalyzer${toolExtension}`),
       apkanalyzer,
     );
+    fs.mkdirSync(path.join(androidHome, "build-tools", "35.0.0", "lib"), { recursive: true });
+    fs.writeFileSync(path.join(androidHome, "build-tools", "35.0.0", "lib", "apksigner.jar"), "test jar");
     writeExecutable(
-      path.join(androidHome, "build-tools", "35.0.0", `apksigner${toolExtension}`),
-      apksigner,
+      path.join(root, "bin", "java"),
+      `#!/usr/bin/env bash\ncat structured-signer-output.txt\ncat structured-signer-stderr.txt >&2\nexit ${structuredSignerExit}\n`,
     );
 
     const command = [
@@ -100,6 +84,7 @@ function runVerifier({
       "export EXPECTED_VERSION_NAME=1.2.1",
       "export EXPECTED_VERSION_CODE=11",
       `export EXPECTED_CERT_SHA256=${pinnedCertificate}`,
+      'export PATH="./bin:$PATH"',
       "bash verify-apk.sh",
     ].join("\n");
 
@@ -114,114 +99,27 @@ function runVerifier({
   }
 }
 
-test("accepts exactly one signer, ignores unrelated output, and normalizes its digest", () => {
-  const result = runVerifier();
+test("accepts and normalizes exactly one structured signer digest", () => {
+  const result = runVerifier({ structuredSignerOutput: fakeDigest(expectedCertificate) });
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, new RegExp(`certificate_sha256=${expectedCertificate}`));
-});
-
-test("accepts one v3_1 signer identity repeated across SDK ranges", () => {
-  const result = runVerifier({
-    signerOutput: [
-      "Verifies",
-      "Verified using v3.1 scheme (APK Signature Scheme v3.1): true",
-      "Number of signers: 1",
-      `Signer (minSdkVersion=35, maxSdkVersion=2147483647) certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
-      `Signer (minSdkVersion=28, maxSdkVersion=34) certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
-    ].join("\n"),
-  });
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, new RegExp(`certificate_sha256=${expectedCertificate}`));
-});
-
-test("rejects distinct v3_1 signer identities across SDK ranges", () => {
-  const result = runVerifier({
-    signerOutput: [
-      "Number of signers: 1",
-      `Signer (minSdkVersion=35, maxSdkVersion=2147483647) certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
-      `Signer (minSdkVersion=28, maxSdkVersion=34) certificate SHA-256 digest: ${fakeDigest("cd".repeat(32))}`,
-    ].join("\n"),
-  });
-
-  assert.notEqual(result.status, 0, result.stdout);
-  assert.match(result.stderr, /expected exactly one signer certificate SHA-256 digest, found 2/);
-});
-
-test("does not treat a source stamp as an APK signer identity", () => {
-  const result = runVerifier({
-    signerOutput: [
-      `Source Stamp Signer certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
-    ].join("\n"),
-  });
-
-  assert.notEqual(result.status, 0, result.stdout);
-  assert.match(result.stderr, /expected exactly one signer certificate SHA-256 digest, found 0/);
-});
-
-test("redacts certificate values while diagnosing an unrecognized signer label", () => {
-  const secretDn = "CN=ThystTV Release,O=Private Signing";
-  const secretDigest = fakeDigest(expectedCertificate);
-  const result = runVerifier({
-    signerOutput: [
-      "Verifies",
-      "Verified using v3.1 scheme (APK Signature Scheme v3.1): true",
-      "Number of signers: 1",
-      `Signer #1 (minSdkVersion=35, maxSdkVersion=2147483647) certificate DN: ${secretDn}`,
-      `Signer #1 (minSdkVersion=35, maxSdkVersion=2147483647) certificate SHA-256 digest: ${secretDigest}`,
-    ].join("\n"),
-  });
-
-  assert.notEqual(result.status, 0, result.stdout);
-  assert.match(result.stderr, /apksigner_version=0\.9/);
-  assert.match(result.stderr, /Verified using v3\.1 scheme .*: true/);
-  assert.match(result.stderr, /Number of signers: 1/);
-  assert.match(
-    result.stderr,
-    /Signer #1 \(minSdkVersion=35, maxSdkVersion=2147483647\) certificate DN: \[redacted\]/,
-  );
-  assert.match(
-    result.stderr,
-    /Signer #1 \(minSdkVersion=35, maxSdkVersion=2147483647\) certificate SHA-256 digest: \[redacted\]/,
-  );
-  assert.doesNotMatch(result.stderr, new RegExp(secretDn));
-  assert.doesNotMatch(result.stderr, new RegExp(secretDigest));
-  assert.doesNotMatch(result.stderr, new RegExp(expectedCertificate));
-});
-
-test("rejects APKs with multiple signer certificates", () => {
-  const result = runVerifier({
-    signerOutput: [
-      oneSignerOutput,
-      `Signer #2 certificate SHA-256 digest: ${fakeDigest("cd".repeat(32))}`,
-    ].join("\n"),
-  });
-
-  assert.notEqual(result.status, 0, result.stdout);
-  assert.match(result.stderr, /expected exactly one signer certificate SHA-256 digest, found 2/);
 });
 
 for (const scenario of [
   {
-    name: "zero parsed signer digests",
-    options: {
-      signerOutput: [
-        "WARNING: signer certificate details are incomplete",
-        "Signer #1 certificate SHA-1 digest: 00:11:22:33",
-        "Verified using v2 scheme (APK Signature Scheme v2): true",
-      ].join("\n"),
-    },
-    error: /expected exactly one signer certificate SHA-256 digest, found 0/,
+    name: "zero structured signer digests",
+    options: { structuredSignerOutput: "" },
+    error: /certificate digest is not a 64-character lowercase hex value/,
   },
   {
-    name: "a malformed actual signer digest",
-    options: {
-      signerOutput: [
-        "WARNING: unrelated verifier warning",
-        "Signer #1 certificate SHA-256 digest: not-a-sha256-digest",
-      ].join("\n"),
-    },
+    name: "multiple structured signer digests",
+    options: { structuredSignerOutput: `${expectedCertificate}\n${"cd".repeat(32)}` },
+    error: /certificate digest is not a 64-character lowercase hex value/,
+  },
+  {
+    name: "a malformed structured signer digest",
+    options: { structuredSignerOutput: "not-a-sha256-digest" },
     error: /certificate digest is not a 64-character lowercase hex value/,
   },
   {
@@ -230,12 +128,12 @@ for (const scenario of [
     error: /expected certificate digest is not a 64-character lowercase hex value/,
   },
   {
-    name: "a nonzero apksigner exit",
+    name: "a structured verifier failure",
     options: {
-      signerStderr: "ERROR: simulated apksigner verification failure",
-      apksignerExit: 23,
+      structuredSignerStderr: "structured APK signer verification failed: simulated failure",
+      structuredSignerExit: 23,
     },
-    error: /simulated apksigner verification failure/,
+    error: /structured APK signer verification failed: simulated failure/,
   },
 ]) {
   test(`rejects ${scenario.name}`, () => {
@@ -246,7 +144,7 @@ for (const scenario of [
   });
 }
 
-test("resolves standard Windows .bat Android SDK tools", () => {
+test("resolves the standard Windows .bat apkanalyzer", () => {
   const result = runVerifier({ toolExtension: ".bat" });
 
   assert.equal(result.status, 0, result.stderr);
