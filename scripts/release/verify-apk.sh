@@ -54,6 +54,19 @@ mapfile -t signer_certificates < <(
     sort -u
 )
 if [[ "${#signer_certificates[@]}" != "1" ]]; then
+  apksigner_version="$("$apksigner" --version 2>/dev/null | head -n 1 || true)"
+  printf 'apksigner_version=%s\n' "$apksigner_version" >&2
+  printf '%s\n' "$signer_output" |
+    awk '
+      /^(Verifies|Verified using |Number of signers:)/ {
+        print
+        next
+      }
+      /^(Signer|Source Stamp Signer).* certificate [^:]+:/ {
+        sub(/: .*/, ": [redacted]")
+        print
+      }
+    ' >&2
   echo "expected exactly one signer certificate SHA-256 digest, found ${#signer_certificates[@]}" >&2
   exit 1
 fi
