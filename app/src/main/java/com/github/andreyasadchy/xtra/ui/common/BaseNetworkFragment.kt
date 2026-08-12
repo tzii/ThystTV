@@ -25,6 +25,7 @@ abstract class BaseNetworkFragment : Fragment() {
     private val mainViewModel: MainViewModel by activityViewModels()
 
     protected open var enableNetworkCheck = true
+    protected open var initializeWhileOffline = false
     private var lastIsOnlineState = false
     private var shouldRestore = false
     protected var isInitialized = false
@@ -90,7 +91,7 @@ abstract class BaseNetworkFragment : Fragment() {
         super.onResume()
         if (enableNetworkCheck) {
             if (!isInitialized) {
-                if (created || lastIsOnlineState) {
+                if (created || lastIsOnlineState || initializeWhileOffline) {
                     init()
                 }
             } else if (shouldRestore && lastIsOnlineState) {

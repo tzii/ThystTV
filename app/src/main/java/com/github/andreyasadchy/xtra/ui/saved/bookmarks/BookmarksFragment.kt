@@ -46,7 +46,7 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
     private val binding get() = _binding!!
     private val viewModel: BookmarksViewModel by viewModels()
     private lateinit var adapter: ListAdapter<Bookmark, out RecyclerView.ViewHolder>
-    override var enableNetworkCheck = false
+    override var initializeWhileOffline = true
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = CommonRecyclerViewLayoutBinding.inflate(inflater, container, false)
