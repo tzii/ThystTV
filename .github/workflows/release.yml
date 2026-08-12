@@ -28,19 +28,22 @@ jobs:
           persist-credentials: false
 
       - name: Assert dispatch target
+        env:
+          EXPECTED_RC_SHA: ${{ inputs.expected_rc_sha }}
+          DISPATCH_REF: ${{ github.ref }}
+          DISPATCH_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          expected_rc_sha='${{ inputs.expected_rc_sha }}'
-          if [[ "${{ github.ref }}" != "refs/heads/master" ]]; then
+          if [[ ! "$EXPECTED_RC_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "expected RC SHA is not 40 lowercase hex characters" >&2
+            exit 1
+          fi
+          if [[ "$DISPATCH_REF" != "refs/heads/master" ]]; then
             echo "release candidates must be dispatched on master" >&2
             exit 1
           fi
-          if [[ "$expected_rc_sha" != "${{ github.sha }}" ]]; then
+          if [[ "$EXPECTED_RC_SHA" != "$DISPATCH_SHA" ]]; then
             echo "expected RC SHA does not match the dispatched commit" >&2
-            exit 1
-          fi
-          if [[ ! "$expected_rc_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "expected RC SHA is not 40 lowercase hex characters" >&2
             exit 1
           fi
 

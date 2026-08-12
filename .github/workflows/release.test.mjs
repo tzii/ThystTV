@@ -61,6 +61,11 @@ function releaseStepContaining(fragment) {
     .find((step) => step.startsWith("      - name: ") && step.includes(fragment));
 }
 
+function stepScript(step) {
+  const runBlock = step.match(/^ {8}run:\s*\|\s*\r?\n([\s\S]*?)(?=^ {6}- name: |(?![\s\S]))/m)?.[1] ?? "";
+  return runBlock.replace(/^ {10}/gm, "");
+}
+
 function validateTemporaryRoot(root, workspace) {
   assert.equal(path.dirname(root), workspace);
   assert.match(path.basename(root), /^\.manifest-checksum-test-[A-Za-z0-9]+$/);
@@ -131,6 +136,37 @@ test("workflow exposes the build-once promotion state machine", () => {
   assert.match(workflow, /expected_rc_sha:/);
   assert.match(workflow, /build_signed_rc:/);
   assert.match(workflow, /promote_release:/);
+});
+
+test("dispatch SHA is data, not executable shell source", () => {
+  const step = releaseStepContaining("Assert dispatch target");
+  assert.ok(step, "dispatch target assertion step not found");
+
+  const maliciousInput = "x'; exit 86; expected_rc_sha='";
+  const expectedSha = "a".repeat(40);
+  const script = stepScript(step);
+  assert.doesNotMatch(script, /\$\{\{/);
+  assert.match(step, /^ {8}env:\s*\r?\n/m);
+  assert.match(step, /^ {10}EXPECTED_RC_SHA:\s*\$\{\{ inputs\.expected_rc_sha \}\}\s*$/m);
+  assert.match(step, /^ {10}DISPATCH_REF:\s*\$\{\{ github\.ref \}\}\s*$/m);
+  assert.match(step, /^ {10}DISPATCH_SHA:\s*\$\{\{ github\.sha \}\}\s*$/m);
+
+  const result = spawnSync("bash", ["-c", script], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      EXPECTED_RC_SHA: maliciousInput,
+      DISPATCH_REF: "refs/heads/master",
+      DISPATCH_SHA: expectedSha,
+    },
+  });
+  assert.notEqual(result.status, 0, "malformed dispatch SHA must be rejected");
+  assert.notEqual(
+    result.status,
+    86,
+    `dispatch input executed as shell source; stderr: ${result.stderr}`,
+  );
 });
 
 test("default and job permissions are least privilege", () => {
