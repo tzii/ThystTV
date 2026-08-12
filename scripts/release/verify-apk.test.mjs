@@ -120,6 +120,45 @@ test("accepts exactly one signer, ignores unrelated output, and normalizes its d
   assert.match(result.stdout, new RegExp(`certificate_sha256=${expectedCertificate}`));
 });
 
+test("accepts one v3_1 signer identity repeated across SDK ranges", () => {
+  const result = runVerifier({
+    signerOutput: [
+      "Verifies",
+      "Verified using v3.1 scheme (APK Signature Scheme v3.1): true",
+      "Number of signers: 1",
+      `Signer (minSdkVersion=35, maxSdkVersion=2147483647) certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
+      `Signer (minSdkVersion=28, maxSdkVersion=34) certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
+    ].join("\n"),
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, new RegExp(`certificate_sha256=${expectedCertificate}`));
+});
+
+test("rejects distinct v3_1 signer identities across SDK ranges", () => {
+  const result = runVerifier({
+    signerOutput: [
+      "Number of signers: 1",
+      `Signer (minSdkVersion=35, maxSdkVersion=2147483647) certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
+      `Signer (minSdkVersion=28, maxSdkVersion=34) certificate SHA-256 digest: ${fakeDigest("cd".repeat(32))}`,
+    ].join("\n"),
+  });
+
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(result.stderr, /expected exactly one signer certificate SHA-256 digest, found 2/);
+});
+
+test("does not treat a source stamp as an APK signer identity", () => {
+  const result = runVerifier({
+    signerOutput: [
+      `Source Stamp Signer certificate SHA-256 digest: ${fakeDigest(expectedCertificate)}`,
+    ].join("\n"),
+  });
+
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(result.stderr, /expected exactly one signer certificate SHA-256 digest, found 0/);
+});
+
 test("rejects APKs with multiple signer certificates", () => {
   const result = runVerifier({
     signerOutput: [

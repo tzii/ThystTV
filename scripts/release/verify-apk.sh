@@ -46,13 +46,18 @@ actual_version_code="$("$apkanalyzer" manifest version-code "$APK_PATH")"
 signer_output="$("$apksigner" verify --print-certs "$APK_PATH")"
 mapfile -t signer_certificates < <(
   printf '%s\n' "$signer_output" |
-    awk -F': ' '/^Signer #[0-9]+ certificate SHA-256 digest:/ { print $2 }'
+    awk -F': ' '/^Signer (#[0-9]+|\(.*\)) certificate SHA-256 digest:/ {
+      digest = $2
+      gsub(/[[:space:]:]/, "", digest)
+      print tolower(digest)
+    }' |
+    sort -u
 )
 if [[ "${#signer_certificates[@]}" != "1" ]]; then
   echo "expected exactly one signer certificate SHA-256 digest, found ${#signer_certificates[@]}" >&2
   exit 1
 fi
-actual_certificate="$(printf '%s' "${signer_certificates[0]}" | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+actual_certificate="${signer_certificates[0]}"
 expected_certificate="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
 apk_sha256="$(sha256sum "$APK_PATH" | awk '{print $1}')"
 
