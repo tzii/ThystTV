@@ -132,6 +132,39 @@ test("every Gradle setup step selects the basic cache provider", () => {
   }
 });
 
+test("structured APK verification always runs after pinned Java 21 setup", () => {
+  const javaSteps = workflows
+    .flatMap(([name, contents]) => actionSteps(name, contents))
+    .filter((step) => step.uses === "actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961");
+  for (const step of javaSteps) {
+    assert.equal(actionInput(step, "distribution"), "temurin", `${step.workflowName} must use Temurin`);
+    assert.equal(actionInput(step, "java-version"), '"21"', `${step.workflowName} must pin Java 21`);
+  }
+
+  const ciJava = ciWorkflow.indexOf("      - name: Set up Java");
+  const ciContracts = ciWorkflow.indexOf("      - name: Run repository contract tests");
+  assert.ok(ciJava > -1 && ciJava < ciContracts, "CI must set up Java before structured verifier tests");
+  const ciBuild = ciWorkflow.indexOf("      - name: Build debug");
+  const ciStructuredIntegration = ciWorkflow.indexOf("      - name: Verify structured APK signer integration");
+  assert.ok(
+    ciBuild > -1 && ciBuild < ciStructuredIntegration,
+    "CI must exercise structured signer verification against the built debug APK",
+  );
+  assert.match(
+    ciWorkflow,
+    /java --class-path "\$apksigner_jar" --source 21 scripts\/release\/VerifyApkSigner\.java/,
+  );
+
+  const promotion = workflow.split(/^ {2}promote_release:\s*$/m)[1] ?? "";
+  const promotionJava = promotion.indexOf("      - name: Set up Java");
+  const promotionVerifier = promotion.indexOf("bash scripts/release/verify-apk.sh");
+  assert.ok(promotionVerifier > -1, "promotion APK verifier not found");
+  assert.ok(
+    promotionJava > -1 && promotionJava < promotionVerifier,
+    "promotion must set up Java before structured APK verification",
+  );
+});
+
 test("workflow exposes the build-once promotion state machine", () => {
   assert.match(workflow, /expected_rc_sha:/);
   assert.match(workflow, /build_signed_rc:/);
