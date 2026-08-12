@@ -49,7 +49,7 @@ export function verifyWorkflowRun(run, expected) {
   if (run.event !== "workflow_dispatch") throw new Error("RC run was not manually dispatched");
   if (run.conclusion !== "success") throw new Error("RC run was not successful");
   if (run.head_sha !== expected.rcSha) throw new Error("RC run head SHA mismatch");
-  if (typeof run.path !== "string" || !run.path.startsWith(".github/workflows/release.yml@")) throw new Error("wrong workflow path");
+  if (run.path !== ".github/workflows/release.yml") throw new Error("wrong workflow path");
 }
 
 export function verifyPromotion(manifest, expected) {

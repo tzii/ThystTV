@@ -82,7 +82,7 @@ test("workflow run is a successful dispatch for the peeled tag commit", () => {
     event: "workflow_dispatch",
     conclusion: "success",
     head_sha: "b".repeat(40),
-    path: ".github/workflows/release.yml@refs/heads/master",
+    path: ".github/workflows/release.yml",
   }, { runId: 12345, rcSha: "b".repeat(40) }));
 });
 
@@ -92,13 +92,14 @@ test("rejects wrong run event, conclusion, path, run ID, or SHA", () => {
     event: "workflow_dispatch",
     conclusion: "success",
     head_sha: "b".repeat(40),
-    path: ".github/workflows/release.yml@refs/heads/master",
+    path: ".github/workflows/release.yml",
   };
   const expected = { runId: 12345, rcSha: "b".repeat(40) };
   assert.throws(() => verifyWorkflowRun({ ...base, event: "push" }, expected));
   assert.throws(() => verifyWorkflowRun({ ...base, conclusion: "failure" }, expected));
   assert.throws(() => verifyWorkflowRun({ ...base, conclusion: null }, expected));
-  assert.throws(() => verifyWorkflowRun({ ...base, path: ".github/workflows/ci.yml@refs/heads/master" }, expected));
+  assert.throws(() => verifyWorkflowRun({ ...base, path: ".github/workflows/ci.yml" }, expected));
+  assert.throws(() => verifyWorkflowRun({ ...base, path: ".github/workflows/release.yml@refs/heads/master" }, expected));
   assert.throws(() => verifyWorkflowRun({ ...base, path: 42 }, expected));
   assert.throws(() => verifyWorkflowRun({ ...base, id: 99999 }, expected));
   assert.throws(() => verifyWorkflowRun({ ...base, head_sha: "d".repeat(40) }, expected));
