@@ -1,0 +1,8 @@
+First major ThystTV milestone release:
+• In-app updater with rendered release notes and download progress
+• Custom playback quality dialog (video / audio-only / chat-only)
+• Fullscreen playback speed dialog and gesture feedback polish
+• Duration-aware VoD scrubbing for long videos
+• Local stats range filters (7 days / 30 days / all time)
+• Player crash fix via focused Media3 rollback (issue #5)
+• Refreshed docs, screenshots, and release automation

@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tzii/ThystTV/tree/release/1.2-prep"><img alt="release branch" src="https://img.shields.io/badge/branch-release%2F1.2--prep-9850ee?style=for-the-badge"></a>
-  <a href="https://github.com/tzii/ThystTV/blob/release/1.2-prep/LICENSE"><img alt="license AGPL-3.0" src="https://img.shields.io/github/license/tzii/ThystTV?style=for-the-badge"></a>
-  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-93.9%25-7f52ff?style=for-the-badge&logo=kotlin&logoColor=white">
+  <a href="https://github.com/tzii/ThystTV/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/tzii/ThystTV?style=for-the-badge"></a>
+  <a href="https://github.com/tzii/ThystTV/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/tzii/ThystTV/ci.yml?style=for-the-badge&label=CI"></a>
+  <a href="https://github.com/tzii/ThystTV/blob/master/LICENSE"><img alt="license AGPL-3.0" src="https://img.shields.io/github/license/tzii/ThystTV?style=for-the-badge"></a>
   <img alt="Stars" src="https://img.shields.io/github/stars/tzii/ThystTV?style=for-the-badge">
 </p>
 
@@ -31,7 +31,7 @@
 
 **ThystTV** is a third-party Twitch client for Android. It is based on [Xtra](https://github.com/crackededed/Xtra), with ThystTV-specific work aimed at making the viewing experience cleaner, faster, and more comfortable on phones, tablets, and large displays.
 
-The current focus is the `release/1.2-prep` branch: player refinement, better floating chat behavior, local watch-history insights, repo polish, and a more complete project presentation.
+The current focus is the `1.2.1` release: player refinement, better floating chat behavior, local watch-history insights, repo polish, and a more complete project presentation.
 
 > ThystTV is a fork of Xtra. A lot of credit goes to the Xtra project for the foundation this app builds on.
 
@@ -40,8 +40,8 @@ The current focus is the `release/1.2-prep` branch: player refinement, better fl
 | Area | Current detail |
 |---|---|
 | Repository | [`tzii/ThystTV`](https://github.com/tzii/ThystTV) |
-| Active branch | [`release/1.2-prep`](https://github.com/tzii/ThystTV/tree/release/1.2-prep) |
-| Release target | `1.2.0` |
+| Active branch | [`master`](https://github.com/tzii/ThystTV/tree/master) |
+| Current release | `1.2.1` |
 | License | [GNU AGPL-3.0](LICENSE) |
 | Primary language | Kotlin, with Java components |
 
@@ -151,9 +151,11 @@ On Windows:
 .\gradlew.bat assembleRelease
 ```
 
-## Downloads
+## Download and install
 
-The active release work is currently happening on [`release/1.2-prep`](https://github.com/tzii/ThystTV/tree/release/1.2-prep). Use the repository releases page when tagged builds are published.
+Download the latest APK from [GitHub Releases](https://github.com/tzii/ThystTV/releases/latest). Each release includes an APK checksum; verify the package, checksum, and official signing certificate with the [APK verification guide](docs/APK_VERIFICATION.md) before installing or upgrading.
+
+ThystTV is distributed independently. It is not affiliated with, endorsed by, or sponsored by Twitch Interactive or Amazon.
 
 ## Documentation
 
@@ -164,12 +166,16 @@ The active release work is currently happening on [`release/1.2-prep`](https://g
 - [Gesture system](docs/GESTURE_SYSTEM.md)
 - [Release process](docs/RELEASE_PROCESS.md)
 - [1.2 release plan](docs/RELEASE_1_2_PLAN.md)
+- [Distribution policy](docs/DISTRIBUTION.md)
+- [APK verification guide](docs/APK_VERIFICATION.md)
+- [Security policy](SECURITY.md)
 - [Upstream sync policy](docs/UPSTREAM_SYNC.md)
+- [Upstream sync ledger](docs/UPSTREAM_SYNC_LEDGER.md)
 - [Visual identity](docs/VISUAL_IDENTITY.md)
 
 ## Contributing
 
-Contributions should stay focused, reviewable, and easy to test. For UI work, include screenshots. For player or gesture changes, include manual test notes for live playback, VoDs, orientation changes, and minimize/restore behavior.
+Contributions should stay focused, reviewable, and easy to test. For UI work, include screenshots. For player or gesture changes, include manual test notes for live playback, VoDs, orientation changes, and minimize/restore behavior. Report bugs through [GitHub Issues](https://github.com/tzii/ThystTV/issues).
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a non-trivial pull request.
 

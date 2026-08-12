@@ -9,16 +9,24 @@ const css = fs.readFileSync(path.join(docsDir, "styles.css"), "utf8");
 const js = fs.readFileSync(path.join(docsDir, "script.js"), "utf8");
 const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
 
+const countOccurrences = (text, value) => text.split(value).length - 1;
+const allFrontDoorText = `${html}\n${readme}`;
+
+assert.doesNotMatch(allFrontDoorText, /release\/1\.2-prep|NEW RELEASE PREP/i);
+assert.doesNotMatch(html, /aria-label="\d+ (stars|forks|releases)"/i);
+assert.match(allFrontDoorText, /https:\/\/github\.com\/tzii\/ThystTV\/releases\/latest/);
+assert.match(html, /<link rel="canonical" href="https:\/\/tzii\.github\.io\/ThystTV\/">/);
+assert.match(html, /property="og:title"/);
+assert.match(html, /name="twitter:card"/);
+assert.match(html, /class="brand" href="#top"/);
+
 assert.match(html, /A BETTER[\s\S]*TWITCH[\s\S]*CLIENT[\s\S]*FOR ANDROID\./i);
 assert.match(html, /polished fork of Xtra/i);
 assert.match(html, /credit goes to the Xtra project/i);
-assert.match(html, /Floating chat overlay/i);
+assert.match(html, /floating chat/i);
 assert.match(html, /Local stats and watch-history insights/i);
 assert.match(html, /GNU Affero General Public License v3\.0|AGPL-3\.0/i);
-assert.match(html, /20\s*stars/i);
-assert.match(html, /1\s*fork/i);
 assert.match(html, /ThystTV 1\.2/i);
-assert.match(html, /popular tab clean\.png/i);
 assert.match(html, /theme-toggle/i);
 assert.match(html, /control-showcase/i);
 assert.match(html, /rail-scrim/i);
@@ -50,6 +58,50 @@ assert.match(css, /\.rail-scrim/);
 assert.match(css, /\.eyebrow/);
 assert.match(css, /data-theme="dark"/);
 
+for (const phrase of [
+  "Download and install",
+  "Verify the APK",
+  "GNU Affero General Public License",
+  "Xtra",
+  "not affiliated with Twitch or Amazon",
+]) {
+  assert.match(allFrontDoorText, new RegExp(phrase, "i"));
+}
+assert.match(readme, /docs\/APK_VERIFICATION\.md/);
+assert.match(readme, /SECURITY\.md/);
+assert.match(html, /https:\/\/github\.com\/tzii\/ThystTV\/issues/);
+
+const head = html.match(/<head>[\s\S]*?<\/head>/i)?.[0] ?? "";
+assert.ok(head.indexOf("thysttv-theme") < head.indexOf("styles.css"));
+assert.match(css, /:focus-visible/);
+assert.match(html, /<figure[\s\S]*?<figcaption/i);
+assert.match(html, /<picture>[\s\S]*?discover-phone\.webp[\s\S]*?discover-phone\.png[\s\S]*?<\/picture>/i);
+assert.match(html, /<picture>[\s\S]*?watch-player\.webp[\s\S]*?watch-player\.png[\s\S]*?<\/picture>/i);
+
+for (const image of html.matchAll(/<img\b[^>]*>/gi)) {
+  assert.match(image[0], /\bwidth="\d+"/);
+  assert.match(image[0], /\bheight="\d+"/);
+}
+assert.match(html, /loading="lazy"/);
+assert.doesNotMatch(html, /alt="[^"]*(popular tab clean|\.png|\.jpg|\.webp)[^"]*"/i);
+
+for (const relativePath of [
+  "cropped/discover-phone.png",
+  "cropped/discover-phone.webp",
+  "cropped/watch-player.png",
+  "cropped/watch-player.webp",
+]) {
+  assert.ok(fs.existsSync(path.join(docsDir, relativePath)), `${relativePath} must exist`);
+}
+assert.ok(
+  fs.statSync(path.join(docsDir, "cropped/discover-phone.webp")).size <
+    fs.statSync(path.join(docsDir, "cropped/discover-phone.png")).size
+);
+assert.ok(
+  fs.statSync(path.join(docsDir, "cropped/watch-player.webp")).size <
+    fs.statSync(path.join(docsDir, "cropped/watch-player.png")).size
+);
+
 const liveFloatingChatVideoUrl =
   "https://github.com/user-attachments/assets/99d97579-3340-4200-8aa7-3cae0414560e";
 const floatingChatSectionMatch = readme.match(
@@ -58,7 +110,6 @@ const floatingChatSectionMatch = readme.match(
 assert.ok(floatingChatSectionMatch, "README should include a ## Floating chat section");
 
 const floatingChatSection = floatingChatSectionMatch[0].replace(/\r\n/g, "\n");
-const countOccurrences = (text, value) => text.split(value).length - 1;
 const centeredDownloadFallback = `<p align="center">
   <a href="docs/images/readme/floating-chat.mp4">Download the floating chat demo video</a>
 </p>`;

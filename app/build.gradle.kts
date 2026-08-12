@@ -12,6 +12,16 @@ kotlin {
     jvmToolchain(21)
 }
 
+val releaseKeystore = file("release-keystore.jks")
+val releaseStorePassword = providers.environmentVariable("KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("KEY_PASSWORD").orNull
+val hasReleaseSigning = releaseKeystore.isFile && listOf(
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     signingConfigs {
         getByName("debug") {
@@ -20,13 +30,12 @@ android {
             storeFile = file("debug-keystore.jks")
             storePassword = "123456"
         }
-        create("release") {
-            val ksPassword = System.getenv("KEYSTORE_PASSWORD")
-            if (ksPassword != null) {
-                storeFile = file("release-keystore.jks")
-                storePassword = ksPassword
-                keyAlias = System.getenv("KEY_ALIAS") ?: "release"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: ksPassword
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
     }
@@ -37,8 +46,8 @@ android {
         applicationId = "com.tzii.thysttv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.2.0"
+        versionCode = 11
+        versionName = "1.2.1"
     }
 
     buildTypes {
@@ -51,11 +60,8 @@ android {
             isShrinkResources = true
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            val ksPassword = System.getenv("KEYSTORE_PASSWORD")
-            signingConfig = if (ksPassword != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }

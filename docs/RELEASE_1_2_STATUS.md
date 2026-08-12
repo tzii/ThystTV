@@ -1,3 +1,5 @@
+> **Frozen (historical).** 1.2 shipped as `v1.2.0` on 2026-05-08 and `release/1.2-prep` was merged into `master` and deleted. Kept for reference only.
+
 # ThystTV 1.2 Prep Status
 
 Last updated: 2026-05-08

@@ -561,6 +561,7 @@ h1 {
 .phone-column {
   display: grid;
   gap: 8px;
+  margin: 0;
   animation: float-soft 7s ease-in-out infinite;
 }
 
@@ -606,6 +607,49 @@ h1 {
   grid-template-columns: 58.2% 41.8%;
   border-left: 17px solid var(--violet);
   border-right: 17px solid var(--violet);
+}
+
+.install-trust,
+.independence {
+  padding: 38px 36px;
+  border-left: 17px solid var(--violet);
+  border-right: 17px solid var(--violet);
+}
+
+.independence {
+  border-top: 3px solid var(--line);
+}
+
+.install-trust h2,
+.independence h2 {
+  font-size: clamp(22px, 2.6vw, 34px);
+  margin: 24px 0 10px;
+}
+
+.install-trust h2:first-child,
+.independence h2:first-child {
+  margin-top: 0;
+}
+
+.install-trust p,
+.independence p {
+  max-width: 640px;
+}
+
+.install-trust a,
+.independence a {
+  color: var(--violet-deep);
+  font-weight: 700;
+}
+
+[data-theme="dark"] .install-trust a,
+[data-theme="dark"] .independence a {
+  color: var(--violet);
+}
+
+:where(a, button):focus-visible {
+  outline: 3px solid var(--violet);
+  outline-offset: 4px;
 }
 
 .control-showcase,
@@ -924,7 +968,9 @@ h1 {
     min-height: 180px;
   }
 
-  .feature-bands {
+  .feature-bands,
+  .install-trust,
+  .independence {
     border-left-width: 8px;
     border-right-width: 8px;
   }

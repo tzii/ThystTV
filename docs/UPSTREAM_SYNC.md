@@ -31,7 +31,7 @@ That means:
 - list the retest areas
 - note any manual conflict resolution
 
-For the current 1.2 branch ledger, see `docs/RELEASE_1_2_UPSTREAM_COMMITS.md`.
+The living commit-by-commit ledger is `docs/UPSTREAM_SYNC_LEDGER.md`. The 1.2-cycle ledger (`docs/RELEASE_1_2_UPSTREAM_COMMITS.md`) is frozen history.
 
 ## Minimum retest areas
 - live stream playback

@@ -4,6 +4,8 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-10
+
 ### Fixed
 - Bookmark VOD expiry now uses Twitch's current 7-day regular, 14-day Affiliate, and 60-day Partner/Prime/Turbo retention policy (manual ports from upstream Xtra `627d440f` and `15dd7d9e`).
 - Stream results with both broadcaster ID and login missing are now filtered before display (manual port from upstream Xtra `cfa61fc8`).
@@ -11,6 +13,16 @@ All notable changes to ThystTV should be documented here.
 - Twitch GraphQL and playback-token requests now use the canonical no-trailing-slash endpoint (manual port from upstream Xtra `345cff59`).
 - Downloaded video thumbnails now update correctly when moving downloaded files (manual port from upstream Xtra `12a8fac5`).
 - Channel point reward cost in chat now uses locale-aware number formatting (manual port from upstream Xtra `12a8fac5`).
+- Saved bookmarks and the Downloads tab stay reachable offline while bookmark metadata refreshes are deferred instead of blocking access.
+- 7TV channel emotes now load from the referenced `/v3/emote-sets/{setId}` endpoint when the channel response omits or returns an empty embedded set (manual port from upstream Xtra `9c47305f`).
+- Partial video downloads now include the HLS segment that overlaps the requested start time (manual port from upstream Xtra `8a8b99c5`).
+
+### Changed
+- Bookmark expiry estimates for regular accounts now assume 7-day VOD retention instead of 14 days; this changes bookmark expiry display and sorting only and never deletes Twitch content.
+
+### Release tooling
+- Local release builds remain unsigned; signed release candidates are built in CI and promoted to a published release only after exact-byte verification against the release manifest.
+- README and website download instructions now point to GitHub Releases with checksum and signing-certificate verification guidance (`docs/APK_VERIFICATION.md`).
 
 ## [1.2.0] - 2026-05-08
 

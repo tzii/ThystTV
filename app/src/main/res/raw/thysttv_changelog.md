@@ -1,3 +1,26 @@
+# ThystTV 1.2.1
+
+ThystTV 1.2.1 is a focused compatibility and reliability release.
+
+## Compatibility fixes
+
+- Bookmark expiry now follows Twitch's current retention policy: 7 days for regular accounts, 14 days for Affiliates, and 60 days for Partner/Prime/Turbo accounts.
+- Stream results with missing broadcaster identity are filtered before display.
+- Chat subscription, gift, and raid events without text keep their event metadata.
+- Twitch GraphQL and playback-token requests use the canonical endpoint.
+- Downloaded video thumbnails update correctly after moving files.
+
+## Bookmarks and downloads
+
+- Saved bookmarks and the Downloads tab stay reachable offline; metadata refreshes are deferred instead of blocking access.
+- Bookmark expiry estimates for regular accounts now use 7-day retention (display and sorting only).
+- Partial downloads include the HLS segment overlapping the requested start time.
+- 7TV channel emotes load via the emote-set endpoint fallback.
+
+## Release verification
+
+- Signed releases are verified by APK checksum and official signing certificate before install (see the APK verification guide).
+
 # ThystTV 1.2.0
 
 ThystTV 1.2.0 is the first major milestone release for the fork. It brings the app closer to a complete ThystTV experience with player polish, local stats improvements, a ThystTV-owned updater, bundled changelog support, refreshed project docs, and release automation.

@@ -1,0 +1,5 @@
+- Twitch compatibility fixes for bookmark expiry, stream results, chat events, and API endpoints
+- Saved bookmarks and Downloads stay reachable offline
+- 7TV channel emotes load via the emote-set fallback
+- Partial downloads include the segment overlapping the start time
+- Signed releases verified by checksum and signing certificate

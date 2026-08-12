@@ -159,47 +159,19 @@ class VideoDownloadWorker @AssistedInject constructor(
                     }
                 }
             }
-            val targetDuration = playlist.targetDuration * 1000L
-            var totalDuration = 0L
-            val size = playlist.segments.size
-            val relativeStartTimes = ArrayList<Long>(size)
-            val durations = ArrayList<Long>(size)
-            var relativeTime = 0L
-            playlist.segments.forEach {
-                val duration = (it.duration * 1000f).toLong()
-                durations.add(duration)
-                totalDuration += duration
-                relativeStartTimes.add(relativeTime)
-                relativeTime += duration
+            val durations = playlist.segments.map { (it.duration * 1000f).toLong() }
+            val selection = selectVideoSegments(durations, from, to)
+            if (selection.isEmpty) {
+                offlineRepository.updateVideo(offlineVideo.apply { status = OfflineVideo.STATUS_PENDING })
+                return Result.failure()
             }
-            val fromIndex = if (from == 0L) {
-                0
-            } else {
-                val min = from - targetDuration
-                relativeStartTimes.binarySearch(comparison = { time ->
-                    when {
-                        time > from -> 1
-                        time < min -> -1
-                        else -> 0
-                    }
-                }).let { if (it < 0) -it else it }
-            }
-            val toIndex = if (to in relativeStartTimes.last()..totalDuration) {
-                relativeStartTimes.lastIndex
-            } else {
-                val max = to + targetDuration
-                relativeStartTimes.binarySearch(comparison = { time ->
-                    when {
-                        time > max -> 1
-                        time < to -> -1
-                        else -> 0
-                    }
-                }).let { if (it < 0) -it else it }
-            }
+            val fromIndex = requireNotNull(selection.startIndex)
+            val toIndex = requireNotNull(selection.endIndex)
+            val selectedIndexes = requireNotNull(selection.indexes)
             val urlPath = sourceUrl.substringBeforeLast('/') + "/"
             val remainingSegments = ArrayList<Segment>()
             if (offlineVideo.progress < offlineVideo.maxProgress) {
-                for (i in fromIndex + offlineVideo.progress..toIndex) {
+                for (i in selectedIndexes.drop(offlineVideo.progress)) {
                     val segment = playlist.segments[i]
                     remainingSegments.add(segment.copy(uri = segment.uri.replace("-unmuted", "-muted")))
                 }
@@ -237,7 +209,6 @@ class VideoDownloadWorker @AssistedInject constructor(
                     } else {
                         "$path${File.separator}$fileName"
                     }
-                    val startPosition = relativeStartTimes[fromIndex]
                     val initSegmentBytes = if (playlist.initSegmentUri != null) {
                         when {
                             networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
@@ -295,9 +266,7 @@ class VideoDownloadWorker @AssistedInject constructor(
                     } else null
                     offlineRepository.updateVideo(offlineVideo.apply {
                         url = fileUri
-                        duration = (relativeStartTimes[toIndex] + durations[toIndex] - startPosition) - 1000L
-                        sourceStartPosition = startPosition
-                        maxProgress = toIndex - fromIndex + 1
+                        applyVideoSegmentSelection(selection)
                         initSegmentBytes?.let { bytes += it }
                     })
                     fileUri
@@ -437,7 +406,6 @@ class VideoDownloadWorker @AssistedInject constructor(
                                 segments = sharedSegments
                             ), it)
                         }
-                        val startPosition = relativeStartTimes[fromIndex]
                         if (playlist.initSegmentUri != null) {
                             val initSegmentFileUri = (videoDirectoryUri + "%2F" + playlist.initSegmentUri).toUri()
                             when {
@@ -492,9 +460,7 @@ class VideoDownloadWorker @AssistedInject constructor(
                         }
                         offlineRepository.updateVideo(offlineVideo.apply {
                             url = playlistFileUri
-                            duration = (relativeStartTimes[toIndex] + durations[toIndex] - startPosition) - 1000L
-                            sourceStartPosition = startPosition
-                            maxProgress = toIndex - fromIndex + 1
+                            applyVideoSegmentSelection(selection)
                         })
                         playlistFileUri
                     }
@@ -604,7 +570,6 @@ class VideoDownloadWorker @AssistedInject constructor(
                         FileOutputStream(playlistUri).use {
                             PlaylistUtils.writeMediaPlaylist(playlist.copy(segments = remainingSegments), it)
                         }
-                        val startPosition = relativeStartTimes[fromIndex]
                         if (playlist.initSegmentUri != null) {
                             when {
                                 networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
@@ -643,9 +608,7 @@ class VideoDownloadWorker @AssistedInject constructor(
                         }
                         offlineRepository.updateVideo(offlineVideo.apply {
                             url = playlistUri
-                            duration = (relativeStartTimes[toIndex] + durations[toIndex] - startPosition) - 1000L
-                            sourceStartPosition = startPosition
-                            maxProgress = toIndex - fromIndex + 1
+                            applyVideoSegmentSelection(selection)
                         })
                         playlistUri
                     }

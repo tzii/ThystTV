@@ -23,10 +23,7 @@ function setTheme(theme) {
 }
 
 const params = new URLSearchParams(window.location.search);
-const requestedTheme = params.get("theme");
-const storedTheme = localStorage.getItem("thysttv-theme");
-const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-setTheme(requestedTheme === "dark" || requestedTheme === "light" ? requestedTheme : storedTheme || preferredTheme);
+setTheme(root.getAttribute("data-theme") === "dark" ? "dark" : "light");
 
 if (params.get("panel") === "open") {
   setRail(true);

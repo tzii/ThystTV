@@ -46,7 +46,7 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
     private val binding get() = _binding!!
     private val viewModel: BookmarksViewModel by viewModels()
     private lateinit var adapter: ListAdapter<Bookmark, out RecyclerView.ViewHolder>
-    override var enableNetworkCheck = false
+    override var initializeWhileOffline = true
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = CommonRecyclerViewLayoutBinding.inflate(inflater, container, false)
@@ -257,9 +257,17 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
                 requireContext().prefs().getBoolean(C.ENABLE_INTEGRITY, false),
             )
         }
+        refreshVideos()
+    }
+
+    private fun refreshVideos() {
         val helixHeaders = TwitchApiHelper.getHelixHeaders(requireContext())
         if (!helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
-            viewModel.updateVideos(requireContext().filesDir.path, requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"), helixHeaders)
+            viewModel.updateVideos(
+                requireContext().filesDir.path,
+                requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
+                helixHeaders,
+            )
         }
     }
 
@@ -308,6 +316,7 @@ class BookmarksFragment : BaseNetworkFragment(), Scrollable, Sortable, Bookmarks
     }
 
     override fun onNetworkRestored() {
+        refreshVideos()
     }
 
     override fun onIntegrityDialogCallback(callback: String?) {

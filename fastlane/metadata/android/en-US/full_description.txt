@@ -1,8 +1,20 @@
-<i>Xtra for Twitch</i> is a <a href='https://en.wikipedia.org/wiki/Twitch_(service)' target='_blank'>Twitch</a> client focused on providing the best viewing and chatting experience on mobile devices:
+<i>ThystTV</i> is a third-party <a href='https://en.wikipedia.org/wiki/Twitch_(service)' target='_blank'>Twitch</a> client for Android, focused on player polish, floating chat, local viewing stats, and large-screen comfort. It is a fork of <a href='https://github.com/crackededed/Xtra' target='_blank'>Xtra</a>.
 
-* Support for popular emotes with BetterTTV and FrankerFaceZ plugins
+What ThystTV adds on top of the base client:
+
+* Floating chat overlay for full-screen viewing — keep chat visible without a cramped split layout
+* Gesture-based playback controls for seeking, playback speed, brightness, and volume
+* Custom playback quality and speed dialogs, with duration-aware VoD scrubbing
+* Local watch-history and screen-time stats: category breakdowns, viewing patterns, favorite channels — all stored only on your device
+* Layouts tuned for phones, tablets, and wide screens
+* Optional in-app update checks against GitHub releases, with rendered changelogs (off by default)
+
+Base features inherited from Xtra:
+
+* Support for popular emotes with BetterTTV, FrankerFaceZ, and 7TV
 * Watch VODs and clips with chat replay
 * Download VODs to watch offline
-* Continue watching outside of the app with Picture-in-Picture mode
-* Sleep timer to stop the stream automatically
-* Customizable interface with 3 different color themes
+* Picture-in-Picture mode and background audio
+* Sleep timer
+
+No ads, no analytics, no tracking. Stats stay local on the device.
