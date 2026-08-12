@@ -146,6 +146,10 @@ test("1.2.1 release metadata is finalized", () => {
   assert.match(changelog, /^## \[1\.2\.1\] - \d{4}-\d{2}-\d{2}$/m);
   assert.match(bundledChangelog, /^# ThystTV 1\.2\.1$/m);
   assert.match(releaseNotes, /^# ThystTV 1\.2\.1$/m);
+  assert.match(
+    releaseNotes,
+    /After upgrading, delete and restart any unfinished downloads begun on ThystTV 1\.2\.0 rather than resuming them\./,
+  );
   assert.doesNotMatch(releaseNotes, /TBD|TODO|placeholder|Release notes were not found/i);
   assert.ok(fastlaneNotes.length <= 500);
 });
