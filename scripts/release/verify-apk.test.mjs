@@ -106,6 +106,13 @@ test("accepts and normalizes exactly one structured signer digest", () => {
   assert.match(result.stdout, new RegExp(`certificate_sha256=${expectedCertificate}`));
 });
 
+test("rejects a valid signer digest that does not match the pin", () => {
+  const result = runVerifier({ structuredSignerOutput: "cd".repeat(32) });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /signing certificate mismatch/);
+});
+
 for (const scenario of [
   {
     name: "zero structured signer digests",

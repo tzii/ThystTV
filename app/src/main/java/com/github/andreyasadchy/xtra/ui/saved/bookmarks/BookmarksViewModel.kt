@@ -300,115 +300,120 @@ class BookmarksViewModel @Inject internal constructor(
     fun updateVideos(filesDir: String, networkLibrary: String?, helixHeaders: Map<String, String>) {
         viewModelScope.launch {
             val bookmarks = bookmarksRepository.loadBookmarks()
-            val videos = videoRefreshGate.load(bookmarks.mapNotNull { it.videoId }) { ids ->
-                helixRepository.getVideos(
-                    networkLibrary = networkLibrary,
-                    headers = helixHeaders,
-                    ids = ids,
-                ).data.map {
-                    Video(
-                        id = it.id,
-                        channelId = it.channelId,
-                        channelLogin = it.channelLogin,
-                        channelName = it.channelName,
-                        title = it.title,
-                        thumbnailURL = it.thumbnailURL,
-                        createdAt = it.createdAt,
-                        viewCount = it.viewCount,
-                        durationSeconds = it.duration?.let { duration -> TwitchApiHelper.getDuration(duration) },
-                    )
-                }
-            }
-            videos.forEach { video ->
-                video.id.takeIf { !it.isNullOrBlank() }?.let { id ->
-                    bookmarks.find { it.videoId == id }
-                }?.let { bookmark ->
-                    if (bookmark.userId != video.channelId ||
-                        bookmark.userLogin != video.channelLogin ||
-                        bookmark.userName != video.channelName ||
-                        bookmark.title != video.title ||
-                        bookmark.createdAt != video.createdAt ||
-                        bookmark.type != video.type ||
-                        bookmark.duration != video.durationSeconds?.toString()
-                    ) {
-                        val downloadedThumbnail = video.thumbnail.takeIf { !it.isNullOrBlank() }?.let {
-                            File(filesDir, "thumbnails").mkdir()
-                            val path = filesDir + File.separator + "thumbnails" + File.separator + video.id
-                            viewModelScope.launch(Dispatchers.IO) {
-                                try {
-                                    when {
-                                        networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                                            val response = suspendCancellableCoroutine { continuation ->
-                                                httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
-                                            }
-                                            if (response.first.httpStatusCode in 200..299) {
-                                                FileOutputStream(path).use {
-                                                    it.write(response.second)
-                                                }
-                                            }
-                                        }
-                                        networkLibrary == "Cronet" && cronetEngine != null -> {
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                                val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
-                                                cronetEngine.get().newUrlRequestBuilder(it, request.callback, cronetExecutor).build().start()
-                                                val response = request.future.get()
-                                                if (response.urlResponseInfo.httpStatusCode in 200..299) {
-                                                    FileOutputStream(path).use {
-                                                        it.write(response.responseBody as ByteArray)
+            videoRefreshGate.load(
+                videoIds = bookmarks.mapNotNull { it.videoId },
+                loader = { ids ->
+                    helixRepository.getVideos(
+                        networkLibrary = networkLibrary,
+                        headers = helixHeaders,
+                        ids = ids,
+                    ).data.map {
+                        Video(
+                            id = it.id,
+                            channelId = it.channelId,
+                            channelLogin = it.channelLogin,
+                            channelName = it.channelName,
+                            title = it.title,
+                            thumbnailURL = it.thumbnailURL,
+                            createdAt = it.createdAt,
+                            viewCount = it.viewCount,
+                            durationSeconds = it.duration?.let { duration -> TwitchApiHelper.getDuration(duration) },
+                        )
+                    }
+                },
+                onLoaded = { videos ->
+                    videos.forEach { video ->
+                        video.id.takeIf { !it.isNullOrBlank() }?.let { id ->
+                            bookmarks.find { it.videoId == id }
+                        }?.let { bookmark ->
+                            if (bookmark.userId != video.channelId ||
+                                bookmark.userLogin != video.channelLogin ||
+                                bookmark.userName != video.channelName ||
+                                bookmark.title != video.title ||
+                                bookmark.createdAt != video.createdAt ||
+                                bookmark.type != video.type ||
+                                bookmark.duration != video.durationSeconds?.toString()
+                            ) {
+                                val downloadedThumbnail = video.thumbnail.takeIf { !it.isNullOrBlank() }?.let {
+                                    File(filesDir, "thumbnails").mkdir()
+                                    val path = filesDir + File.separator + "thumbnails" + File.separator + video.id
+                                    viewModelScope.launch(Dispatchers.IO) {
+                                        try {
+                                            when {
+                                                networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
+                                                    val response = suspendCancellableCoroutine { continuation ->
+                                                        httpEngine.get().newUrlRequestBuilder(it, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
+                                                    }
+                                                    if (response.first.httpStatusCode in 200..299) {
+                                                        FileOutputStream(path).use {
+                                                            it.write(response.second)
+                                                        }
                                                     }
                                                 }
-                                            } else {
-                                                val response = suspendCancellableCoroutine { continuation ->
-                                                    cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
-                                                }
-                                                if (response.first.httpStatusCode in 200..299) {
-                                                    FileOutputStream(path).use {
-                                                        it.write(response.second)
+                                                networkLibrary == "Cronet" && cronetEngine != null -> {
+                                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                                        val request = UrlRequestCallbacks.forByteArrayBody(RedirectHandlers.alwaysFollow())
+                                                        cronetEngine.get().newUrlRequestBuilder(it, request.callback, cronetExecutor).build().start()
+                                                        val response = request.future.get()
+                                                        if (response.urlResponseInfo.httpStatusCode in 200..299) {
+                                                            FileOutputStream(path).use {
+                                                                it.write(response.responseBody as ByteArray)
+                                                            }
+                                                        }
+                                                    } else {
+                                                        val response = suspendCancellableCoroutine { continuation ->
+                                                            cronetEngine.get().newUrlRequestBuilder(it, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
+                                                        }
+                                                        if (response.first.httpStatusCode in 200..299) {
+                                                            FileOutputStream(path).use {
+                                                                it.write(response.second)
+                                                            }
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        }
-                                        else -> {
-                                            okHttpClient.newCall(Request.Builder().url(it).build()).execute().use { response ->
-                                                if (response.isSuccessful) {
-                                                    FileOutputStream(path).use { outputStream ->
-                                                        response.body.byteStream().use { inputStream ->
-                                                            inputStream.copyTo(outputStream)
+                                                else -> {
+                                                    okHttpClient.newCall(Request.Builder().url(it).build()).execute().use { response ->
+                                                        if (response.isSuccessful) {
+                                                            FileOutputStream(path).use { outputStream ->
+                                                                response.body.byteStream().use { inputStream ->
+                                                                    inputStream.copyTo(outputStream)
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
+                                        } catch (e: Exception) {
+
                                         }
                                     }
-                                } catch (e: Exception) {
-
+                                    path
                                 }
+                                bookmarksRepository.updateBookmark(
+                                    Bookmark(
+                                        videoId = bookmark.videoId,
+                                        userId = video.channelId ?: bookmark.userId,
+                                        userLogin = video.channelLogin ?: bookmark.userLogin,
+                                        userName = video.channelName ?: bookmark.userName,
+                                        userType = bookmark.userType,
+                                        userBroadcasterType = bookmark.userBroadcasterType,
+                                        userLogo = bookmark.userLogo,
+                                        gameId = bookmark.gameId,
+                                        gameSlug = bookmark.gameSlug,
+                                        gameName = bookmark.gameName,
+                                        title = video.title ?: bookmark.title,
+                                        createdAt = video.createdAt ?: bookmark.createdAt,
+                                        thumbnail = downloadedThumbnail,
+                                        type = video.type ?: bookmark.type,
+                                        duration = video.durationSeconds?.toString() ?: bookmark.duration,
+                                        animatedPreviewURL = video.animatedPreviewURL ?: bookmark.animatedPreviewURL
+                                    )
+                                )
                             }
-                            path
                         }
-                        bookmarksRepository.updateBookmark(
-                            Bookmark(
-                                videoId = bookmark.videoId,
-                                userId = video.channelId ?: bookmark.userId,
-                                userLogin = video.channelLogin ?: bookmark.userLogin,
-                                userName = video.channelName ?: bookmark.userName,
-                                userType = bookmark.userType,
-                                userBroadcasterType = bookmark.userBroadcasterType,
-                                userLogo = bookmark.userLogo,
-                                gameId = bookmark.gameId,
-                                gameSlug = bookmark.gameSlug,
-                                gameName = bookmark.gameName,
-                                title = video.title ?: bookmark.title,
-                                createdAt = video.createdAt ?: bookmark.createdAt,
-                                thumbnail = downloadedThumbnail,
-                                type = video.type ?: bookmark.type,
-                                duration = video.durationSeconds?.toString() ?: bookmark.duration,
-                                animatedPreviewURL = video.animatedPreviewURL ?: bookmark.animatedPreviewURL
-                            )
-                        )
                     }
-                }
-            }
+                },
+            )
         }
     }
 

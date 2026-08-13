@@ -51,6 +51,31 @@ class BookmarkVideoRefreshGateTest {
     }
 
     @Test
+    fun `metadata application failure leaves refresh retryable`() = runTest {
+        val gate = BookmarkVideoRefreshGate()
+        var loads = 0
+        var applications = 0
+
+        gate.load(listOf("1"), loader = { ids ->
+            loads += 1
+            ids
+        }, onLoaded = {
+            applications += 1
+            throw IllegalStateException("database write failed")
+        })
+        val retried = gate.load(listOf("1"), loader = { ids ->
+            loads += 1
+            ids
+        }, onLoaded = {
+            applications += 1
+        })
+
+        assertEquals(listOf("1"), retried)
+        assertEquals(2, loads)
+        assertEquals(2, applications)
+    }
+
+    @Test
     fun `empty input completes without loading`() = runTest {
         val gate = BookmarkVideoRefreshGate()
         var loads = 0
@@ -94,5 +119,14 @@ class BookmarkVideoRefreshGateTest {
         BookmarkVideoRefreshGate().load<String>(listOf("1")) {
             throw CancellationException("view model cleared")
         }
+    }
+
+    @Test(expected = CancellationException::class)
+    fun `metadata application cancellation is rethrown`() = runTest {
+        BookmarkVideoRefreshGate().load(
+            videoIds = listOf("1"),
+            loader = { it },
+            onLoaded = { throw CancellationException("view model cleared") },
+        )
     }
 }
