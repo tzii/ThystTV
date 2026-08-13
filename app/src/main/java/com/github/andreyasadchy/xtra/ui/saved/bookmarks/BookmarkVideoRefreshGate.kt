@@ -11,20 +11,35 @@ internal class BookmarkVideoRefreshGate {
     suspend fun <T> load(
         videoIds: List<String>,
         loader: suspend (List<String>) -> List<T>,
+    ): List<T> = load(videoIds, loader) {}
+
+    suspend fun <T> load(
+        videoIds: List<String>,
+        loader: suspend (List<String>) -> List<T>,
+        onLoaded: suspend (List<T>) -> Unit,
     ): List<T> = mutex.withLock {
         if (completed) return@withLock emptyList()
 
         val loaded = mutableListOf<T>()
+        var allChunksLoaded = true
         for (ids in videoIds.chunked(100)) {
             try {
                 loaded += loader(ids)
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                return@withLock loaded
+                allChunksLoaded = false
+                break
             }
         }
-        completed = true
+        try {
+            onLoaded(loaded)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            return@withLock loaded
+        }
+        completed = allChunksLoaded
         loaded
     }
 }
