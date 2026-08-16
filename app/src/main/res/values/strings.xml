@@ -807,6 +807,10 @@
     <string name="player_gestures_haptic_summary" tools:ignore="MissingTranslation">Vibrate when changing volume or brightness</string>
     <string name="player_gestures_sensitivity" tools:ignore="MissingTranslation">Sensitivity</string>
     <string name="player_gestures_zone_split" tools:ignore="MissingTranslation">Zone split</string>
+    <string name="gesture_feedback_brightness" tools:ignore="MissingTranslation">Brightness</string>
+    <string name="gesture_feedback_device_volume" tools:ignore="MissingTranslation">Device volume</string>
+    <string name="gesture_feedback_seek" tools:ignore="MissingTranslation">Seek</string>
+    <string name="gesture_feedback_playback_speed" tools:ignore="MissingTranslation">Playback speed</string>
     <string name="less_rounded_corners">Less rounded</string>
     <string name="reduced_padding">Reduced padding</string>
     <string name="compact_text">Compact text</string>

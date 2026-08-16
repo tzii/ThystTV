@@ -19,10 +19,11 @@ interface PlayerGestureCallback {
     val isMaximized: Boolean
     val isControlsVisible: Boolean
     val controlsVisibleAtGestureStart: Boolean
-    val screenWidth: Int
-    val screenHeight: Int
+    val playerWidth: Int
+    val playerHeight: Int
     val windowAttributes: android.view.WindowManager.LayoutParams
     val isEdgeSwipe: Boolean
+    val playerGestureInsets: androidx.core.graphics.Insets?
     
     fun setWindowAttributes(params: android.view.WindowManager.LayoutParams)
     fun showController()
@@ -109,8 +110,8 @@ class PlayerGestureListener(
         // - player is in portrait or minimized mode
         if (e1 == null || callback.isPortrait || !callback.isMaximized || callback.isEdgeSwipe || callback.controlsVisibleAtGestureStart) return false
         
-        val width = callback.screenWidth.toFloat()
-        val height = callback.screenHeight.toFloat()
+        val width = callback.playerWidth.toFloat()
+        val height = callback.playerHeight.toFloat()
         
         // If we haven't locked onto a specific gesture type yet, determine it now
         if (!isVolume && !isBrightness && !isSeek && !isSpeed) {
@@ -176,17 +177,15 @@ class PlayerGestureListener(
             callback.setWindowAttributes(lp)
             
             icon.setImageResource(R.drawable.ic_brightness_medium_black_24dp)
-            feedback.visibility = View.VISIBLE
-            feedback.removeCallbacks(callback.getHideGestureRunnable())
-            feedback.postDelayed(callback.getHideGestureRunnable(), 800)
-            
+
             if (isAuto) {
                 progress.progress = 0
-                text.text = "Auto"
+                text.text = labeledText(PlayerGestureFeedbackKind.BRIGHTNESS, "Auto")
             } else {
                 progress.progress = (newBrightness * 100).toInt()
-                text.text = "%d%%".format((newBrightness * 100).toInt())
+                text.text = labeledText(PlayerGestureFeedbackKind.BRIGHTNESS, "%d%%".format((newBrightness * 100).toInt()))
             }
+            presentFeedback(feedback, container, PlayerGestureFeedbackKind.BRIGHTNESS)
             return true
         }
         
@@ -201,12 +200,13 @@ class PlayerGestureListener(
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
             
             icon.setImageResource(if (newVolume == 0) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24)
-            feedback.visibility = View.VISIBLE
-            feedback.removeCallbacks(callback.getHideGestureRunnable())
-            feedback.postDelayed(callback.getHideGestureRunnable(), 800)
-            
+
             progress.progress = ((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt()
-            text.text = "%d".format(((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt())
+            text.text = labeledText(
+                PlayerGestureFeedbackKind.DEVICE_VOLUME,
+                "%d".format(((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt()),
+            )
+            presentFeedback(feedback, container, PlayerGestureFeedbackKind.DEVICE_VOLUME)
             return true
         }
 
@@ -220,19 +220,19 @@ class PlayerGestureListener(
                     currentPosition = startPosition,
                     duration = duration,
                     gestureDelta = e2.x - gestureStartX,
-                    screenWidth = callback.screenWidth,
+                    screenWidth = callback.playerWidth,
                     sensitivity = sensitivity
                 )
                 val seekAmount = newPosition - startPosition
                 callback.seek(newPosition)
 
                 icon.setImageResource(if (seekAmount > 0) R.drawable.baseline_add_black_24 else R.drawable.baseline_remove_black_24)
-                
-                feedback.visibility = View.VISIBLE
-                feedback.removeCallbacks(callback.getHideGestureRunnable())
-                feedback.postDelayed(callback.getHideGestureRunnable(), 800)
-                
-                text.text = "${helper.formatDuration(newPosition)} / ${helper.formatDuration(duration)}"
+
+                text.text = labeledText(
+                    PlayerGestureFeedbackKind.SEEK,
+                    "${helper.formatDuration(newPosition)} / ${helper.formatDuration(duration)}",
+                )
+                presentFeedback(feedback, container, PlayerGestureFeedbackKind.SEEK)
             }
             return true
         }
@@ -254,11 +254,9 @@ class PlayerGestureListener(
             }
 
             icon.setImageResource(R.drawable.baseline_speed_black_24)
-            feedback.visibility = View.VISIBLE
-            feedback.removeCallbacks(callback.getHideGestureRunnable())
-            feedback.postDelayed(callback.getHideGestureRunnable(), 800)
-            
-            text.text = "%.2fx".format(newSpeed)
+
+            text.text = labeledText(PlayerGestureFeedbackKind.PLAYBACK_SPEED, "%.2fx".format(newSpeed))
+            presentFeedback(feedback, container, PlayerGestureFeedbackKind.PLAYBACK_SPEED)
             return true
         }
 
@@ -267,6 +265,44 @@ class PlayerGestureListener(
 
     private fun dpToPx(value: Int): Int {
         return (value * context.resources.displayMetrics.density).toInt()
+    }
+
+    private fun surfaceClass(): PlayerSurfaceClass {
+        return PlayerSurfacePolicy.classify(callback.playerWidth, context.resources.displayMetrics.density)
+    }
+
+    private fun labeledText(kind: PlayerGestureFeedbackKind, value: String): String {
+        return if (surfaceClass() == PlayerSurfaceClass.LARGE) {
+            val labelRes = when (kind) {
+                PlayerGestureFeedbackKind.BRIGHTNESS -> R.string.gesture_feedback_brightness
+                PlayerGestureFeedbackKind.DEVICE_VOLUME -> R.string.gesture_feedback_device_volume
+                PlayerGestureFeedbackKind.SEEK -> R.string.gesture_feedback_seek
+                PlayerGestureFeedbackKind.PLAYBACK_SPEED -> R.string.gesture_feedback_playback_speed
+            }
+            context.getString(labelRes) + " \u00B7 " + value
+        } else {
+            value
+        }
+    }
+
+    private fun presentFeedback(feedback: View, container: LinearLayout, kind: PlayerGestureFeedbackKind) {
+        val insets = callback.playerGestureInsets
+        PlayerSurfacePolicy.applyPlacement(
+            feedbackRoot = feedback,
+            container = container,
+            placement = PlayerSurfacePolicy.placementFor(
+                kind = kind,
+                surfaceClass = surfaceClass(),
+                density = context.resources.displayMetrics.density,
+                insetStartPx = insets?.left ?: 0,
+                insetEndPx = insets?.right ?: 0,
+            ),
+        )
+        feedback.animate().cancel()
+        feedback.alpha = 1f
+        feedback.visibility = View.VISIBLE
+        feedback.removeCallbacks(callback.getHideGestureRunnable())
+        feedback.postDelayed(callback.getHideGestureRunnable(), PlayerSurfacePolicy.FEEDBACK_HOLD_MS)
     }
 
     override fun onSingleTapUp(e: MotionEvent): Boolean {

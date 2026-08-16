@@ -51,3 +51,32 @@ Command (per slice): `./gradlew.bat check assembleDebug assembleDebugAndroidTest
 ### Existing unrelated failures
 
 - None recorded yet; to be appended per slice if `check` surfaces failures unrelated to this feature.
+
+## Slice 1 — Tablet correctness
+
+Changes:
+
+- Mini-player rendering switched from `RESIZE_MODE_ZOOM` to `RESIZE_MODE_FIT` in `applyMinimizedPlayerVisualState()`; the complete source frame is preserved (16:9, 4:3, 21:9, portrait, odd-dimension, transcode variants) and empty space is preferred to cropping. The canonical landscape mode is untouched by minimize/maximize.
+- New `PlayerSurfacePolicy` classifies the measured active player surface (`binding.playerLayout`) as COMPACT (<600dp) or LARGE (≥600dp) and derives gesture-feedback placement:
+  - compact surfaces keep the existing top-centered pill, margins, and 24dp top padding (phone presentation materially unchanged);
+  - LARGE surfaces place Brightness at the start edge and Device volume at the end edge, vertically centered, capped at 280dp; Seek/Playback speed stay top-centered, capped at 360dp;
+  - edge margins add captured system-gesture insets so indicators never sit in protected zones;
+  - LARGE feedback shows a concise label (`Brightness`, `Device volume`, `Seek`, `Playback speed`) before the value; compact feedback is unchanged.
+- Gesture zone math and feedback placement now use player-surface dimensions (`playerWidth`/`playerHeight` on `PlayerGestureCallback`) instead of `resources.displayMetrics`, correcting split-screen and resizable-window behavior. Recalculation happens naturally per event after rotation, split-screen, chat-visibility, and freeform resize changes.
+- Feedback hide now fades out over 150ms after the existing 800ms idle hold.
+- `layout_player_gesture_feedback.xml` root converted to FrameLayout to support runtime gravity/margins; ids and pill styling unchanged.
+
+Tablet audit (static, per design list; interactive matrix rows pending hardware):
+
+- Main player: single adaptive layout; large-surface feedback compact and edge-localized (this slice). No duplicated tablet screens introduced.
+- Mini-player: Fit, full frame preserved, background remains theme surface (this slice).
+- Player with/without chat: `playerLayout` width already excludes sidebar chat; policy reads the measured surface, so feedback and zones follow chat visibility (this slice).
+- Controls, Quality, Speed, Stream volume, More: addressed in Slice 4.
+- Gesture guide, profile live state, search live results: Slices 5–6.
+
+Automated evidence:
+
+- `PlayerSurfacePolicyTest`: classification boundaries (599/600dp, invalid dims), compact placement for all kinds, large edge/center placement, inset awareness, compact inset-ignoring.
+- Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (2m50s, includes unit tests + lint).
+
+Manual matrix: pending hardware (no attached devices in this environment).

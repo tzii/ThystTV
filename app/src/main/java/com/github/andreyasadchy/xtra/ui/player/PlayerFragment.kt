@@ -106,7 +106,21 @@ import java.util.Locale
 abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment.OnSortOptionChanged, IntegrityDialog.CallbackListener, PlayerGestureCallback {
 
     private var _binding: FragmentPlayerBinding? = null
-    private val hideGestureRunnable = Runnable { binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.apply { visibility = View.GONE } }
+    private val hideGestureRunnable = Runnable {
+        binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
+            feedback.animate().cancel()
+            if (feedback.isVisible) {
+                feedback.animate()
+                    .alpha(0f)
+                    .setDuration(PlayerSurfacePolicy.FEEDBACK_FADE_MS)
+                    .withEndAction {
+                        feedback.visibility = View.GONE
+                        feedback.alpha = 1f
+                    }
+                    .start()
+            }
+        }
+    }
     protected val binding get() = _binding!!
     protected val viewModel: PlayerViewModel by viewModels()
     protected var chatFragment: ChatFragment? = null
@@ -231,7 +245,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun applyMinimizedPlayerVisualState() {
-        binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         binding.playerLayout.setBackgroundColor(
             MaterialColors.getColor(binding.playerLayout, com.google.android.material.R.attr.colorSurface)
         )
@@ -3030,8 +3044,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     // PlayerGestureCallback implementation
     override val isControlsVisible get() = binding.playerControls.root.isVisible
-    override val screenWidth get() = resources.displayMetrics.widthPixels
-    override val screenHeight get() = resources.displayMetrics.heightPixels
+    override val playerWidth get() = binding.playerLayout.width
+    override val playerHeight get() = binding.playerLayout.height
+    override val playerGestureInsets get() = gestureInsets
     override val windowAttributes: android.view.WindowManager.LayoutParams
         get() = android.view.WindowManager.LayoutParams().apply {
             copyFrom(requireActivity().window.attributes)
