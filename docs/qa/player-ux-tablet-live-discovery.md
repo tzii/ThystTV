@@ -166,3 +166,30 @@ Automated evidence:
 
 - `ChannelSearchMapperTest` (8 tests): persisted-GraphQL live/offline mapping, Helix title/game/start-time mapping, blank-metadata degradation, offline identity mapping, Watch-live eligibility matrix, content-equality rebinding.
 - Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (4m03s).
+
+## Slice 7 — Final cleanup
+
+Changes:
+
+- Removed the dedicated aspect-ratio resize control: the `aspectRatio` ImageButton is gone from the player controls layout, its landscape wiring and portrait hide are gone from `PlayerFragment`, and the obsolete `player_aspect` button preference and `player_menu_aspect` menu preference (and their constants) are removed from the settings screens. The now-unused temporary Fit→Fill→Stretch cycle helper was removed with it. Display mode remains permanently available through `More > Playback > Display mode` and the pinch gesture; no other user-configurable control was removed.
+- The volume menu preference row label now reads `Stream volume` to match the overlay it opens.
+- No new features; regression-only cleanup.
+
+Gates:
+
+- `check assembleDebug assembleDebugAndroidTest assembleRelease` **BUILD SUCCESSFUL** (7m25s). Release artifact: `app-release-unsigned.apk` (signing is a release-engineering step outside this branch).
+
+## Final status against the Definition of Done
+
+- Checkpoint commits: Slice 0 baseline docs, then Slices 1–7, each independently buildable and committed separately (`git log codex/player-ux-tablet-live-discovery`).
+- Tablet mini-player never crops (Fit, Slice 1); large-surface feedback/menus are compact and edge/center-localized (Slices 1, 4).
+- Gesture ownership: single arbiter, conflict matrix unit-tested (Slice 2); upper-zone seek and lower-zone playback-speed eligibility unchanged; double-tap still toggles chat (claim-gated, with pinch-supersede revert).
+- Device volume (right vertical) and stream volume (speaker overlay) are separate and labeled (Slice 4).
+- Pinch previews and commits Fit/Fill from every mode; Stretch remains available from the canonical More picker; one state source with deterministic migration (Slice 3).
+- Gesture guide concise, context-aware, versioned, reopenable from More and Settings; pinch hint one-time and suppressed by successful use (Slice 5).
+- Live profiles and search rows unmistakable (LIVE badge, metadata, Watch live); direct Search-to-player navigation without per-row requests; optional metadata degrades cleanly (Slice 6).
+- Dedicated resize button absent from final primary controls; all three modes share one state source (Slices 3, 7).
+- Automated gates green including release assembly.
+- **Not satisfiable in this environment:** `connectedDebugAndroidTest` — no device/emulator is attached locally (recorded in Slice 0). The gate is *not* waived: it must run (locally or in CI) before the PR leaves draft. No androidTest source set existed at base; the instrumentation portion of the verification plan (view binding, contextual guide rows, display-mode selection, profile/search click targets) still needs authoring alongside that run.
+- Manual matrix rows requiring hardware (phone/tablet portrait+landscape, split-screen, live resizing, chat modes, aspect-ratio coverage, backend-specific behavior) remain pending interactive QA; the deterministic cores (arbiter, pinch table, migration, sizing policy, mapping) are unit-tested.
+- PR: branch is local-only by request; push and open the draft PR (targeting `master`) when ready, with this ledger attached.

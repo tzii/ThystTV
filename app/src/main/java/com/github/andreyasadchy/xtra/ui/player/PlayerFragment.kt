@@ -324,17 +324,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     fun getCurrentDisplayMode(): PlayerDisplayMode = displayMode
 
-    /** Temporary resize button cycle: Fit -> Fill -> Stretch -> Fit. */
-    fun cycleDisplayMode() {
-        selectDisplayMode(
-            when (displayMode) {
-                PlayerDisplayMode.FIT -> PlayerDisplayMode.FILL
-                PlayerDisplayMode.FILL -> PlayerDisplayMode.STRETCH
-                PlayerDisplayMode.STRETCH -> PlayerDisplayMode.FIT
-            }
-        )
-    }
-
     open fun updateVideoAspectRatio(aspectRatio: Float) {
         videoAspectRatio = aspectRatio
         binding.aspectRatioFrameLayout.setAspectRatio(aspectRatio)
@@ -1397,10 +1386,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                         }
                     }
-                    aspectRatio.visibility = View.GONE
                     toggleChat.visibility = View.GONE
-                }
-            } else {
+                }            } else {
                 requireActivity().window.decorView.setOnSystemUiVisibilityChangeListener {
                     if (!isKeyboardShown && isMaximized && activity != null) {
                         hideStatusBar()
@@ -1479,10 +1466,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                         }
-                    }
-                    if (requireContext().prefs().getBoolean(C.PLAYER_ASPECT, true)) {
-                        aspectRatio.visibility = View.VISIBLE
-                        aspectRatio.setOnClickListener { cycleDisplayMode() }
                     }
                     if (requireContext().prefs().getBoolean(C.PLAYER_CHATTOGGLE, true) && !requireContext().prefs().getBoolean(C.CHAT_DISABLE, false)) {
                         toggleChat.visibility = View.VISIBLE
