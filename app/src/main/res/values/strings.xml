@@ -820,6 +820,22 @@
     <string name="more_group_stream" tools:ignore="MissingTranslation">Stream</string>
     <string name="more_group_chat" tools:ignore="MissingTranslation">Chat</string>
     <string name="more_group_playback" tools:ignore="MissingTranslation">Playback</string>
+    <string name="more_group_help" tools:ignore="MissingTranslation">Help</string>
+    <string name="more_player_gestures" tools:ignore="MissingTranslation">Player gestures</string>
+    <string name="player_gesture_guide_title" tools:ignore="MissingTranslation">Player gestures</string>
+    <string name="player_gesture_guide_got_it" tools:ignore="MissingTranslation">Got it</string>
+    <string name="player_gesture_guide_settings_summary" tools:ignore="MissingTranslation">Show the player gesture guide</string>
+    <string name="gesture_row_brightness" tools:ignore="MissingTranslation">Left vertical</string>
+    <string name="gesture_row_device_volume" tools:ignore="MissingTranslation">Right vertical</string>
+    <string name="gesture_row_seek" tools:ignore="MissingTranslation">Upper horizontal</string>
+    <string name="gesture_row_playback_speed" tools:ignore="MissingTranslation">Lower horizontal</string>
+    <string name="gesture_row_pinch" tools:ignore="MissingTranslation">Pinch</string>
+    <string name="gesture_row_double_tap" tools:ignore="MissingTranslation">Double tap</string>
+    <string name="gesture_action_seek_settings" tools:ignore="MissingTranslation">Seek on VODs and seekable videos</string>
+    <string name="gesture_action_playback_speed_settings" tools:ignore="MissingTranslation">Playback speed on supported non-live media</string>
+    <string name="gesture_action_pinch" tools:ignore="MissingTranslation">Fit / Fill</string>
+    <string name="gesture_action_toggle_chat" tools:ignore="MissingTranslation">Toggle chat</string>
+    <string name="pinch_hint" tools:ignore="MissingTranslation">Pinch to fit or fill video</string>
     <string name="less_rounded_corners">Less rounded</string>
     <string name="reduced_padding">Reduced padding</string>
     <string name="compact_text">Compact text</string>

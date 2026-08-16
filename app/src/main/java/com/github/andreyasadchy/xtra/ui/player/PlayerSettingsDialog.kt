@@ -217,6 +217,11 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
                     dismiss()
                 }
             }
+            menuGestureGuide.visibility = View.VISIBLE
+            menuGestureGuide.setOnClickListener {
+                (parentFragment as? PlayerFragment)?.showGestureGuide()
+                dismiss()
+            }
         }
         updateGroupVisibilities()
     }
@@ -249,6 +254,7 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
                 listOf(menuChatBar, menuChatToggle, menuTranslateAll, menuReloadEmotes, menuChatDisconnect).any { it.isVisible }
             playbackGroupHeader.isVisible =
                 listOf(menuVolume, menuSubtitles, menuDisplayMode, menuMediaPlaylistTags, menuMultivariantPlaylistTags).any { it.isVisible }
+            helpGroupHeader.isVisible = menuGestureGuide.isVisible
         }
     }
 

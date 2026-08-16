@@ -137,3 +137,17 @@ Automated evidence:
 - Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (3m49s). One earlier run hit the known-flaky lint/UAST tooling crash (on `ExoPlayerFragment.kt`, one line changed); it did not reproduce on the clean re-run.
 
 Manual matrix: pending hardware (surfaces reposition/center after rotation and window resize need interactive confirmation).
+
+## Slice 5 — Gesture education
+
+Changes:
+
+- New `PlayerGestureGuideDialog`: one compact screen, no demonstrations, `Got it` button; plain-text rows keep it keyboard/TalkBack navigable and it never auto-dismisses on a timer. Copy lives entirely in string resources and never teaches double-tap seeking; the double-tap row says `Toggle chat`.
+- Context-aware rows: seekable media shows Left vertical → Brightness, Right vertical → Device volume, Upper horizontal → Seek, Lower horizontal → Playback speed, Pinch → Fit / Fill, Double tap → Toggle chat; live streams omit both horizontal rows (live playback supports neither gesture); Settings without a playback context keeps them with qualified copy (`Seek on VODs and seekable videos`, `Playback speed on supported non-live media`).
+- One-time display: appears on the first eligible non-portrait maximized playback (initial layout or first rotation into landscape), never above an existing modal surface (`closeOnPip`). A versioned preference (`player_gesture_guide_version`, current 1) records dismissal so a materially revised guide can be shown once in a later release. Reopenable from `More > Help > Player gestures` and `Settings > Player > Player gestures`.
+- Contextual pinch hint: after the guide is dismissed, a later eligible playback may show `Pinch to fit or fill video` when controls first hide (non-forced hide only). Separate preferences record hint-shown and pinch-used; a successful pinch commit sets pinch-used and permanently suppresses the hint; an unrecognized two-finger touch counts as nothing. The hint never appears above a modal surface.
+
+Automated evidence:
+
+- `PlayerGestureEducationTest` (5 tests): seekable/settings row sets, live row omission, guide versioning, full pinch-hint eligibility matrix (guide current, unshown, unused, later session).
+- Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (2m40s; one prior run hit the known-flaky lint/UAST crash and passed on re-run).

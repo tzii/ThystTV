@@ -74,6 +74,8 @@ import com.github.andreyasadchy.xtra.model.ui.SettingsSearchItem
 import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.ui.common.UpdateAvailableDialog
+import com.github.andreyasadchy.xtra.ui.player.PlayerGestureGuideContext
+import com.github.andreyasadchy.xtra.ui.player.PlayerGestureGuideDialog
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.UpdateUtils
@@ -1107,6 +1109,11 @@ class SettingsActivity : AppCompatActivity() {
                     }
                     .setNegativeButton(getString(R.string.no), null)
                     .show()
+                true
+            }
+            findPreference<Preference>("player_gesture_guide")?.setOnPreferenceClickListener {
+                PlayerGestureGuideDialog.newInstance(PlayerGestureGuideContext.SETTINGS)
+                    .show(childFragmentManager, null)
                 true
             }
         }

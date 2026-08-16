@@ -181,6 +181,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private val volumeOverlayDismissRunnable = Runnable { hideVolumeOverlay() }
     private var volumeOverlayLastNonZero = 100
 
+    // Gesture education
+    private var gestureGuideShownThisSession = false
+
     // Floating Chat Properties
     private var isFloatingChatEnabled = false
     private var dX = 0f
@@ -436,6 +439,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             initLayout()
             setupVolumeOverlayListeners()
             playerLayout.doOnLayout { updateQuickPlayerControls() }
+            playerLayout.post { maybeShowGestureGuide() }
             changePlayerMode()
             val viewConfiguration = ViewConfiguration.get(requireContext())
             val touchSlop = viewConfiguration.scaledTouchSlop
@@ -2049,6 +2053,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun hideController(force: Boolean = false) {
+        if (!force) {
+            maybeShowPinchHint()
+        }
         if (!controllerIsAnimating && binding.playerControls.root.isVisible) {
             controllerAnimation = binding.playerControls.root.animate().apply {
                 alpha(0f)
@@ -2413,6 +2420,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(chatLayout.windowToken, 0)
                 chatLayout.clearFocus()
                 initLayout()
+            }
+            if (!isPortrait && isMaximized) {
+                maybeShowGestureGuide()
             }
             (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.dismiss()
         }
@@ -2914,6 +2924,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         private const val PINCH_SCALE_CLAIM_DEADZONE = 0.02f
         private const val PINCH_FEEDBACK_LINGER_MS = 400L
         private const val VOLUME_OVERLAY_DISMISS_MS = 1500L
+        private const val PINCH_HINT_LINGER_MS = 3000L
 
         internal const val STREAM = "stream"
         internal const val VIDEO = "video"
@@ -3355,6 +3366,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             is PinchDisplayModeController.Event.Disarmed -> Unit
             is PinchDisplayModeController.Event.Commit -> {
                 selectDisplayMode(pinchEvent.mode)
+                onSuccessfulPinch()
                 hidePinchFeedback()
             }
             is PinchDisplayModeController.Event.Restore -> {
@@ -3433,6 +3445,82 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
             feedback.removeCallbacks(hideGestureRunnable)
             feedback.postDelayed(hideGestureRunnable, PINCH_FEEDBACK_LINGER_MS)
+        }
+    }
+
+    /**
+     * One-time gesture guide on the first eligible non-portrait maximized
+     * playback; a versioned preference records dismissal.
+     */
+    fun maybeShowGestureGuide() {
+        if (isPortrait || !isMaximized || gestureGuideShownThisSession) return
+        if (childFragmentManager.findFragmentByTag("closeOnPip") != null) return
+        if (PlayerGestureEducationState.shouldShowGuide(prefs.getInt(C.PLAYER_GESTURE_GUIDE_VERSION, 0))) {
+            showGestureGuide()
+        }
+    }
+
+    fun showGestureGuide(contextOverride: PlayerGestureGuideContext? = null) {
+        val guideContext = contextOverride ?: if (videoType == STREAM) {
+            PlayerGestureGuideContext.LIVE
+        } else {
+            PlayerGestureGuideContext.SEEKABLE
+        }
+        gestureGuideShownThisSession = true
+        PlayerGestureGuideDialog.newInstance(guideContext).show(childFragmentManager, "closeOnPip")
+    }
+
+    fun onGestureGuideDismissed() {
+        // The pinch hint becomes eligible in a later playback session; state
+        // lives in preferences, nothing else to do here.
+    }
+
+    /**
+     * Contextual pinch hint: shown at most once, only after the guide was
+     * dismissed in an earlier session, and suppressed forever once a pinch
+     * successfully changed the display mode. Never appears above a modal
+     * player surface.
+     */
+    private fun maybeShowPinchHint() {
+        if (isPortrait || !isMaximized) return
+        if (childFragmentManager.findFragmentByTag("closeOnPip") != null) return
+        if (!PlayerGestureEducationState.shouldShowPinchHint(
+                guideStoredVersion = prefs.getInt(C.PLAYER_GESTURE_GUIDE_VERSION, 0),
+                pinchHintShown = prefs.getBoolean(C.PLAYER_PINCH_HINT_SHOWN, false),
+                pinchUsed = prefs.getBoolean(C.PLAYER_PINCH_USED, false),
+                guideShownThisSession = gestureGuideShownThisSession,
+            )
+        ) {
+            return
+        }
+        prefs.edit { putBoolean(C.PLAYER_PINCH_HINT_SHOWN, true) }
+        val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback) ?: return
+        val container = feedback.findViewById<LinearLayout>(R.id.feedbackContainer) ?: return
+        feedback.findViewById<ImageView>(R.id.feedbackIcon)?.setImageResource(R.drawable.baseline_aspect_ratio_black_24)
+        feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)?.visibility = View.GONE
+        container.minimumWidth = 0
+        feedback.findViewById<TextView>(R.id.feedbackText)?.text = getString(R.string.pinch_hint)
+        PlayerSurfacePolicy.applyPlacement(
+            feedbackRoot = feedback,
+            container = container,
+            placement = PlayerSurfacePolicy.placementFor(
+                kind = PlayerGestureFeedbackKind.PINCH,
+                surfaceClass = PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density),
+                density = resources.displayMetrics.density,
+                insetStartPx = gestureInsets?.left ?: 0,
+                insetEndPx = gestureInsets?.right ?: 0,
+            ),
+        )
+        feedback.animate().cancel()
+        feedback.alpha = 1f
+        feedback.visibility = View.VISIBLE
+        feedback.removeCallbacks(hideGestureRunnable)
+        feedback.postDelayed(hideGestureRunnable, PINCH_HINT_LINGER_MS)
+    }
+
+    private fun onSuccessfulPinch() {
+        if (!prefs.getBoolean(C.PLAYER_PINCH_USED, false)) {
+            prefs.edit { putBoolean(C.PLAYER_PINCH_USED, true) }
         }
     }
 
