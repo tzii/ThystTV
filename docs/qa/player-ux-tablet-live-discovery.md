@@ -151,3 +151,18 @@ Automated evidence:
 
 - `PlayerGestureEducationTest` (5 tests): seekable/settings row sets, live row omission, guide versioning, full pinch-hint eligibility matrix (guide current, unshown, unused, later session).
 - Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (2m40s; one prior run hit the known-flaky lint/UAST crash and passed on re-run).
+
+## Slice 6 — Live discovery
+
+Changes:
+
+- New `ChannelSearchItem` model (channel identity/profile data plus optional live stream metadata) keeps search-only playback fields out of the shared `User` model. The paging pipeline (data source, view model, fragment, adapter) now carries it.
+- Mapping per API without any per-row enrichment request: the GraphQL typed query now also requests stream id, title, game display name, creation time, preview image and viewer count; the persisted GraphQL query maps viewersCount (its response carries nothing else); Helix maps its existing title, game name and start time — viewer count stays absent for Helix because channel search does not provide it.
+- Search rows: live results show a prominent red LIVE badge, stream title, category, viewer count when available, and a `Watch live` action that constructs the existing `Stream` model and calls `MainActivity.startStream` directly. Offline rows keep the channel and follower presentation. Missing optional metadata hides cleanly. The adapter's unconditional `areContentsTheSame = true` was replaced with real model equality (data class), so changing live state or metadata rebinds the row.
+- Interaction targets are distinct: row, avatar and channel name open the channel profile; `Watch live` launches playback; if live status exists but playback identity is insufficient (missing channel id), `Watch live` is disabled while profile navigation remains available.
+- Channel profile: the header stream layout now prominently shows a red LIVE badge above the title when live, alongside the existing title, category, viewer count, uptime and `Watch live` button (which already launches `startStream`). Offline profiles keep the existing open-player behavior without masquerading as a live CTA. No additional network request is made; a stale search result enters the existing player error path.
+
+Automated evidence:
+
+- `ChannelSearchMapperTest` (8 tests): persisted-GraphQL live/offline mapping, Helix title/game/start-time mapping, blank-metadata degradation, offline identity mapping, Watch-live eligibility matrix, content-equality rebinding.
+- Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (4m03s).
