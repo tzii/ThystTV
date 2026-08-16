@@ -105,3 +105,19 @@ Automated evidence:
 - Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (4m09s). Two earlier runs failed for environment reasons recorded here: one flaky lint/UAST tooling crash (`RepeatOnLifecycleDetector`/FIR on the untouched `MainActivity.kt`) that did not reproduce, and three `UnsafeOptInUsageError`s on the new `PlayerDisplayMode` enum (fixed with the same `@OptIn(UnstableApi)` treatment the player fragments use).
 
 Manual matrix: pending hardware; the conflict list from the design (swipe-then-second-finger, controls visible/hidden, portrait/minimized, pinch near edges, two fingers without movement, below deadzone, reversal, one-finger lift, third finger, pinch with controls visible, modal surface open, rapid gestures, double-tap before/after pinch) is covered deterministically by the arbiter/controller tests above and awaits interactive confirmation.
+
+## Slice 3 — Display modes
+
+Changes:
+
+- New `PlayerDisplayModeStore` owns persistence and legacy migration for the non-portrait maximized player. Canonical key `playerDisplayModeLandscape` (strings fit/fill/stretch). On first read when absent, the legacy `aspectRatioLandscape` integer migrates: 0→Fit, 1/2/4→Fill, 3→Stretch, missing/corrupt/unknown→Fit, and the canonical value is persisted so upgrades are deterministic. The legacy key is never written and remains read-only migration input.
+- One canonical runtime state: `PlayerFragment.displayMode` (loaded via the store) drives the renderer (`applyMaximizedPlayerVisualState`), pinch (`effectivePinchDisplayMode`/`PinchDisplayModeController.begin`), and the More menu. The temporary resize button cycles Fit→Fill→Stretch→Fit through `cycleDisplayMode()` and writes only the canonical key — it never writes raw five-mode renderer values.
+- Pinch preview and commit: on API 24+ the renderer pins to Fit and a uniform view scale interpolates toward the target geometry (`PlayerDisplayModePreviewer`); Stretch previews anchor at the Fill scale in both directions since Stretch is not on the Fit-to-Fill continuum; below API 24 (unreliable SurfaceView transforms) the preview steps to the target renderer mode only when armed. Commit stores the canonical mode; neutral release and cancellation restore the committed mode and clear transient transforms; `applyMinimizedPlayerVisualState`/`applyMaximizedPlayerVisualState` also reset preview scale. When source and viewport aspects match, the ratio collapses to 1 and feedback is label-only.
+- Video aspect ratio is now tracked via `PlayerFragment.updateVideoAspectRatio`, called by the Media3, ExoPlayer and MediaPlayer backends instead of touching the frame layout directly.
+- More menu: the pref-gated raw `menuRatio` cycler is replaced by a permanent `Display mode` entry (non-portrait) showing the current mode and opening a Fit/Fill/Stretch single-choice picker that writes the canonical state. Portrait maximized playback and the mini-player remain forced Fit and never mutate the stored mode.
+
+Automated evidence:
+
+- `PlayerDisplayModeStoreTest` (8 tests): every legacy mapping including missing/corrupt/unknown, canonical-wins, corrupt-canonical fallback, save writes canonical only, renderer mapping for the three modes.
+- `PlayerDisplayModePreviewerTest` (9 tests): matching-aspect collapse to 1, 4:3/9:16 ratios, invalid inputs, Fit↔Fill interpolation, Stretch anchoring in both directions, progress clamping.
+- Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (3m18s).

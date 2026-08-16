@@ -135,7 +135,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override var isMaximized = true
     private var isChatOpen = true
     private var isKeyboardShown = false
-    private var resizeMode = 0
+    protected var displayMode = PlayerDisplayMode.FIT
+    private lateinit var displayModeStore: PlayerDisplayModeStore
+    protected var videoAspectRatio = 0f
     private var chatWidthLandscape = 0
 
     private var activePointerId = -1
@@ -258,6 +260,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun applyMinimizedPlayerVisualState() {
+        binding.aspectRatioFrameLayout.scaleX = 1f
+        binding.aspectRatioFrameLayout.scaleY = 1f
         binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         binding.playerLayout.setBackgroundColor(
             MaterialColors.getColor(binding.playerLayout, com.google.android.material.R.attr.colorSurface)
@@ -265,12 +269,47 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun applyMaximizedPlayerVisualState() {
+        binding.aspectRatioFrameLayout.scaleX = 1f
+        binding.aspectRatioFrameLayout.scaleY = 1f
         binding.aspectRatioFrameLayout.resizeMode = if (isPortrait) {
             AspectRatioFrameLayout.RESIZE_MODE_FIT
         } else {
-            resizeMode
+            displayMode.resizeMode
         }
         binding.playerLayout.setBackgroundColor(Color.BLACK)
+    }
+
+    /**
+     * Canonical setter for the non-portrait maximized display mode. Portrait
+     * maximized playback and the mini-player always render Fit and never
+     * mutate this state.
+     */
+    fun selectDisplayMode(mode: PlayerDisplayMode) {
+        displayMode = mode
+        displayModeStore.saveDisplayMode(mode)
+        binding.aspectRatioFrameLayout.scaleX = 1f
+        binding.aspectRatioFrameLayout.scaleY = 1f
+        if (!isPortrait && isMaximized) {
+            binding.aspectRatioFrameLayout.resizeMode = mode.resizeMode
+        }
+    }
+
+    fun getCurrentDisplayMode(): PlayerDisplayMode = displayMode
+
+    /** Temporary resize button cycle: Fit -> Fill -> Stretch -> Fit. */
+    fun cycleDisplayMode() {
+        selectDisplayMode(
+            when (displayMode) {
+                PlayerDisplayMode.FIT -> PlayerDisplayMode.FILL
+                PlayerDisplayMode.FILL -> PlayerDisplayMode.STRETCH
+                PlayerDisplayMode.STRETCH -> PlayerDisplayMode.FIT
+            }
+        )
+    }
+
+    open fun updateVideoAspectRatio(aspectRatio: Float) {
+        videoAspectRatio = aspectRatio
+        binding.aspectRatioFrameLayout.setAspectRatio(aspectRatio)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -366,7 +405,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             isChatOpen = requireContext().prefs().getBoolean(C.KEY_CHAT_OPENED, true) && !requireContext().prefs().getBoolean(C.CHAT_DISABLE, false)
             chatWidthLandscape = requireContext().prefs().getInt(C.LANDSCAPE_CHAT_WIDTH, 0)
-            resizeMode = requireContext().prefs().getInt(C.ASPECT_RATIO_LANDSCAPE, AspectRatioFrameLayout.RESIZE_MODE_FIT)
+            displayModeStore = PlayerDisplayModeStore(SharedPreferencesDisplayModeStorage(prefs))
+            displayMode = displayModeStore.loadDisplayMode()
             aspectRatioFrameLayout.setAspectRatio(16f / 9f)
             initLayout()
             changePlayerMode()
@@ -1405,7 +1445,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                     if (requireContext().prefs().getBoolean(C.PLAYER_ASPECT, true)) {
                         aspectRatio.visibility = View.VISIBLE
-                        aspectRatio.setOnClickListener { setResizeMode() }
+                        aspectRatio.setOnClickListener { cycleDisplayMode() }
                     }
                     if (requireContext().prefs().getBoolean(C.PLAYER_CHATTOGGLE, true) && !requireContext().prefs().getBoolean(C.CHAT_DISABLE, false)) {
                         toggleChat.visibility = View.VISIBLE
@@ -1422,12 +1462,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             updateQuickPlayerControls()
         }
-    }
-
-    fun setResizeMode() {
-        resizeMode = (resizeMode + 1).let { if (it < 5) it else 0 }
-        binding.aspectRatioFrameLayout.resizeMode = resizeMode
-        requireContext().prefs().edit { putInt(C.ASPECT_RATIO_LANDSCAPE, resizeMode) }
     }
 
     fun showSleepTimerDialog() {
@@ -3153,15 +3187,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     /**
-     * Interim mapping for pinch feedback until the canonical display-mode store
-     * replaces the raw renderer preference.
+     * Display mode used to begin a pinch: the canonical persisted mode.
      */
     internal open fun effectivePinchDisplayMode(): PlayerDisplayMode {
-        return when (resizeMode) {
-            AspectRatioFrameLayout.RESIZE_MODE_FILL -> PlayerDisplayMode.STRETCH
-            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> PlayerDisplayMode.FILL
-            else -> PlayerDisplayMode.FIT
-        }
+        return displayMode
     }
 
     private fun beginPinch(supersededDoubleTap: Boolean, event: MotionEvent) {
@@ -3195,8 +3224,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     private fun applyPinchEvent(pinchEvent: PinchDisplayModeController.Event) {
         when (pinchEvent) {
-            is PinchDisplayModeController.Event.Preview -> showPinchFeedback(pinchEvent.toward, pinchEvent.progress)
-            is PinchDisplayModeController.Event.NoPreview -> showPinchFeedback(pinchEvent.from, 0f)
+            is PinchDisplayModeController.Event.Preview -> {
+                showPinchFeedback(pinchEvent.toward, pinchEvent.progress)
+                applyPinchPreview(pinchEvent.from, pinchEvent.toward, pinchEvent.progress)
+            }
+            is PinchDisplayModeController.Event.NoPreview -> {
+                showPinchFeedback(pinchEvent.from, 0f)
+                clearPinchPreview(pinchEvent.from)
+            }
             is PinchDisplayModeController.Event.Armed -> {
                 if (pinchEvent.target != pinchController.committedMode && pinchEvent.target != pinchLastArmedTarget) {
                     pinchLastArmedTarget = pinchEvent.target
@@ -3211,9 +3246,47 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
             }
             is PinchDisplayModeController.Event.Disarmed -> Unit
-            is PinchDisplayModeController.Event.Commit,
-            is PinchDisplayModeController.Event.Restore,
-            is PinchDisplayModeController.Event.Cancelled -> hidePinchFeedback()
+            is PinchDisplayModeController.Event.Commit -> {
+                selectDisplayMode(pinchEvent.mode)
+                hidePinchFeedback()
+            }
+            is PinchDisplayModeController.Event.Restore -> {
+                clearPinchPreview(pinchEvent.mode)
+                hidePinchFeedback()
+            }
+            is PinchDisplayModeController.Event.Cancelled -> {
+                clearPinchPreview(pinchEvent.mode)
+                hidePinchFeedback()
+            }
+        }
+    }
+
+    /**
+     * Continuous preview toward the target geometry. On API 24+ the renderer is
+     * pinned to Fit and a uniform view scale interpolates toward Fill; on older
+     * devices SurfaceView transforms are unreliable, so the preview steps to
+     * the target renderer mode only once armed.
+     */
+    private fun applyPinchPreview(from: PlayerDisplayMode, toward: PlayerDisplayMode, progress: Float) {
+        if (isPortrait || !isMaximized) {
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val ratio = PlayerDisplayModePreviewer.fillToFitRatio(videoAspectRatio, binding.playerLayout.width, binding.playerLayout.height)
+            val scale = PlayerDisplayModePreviewer.previewScale(from, toward, progress, ratio)
+            binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            binding.aspectRatioFrameLayout.scaleX = scale
+            binding.aspectRatioFrameLayout.scaleY = scale
+        } else if (progress >= 1f) {
+            binding.aspectRatioFrameLayout.resizeMode = toward.resizeMode
+        }
+    }
+
+    private fun clearPinchPreview(restore: PlayerDisplayMode) {
+        binding.aspectRatioFrameLayout.scaleX = 1f
+        binding.aspectRatioFrameLayout.scaleY = 1f
+        if (!isPortrait && isMaximized) {
+            binding.aspectRatioFrameLayout.resizeMode = restore.resizeMode
         }
     }
 

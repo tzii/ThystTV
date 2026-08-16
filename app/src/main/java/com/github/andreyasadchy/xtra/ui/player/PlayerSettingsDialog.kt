@@ -12,6 +12,7 @@ import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.PlayerSettingsBinding
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -159,13 +160,7 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
                 }
             }
             if ((parentFragment as? PlayerFragment)?.getIsPortrait() == false) {
-                if (requireContext().prefs().getBoolean(C.PLAYER_MENU_ASPECT, false)) {
-                    menuRatio.visibility = View.VISIBLE
-                    menuRatio.setOnClickListener {
-                        (parentFragment as? PlayerFragment)?.setResizeMode()
-                        dismiss()
-                    }
-                }
+                setupDisplayModeMenu()
                 if (requireContext().prefs().getBoolean(C.PLAYER_MENU_CHAT_TOGGLE, false)) {
                     menuChatToggle.visibility = View.VISIBLE
                     if (requireContext().prefs().getBoolean(C.KEY_CHAT_OPENED, true)) {
@@ -217,6 +212,35 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
                     (parentFragment as? PlayerFragment)?.reloadEmotes()
                     dismiss()
                 }
+            }
+        }
+    }
+
+    private fun setupDisplayModeMenu() {
+        val playerFragment = parentFragment as? PlayerFragment ?: return
+        with(binding) {
+            menuDisplayMode.visibility = View.VISIBLE
+            val modes = PlayerDisplayMode.entries
+            val labels = modes.map { mode ->
+                getString(
+                    when (mode) {
+                        PlayerDisplayMode.FIT -> R.string.display_mode_fit
+                        PlayerDisplayMode.FILL -> R.string.display_mode_fill
+                        PlayerDisplayMode.STRETCH -> R.string.display_mode_stretch
+                    }
+                )
+            }.toTypedArray()
+            val current = playerFragment.getCurrentDisplayMode()
+            displayModeValue.text = labels[modes.indexOf(current)]
+            menuDisplayMode.setOnClickListener {
+                requireContext().getAlertDialogBuilder()
+                    .setTitle(getString(R.string.display_mode))
+                    .setSingleChoiceItems(labels, modes.indexOf(playerFragment.getCurrentDisplayMode())) { dialog, which ->
+                        playerFragment.selectDisplayMode(modes[which])
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton(getString(R.string.no), null)
+                    .show()
             }
         }
     }
