@@ -45,6 +45,10 @@ interface PlayerGestureCallback {
     // Notify when gesture detector has claimed a swipe gesture
     fun onSwipeGestureStarted()
     fun onSwipeGestureEnded()
+
+    // Gesture arbitration: the single owner of the touch sequence
+    fun claimSingleFingerGesture(owner: PlayerGestureArbiter.Owner): Boolean
+    fun claimDoubleTapChat(): Boolean
 }
 
 class PlayerGestureListener(
@@ -145,13 +149,27 @@ class PlayerGestureListener(
              
              // Notify that we've claimed this gesture (prevents minimize gesture from triggering)
              if (isVolume || isBrightness || isSeek || isSpeed) {
-                 isScrolling = true  // Mark that we're in a scroll gesture
-                 if (!hasNotifiedGestureStart) {
-                     callback.onSwipeGestureStarted()
-                     performHapticFeedback() // Feedback on gesture start
-                     hasNotifiedGestureStart = true
-                 }
-             }
+                val owner = when {
+                    isBrightness -> PlayerGestureArbiter.Owner.BRIGHTNESS
+                    isVolume -> PlayerGestureArbiter.Owner.DEVICE_VOLUME
+                    isSeek -> PlayerGestureArbiter.Owner.SEEK
+                    else -> PlayerGestureArbiter.Owner.PLAYBACK_SPEED
+                }
+                if (!callback.claimSingleFingerGesture(owner)) {
+                    // A pinch candidate owns this sequence; abandon the claim.
+                    isVolume = false
+                    isBrightness = false
+                    isSeek = false
+                    isSpeed = false
+                    return false
+                }
+                isScrolling = true  // Mark that we're in a scroll gesture
+                if (!hasNotifiedGestureStart) {
+                    callback.onSwipeGestureStarted()
+                    performHapticFeedback() // Feedback on gesture start
+                    hasNotifiedGestureStart = true
+                }
+            }
         }
 
         val percentY = (gestureStartY - e2.y) / height
@@ -278,6 +296,7 @@ class PlayerGestureListener(
                 PlayerGestureFeedbackKind.DEVICE_VOLUME -> R.string.gesture_feedback_device_volume
                 PlayerGestureFeedbackKind.SEEK -> R.string.gesture_feedback_seek
                 PlayerGestureFeedbackKind.PLAYBACK_SPEED -> R.string.gesture_feedback_playback_speed
+                PlayerGestureFeedbackKind.PINCH -> R.string.gesture_feedback_pinch
             }
             context.getString(labelRes) + " \u00B7 " + value
         } else {
@@ -286,23 +305,15 @@ class PlayerGestureListener(
     }
 
     private fun presentFeedback(feedback: View, container: LinearLayout, kind: PlayerGestureFeedbackKind) {
-        val insets = callback.playerGestureInsets
-        PlayerSurfacePolicy.applyPlacement(
+        PlayerSurfacePolicy.presentFeedback(
+            context = context,
             feedbackRoot = feedback,
             container = container,
-            placement = PlayerSurfacePolicy.placementFor(
-                kind = kind,
-                surfaceClass = surfaceClass(),
-                density = context.resources.displayMetrics.density,
-                insetStartPx = insets?.left ?: 0,
-                insetEndPx = insets?.right ?: 0,
-            ),
+            kind = kind,
+            surfaceWidthPx = callback.playerWidth,
+            insets = callback.playerGestureInsets,
+            hideRunnable = callback.getHideGestureRunnable(),
         )
-        feedback.animate().cancel()
-        feedback.alpha = 1f
-        feedback.visibility = View.VISIBLE
-        feedback.removeCallbacks(callback.getHideGestureRunnable())
-        feedback.postDelayed(callback.getHideGestureRunnable(), PlayerSurfacePolicy.FEEDBACK_HOLD_MS)
     }
 
     override fun onSingleTapUp(e: MotionEvent): Boolean {
@@ -345,8 +356,10 @@ class PlayerGestureListener(
 
     override fun onDoubleTap(e: MotionEvent): Boolean {
         return if (doubleTapEnabled && !callback.isPortrait && callback.isMaximized) {
-            callback.cycleChatMode()
-            performHapticFeedback() // Feedback for double tap action
+            if (callback.claimDoubleTapChat()) {
+                callback.cycleChatMode()
+                performHapticFeedback() // Feedback for double tap action
+            }
             true
         } else {
             false

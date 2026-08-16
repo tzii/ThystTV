@@ -22,6 +22,7 @@ import android.text.format.DateFormat
 import android.text.format.DateUtils
 import android.util.TypedValue
 import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
 import android.media.AudioManager
 import android.provider.Settings
 import android.view.WindowManager
@@ -44,6 +45,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.trackPipAnimationHintView
 import androidx.annotation.OptIn
@@ -98,7 +100,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.sqrt
 import java.util.Locale
 
 @OptIn(UnstableApi::class)
@@ -161,6 +165,15 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     // Gesture conflict prevention: track state at gesture start
     override var controlsVisibleAtGestureStart = false
     private var isSwipeGestureInProgress = false
+
+    // Gesture arbitration and pinch display-mode control
+    private var controllerTapDetector: GestureDetector? = null
+    private lateinit var gestureArbiter: PlayerGestureArbiter
+    private val pinchController = PinchDisplayModeController()
+    private var pinchPointerId1 = -1
+    private var pinchPointerId2 = -1
+    private var pinchAnchorSpan = 0f
+    private var pinchLastArmedTarget: PlayerDisplayMode? = null
 
     // Floating Chat Properties
     private var isFloatingChatEnabled = false
@@ -376,17 +389,21 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
 
             val zoneSplit = prefs.getString(C.PLAYER_GESTURES_ZONE_SPLIT, "0.5")?.toFloatOrNull() ?: 0.5f
-            val controllerTapDetector = GestureDetector(
+            controllerTapDetector = GestureDetector(
                 requireContext(),
                 PlayerGestureListener(
-                    requireContext(), 
-                    this@PlayerFragment, 
+                    requireContext(),
+                    this@PlayerFragment,
                     doubleTap,
                     gesturesEnabled,
                     hapticEnabled,
                     sensitivity,
                     zoneSplit
                 )
+            )
+            gestureArbiter = PlayerGestureArbiter(
+                pinchSpanSlopPx = touchSlop * 2f,
+                scaleClaimDeadzone = PINCH_SCALE_CLAIM_DEADZONE,
             )
 
             // Edge zone detection for system gesture areas
@@ -423,7 +440,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     if (playerControls.root.isVisible) {
                         playerControls.root.dispatchTouchEvent(event)
                     } else {
-                        controllerTapDetector.onTouchEvent(event)
+                        controllerTapDetector?.onTouchEvent(event)
                     }
                 } else {
                     velocityTracker?.clear()
@@ -455,7 +472,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             if (controlsVisibleAtGestureStart) {
                                 playerControls.root.dispatchTouchEvent(event)
                             } else {
-                                controllerTapDetector.onTouchEvent(event)
+                                controllerTapDetector?.onTouchEvent(event)
                             }
                         }
                         // Only check minimize threshold if controls were visible and no swipe gesture claimed this touch
@@ -573,6 +590,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 if (!isAnimating) {
                     when (event.actionMasked) {
                         MotionEvent.ACTION_DOWN -> {
+                            gestureArbiter.onSequenceStarted()
+                            resetPinchTracking()
                             activePointerId = event.getPointerId(0)
                             val x = event.x
                             val y = event.y
@@ -583,6 +602,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             downAction(event)
                         }
                         MotionEvent.ACTION_POINTER_DOWN -> {
+                            if (!isPortrait && isMaximized && gesturesEnabled && gestureArbiter.onPointerAdded(event.pointerCount)) {
+                                pinchPointerId1 = event.getPointerId(0)
+                                pinchPointerId2 = event.getPointerId(1)
+                                pinchAnchorSpan = twoFingerSpan(event, pinchPointerId1, pinchPointerId2)
+                            }
                             if (activePointerId == -1) {
                                 val pointerIndex = event.actionIndex
                                 val pointerId = event.getPointerId(pointerIndex)
@@ -599,6 +623,21 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             }
                         }
                         MotionEvent.ACTION_MOVE -> {
+                            if (gestureArbiter.owner == PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
+                                updatePinch(event)
+                            } else {
+                                if (gestureArbiter.isPinchCandidate && pinchPointerId1 != -1 && pinchPointerId2 != -1 && pinchAnchorSpan > 0f) {
+                                    val span = twoFingerSpan(event, pinchPointerId1, pinchPointerId2)
+                                    if (span > 0f) {
+                                        val supersededDoubleTap = gestureArbiter.owner == PlayerGestureArbiter.Owner.DOUBLE_TAP_CHAT
+                                        if (gestureArbiter.onScaleUpdate(span / pinchAnchorSpan, abs(span - pinchAnchorSpan))) {
+                                            beginPinch(supersededDoubleTap, event)
+                                            updatePinch(event)
+                                        }
+                                    }
+                                }
+                            }
+                            if (gestureArbiter.owner != PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
                             if (isMaximized) {
                                 // Use controlsVisibleAtGestureStart for consistent routing throughout the gesture
                                 if (controlsVisibleAtGestureStart) {
@@ -630,7 +669,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     }
                                 } else {
                                     // Controls were hidden at gesture start: let gesture detector handle scroll gestures
-                                    controllerTapDetector.onTouchEvent(event)
+                                    controllerTapDetector?.onTouchEvent(event)
                                 }
                             } else {
                                 if (activePointerId != -1) {
@@ -662,32 +701,46 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     }
                                 }
                             }
-                        }
-                        MotionEvent.ACTION_POINTER_UP -> {
-                            val pointerIndex = event.actionIndex
-                            val pointerId = event.getPointerId(pointerIndex)
-                            if (pointerId == activePointerId) {
-                                var newId = -1
-                                for (i in 0 until event.pointerCount) {
-                                    val id = event.getPointerId(i)
-                                    if (id != activePointerId) {
-                                        val x = event.getX(i)
-                                        val y = event.getY(i)
-                                        if (x in 0f..playerLayout.width.toFloat() && y in 0f..playerLayout.height.toFloat()) {
-                                            newId = id
-                                            lastX = x * slidingLayout.scaleX
-                                            lastY = y * slidingLayout.scaleY
-                                            break
-                                        }
-                                    }
-                                }
-                                if (newId == -1) {
-                                    upAction(event)
-                                }
-                                activePointerId = newId
                             }
                         }
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> upAction(event)
+                        MotionEvent.ACTION_POINTER_UP -> {
+                            gestureArbiter.onPointerRemoved(event.pointerCount - 1)
+                            if (gestureArbiter.owner != PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
+                                val pointerIndex = event.actionIndex
+                                val pointerId = event.getPointerId(pointerIndex)
+                                if (pointerId == activePointerId) {
+                                    var newId = -1
+                                    for (i in 0 until event.pointerCount) {
+                                        val id = event.getPointerId(i)
+                                        if (id != activePointerId) {
+                                            val x = event.getX(i)
+                                            val y = event.getY(i)
+                                            if (x in 0f..playerLayout.width.toFloat() && y in 0f..playerLayout.height.toFloat()) {
+                                                newId = id
+                                                lastX = x * slidingLayout.scaleX
+                                                lastY = y * slidingLayout.scaleY
+                                                break
+                                            }
+                                        }
+                                    }
+                                    if (newId == -1) {
+                                        upAction(event)
+                                    }
+                                    activePointerId = newId
+                                }
+                            }
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            if (gestureArbiter.owner == PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
+                                finishPinch(cancelled = event.actionMasked == MotionEvent.ACTION_CANCEL)
+                                gestureArbiter.onSequenceFinished()
+                                resetPinchTracking()
+                            } else {
+                                gestureArbiter.onSequenceFinished()
+                                resetPinchTracking()
+                                upAction(event)
+                            }
+                        }
                     }
                 }
                 true
@@ -715,7 +768,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             with(playerControls) {
                 root.setOnTouchListener { _, event ->
-                    controllerTapDetector.onTouchEvent(event)
+                    controllerTapDetector?.onTouchEvent(event) == true
                 }
                 playPause.setOnClickListener { playPause() }
                 rewind.text = ((requireContext().prefs().getString(C.PLAYER_REWIND, "10000")?.toLongOrNull() ?: 10000) / 1000).toString()
@@ -2718,6 +2771,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         private const val REQUEST_CODE_AUDIO_ONLY = 2
         private const val REQUEST_CODE_PLAY_PAUSE = 3
 
+        private const val PINCH_SCALE_CLAIM_DEADZONE = 0.02f
+        private const val PINCH_FEEDBACK_LINGER_MS = 400L
+
         internal const val STREAM = "stream"
         internal const val VIDEO = "video"
         internal const val CLIP = "clip"
@@ -3066,8 +3122,144 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override fun onSwipeGestureStarted() {
         isSwipeGestureInProgress = true
     }
-    
+
     override fun onSwipeGestureEnded() {
+        isSwipeGestureInProgress = false
+    }
+
+    override fun claimSingleFingerGesture(owner: PlayerGestureArbiter.Owner): Boolean {
+        return gestureArbiter.tryClaimSingleFinger(owner)
+    }
+
+    override fun claimDoubleTapChat(): Boolean {
+        return gestureArbiter.onDoubleTapClaimed()
+    }
+
+    private fun twoFingerSpan(event: MotionEvent, pointerId1: Int, pointerId2: Int): Float {
+        val index1 = event.findPointerIndex(pointerId1)
+        val index2 = event.findPointerIndex(pointerId2)
+        if (index1 == -1 || index2 == -1) {
+            return -1f
+        }
+        val dx = event.getX(index1) - event.getX(index2)
+        val dy = event.getY(index1) - event.getY(index2)
+        return sqrt(dx * dx + dy * dy)
+    }
+
+    private fun resetPinchTracking() {
+        pinchPointerId1 = -1
+        pinchPointerId2 = -1
+        pinchAnchorSpan = 0f
+    }
+
+    /**
+     * Interim mapping for pinch feedback until the canonical display-mode store
+     * replaces the raw renderer preference.
+     */
+    internal open fun effectivePinchDisplayMode(): PlayerDisplayMode {
+        return when (resizeMode) {
+            AspectRatioFrameLayout.RESIZE_MODE_FILL -> PlayerDisplayMode.STRETCH
+            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> PlayerDisplayMode.FILL
+            else -> PlayerDisplayMode.FIT
+        }
+    }
+
+    private fun beginPinch(supersededDoubleTap: Boolean, event: MotionEvent) {
+        if (supersededDoubleTap) {
+            // The pinch's first-finger down was consumed as the second tap of a
+            // double tap and already toggled chat; revert so an intentional
+            // pinch does not toggle chat.
+            cycleChatMode()
+        }
+        pinchController.begin(effectivePinchDisplayMode())
+        pinchLastArmedTarget = null
+        isSwipeGestureInProgress = true
+        val cancelEvent = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
+        if (controlsVisibleAtGestureStart) {
+            binding.playerControls.root.dispatchTouchEvent(cancelEvent)
+        }
+        controllerTapDetector?.onTouchEvent(cancelEvent)
+        cancelEvent.recycle()
+    }
+
+    private fun updatePinch(event: MotionEvent) {
+        if (pinchPointerId1 == -1 || pinchPointerId2 == -1 || pinchAnchorSpan <= 0f) {
+            return
+        }
+        val span = twoFingerSpan(event, pinchPointerId1, pinchPointerId2)
+        if (span <= 0f) {
+            return
+        }
+        pinchController.update(span / pinchAnchorSpan).forEach(::applyPinchEvent)
+    }
+
+    private fun applyPinchEvent(pinchEvent: PinchDisplayModeController.Event) {
+        when (pinchEvent) {
+            is PinchDisplayModeController.Event.Preview -> showPinchFeedback(pinchEvent.toward, pinchEvent.progress)
+            is PinchDisplayModeController.Event.NoPreview -> showPinchFeedback(pinchEvent.from, 0f)
+            is PinchDisplayModeController.Event.Armed -> {
+                if (pinchEvent.target != pinchController.committedMode && pinchEvent.target != pinchLastArmedTarget) {
+                    pinchLastArmedTarget = pinchEvent.target
+                    if (prefs.getBoolean(C.PLAYER_GESTURES_HAPTIC, false)) {
+                        try {
+                            binding.playerLayout.findViewById<View>(R.id.gestureFeedback)
+                                ?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        } catch (e: Exception) {
+                            // Haptic failure must not block gesture completion.
+                        }
+                    }
+                }
+            }
+            is PinchDisplayModeController.Event.Disarmed -> Unit
+            is PinchDisplayModeController.Event.Commit,
+            is PinchDisplayModeController.Event.Restore,
+            is PinchDisplayModeController.Event.Cancelled -> hidePinchFeedback()
+        }
+    }
+
+    private fun showPinchFeedback(target: PlayerDisplayMode, progress: Float) {
+        val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback) ?: return
+        val container = feedback.findViewById<LinearLayout>(R.id.feedbackContainer) ?: return
+        val icon = feedback.findViewById<ImageView>(R.id.feedbackIcon)
+        val progressIndicator = feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)
+        val text = feedback.findViewById<TextView>(R.id.feedbackText)
+        icon?.setImageResource(R.drawable.baseline_aspect_ratio_black_24)
+        text?.text = getString(
+            when (target) {
+                PlayerDisplayMode.FIT -> R.string.display_mode_fit
+                PlayerDisplayMode.FILL -> R.string.display_mode_fill
+                PlayerDisplayMode.STRETCH -> R.string.display_mode_stretch
+            }
+        )
+        if (progress > 0f) {
+            progressIndicator?.visibility = View.VISIBLE
+            progressIndicator?.progress = (progress * 100).toInt()
+            container.minimumWidth = 0
+        } else {
+            progressIndicator?.visibility = View.GONE
+        }
+        PlayerSurfacePolicy.presentFeedback(
+            context = requireContext(),
+            feedbackRoot = feedback,
+            container = container,
+            kind = PlayerGestureFeedbackKind.PINCH,
+            surfaceWidthPx = binding.playerLayout.width,
+            insets = gestureInsets,
+            hideRunnable = hideGestureRunnable,
+        )
+    }
+
+    private fun hidePinchFeedback() {
+        binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
+            feedback.removeCallbacks(hideGestureRunnable)
+            feedback.postDelayed(hideGestureRunnable, PINCH_FEEDBACK_LINGER_MS)
+        }
+    }
+
+    private fun finishPinch(cancelled: Boolean) {
+        val terminal = if (cancelled) pinchController.cancel() else pinchController.release()
+        applyPinchEvent(terminal)
+        pinchLastArmedTarget = null
         isSwipeGestureInProgress = false
     }
     

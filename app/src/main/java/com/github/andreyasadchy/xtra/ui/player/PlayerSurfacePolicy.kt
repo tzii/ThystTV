@@ -1,5 +1,6 @@
 package com.github.andreyasadchy.xtra.ui.player
 
+import android.content.Context
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -21,6 +22,7 @@ enum class PlayerGestureFeedbackKind {
     DEVICE_VOLUME,
     SEEK,
     PLAYBACK_SPEED,
+    PINCH,
 }
 
 data class PlayerFeedbackPlacement(
@@ -87,7 +89,7 @@ object PlayerSurfacePolicy {
                     topPaddingPx = 0,
                     fixedContainerWidthPx = (EDGE_FEEDBACK_MAX_WIDTH_DP * density).toInt(),
                 )
-                PlayerGestureFeedbackKind.SEEK, PlayerGestureFeedbackKind.PLAYBACK_SPEED -> PlayerFeedbackPlacement(
+                PlayerGestureFeedbackKind.SEEK, PlayerGestureFeedbackKind.PLAYBACK_SPEED, PlayerGestureFeedbackKind.PINCH -> PlayerFeedbackPlacement(
                     gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL,
                     maxWidthPx = (CENTER_FEEDBACK_MAX_WIDTH_DP * density).toInt(),
                     marginStartPx = margin,
@@ -120,5 +122,36 @@ object PlayerSurfacePolicy {
                 width = placement.fixedContainerWidthPx ?: LinearLayout.LayoutParams.WRAP_CONTENT
             } ?: params
         }
+    }
+
+    /**
+     * Places and shows a gesture-feedback pill using player-surface dimensions,
+     * then schedules the shared idle-hold hide.
+     */
+    fun presentFeedback(
+        context: Context,
+        feedbackRoot: View,
+        container: LinearLayout,
+        kind: PlayerGestureFeedbackKind,
+        surfaceWidthPx: Int,
+        insets: androidx.core.graphics.Insets?,
+        hideRunnable: Runnable,
+    ) {
+        applyPlacement(
+            feedbackRoot = feedbackRoot,
+            container = container,
+            placement = placementFor(
+                kind = kind,
+                surfaceClass = classify(surfaceWidthPx, context.resources.displayMetrics.density),
+                density = context.resources.displayMetrics.density,
+                insetStartPx = insets?.left ?: 0,
+                insetEndPx = insets?.right ?: 0,
+            ),
+        )
+        feedbackRoot.animate().cancel()
+        feedbackRoot.alpha = 1f
+        feedbackRoot.visibility = View.VISIBLE
+        feedbackRoot.removeCallbacks(hideRunnable)
+        feedbackRoot.postDelayed(hideRunnable, FEEDBACK_HOLD_MS)
     }
 }

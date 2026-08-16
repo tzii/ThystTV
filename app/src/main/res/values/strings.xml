@@ -811,6 +811,10 @@
     <string name="gesture_feedback_device_volume" tools:ignore="MissingTranslation">Device volume</string>
     <string name="gesture_feedback_seek" tools:ignore="MissingTranslation">Seek</string>
     <string name="gesture_feedback_playback_speed" tools:ignore="MissingTranslation">Playback speed</string>
+    <string name="gesture_feedback_pinch" tools:ignore="MissingTranslation">Pinch</string>
+    <string name="display_mode_fit" tools:ignore="MissingTranslation">Fit</string>
+    <string name="display_mode_fill" tools:ignore="MissingTranslation">Fill</string>
+    <string name="display_mode_stretch" tools:ignore="MissingTranslation">Stretch</string>
     <string name="less_rounded_corners">Less rounded</string>
     <string name="reduced_padding">Reduced padding</string>
     <string name="compact_text">Compact text</string>

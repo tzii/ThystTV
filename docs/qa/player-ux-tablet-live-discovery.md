@@ -80,3 +80,28 @@ Automated evidence:
 - Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (2m50s, includes unit tests + lint).
 
 Manual matrix: pending hardware (no attached devices in this environment).
+
+## Slice 2 — Gesture infrastructure
+
+Changes:
+
+- New `PlayerGestureArbiter` owns every touch sequence with owners Idle, Seek, PlaybackSpeed, Brightness, DeviceVolume, DoubleTapChat, PinchDisplayMode. It is fed pointer lifecycle events inside the dragView listener before the single-finger detector decides:
+  - a second pointer creates a pinch candidate before an unclaimed single-finger gesture can win (claims by the detector are denied while a candidate exists);
+  - merely placing two fingers claims nothing; pinch claims only after span travel ≥ 2× touch slop AND |scale−1| ≥ 0.02;
+  - an owned single-finger gesture cannot be converted by a second finger;
+  - once pinch owns, lifting one finger suppresses remaining single-finger events until the final release/cancel (no pointer handoff, no upAction routing);
+  - a third finger never creates or restores a candidate;
+  - when pinch claims, CANCEL is dispatched to the tap detector and (if controls were visible at gesture start) to the controls root so no view stays pressed; `isSwipeGestureInProgress` blocks controller show/minimize mid-pinch;
+  - pinch is the deliberate `controlsVisibleAtGestureStart` exception: candidacy requires only non-portrait + maximized + gestures enabled.
+- Pinch candidacy also honors the gestures master toggle and portrait/minimized ineligibility.
+- Double-tap compensation: the detector can fire double-tap on the first finger of a fast pinch (tap-to-hide-then-pinch). The arbiter allows pinch to supersede an already-claimed DoubleTapChat, and `beginPinch` reverts the chat toggle exactly once so an intentional pinch never toggles chat.
+- New `PinchDisplayModeController` implements the spec's reversal state table (arm 1.08/0.92, hysteresis 0.04, Stretch exits toward Fill/Fit by direction; only Fit or Fill can be committed; float-tolerant boundary comparisons). `PlayerDisplayMode` enum introduced (FIT/FILL/STRETCH with Media3 renderer mapping) — the store and renderer wiring arrive in Slice 3; Slice 2 shows centered pinch feedback (icon + Fit/Fill label + progress + haptic-on-arm using the existing haptic preference) and changes no display mode yet.
+- The temporary aspect-ratio resize button remains available and unchanged; double-tap still invokes the existing chat-mode callback (now claim-gated).
+
+Automated evidence:
+
+- `PlayerGestureArbiterTest` (18 tests): the full conflict matrix — candidate creation/dissolution, third finger, no-claim for stationary fingers/below slop/below deadzone, single-claim-per-sequence, conversion denial, post-pinch suppression, double-tap claim/denial/supersede, invalid claims, resets.
+- `PinchDisplayModeControllerTest` (18 tests): every row of the reversal table from Fit/Fill/Stretch, hysteresis boundaries, re-arm, release-commit vs neutral-restore, cancel, single Armed event per target, committed-mode carryover.
+- Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (4m09s). Two earlier runs failed for environment reasons recorded here: one flaky lint/UAST tooling crash (`RepeatOnLifecycleDetector`/FIR on the untouched `MainActivity.kt`) that did not reproduce, and three `UnsafeOptInUsageError`s on the new `PlayerDisplayMode` enum (fixed with the same `@OptIn(UnstableApi)` treatment the player fragments use).
+
+Manual matrix: pending hardware; the conflict list from the design (swipe-then-second-finger, controls visible/hidden, portrait/minimized, pinch near edges, two fingers without movement, below deadzone, reversal, one-finger lift, third finger, pinch with controls visible, modal surface open, rapid gestures, double-tap before/after pinch) is covered deterministically by the arbiter/controller tests above and awaits interactive confirmation.
