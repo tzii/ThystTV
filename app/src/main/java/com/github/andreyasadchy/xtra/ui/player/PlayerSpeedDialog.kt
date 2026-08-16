@@ -109,7 +109,8 @@ class PlayerSpeedDialog : DialogFragment() {
         dialog?.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             setDimAmount(0f)
-            setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+            val density = resources.displayMetrics.density
+            setGravity(PlayerDialogSizing.windowGravity(PlayerDialogSizing.surfaceWidthPx(dialog!!), density))
             setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT)
         }
     }
@@ -310,9 +311,9 @@ class PlayerSpeedDialog : DialogFragment() {
 
     private fun getPanelWidth(): Int {
         val density = resources.displayMetrics.density
-        val maxWidth = (density * 500f).toInt()
-        val horizontalMargin = (density * 40f).toInt()
-        return (resources.displayMetrics.widthPixels - horizontalMargin).coerceAtMost(maxWidth)
+        val surfaceWidth = dialog?.let { PlayerDialogSizing.surfaceWidthPx(it) }
+            ?: resources.displayMetrics.widthPixels
+        return PlayerDialogSizing.panelWidthPx(surfaceWidth, density)
     }
 
     private fun saveSpeed(speed: Float) {

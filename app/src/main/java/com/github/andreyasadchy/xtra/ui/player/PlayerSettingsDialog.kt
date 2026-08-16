@@ -2,11 +2,14 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.core.content.edit
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.media3.common.Tracks
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.PlayerSettingsBinding
@@ -50,6 +53,7 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
         val behavior = BottomSheetBehavior.from(view.parent as View)
         behavior.skipCollapsed = true
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        applyResponsiveSheetSizing(view)
         val arguments = requireArguments()
         val videoType = arguments.getString(TYPE)
         with(binding) {
@@ -181,7 +185,7 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
             if (requireContext().prefs().getBoolean(C.PLAYER_MENU_VOLUME, false)) {
                 menuVolume.visibility = View.VISIBLE
                 menuVolume.setOnClickListener {
-                    (parentFragment as? PlayerFragment)?.showVolumeDialog()
+                    (parentFragment as? PlayerFragment)?.showVolumeOverlay()
                     dismiss()
                 }
             }
@@ -213,6 +217,38 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
                     dismiss()
                 }
             }
+        }
+        updateGroupVisibilities()
+    }
+
+    /**
+     * Large/windowed player surfaces get a centered, width-capped sheet
+     * instead of a full-width bottom sheet.
+     */
+    private fun applyResponsiveSheetSizing(view: View) {
+        val dialog = dialog ?: return
+        val density = resources.displayMetrics.density
+        val surfaceWidth = PlayerDialogSizing.surfaceWidthPx(dialog)
+        if (surfaceWidth <= 0) return
+        if (PlayerDialogSizing.isLargeSurface(surfaceWidth, density)) {
+            view.updateLayoutParams { width = PlayerDialogSizing.panelWidthPx(surfaceWidth, density) }
+            val sheet = (view.parent as? View)?.parent as? View
+            (sheet?.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+                params.gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+                sheet.layoutParams = params
+            }
+        }
+    }
+
+    /** Group headers are hidden when every row they contain is hidden. */
+    private fun updateGroupVisibilities() {
+        with(binding) {
+            streamGroupHeader.isVisible =
+                listOf(menuViewerList, menuVodGames, menuDownload, menuBookmark, menuTimer, menuRestart).any { it.isVisible }
+            chatGroupHeader.isVisible =
+                listOf(menuChatBar, menuChatToggle, menuTranslateAll, menuReloadEmotes, menuChatDisconnect).any { it.isVisible }
+            playbackGroupHeader.isVisible =
+                listOf(menuVolume, menuSubtitles, menuDisplayMode, menuMediaPlaylistTags, menuMultivariantPlaylistTags).any { it.isVisible }
         }
     }
 

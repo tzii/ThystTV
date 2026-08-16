@@ -121,3 +121,19 @@ Automated evidence:
 - `PlayerDisplayModeStoreTest` (8 tests): every legacy mapping including missing/corrupt/unknown, canonical-wins, corrupt-canonical fallback, save writes canonical only, renderer mapping for the three modes.
 - `PlayerDisplayModePreviewerTest` (9 tests): matching-aspect collapse to 1, 4:3/9:16 ratios, invalid inputs, Fit↔Fill interpolation, Stretch anchoring in both directions, progress clamping.
 - Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (3m18s).
+
+## Slice 4 — Player-control polish
+
+Changes:
+
+- New shared `PlayerDialogSizing` policy: Quality, Speed and More surfaces derive their width and window gravity from the dialog's own window metrics (correct in split-screen/freeform). Compact surfaces keep the current bottom-anchored phone presentation; large/windowed surfaces (≥600dp) become centered surfaces capped at 420dp. The More bottom sheet is width-capped and horizontally centered on large surfaces.
+- Quality exposes its current state as text (e.g. `1080p60`) on large/windowed surfaces — a new `qualityValue` control replaces the settings icon there and re-runs when the surface is first laid out or changes orientation; compact surfaces keep the icon. Speed continues to show its current value.
+- Stream volume becomes a transient player overlay anchored near the speaker control: `Stream volume [speaker] [slider] 65%`. It stays open while touched, dismisses on an outside tap (the next tap on the player surface only dismisses, it does not start a gesture) or 1500ms after the last adjustment, and keeps mute, slider, percentage, current backend volume (`changeVolume`), and persisted `PLAYER_VOLUME` synchronized across Media3, custom ExoPlayer and MediaPlayer backends. The old `PlayerVolumeDialog` bottom sheet and its layout were removed. The More entry is labeled `Stream volume` to be unmistakable from the right-side vertical `Device volume` gesture. Stream volume is not moved into More as its primary interaction; the speaker button remains primary.
+- More hierarchy regrouped dynamically: Stream (Viewer list, Chapters, Download, Bookmark, Sleep timer, Restart player), Chat (chat bar, chat visibility, Translate all, Reload emotes, Connect/Disconnect), Playback (Stream volume, Subtitles, Display mode, debug playlist tags). Existing feature preferences continue gating their rows; empty groups hide their headers. Quality and Speed remain leading entries with value text. Display mode is the permanent canonical picker from Slice 3.
+
+Automated evidence:
+
+- `PlayerDialogSizingTest` (6 tests): large/compact classification, 420dp capping, compact phone-sheet sizing, window gravity mapping.
+- Gate: `check assembleDebug assembleDebugAndroidTest` **BUILD SUCCESSFUL** (3m49s). One earlier run hit the known-flaky lint/UAST tooling crash (on `ExoPlayerFragment.kt`, one line changed); it did not reproduce on the clean re-run.
+
+Manual matrix: pending hardware (surfaces reposition/center after rotation and window resize need interactive confirmation).

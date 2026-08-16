@@ -177,6 +177,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pinchAnchorSpan = 0f
     private var pinchLastArmedTarget: PlayerDisplayMode? = null
 
+    // Stream volume overlay (ThystTV playback volume, independent of device volume)
+    private val volumeOverlayDismissRunnable = Runnable { hideVolumeOverlay() }
+    private var volumeOverlayLastNonZero = 100
+
     // Floating Chat Properties
     private var isFloatingChatEnabled = false
     private var dX = 0f
@@ -243,10 +247,27 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private fun updateQuickPlayerControls() {
         with(binding.playerControls) {
             if (requireContext().prefs().getBoolean(C.PLAYER_SETTINGS, true)) {
-                quality.visibility = View.VISIBLE
-                quality.setOnClickListener { showQualityDialog() }
+                // Large/windowed surfaces expose quality as text (e.g. 1080p);
+                // compact surfaces keep the settings icon.
+                val label = currentQualityLabel()
+                val useTextControl = label != null &&
+                        PlayerSurfacePolicy.classify(
+                            binding.playerLayout.width,
+                            resources.displayMetrics.density,
+                        ) == PlayerSurfaceClass.LARGE
+                if (useTextControl) {
+                    quality.visibility = View.GONE
+                    qualityValue.visibility = View.VISIBLE
+                    qualityValue.text = label
+                    qualityValue.setOnClickListener { showQualityDialog() }
+                } else {
+                    qualityValue.visibility = View.GONE
+                    quality.visibility = View.VISIBLE
+                    quality.setOnClickListener { showQualityDialog() }
+                }
             } else {
                 quality.visibility = View.GONE
+                qualityValue.visibility = View.GONE
             }
 
             if (videoType != STREAM && requireContext().prefs().getBoolean(C.PLAYER_SPEEDBUTTON, true)) {
@@ -257,6 +278,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 speed.visibility = View.GONE
             }
         }
+    }
+
+    private fun currentQualityLabel(): String? {
+        return getQualityMap()?.entries?.find { it.value == viewModel.quality }?.key
     }
 
     private fun applyMinimizedPlayerVisualState() {
@@ -409,6 +434,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             displayMode = displayModeStore.loadDisplayMode()
             aspectRatioFrameLayout.setAspectRatio(16f / 9f)
             initLayout()
+            setupVolumeOverlayListeners()
+            playerLayout.doOnLayout { updateQuickPlayerControls() }
             changePlayerMode()
             val viewConfiguration = ViewConfiguration.get(requireContext())
             val touchSlop = viewConfiguration.scaledTouchSlop
@@ -630,6 +657,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 if (!isAnimating) {
                     when (event.actionMasked) {
                         MotionEvent.ACTION_DOWN -> {
+                            if (binding.volumeOverlay.root.isVisible) {
+                                hideVolumeOverlay()
+                                return@setOnTouchListener true
+                            }
                             gestureArbiter.onSequenceStarted()
                             resetPinchTracking()
                             activePointerId = event.getPointerId(0)
@@ -900,7 +931,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
                 if (requireContext().prefs().getBoolean(C.PLAYER_VOLUMEBUTTON, true)) {
                     volume.visibility = View.VISIBLE
-                    volume.setOnClickListener { showVolumeDialog() }
+                    volume.setOnClickListener {
+                        if (binding.volumeOverlay.root.isVisible) hideVolumeOverlay() else showVolumeOverlay()
+                    }
                 }
                 if (requireContext().prefs().getBoolean(C.PLAYER_SETTINGS, true)) {
                     quality.visibility = View.VISIBLE
@@ -1569,8 +1602,77 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
     }
 
-    fun showVolumeDialog() {
-        PlayerVolumeDialog.newInstance(getCurrentVolume()).show(childFragmentManager, "closeOnPip")
+    private val volumeOverlayRoot get() = binding.volumeOverlay.root
+
+    fun showVolumeOverlay() {
+        if (!isMaximized) return
+        val current = getCurrentVolume() ?: (prefs.getInt(C.PLAYER_VOLUME, 100) / 100f)
+        volumeOverlayRoot.visibility = View.VISIBLE
+        applyVolumeOverlayValue(current)
+        positionVolumeOverlay()
+    }
+
+    fun hideVolumeOverlay() {
+        volumeOverlayRoot.removeCallbacks(volumeOverlayDismissRunnable)
+        volumeOverlayRoot.visibility = View.GONE
+    }
+
+    private fun applyVolumeOverlayValue(value: Float) {
+        with(binding.volumeOverlay) {
+            volumeOverlaySlider.value = (value * 100).coerceIn(0f, 100f)
+            volumeOverlayPercent.text = "${(value * 100).toInt()}%"
+            volumeOverlayMute.setImageResource(
+                if (value <= 0f) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24
+            )
+            root.removeCallbacks(volumeOverlayDismissRunnable)
+            root.postDelayed(volumeOverlayDismissRunnable, VOLUME_OVERLAY_DISMISS_MS)
+        }
+    }
+
+    private fun positionVolumeOverlay() {
+        val anchor = if (binding.playerControls.volume.isVisible) binding.playerControls.volume else binding.playerControls.root
+        val anchorLocation = IntArray(2)
+        val playerLocation = IntArray(2)
+        anchor.getLocationOnScreen(anchorLocation)
+        binding.playerLayout.getLocationOnScreen(playerLocation)
+        volumeOverlayRoot.doOnPreDraw {
+            val margin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics)
+            val x = (anchorLocation[0] - playerLocation[0]).toFloat().coerceAtLeast(margin)
+            val y = (anchorLocation[1] - playerLocation[1]) - volumeOverlayRoot.height - margin
+            volumeOverlayRoot.translationX = x
+            volumeOverlayRoot.translationY = y.coerceAtLeast(margin)
+        }
+    }
+
+    private fun setupVolumeOverlayListeners() {
+        with(binding.volumeOverlay) {
+            volumeOverlaySlider.addOnChangeListener { _, value, fromUser ->
+                if (fromUser) {
+                    if (value > 0f) {
+                        volumeOverlayLastNonZero = value.toInt()
+                    }
+                    changeVolume(value / 100f)
+                    applyVolumeOverlayValue(value / 100f)
+                }
+            }
+            volumeOverlaySlider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+                override fun onStartTrackingTouch(slider: Slider) {
+                    root.removeCallbacks(volumeOverlayDismissRunnable)
+                }
+
+                override fun onStopTrackingTouch(slider: Slider) {
+                    prefs.edit { putInt(C.PLAYER_VOLUME, slider.value.toInt()) }
+                    applyVolumeOverlayValue(slider.value / 100f)
+                }
+            })
+            volumeOverlayMute.setOnClickListener {
+                val target = if (volumeOverlaySlider.value <= 0f) volumeOverlayLastNonZero else 0
+                val value = target.coerceIn(0, 100) / 100f
+                changeVolume(value)
+                prefs.edit { putInt(C.PLAYER_VOLUME, target.coerceIn(0, 100)) }
+                applyVolumeOverlayValue(value)
+            }
+        }
     }
 
     fun getTranslateAllMessages(): Boolean? {
@@ -1671,9 +1773,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     fun setQualityText() {
-        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setQuality(
-            getQualityMap()?.entries?.find { it.value == viewModel.quality }?.key
-        )
+        val label = getQualityMap()?.entries?.find { it.value == viewModel.quality }?.key
+        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setQuality(label)
+        if (binding.playerControls.qualityValue.isVisible) {
+            binding.playerControls.qualityValue.text = label
+        }
     }
 
     fun updateViewerCount(viewerCount: Int?) {
@@ -2294,6 +2398,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (isPortrait && !wasPortrait) {
                 restoreBrightness()
             }
+            hideVolumeOverlay()
             if (isMaximized) {
                 enableBackground()
             } else {
@@ -2381,6 +2486,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             isMaximized = false
             // Restore original brightness when minimizing
             restoreBrightness()
+            hideVolumeOverlay()
             // Hide floating chat when minimizing - it should only appear in fullscreen
             if (isFloatingChatEnabled) {
                 floatingChatRoot.visibility = View.GONE
@@ -2807,6 +2913,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
         private const val PINCH_SCALE_CLAIM_DEADZONE = 0.02f
         private const val PINCH_FEEDBACK_LINGER_MS = 400L
+        private const val VOLUME_OVERLAY_DISMISS_MS = 1500L
 
         internal const val STREAM = "stream"
         internal const val VIDEO = "video"

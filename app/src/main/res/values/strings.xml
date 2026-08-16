@@ -816,6 +816,10 @@
     <string name="display_mode_fill" tools:ignore="MissingTranslation">Fill</string>
     <string name="display_mode_stretch" tools:ignore="MissingTranslation">Stretch</string>
     <string name="display_mode" tools:ignore="MissingTranslation">Display mode</string>
+    <string name="stream_volume" tools:ignore="MissingTranslation">Stream volume</string>
+    <string name="more_group_stream" tools:ignore="MissingTranslation">Stream</string>
+    <string name="more_group_chat" tools:ignore="MissingTranslation">Chat</string>
+    <string name="more_group_playback" tools:ignore="MissingTranslation">Playback</string>
     <string name="less_rounded_corners">Less rounded</string>
     <string name="reduced_padding">Reduced padding</string>
     <string name="compact_text">Compact text</string>
