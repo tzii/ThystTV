@@ -142,9 +142,23 @@
                         app:layout_constraintTop_toTopOf="parent">
 
                         <TextView
+                            android:id="@+id/liveBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="@string/live"
+                            android:textAllCaps="true"
+                            android:textAppearance="?attr/textAppearanceLabelLarge"
+                            android:textColor="@color/liveStreamRed"
+                            android:textStyle="bold"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+
+                        <TextView
                             android:id="@+id/title"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
                             android:textAppearance="?attr/textAppearanceTitleMedium"
                             android:visibility="gone"
                             tools:text="@sample/streams.json/streams/channel/status"

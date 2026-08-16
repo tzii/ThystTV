@@ -2,16 +2,20 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.core.content.edit
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.media3.common.Tracks
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.PlayerSettingsBinding
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
+import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -49,6 +53,7 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
         val behavior = BottomSheetBehavior.from(view.parent as View)
         behavior.skipCollapsed = true
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        applyResponsiveSheetSizing(view)
         val arguments = requireArguments()
         val videoType = arguments.getString(TYPE)
         with(binding) {
@@ -159,13 +164,7 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
                 }
             }
             if ((parentFragment as? PlayerFragment)?.getIsPortrait() == false) {
-                if (requireContext().prefs().getBoolean(C.PLAYER_MENU_ASPECT, false)) {
-                    menuRatio.visibility = View.VISIBLE
-                    menuRatio.setOnClickListener {
-                        (parentFragment as? PlayerFragment)?.setResizeMode()
-                        dismiss()
-                    }
-                }
+                setupDisplayModeMenu()
                 if (requireContext().prefs().getBoolean(C.PLAYER_MENU_CHAT_TOGGLE, false)) {
                     menuChatToggle.visibility = View.VISIBLE
                     if (requireContext().prefs().getBoolean(C.KEY_CHAT_OPENED, true)) {
@@ -186,7 +185,7 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
             if (requireContext().prefs().getBoolean(C.PLAYER_MENU_VOLUME, false)) {
                 menuVolume.visibility = View.VISIBLE
                 menuVolume.setOnClickListener {
-                    (parentFragment as? PlayerFragment)?.showVolumeDialog()
+                    (parentFragment as? PlayerFragment)?.showVolumeOverlay()
                     dismiss()
                 }
             }
@@ -217,6 +216,73 @@ class PlayerSettingsDialog : BottomSheetDialogFragment() {
                     (parentFragment as? PlayerFragment)?.reloadEmotes()
                     dismiss()
                 }
+            }
+            menuGestureGuide.visibility = View.VISIBLE
+            menuGestureGuide.setOnClickListener {
+                (parentFragment as? PlayerFragment)?.showGestureGuide()
+                dismiss()
+            }
+        }
+        updateGroupVisibilities()
+    }
+
+    /**
+     * Large/windowed player surfaces get a centered, width-capped sheet
+     * instead of a full-width bottom sheet.
+     */
+    private fun applyResponsiveSheetSizing(view: View) {
+        val dialog = dialog ?: return
+        val density = resources.displayMetrics.density
+        val surfaceWidth = PlayerDialogSizing.surfaceWidthPx(dialog)
+        if (surfaceWidth <= 0) return
+        if (PlayerDialogSizing.isLargeSurface(surfaceWidth, density)) {
+            view.updateLayoutParams { width = PlayerDialogSizing.panelWidthPx(surfaceWidth, density) }
+            val sheet = (view.parent as? View)?.parent as? View
+            (sheet?.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+                params.gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+                sheet.layoutParams = params
+            }
+        }
+    }
+
+    /** Group headers are hidden when every row they contain is hidden. */
+    private fun updateGroupVisibilities() {
+        with(binding) {
+            streamGroupHeader.isVisible =
+                listOf(menuViewerList, menuVodGames, menuDownload, menuBookmark, menuTimer, menuRestart).any { it.isVisible }
+            chatGroupHeader.isVisible =
+                listOf(menuChatBar, menuChatToggle, menuTranslateAll, menuReloadEmotes, menuChatDisconnect).any { it.isVisible }
+            playbackGroupHeader.isVisible =
+                listOf(menuVolume, menuSubtitles, menuDisplayMode, menuMediaPlaylistTags, menuMultivariantPlaylistTags).any { it.isVisible }
+            helpGroupHeader.isVisible = menuGestureGuide.isVisible
+        }
+    }
+
+    private fun setupDisplayModeMenu() {
+        val playerFragment = parentFragment as? PlayerFragment ?: return
+        with(binding) {
+            menuDisplayMode.visibility = View.VISIBLE
+            val modes = PlayerDisplayMode.entries
+            val labels = modes.map { mode ->
+                getString(
+                    when (mode) {
+                        PlayerDisplayMode.FIT -> R.string.display_mode_fit
+                        PlayerDisplayMode.FILL -> R.string.display_mode_fill
+                        PlayerDisplayMode.STRETCH -> R.string.display_mode_stretch
+                    }
+                )
+            }.toTypedArray()
+            val current = playerFragment.getCurrentDisplayMode()
+            displayModeValue.text = labels[modes.indexOf(current)]
+            menuDisplayMode.setOnClickListener {
+                requireContext().getAlertDialogBuilder()
+                    .setTitle(getString(R.string.display_mode))
+                    .setSingleChoiceItems(labels, modes.indexOf(playerFragment.getCurrentDisplayMode())) { dialog, which ->
+                        playerFragment.selectDisplayMode(modes[which])
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton(getString(R.string.no), null)
+                    .show()
             }
         }
     }

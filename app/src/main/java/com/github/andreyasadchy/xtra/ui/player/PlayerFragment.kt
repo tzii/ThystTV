@@ -22,6 +22,7 @@ import android.text.format.DateFormat
 import android.text.format.DateUtils
 import android.util.TypedValue
 import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
 import android.media.AudioManager
 import android.provider.Settings
 import android.view.WindowManager
@@ -44,6 +45,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.trackPipAnimationHintView
 import androidx.annotation.OptIn
@@ -98,7 +100,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.sqrt
 import java.util.Locale
 
 @OptIn(UnstableApi::class)
@@ -106,7 +110,21 @@ import java.util.Locale
 abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment.OnSortOptionChanged, IntegrityDialog.CallbackListener, PlayerGestureCallback {
 
     private var _binding: FragmentPlayerBinding? = null
-    private val hideGestureRunnable = Runnable { binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.apply { visibility = View.GONE } }
+    private val hideGestureRunnable = Runnable {
+        binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
+            feedback.animate().cancel()
+            if (feedback.isVisible) {
+                feedback.animate()
+                    .alpha(0f)
+                    .setDuration(PlayerSurfacePolicy.FEEDBACK_FADE_MS)
+                    .withEndAction {
+                        feedback.visibility = View.GONE
+                        feedback.alpha = 1f
+                    }
+                    .start()
+            }
+        }
+    }
     protected val binding get() = _binding!!
     protected val viewModel: PlayerViewModel by viewModels()
     protected var chatFragment: ChatFragment? = null
@@ -117,7 +135,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override var isMaximized = true
     private var isChatOpen = true
     private var isKeyboardShown = false
-    private var resizeMode = 0
+    protected var displayMode = PlayerDisplayMode.FIT
+    private lateinit var displayModeStore: PlayerDisplayModeStore
+    protected var videoAspectRatio = 0f
     private var chatWidthLandscape = 0
 
     private var activePointerId = -1
@@ -147,6 +167,22 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     // Gesture conflict prevention: track state at gesture start
     override var controlsVisibleAtGestureStart = false
     private var isSwipeGestureInProgress = false
+
+    // Gesture arbitration and pinch display-mode control
+    private var controllerTapDetector: GestureDetector? = null
+    private lateinit var gestureArbiter: PlayerGestureArbiter
+    private val pinchController = PinchDisplayModeController()
+    private var pinchPointerId1 = -1
+    private var pinchPointerId2 = -1
+    private var pinchAnchorSpan = 0f
+    private var pinchLastArmedTarget: PlayerDisplayMode? = null
+
+    // Stream volume overlay (ThystTV playback volume, independent of device volume)
+    private val volumeOverlayDismissRunnable = Runnable { hideVolumeOverlay() }
+    private var volumeOverlayLastNonZero = 100
+
+    // Gesture education
+    private var gestureGuideShownThisSession = false
 
     // Floating Chat Properties
     private var isFloatingChatEnabled = false
@@ -214,10 +250,27 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private fun updateQuickPlayerControls() {
         with(binding.playerControls) {
             if (requireContext().prefs().getBoolean(C.PLAYER_SETTINGS, true)) {
-                quality.visibility = View.VISIBLE
-                quality.setOnClickListener { showQualityDialog() }
+                // Large/windowed surfaces expose quality as text (e.g. 1080p);
+                // compact surfaces keep the settings icon.
+                val label = currentQualityLabel()
+                val useTextControl = label != null &&
+                        PlayerSurfacePolicy.classify(
+                            binding.playerLayout.width,
+                            resources.displayMetrics.density,
+                        ) == PlayerSurfaceClass.LARGE
+                if (useTextControl) {
+                    quality.visibility = View.GONE
+                    qualityValue.visibility = View.VISIBLE
+                    qualityValue.text = label
+                    qualityValue.setOnClickListener { showQualityDialog() }
+                } else {
+                    qualityValue.visibility = View.GONE
+                    quality.visibility = View.VISIBLE
+                    quality.setOnClickListener { showQualityDialog() }
+                }
             } else {
                 quality.visibility = View.GONE
+                qualityValue.visibility = View.GONE
             }
 
             if (videoType != STREAM && requireContext().prefs().getBoolean(C.PLAYER_SPEEDBUTTON, true)) {
@@ -230,20 +283,50 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
+    private fun currentQualityLabel(): String? {
+        return getQualityMap()?.entries?.find { it.value == viewModel.quality }?.key
+    }
+
     private fun applyMinimizedPlayerVisualState() {
-        binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        binding.aspectRatioFrameLayout.scaleX = 1f
+        binding.aspectRatioFrameLayout.scaleY = 1f
+        binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         binding.playerLayout.setBackgroundColor(
             MaterialColors.getColor(binding.playerLayout, com.google.android.material.R.attr.colorSurface)
         )
     }
 
     private fun applyMaximizedPlayerVisualState() {
+        binding.aspectRatioFrameLayout.scaleX = 1f
+        binding.aspectRatioFrameLayout.scaleY = 1f
         binding.aspectRatioFrameLayout.resizeMode = if (isPortrait) {
             AspectRatioFrameLayout.RESIZE_MODE_FIT
         } else {
-            resizeMode
+            displayMode.resizeMode
         }
         binding.playerLayout.setBackgroundColor(Color.BLACK)
+    }
+
+    /**
+     * Canonical setter for the non-portrait maximized display mode. Portrait
+     * maximized playback and the mini-player always render Fit and never
+     * mutate this state.
+     */
+    fun selectDisplayMode(mode: PlayerDisplayMode) {
+        displayMode = mode
+        displayModeStore.saveDisplayMode(mode)
+        binding.aspectRatioFrameLayout.scaleX = 1f
+        binding.aspectRatioFrameLayout.scaleY = 1f
+        if (!isPortrait && isMaximized) {
+            binding.aspectRatioFrameLayout.resizeMode = mode.resizeMode
+        }
+    }
+
+    fun getCurrentDisplayMode(): PlayerDisplayMode = displayMode
+
+    open fun updateVideoAspectRatio(aspectRatio: Float) {
+        videoAspectRatio = aspectRatio
+        binding.aspectRatioFrameLayout.setAspectRatio(aspectRatio)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -339,9 +422,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             isChatOpen = requireContext().prefs().getBoolean(C.KEY_CHAT_OPENED, true) && !requireContext().prefs().getBoolean(C.CHAT_DISABLE, false)
             chatWidthLandscape = requireContext().prefs().getInt(C.LANDSCAPE_CHAT_WIDTH, 0)
-            resizeMode = requireContext().prefs().getInt(C.ASPECT_RATIO_LANDSCAPE, AspectRatioFrameLayout.RESIZE_MODE_FIT)
+            displayModeStore = PlayerDisplayModeStore(SharedPreferencesDisplayModeStorage(prefs))
+            displayMode = displayModeStore.loadDisplayMode()
             aspectRatioFrameLayout.setAspectRatio(16f / 9f)
             initLayout()
+            setupVolumeOverlayListeners()
+            playerLayout.doOnLayout { updateQuickPlayerControls() }
+            playerLayout.post { maybeShowGestureGuide() }
             changePlayerMode()
             val viewConfiguration = ViewConfiguration.get(requireContext())
             val touchSlop = viewConfiguration.scaledTouchSlop
@@ -362,17 +449,21 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
 
             val zoneSplit = prefs.getString(C.PLAYER_GESTURES_ZONE_SPLIT, "0.5")?.toFloatOrNull() ?: 0.5f
-            val controllerTapDetector = GestureDetector(
+            controllerTapDetector = GestureDetector(
                 requireContext(),
                 PlayerGestureListener(
-                    requireContext(), 
-                    this@PlayerFragment, 
+                    requireContext(),
+                    this@PlayerFragment,
                     doubleTap,
                     gesturesEnabled,
                     hapticEnabled,
                     sensitivity,
                     zoneSplit
                 )
+            )
+            gestureArbiter = PlayerGestureArbiter(
+                pinchSpanSlopPx = touchSlop * 2f,
+                scaleClaimDeadzone = PINCH_SCALE_CLAIM_DEADZONE,
             )
 
             // Edge zone detection for system gesture areas
@@ -409,7 +500,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     if (playerControls.root.isVisible) {
                         playerControls.root.dispatchTouchEvent(event)
                     } else {
-                        controllerTapDetector.onTouchEvent(event)
+                        controllerTapDetector?.onTouchEvent(event)
                     }
                 } else {
                     velocityTracker?.clear()
@@ -441,7 +532,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             if (controlsVisibleAtGestureStart) {
                                 playerControls.root.dispatchTouchEvent(event)
                             } else {
-                                controllerTapDetector.onTouchEvent(event)
+                                controllerTapDetector?.onTouchEvent(event)
                             }
                         }
                         // Only check minimize threshold if controls were visible and no swipe gesture claimed this touch
@@ -559,6 +650,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 if (!isAnimating) {
                     when (event.actionMasked) {
                         MotionEvent.ACTION_DOWN -> {
+                            if (binding.volumeOverlay.root.isVisible) {
+                                hideVolumeOverlay()
+                                return@setOnTouchListener true
+                            }
+                            gestureArbiter.onSequenceStarted()
+                            resetPinchTracking()
                             activePointerId = event.getPointerId(0)
                             val x = event.x
                             val y = event.y
@@ -569,6 +666,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             downAction(event)
                         }
                         MotionEvent.ACTION_POINTER_DOWN -> {
+                            if (!isPortrait && isMaximized && gesturesEnabled && gestureArbiter.onPointerAdded(event.pointerCount)) {
+                                pinchPointerId1 = event.getPointerId(0)
+                                pinchPointerId2 = event.getPointerId(1)
+                                pinchAnchorSpan = twoFingerSpan(event, pinchPointerId1, pinchPointerId2)
+                            }
                             if (activePointerId == -1) {
                                 val pointerIndex = event.actionIndex
                                 val pointerId = event.getPointerId(pointerIndex)
@@ -585,6 +687,21 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             }
                         }
                         MotionEvent.ACTION_MOVE -> {
+                            if (gestureArbiter.owner == PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
+                                updatePinch(event)
+                            } else {
+                                if (gestureArbiter.isPinchCandidate && pinchPointerId1 != -1 && pinchPointerId2 != -1 && pinchAnchorSpan > 0f) {
+                                    val span = twoFingerSpan(event, pinchPointerId1, pinchPointerId2)
+                                    if (span > 0f) {
+                                        val supersededDoubleTap = gestureArbiter.owner == PlayerGestureArbiter.Owner.DOUBLE_TAP_CHAT
+                                        if (gestureArbiter.onScaleUpdate(span / pinchAnchorSpan, abs(span - pinchAnchorSpan))) {
+                                            beginPinch(supersededDoubleTap, event)
+                                            updatePinch(event)
+                                        }
+                                    }
+                                }
+                            }
+                            if (gestureArbiter.owner != PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
                             if (isMaximized) {
                                 // Use controlsVisibleAtGestureStart for consistent routing throughout the gesture
                                 if (controlsVisibleAtGestureStart) {
@@ -616,7 +733,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     }
                                 } else {
                                     // Controls were hidden at gesture start: let gesture detector handle scroll gestures
-                                    controllerTapDetector.onTouchEvent(event)
+                                    controllerTapDetector?.onTouchEvent(event)
                                 }
                             } else {
                                 if (activePointerId != -1) {
@@ -648,32 +765,46 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     }
                                 }
                             }
-                        }
-                        MotionEvent.ACTION_POINTER_UP -> {
-                            val pointerIndex = event.actionIndex
-                            val pointerId = event.getPointerId(pointerIndex)
-                            if (pointerId == activePointerId) {
-                                var newId = -1
-                                for (i in 0 until event.pointerCount) {
-                                    val id = event.getPointerId(i)
-                                    if (id != activePointerId) {
-                                        val x = event.getX(i)
-                                        val y = event.getY(i)
-                                        if (x in 0f..playerLayout.width.toFloat() && y in 0f..playerLayout.height.toFloat()) {
-                                            newId = id
-                                            lastX = x * slidingLayout.scaleX
-                                            lastY = y * slidingLayout.scaleY
-                                            break
-                                        }
-                                    }
-                                }
-                                if (newId == -1) {
-                                    upAction(event)
-                                }
-                                activePointerId = newId
                             }
                         }
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> upAction(event)
+                        MotionEvent.ACTION_POINTER_UP -> {
+                            gestureArbiter.onPointerRemoved(event.pointerCount - 1)
+                            if (gestureArbiter.owner != PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
+                                val pointerIndex = event.actionIndex
+                                val pointerId = event.getPointerId(pointerIndex)
+                                if (pointerId == activePointerId) {
+                                    var newId = -1
+                                    for (i in 0 until event.pointerCount) {
+                                        val id = event.getPointerId(i)
+                                        if (id != activePointerId) {
+                                            val x = event.getX(i)
+                                            val y = event.getY(i)
+                                            if (x in 0f..playerLayout.width.toFloat() && y in 0f..playerLayout.height.toFloat()) {
+                                                newId = id
+                                                lastX = x * slidingLayout.scaleX
+                                                lastY = y * slidingLayout.scaleY
+                                                break
+                                            }
+                                        }
+                                    }
+                                    if (newId == -1) {
+                                        upAction(event)
+                                    }
+                                    activePointerId = newId
+                                }
+                            }
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            if (gestureArbiter.owner == PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
+                                finishPinch(cancelled = event.actionMasked == MotionEvent.ACTION_CANCEL)
+                                gestureArbiter.onSequenceFinished()
+                                resetPinchTracking()
+                            } else {
+                                gestureArbiter.onSequenceFinished()
+                                resetPinchTracking()
+                                upAction(event)
+                            }
+                        }
                     }
                 }
                 true
@@ -701,7 +832,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             with(playerControls) {
                 root.setOnTouchListener { _, event ->
-                    controllerTapDetector.onTouchEvent(event)
+                    controllerTapDetector?.onTouchEvent(event) == true
                 }
                 playPause.setOnClickListener { playPause() }
                 rewind.text = ((requireContext().prefs().getString(C.PLAYER_REWIND, "10000")?.toLongOrNull() ?: 10000) / 1000).toString()
@@ -793,7 +924,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
                 if (requireContext().prefs().getBoolean(C.PLAYER_VOLUMEBUTTON, true)) {
                     volume.visibility = View.VISIBLE
-                    volume.setOnClickListener { showVolumeDialog() }
+                    volume.setOnClickListener {
+                        if (binding.volumeOverlay.root.isVisible) hideVolumeOverlay() else showVolumeOverlay()
+                    }
                 }
                 if (requireContext().prefs().getBoolean(C.PLAYER_SETTINGS, true)) {
                     quality.visibility = View.VISIBLE
@@ -1253,10 +1386,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                         }
                     }
-                    aspectRatio.visibility = View.GONE
                     toggleChat.visibility = View.GONE
-                }
-            } else {
+                }            } else {
                 requireActivity().window.decorView.setOnSystemUiVisibilityChangeListener {
                     if (!isKeyboardShown && isMaximized && activity != null) {
                         hideStatusBar()
@@ -1336,10 +1467,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                         }
                     }
-                    if (requireContext().prefs().getBoolean(C.PLAYER_ASPECT, true)) {
-                        aspectRatio.visibility = View.VISIBLE
-                        aspectRatio.setOnClickListener { setResizeMode() }
-                    }
                     if (requireContext().prefs().getBoolean(C.PLAYER_CHATTOGGLE, true) && !requireContext().prefs().getBoolean(C.CHAT_DISABLE, false)) {
                         toggleChat.visibility = View.VISIBLE
                         updateChatButtonIcon()
@@ -1355,12 +1482,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             updateQuickPlayerControls()
         }
-    }
-
-    fun setResizeMode() {
-        resizeMode = (resizeMode + 1).let { if (it < 5) it else 0 }
-        binding.aspectRatioFrameLayout.resizeMode = resizeMode
-        requireContext().prefs().edit { putInt(C.ASPECT_RATIO_LANDSCAPE, resizeMode) }
     }
 
     fun showSleepTimerDialog() {
@@ -1468,8 +1589,77 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
     }
 
-    fun showVolumeDialog() {
-        PlayerVolumeDialog.newInstance(getCurrentVolume()).show(childFragmentManager, "closeOnPip")
+    private val volumeOverlayRoot get() = binding.volumeOverlay.root
+
+    fun showVolumeOverlay() {
+        if (!isMaximized) return
+        val current = getCurrentVolume() ?: (prefs.getInt(C.PLAYER_VOLUME, 100) / 100f)
+        volumeOverlayRoot.visibility = View.VISIBLE
+        applyVolumeOverlayValue(current)
+        positionVolumeOverlay()
+    }
+
+    fun hideVolumeOverlay() {
+        volumeOverlayRoot.removeCallbacks(volumeOverlayDismissRunnable)
+        volumeOverlayRoot.visibility = View.GONE
+    }
+
+    private fun applyVolumeOverlayValue(value: Float) {
+        with(binding.volumeOverlay) {
+            volumeOverlaySlider.value = (value * 100).coerceIn(0f, 100f)
+            volumeOverlayPercent.text = "${(value * 100).toInt()}%"
+            volumeOverlayMute.setImageResource(
+                if (value <= 0f) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24
+            )
+            root.removeCallbacks(volumeOverlayDismissRunnable)
+            root.postDelayed(volumeOverlayDismissRunnable, VOLUME_OVERLAY_DISMISS_MS)
+        }
+    }
+
+    private fun positionVolumeOverlay() {
+        val anchor = if (binding.playerControls.volume.isVisible) binding.playerControls.volume else binding.playerControls.root
+        val anchorLocation = IntArray(2)
+        val playerLocation = IntArray(2)
+        anchor.getLocationOnScreen(anchorLocation)
+        binding.playerLayout.getLocationOnScreen(playerLocation)
+        volumeOverlayRoot.doOnPreDraw {
+            val margin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics)
+            val x = (anchorLocation[0] - playerLocation[0]).toFloat().coerceAtLeast(margin)
+            val y = (anchorLocation[1] - playerLocation[1]) - volumeOverlayRoot.height - margin
+            volumeOverlayRoot.translationX = x
+            volumeOverlayRoot.translationY = y.coerceAtLeast(margin)
+        }
+    }
+
+    private fun setupVolumeOverlayListeners() {
+        with(binding.volumeOverlay) {
+            volumeOverlaySlider.addOnChangeListener { _, value, fromUser ->
+                if (fromUser) {
+                    if (value > 0f) {
+                        volumeOverlayLastNonZero = value.toInt()
+                    }
+                    changeVolume(value / 100f)
+                    applyVolumeOverlayValue(value / 100f)
+                }
+            }
+            volumeOverlaySlider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+                override fun onStartTrackingTouch(slider: Slider) {
+                    root.removeCallbacks(volumeOverlayDismissRunnable)
+                }
+
+                override fun onStopTrackingTouch(slider: Slider) {
+                    prefs.edit { putInt(C.PLAYER_VOLUME, slider.value.toInt()) }
+                    applyVolumeOverlayValue(slider.value / 100f)
+                }
+            })
+            volumeOverlayMute.setOnClickListener {
+                val target = if (volumeOverlaySlider.value <= 0f) volumeOverlayLastNonZero else 0
+                val value = target.coerceIn(0, 100) / 100f
+                changeVolume(value)
+                prefs.edit { putInt(C.PLAYER_VOLUME, target.coerceIn(0, 100)) }
+                applyVolumeOverlayValue(value)
+            }
+        }
     }
 
     fun getTranslateAllMessages(): Boolean? {
@@ -1570,9 +1760,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     fun setQualityText() {
-        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setQuality(
-            getQualityMap()?.entries?.find { it.value == viewModel.quality }?.key
-        )
+        val label = getQualityMap()?.entries?.find { it.value == viewModel.quality }?.key
+        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setQuality(label)
+        if (binding.playerControls.qualityValue.isVisible) {
+            binding.playerControls.qualityValue.text = label
+        }
     }
 
     fun updateViewerCount(viewerCount: Int?) {
@@ -1844,6 +2036,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun hideController(force: Boolean = false) {
+        if (!force) {
+            maybeShowPinchHint()
+        }
         if (!controllerIsAnimating && binding.playerControls.root.isVisible) {
             controllerAnimation = binding.playerControls.root.animate().apply {
                 alpha(0f)
@@ -2193,6 +2388,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (isPortrait && !wasPortrait) {
                 restoreBrightness()
             }
+            hideVolumeOverlay()
             if (isMaximized) {
                 enableBackground()
             } else {
@@ -2207,6 +2403,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(chatLayout.windowToken, 0)
                 chatLayout.clearFocus()
                 initLayout()
+            }
+            if (!isPortrait && isMaximized) {
+                maybeShowGestureGuide()
             }
             (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.dismiss()
         }
@@ -2280,6 +2479,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             isMaximized = false
             // Restore original brightness when minimizing
             restoreBrightness()
+            hideVolumeOverlay()
             // Hide floating chat when minimizing - it should only appear in fullscreen
             if (isFloatingChatEnabled) {
                 floatingChatRoot.visibility = View.GONE
@@ -2704,6 +2904,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         private const val REQUEST_CODE_AUDIO_ONLY = 2
         private const val REQUEST_CODE_PLAY_PAUSE = 3
 
+        private const val PINCH_SCALE_CLAIM_DEADZONE = 0.02f
+        private const val PINCH_FEEDBACK_LINGER_MS = 400L
+        private const val VOLUME_OVERLAY_DISMISS_MS = 1500L
+        private const val PINCH_HINT_LINGER_MS = 3000L
+
         internal const val STREAM = "stream"
         internal const val VIDEO = "video"
         internal const val CLIP = "clip"
@@ -3030,8 +3235,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     // PlayerGestureCallback implementation
     override val isControlsVisible get() = binding.playerControls.root.isVisible
-    override val screenWidth get() = resources.displayMetrics.widthPixels
-    override val screenHeight get() = resources.displayMetrics.heightPixels
+    override val playerWidth get() = binding.playerLayout.width
+    override val playerHeight get() = binding.playerLayout.height
+    override val playerGestureInsets get() = gestureInsets
     override val windowAttributes: android.view.WindowManager.LayoutParams
         get() = android.view.WindowManager.LayoutParams().apply {
             copyFrom(requireActivity().window.attributes)
@@ -3051,8 +3257,260 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override fun onSwipeGestureStarted() {
         isSwipeGestureInProgress = true
     }
-    
+
     override fun onSwipeGestureEnded() {
+        isSwipeGestureInProgress = false
+    }
+
+    override fun claimSingleFingerGesture(owner: PlayerGestureArbiter.Owner): Boolean {
+        return gestureArbiter.tryClaimSingleFinger(owner)
+    }
+
+    override fun claimDoubleTapChat(): Boolean {
+        return gestureArbiter.onDoubleTapClaimed()
+    }
+
+    private fun twoFingerSpan(event: MotionEvent, pointerId1: Int, pointerId2: Int): Float {
+        val index1 = event.findPointerIndex(pointerId1)
+        val index2 = event.findPointerIndex(pointerId2)
+        if (index1 == -1 || index2 == -1) {
+            return -1f
+        }
+        val dx = event.getX(index1) - event.getX(index2)
+        val dy = event.getY(index1) - event.getY(index2)
+        return sqrt(dx * dx + dy * dy)
+    }
+
+    private fun resetPinchTracking() {
+        pinchPointerId1 = -1
+        pinchPointerId2 = -1
+        pinchAnchorSpan = 0f
+    }
+
+    /**
+     * Display mode used to begin a pinch: the canonical persisted mode.
+     */
+    internal open fun effectivePinchDisplayMode(): PlayerDisplayMode {
+        return displayMode
+    }
+
+    private fun beginPinch(supersededDoubleTap: Boolean, event: MotionEvent) {
+        if (supersededDoubleTap) {
+            // The pinch's first-finger down was consumed as the second tap of a
+            // double tap and already toggled chat; revert so an intentional
+            // pinch does not toggle chat.
+            cycleChatMode()
+        }
+        pinchController.begin(effectivePinchDisplayMode())
+        pinchLastArmedTarget = null
+        isSwipeGestureInProgress = true
+        val cancelEvent = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
+        if (controlsVisibleAtGestureStart) {
+            binding.playerControls.root.dispatchTouchEvent(cancelEvent)
+        }
+        controllerTapDetector?.onTouchEvent(cancelEvent)
+        cancelEvent.recycle()
+    }
+
+    private fun updatePinch(event: MotionEvent) {
+        if (pinchPointerId1 == -1 || pinchPointerId2 == -1 || pinchAnchorSpan <= 0f) {
+            return
+        }
+        val span = twoFingerSpan(event, pinchPointerId1, pinchPointerId2)
+        if (span <= 0f) {
+            return
+        }
+        pinchController.update(span / pinchAnchorSpan).forEach(::applyPinchEvent)
+    }
+
+    private fun applyPinchEvent(pinchEvent: PinchDisplayModeController.Event) {
+        when (pinchEvent) {
+            is PinchDisplayModeController.Event.Preview -> {
+                showPinchFeedback(pinchEvent.toward, pinchEvent.progress)
+                applyPinchPreview(pinchEvent.from, pinchEvent.toward, pinchEvent.progress)
+            }
+            is PinchDisplayModeController.Event.NoPreview -> {
+                showPinchFeedback(pinchEvent.from, 0f)
+                clearPinchPreview(pinchEvent.from)
+            }
+            is PinchDisplayModeController.Event.Armed -> {
+                if (pinchEvent.target != pinchController.committedMode && pinchEvent.target != pinchLastArmedTarget) {
+                    pinchLastArmedTarget = pinchEvent.target
+                    if (prefs.getBoolean(C.PLAYER_GESTURES_HAPTIC, false)) {
+                        try {
+                            binding.playerLayout.findViewById<View>(R.id.gestureFeedback)
+                                ?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        } catch (e: Exception) {
+                            // Haptic failure must not block gesture completion.
+                        }
+                    }
+                }
+            }
+            is PinchDisplayModeController.Event.Disarmed -> Unit
+            is PinchDisplayModeController.Event.Commit -> {
+                selectDisplayMode(pinchEvent.mode)
+                onSuccessfulPinch()
+                hidePinchFeedback()
+            }
+            is PinchDisplayModeController.Event.Restore -> {
+                clearPinchPreview(pinchEvent.mode)
+                hidePinchFeedback()
+            }
+            is PinchDisplayModeController.Event.Cancelled -> {
+                clearPinchPreview(pinchEvent.mode)
+                hidePinchFeedback()
+            }
+        }
+    }
+
+    /**
+     * Continuous preview toward the target geometry. On API 24+ the renderer is
+     * pinned to Fit and a uniform view scale interpolates toward Fill; on older
+     * devices SurfaceView transforms are unreliable, so the preview steps to
+     * the target renderer mode only once armed.
+     */
+    private fun applyPinchPreview(from: PlayerDisplayMode, toward: PlayerDisplayMode, progress: Float) {
+        if (isPortrait || !isMaximized) {
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val ratio = PlayerDisplayModePreviewer.fillToFitRatio(videoAspectRatio, binding.playerLayout.width, binding.playerLayout.height)
+            val scale = PlayerDisplayModePreviewer.previewScale(from, toward, progress, ratio)
+            binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            binding.aspectRatioFrameLayout.scaleX = scale
+            binding.aspectRatioFrameLayout.scaleY = scale
+        } else if (progress >= 1f) {
+            binding.aspectRatioFrameLayout.resizeMode = toward.resizeMode
+        }
+    }
+
+    private fun clearPinchPreview(restore: PlayerDisplayMode) {
+        binding.aspectRatioFrameLayout.scaleX = 1f
+        binding.aspectRatioFrameLayout.scaleY = 1f
+        if (!isPortrait && isMaximized) {
+            binding.aspectRatioFrameLayout.resizeMode = restore.resizeMode
+        }
+    }
+
+    private fun showPinchFeedback(target: PlayerDisplayMode, progress: Float) {
+        val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback) ?: return
+        val container = feedback.findViewById<LinearLayout>(R.id.feedbackContainer) ?: return
+        val icon = feedback.findViewById<ImageView>(R.id.feedbackIcon)
+        val progressIndicator = feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)
+        val text = feedback.findViewById<TextView>(R.id.feedbackText)
+        icon?.setImageResource(R.drawable.baseline_aspect_ratio_black_24)
+        text?.text = getString(
+            when (target) {
+                PlayerDisplayMode.FIT -> R.string.display_mode_fit
+                PlayerDisplayMode.FILL -> R.string.display_mode_fill
+                PlayerDisplayMode.STRETCH -> R.string.display_mode_stretch
+            }
+        )
+        if (progress > 0f) {
+            progressIndicator?.visibility = View.VISIBLE
+            progressIndicator?.progress = (progress * 100).toInt()
+            container.minimumWidth = 0
+        } else {
+            progressIndicator?.visibility = View.GONE
+        }
+        PlayerSurfacePolicy.presentFeedback(
+            context = requireContext(),
+            feedbackRoot = feedback,
+            container = container,
+            kind = PlayerGestureFeedbackKind.PINCH,
+            surfaceWidthPx = binding.playerLayout.width,
+            insets = gestureInsets,
+            hideRunnable = hideGestureRunnable,
+        )
+    }
+
+    private fun hidePinchFeedback() {
+        binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
+            feedback.removeCallbacks(hideGestureRunnable)
+            feedback.postDelayed(hideGestureRunnable, PINCH_FEEDBACK_LINGER_MS)
+        }
+    }
+
+    /**
+     * One-time gesture guide on the first eligible non-portrait maximized
+     * playback; a versioned preference records dismissal.
+     */
+    fun maybeShowGestureGuide() {
+        if (isPortrait || !isMaximized || gestureGuideShownThisSession) return
+        if (childFragmentManager.findFragmentByTag("closeOnPip") != null) return
+        if (PlayerGestureEducationState.shouldShowGuide(prefs.getInt(C.PLAYER_GESTURE_GUIDE_VERSION, 0))) {
+            showGestureGuide()
+        }
+    }
+
+    fun showGestureGuide(contextOverride: PlayerGestureGuideContext? = null) {
+        val guideContext = contextOverride ?: if (videoType == STREAM) {
+            PlayerGestureGuideContext.LIVE
+        } else {
+            PlayerGestureGuideContext.SEEKABLE
+        }
+        gestureGuideShownThisSession = true
+        PlayerGestureGuideDialog.newInstance(guideContext).show(childFragmentManager, "closeOnPip")
+    }
+
+    fun onGestureGuideDismissed() {
+        // The pinch hint becomes eligible in a later playback session; state
+        // lives in preferences, nothing else to do here.
+    }
+
+    /**
+     * Contextual pinch hint: shown at most once, only after the guide was
+     * dismissed in an earlier session, and suppressed forever once a pinch
+     * successfully changed the display mode. Never appears above a modal
+     * player surface.
+     */
+    private fun maybeShowPinchHint() {
+        if (isPortrait || !isMaximized) return
+        if (childFragmentManager.findFragmentByTag("closeOnPip") != null) return
+        if (!PlayerGestureEducationState.shouldShowPinchHint(
+                guideStoredVersion = prefs.getInt(C.PLAYER_GESTURE_GUIDE_VERSION, 0),
+                pinchHintShown = prefs.getBoolean(C.PLAYER_PINCH_HINT_SHOWN, false),
+                pinchUsed = prefs.getBoolean(C.PLAYER_PINCH_USED, false),
+                guideShownThisSession = gestureGuideShownThisSession,
+            )
+        ) {
+            return
+        }
+        prefs.edit { putBoolean(C.PLAYER_PINCH_HINT_SHOWN, true) }
+        val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback) ?: return
+        val container = feedback.findViewById<LinearLayout>(R.id.feedbackContainer) ?: return
+        feedback.findViewById<ImageView>(R.id.feedbackIcon)?.setImageResource(R.drawable.baseline_aspect_ratio_black_24)
+        feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)?.visibility = View.GONE
+        container.minimumWidth = 0
+        feedback.findViewById<TextView>(R.id.feedbackText)?.text = getString(R.string.pinch_hint)
+        PlayerSurfacePolicy.applyPlacement(
+            feedbackRoot = feedback,
+            container = container,
+            placement = PlayerSurfacePolicy.placementFor(
+                kind = PlayerGestureFeedbackKind.PINCH,
+                surfaceClass = PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density),
+                density = resources.displayMetrics.density,
+                insetStartPx = gestureInsets?.left ?: 0,
+                insetEndPx = gestureInsets?.right ?: 0,
+            ),
+        )
+        feedback.animate().cancel()
+        feedback.alpha = 1f
+        feedback.visibility = View.VISIBLE
+        feedback.removeCallbacks(hideGestureRunnable)
+        feedback.postDelayed(hideGestureRunnable, PINCH_HINT_LINGER_MS)
+    }
+
+    private fun onSuccessfulPinch() {
+        if (!prefs.getBoolean(C.PLAYER_PINCH_USED, false)) {
+            prefs.edit { putBoolean(C.PLAYER_PINCH_USED, true) }
+        }
+    }
+
+    private fun finishPinch(cancelled: Boolean) {
+        val terminal = if (cancelled) pinchController.cancel() else pinchController.release()
+        applyPinchEvent(terminal)
+        pinchLastArmedTarget = null
         isSwipeGestureInProgress = false
     }
     

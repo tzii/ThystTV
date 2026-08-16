@@ -607,6 +607,7 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
             }
             if (!stream?.title.isNullOrBlank()) {
                 streamLayout.visibility = View.VISIBLE
+                liveBadge.visibility = View.VISIBLE
                 title.visibility = View.VISIBLE
                 title.text = stream.title?.trim()
             } else {

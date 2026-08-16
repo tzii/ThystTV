@@ -87,7 +87,8 @@ class PlayerQualityDialog : DialogFragment() {
         dialog?.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             setDimAmount(0f)
-            setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+            val density = resources.displayMetrics.density
+            setGravity(PlayerDialogSizing.windowGravity(PlayerDialogSizing.surfaceWidthPx(dialog!!), density))
             setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT)
         }
     }
@@ -282,9 +283,9 @@ class PlayerQualityDialog : DialogFragment() {
     }
 
     private fun getPanelWidth(): Int {
-        val maxWidth = dp(500f)
-        val horizontalMargin = dp(40f)
-        return (resources.displayMetrics.widthPixels - horizontalMargin).coerceAtMost(maxWidth)
+        val surfaceWidth = dialog?.let { PlayerDialogSizing.surfaceWidthPx(it) }
+            ?: resources.displayMetrics.widthPixels
+        return PlayerDialogSizing.panelWidthPx(surfaceWidth, resources.displayMetrics.density)
     }
 
     private fun dp(value: Float): Int {

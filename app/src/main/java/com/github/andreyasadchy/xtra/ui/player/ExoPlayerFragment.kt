@@ -142,7 +142,7 @@ class ExoPlayerFragment : PlayerFragment() {
                         override fun onVideoSizeChanged(videoSize: VideoSize) {
                             if (videoSize != VideoSize.UNKNOWN && player?.let { it.playbackState != Player.STATE_IDLE } == true) {
                                 val aspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
-                                binding.aspectRatioFrameLayout.setAspectRatio(aspectRatio)
+                                updateVideoAspectRatio(aspectRatio)
                             }
                         }
 
