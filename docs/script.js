@@ -199,22 +199,17 @@
 
     let duration = 0;
     let desiredTime = 0;
-    let raf = 0;
-
-    const tickVideo = () => {
-      raf = 0;
-      if (!duration || !Number.isFinite(duration)) return;
-      const delta = desiredTime - video.currentTime;
-      if (Math.abs(delta) > .025) {
-        try { video.currentTime += delta * .35; } catch (_) { /* seeking can fail before metadata settles */ }
-        raf = requestAnimationFrame(tickVideo);
-      }
-    };
+    let seekFrame = 0;
 
     const syncVideo = (progress) => {
       if (!duration || !Number.isFinite(duration)) return;
       desiredTime = clamp(progress) * Math.max(0, duration - .04);
-      if (!raf) raf = requestAnimationFrame(tickVideo);
+      if (seekFrame) return;
+      seekFrame = requestAnimationFrame(() => {
+        seekFrame = 0;
+        if (Math.abs(video.currentTime - desiredTime) < .025) return;
+        try { video.currentTime = desiredTime; } catch (_) { /* seeking can fail before metadata settles */ }
+      });
     };
 
     const readDuration = () => {
@@ -246,9 +241,11 @@
 
     const tl = gsap.timeline({ paused: true, defaults: { ease: "power2.inOut" } });
     tl
-      .fromTo(frame, { scaleX: .55, scaleY: 1.16, rotation: -2 }, { scaleX: 1.02, scaleY: .72, rotation: 0, duration: 1 }, 0)
-      .to(frame, { scaleX: 1.16, scaleY: 1.05, rotation: .4, duration: 1 }, 1)
-      .to(frame, { scaleX: 1.34, scaleY: .82, rotation: 0, duration: 1 }, 2);
+      .fromTo(frame,
+        { clipPath: "inset(0 35% 0 35%)", scale: .86, rotation: -1.2 },
+        { clipPath: "inset(16% 4% 16% 4%)", scale: .95, rotation: 0, duration: 1 }, 0)
+      .to(frame, { clipPath: "inset(2% 14% 2% 14%)", scale: 1, rotation: .35, duration: 1 }, 1)
+      .to(frame, { clipPath: "inset(18% 0 18% 0)", scale: 1.08, rotation: 0, duration: 1 }, 2);
 
     ScrollTrigger.create({
       trigger: section,
