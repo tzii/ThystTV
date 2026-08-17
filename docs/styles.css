@@ -448,9 +448,10 @@ h2 em {
     var(--bg);
 }
 .escape-copy h2 { font-size: clamp(58px, 7.2vw, 116px); }
-.video-world { position: relative; display: grid; place-items: center; min-height: 70vh; }
+.video-world { position: relative; isolation: isolate; display: grid; place-items: center; min-height: 70vh; }
 .video-shell {
   position: relative;
+  z-index: 2;
   width: min(100%, 900px);
   overflow: hidden;
   border: 1px solid rgba(246,244,251,.5);
@@ -478,7 +479,7 @@ h2 em {
 .video-chrome__live { color: var(--cyan); }
 .escape-fragment {
   position: absolute;
-  z-index: -1;
+  z-index: 1;
   padding: 7px 9px;
   border: 1px solid var(--line-strong);
   background: var(--bg);
@@ -495,7 +496,7 @@ h2 em {
 .escape-fragment--five { right: 19%; bottom: 15%; }
 .escape-mark {
   position: absolute;
-  z-index: -2;
+  z-index: 0;
   width: 42vw;
   max-width: 650px;
   aspect-ratio: 1;
