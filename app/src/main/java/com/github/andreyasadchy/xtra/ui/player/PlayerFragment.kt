@@ -28,8 +28,6 @@ import android.provider.Settings
 import android.view.WindowManager
 import android.os.Handler
 import android.os.Looper
-import android.widget.ImageView
-import android.widget.TextView
 import com.google.android.material.slider.Slider
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -45,7 +43,6 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
-import com.google.android.material.progressindicator.LinearProgressIndicator
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.trackPipAnimationHintView
 import androidx.annotation.OptIn
@@ -111,7 +108,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     private var _binding: FragmentPlayerBinding? = null
     private val hideGestureRunnable = Runnable {
-        binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
+        _binding?.playerLayout?.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
             feedback.animate().cancel()
             if (feedback.isVisible) {
                 feedback.animate()
@@ -120,8 +117,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     .withEndAction {
                         feedback.visibility = View.GONE
                         feedback.alpha = 1f
+                        PlayerSurfacePolicy.resetFeedback(feedback)
                     }
                     .start()
+            } else {
+                PlayerSurfacePolicy.resetFeedback(feedback)
             }
         }
     }
@@ -178,8 +178,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pinchLastArmedTarget: PlayerDisplayMode? = null
 
     // Stream volume overlay (ThystTV playback volume, independent of device volume)
-    private val volumeOverlayDismissRunnable = Runnable { hideVolumeOverlay() }
-    private var volumeOverlayLastNonZero = 100
+    private val volumeOverlayDismissRunnable = Runnable {
+        _binding?.volumeOverlay?.root?.visibility = View.GONE
+    }
+    private val volumeOverlayState = PlayerVolumeOverlayState()
 
     // Gesture education
     private var gestureGuideShownThisSession = false
@@ -1594,6 +1596,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun showVolumeOverlay() {
         if (!isMaximized) return
         val current = getCurrentVolume() ?: (prefs.getInt(C.PLAYER_VOLUME, 100) / 100f)
+        volumeOverlayState.remember((current * 100).toInt())
         volumeOverlayRoot.visibility = View.VISIBLE
         applyVolumeOverlayValue(current)
         positionVolumeOverlay()
@@ -1635,9 +1638,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         with(binding.volumeOverlay) {
             volumeOverlaySlider.addOnChangeListener { _, value, fromUser ->
                 if (fromUser) {
-                    if (value > 0f) {
-                        volumeOverlayLastNonZero = value.toInt()
-                    }
+                    volumeOverlayState.remember(value.toInt())
                     changeVolume(value / 100f)
                     applyVolumeOverlayValue(value / 100f)
                 }
@@ -1653,7 +1654,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
             })
             volumeOverlayMute.setOnClickListener {
-                val target = if (volumeOverlaySlider.value <= 0f) volumeOverlayLastNonZero else 0
+                val target = volumeOverlayState.targetAfterToggle(volumeOverlaySlider.value.toInt())
                 val value = target.coerceIn(0, 100) / 100f
                 changeVolume(value)
                 prefs.edit { putInt(C.PLAYER_VOLUME, target.coerceIn(0, 100)) }
@@ -2888,6 +2889,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun onDestroyView() {
+        _binding?.playerLayout?.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
+            feedback.animate().cancel()
+            feedback.removeCallbacks(hideGestureRunnable)
+        }
+        _binding?.volumeOverlay?.root?.removeCallbacks(volumeOverlayDismissRunnable)
         // Restore original brightness when fragment is destroyed
         restoreBrightness()
         super.onDestroyView()
@@ -3350,6 +3356,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             is PinchDisplayModeController.Event.Commit -> {
                 selectDisplayMode(pinchEvent.mode)
                 onSuccessfulPinch()
+                // Show the completed bar briefly before the linger hide.
+                showPinchFeedback(pinchEvent.mode, 1f)
                 hidePinchFeedback()
             }
             is PinchDisplayModeController.Event.Restore -> {
@@ -3394,32 +3402,27 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     private fun showPinchFeedback(target: PlayerDisplayMode, progress: Float) {
         val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback) ?: return
-        val container = feedback.findViewById<LinearLayout>(R.id.feedbackContainer) ?: return
-        val icon = feedback.findViewById<ImageView>(R.id.feedbackIcon)
-        val progressIndicator = feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)
-        val text = feedback.findViewById<TextView>(R.id.feedbackText)
-        icon?.setImageResource(R.drawable.baseline_aspect_ratio_black_24)
-        text?.text = getString(
+        val targetLabel = getString(
             when (target) {
                 PlayerDisplayMode.FIT -> R.string.display_mode_fit
                 PlayerDisplayMode.FILL -> R.string.display_mode_fill
                 PlayerDisplayMode.STRETCH -> R.string.display_mode_stretch
             }
         )
-        if (progress > 0f) {
-            progressIndicator?.visibility = View.VISIBLE
-            progressIndicator?.progress = (progress * 100).toInt()
-            container.minimumWidth = 0
-        } else {
-            progressIndicator?.visibility = View.GONE
-        }
         PlayerSurfacePolicy.presentFeedback(
             context = requireContext(),
             feedbackRoot = feedback,
-            container = container,
             kind = PlayerGestureFeedbackKind.PINCH,
             surfaceWidthPx = binding.playerLayout.width,
+            surfaceHeightPx = binding.playerLayout.height,
             insets = gestureInsets,
+            presentation = PlayerGestureFeedbackState.pinchPresentation(
+                surfaceClass = PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density),
+                progress = progress,
+                targetLabel = targetLabel,
+            ),
+            iconRes = R.drawable.baseline_aspect_ratio_black_24,
+            a11yText = getString(R.string.gesture_feedback_pinch) + " \u00B7 " + targetLabel,
             hideRunnable = hideGestureRunnable,
         )
     }
@@ -3478,27 +3481,23 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
         prefs.edit { putBoolean(C.PLAYER_PINCH_HINT_SHOWN, true) }
         val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback) ?: return
-        val container = feedback.findViewById<LinearLayout>(R.id.feedbackContainer) ?: return
-        feedback.findViewById<ImageView>(R.id.feedbackIcon)?.setImageResource(R.drawable.baseline_aspect_ratio_black_24)
-        feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)?.visibility = View.GONE
-        container.minimumWidth = 0
-        feedback.findViewById<TextView>(R.id.feedbackText)?.text = getString(R.string.pinch_hint)
-        PlayerSurfacePolicy.applyPlacement(
+        PlayerSurfacePolicy.presentFeedback(
+            context = requireContext(),
             feedbackRoot = feedback,
-            container = container,
-            placement = PlayerSurfacePolicy.placementFor(
+            kind = PlayerGestureFeedbackKind.PINCH,
+            surfaceWidthPx = binding.playerLayout.width,
+            surfaceHeightPx = binding.playerLayout.height,
+            insets = gestureInsets,
+            presentation = PlayerGestureFeedbackState.presentation(
                 kind = PlayerGestureFeedbackKind.PINCH,
                 surfaceClass = PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density),
-                density = resources.displayMetrics.density,
-                insetStartPx = gestureInsets?.left ?: 0,
-                insetEndPx = gestureInsets?.right ?: 0,
+                text = getString(R.string.pinch_hint),
             ),
+            iconRes = R.drawable.baseline_aspect_ratio_black_24,
+            a11yText = getString(R.string.pinch_hint),
+            hideRunnable = hideGestureRunnable,
+            holdMs = PINCH_HINT_LINGER_MS,
         )
-        feedback.animate().cancel()
-        feedback.alpha = 1f
-        feedback.visibility = View.VISIBLE
-        feedback.removeCallbacks(hideGestureRunnable)
-        feedback.postDelayed(hideGestureRunnable, PINCH_HINT_LINGER_MS)
     }
 
     private fun onSuccessfulPinch() {

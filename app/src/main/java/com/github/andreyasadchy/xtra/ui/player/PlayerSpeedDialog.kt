@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
@@ -68,8 +69,10 @@ class PlayerSpeedDialog : DialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        dialog?.setCanceledOnTouchOutside(true)
         dialog?.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog?.window?.setDimAmount(0f)
+        dismissOnTouchOutsidePanel()
 
         with(binding) {
             speedPanel.layoutParams = speedPanel.layoutParams.apply {
@@ -101,6 +104,22 @@ class PlayerSpeedDialog : DialogFragment() {
             btnIncreaseSpeed.setOnClickListener {
                 applySpeed((selectedSpeed + SPEED_STEP).coerceAtMost(MAX_SPEED))
             }
+        }
+    }
+
+    /**
+     * The window spans the full player width, so taps "outside" the panel are
+     * usually still inside the window and outside-touch cancellation never
+     * fires. The panel consumes its own touches, so the decor only receives
+     * blank-area taps; those collapse the popup too.
+     */
+    private fun dismissOnTouchOutsidePanel() {
+        dialog?.window?.decorView?.setOnTouchListener { v, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                v.performClick()
+                dismissAllowingStateLoss()
+            }
+            true
         }
     }
 

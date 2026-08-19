@@ -2,6 +2,8 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import android.view.Gravity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -28,7 +30,7 @@ class PlayerSurfacePolicyTest {
     }
 
     @Test
-    fun `compact placement keeps top-centered pill for every kind`() {
+    fun `compact placement keeps top-centered horizontal pill for every kind`() {
         for (kind in PlayerGestureFeedbackKind.entries) {
             val placement = PlayerSurfacePolicy.placementFor(kind, PlayerSurfaceClass.COMPACT, 2f)
             assertEquals(Gravity.TOP or Gravity.CENTER_HORIZONTAL, placement.gravity)
@@ -36,43 +38,50 @@ class PlayerSurfacePolicyTest {
             assertEquals((16 * 2f).toInt(), placement.marginStartPx)
             assertEquals((16 * 2f).toInt(), placement.marginEndPx)
             assertTrue(placement.topPaddingPx > 0)
-            assertEquals(null, placement.fixedContainerWidthPx)
+            assertNull(placement.fixedContainerWidthPx)
+            assertNull(placement.fixedContainerHeightPx)
+            assertFalse(placement.verticalPill)
         }
     }
 
     @Test
-    fun `large brightness is vertically centered at start edge with capped width`() {
+    fun `large brightness is a start-edge vertical pill with compact fixed size`() {
         val placement = PlayerSurfacePolicy.placementFor(
             PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfaceClass.LARGE, 2f,
+            surfaceHeightPx = 1600,
         )
         assertEquals(Gravity.CENTER_VERTICAL or Gravity.START, placement.gravity)
-        assertEquals((PlayerSurfacePolicy.EDGE_FEEDBACK_MAX_WIDTH_DP * 2f).toInt(), placement.maxWidthPx)
+        assertEquals((PlayerSurfacePolicy.EDGE_PILL_WIDTH_DP * 2f).toInt(), placement.maxWidthPx)
+        assertEquals((PlayerSurfacePolicy.EDGE_PILL_WIDTH_DP * 2f).toInt(), placement.fixedContainerWidthPx)
+        assertEquals((PlayerSurfacePolicy.EDGE_PILL_HEIGHT_DP * 2f).toInt(), placement.fixedContainerHeightPx)
         assertEquals(0, placement.topPaddingPx)
-        assertEquals((PlayerSurfacePolicy.EDGE_FEEDBACK_MAX_WIDTH_DP * 2f).toInt(), placement.fixedContainerWidthPx)
+        assertTrue(placement.verticalPill)
     }
 
     @Test
-    fun `large device volume is vertically centered at end edge`() {
+    fun `large device volume is an end-edge vertical pill`() {
         val placement = PlayerSurfacePolicy.placementFor(
             PlayerGestureFeedbackKind.DEVICE_VOLUME, PlayerSurfaceClass.LARGE, 2f,
+            surfaceHeightPx = 1600,
         )
         assertEquals(Gravity.CENTER_VERTICAL or Gravity.END, placement.gravity)
-        assertEquals((PlayerSurfacePolicy.EDGE_FEEDBACK_MAX_WIDTH_DP * 2f).toInt(), placement.maxWidthPx)
-        assertEquals(0, placement.topPaddingPx)
-        assertEquals((PlayerSurfacePolicy.EDGE_FEEDBACK_MAX_WIDTH_DP * 2f).toInt(), placement.fixedContainerWidthPx)
+        assertEquals((PlayerSurfacePolicy.EDGE_PILL_WIDTH_DP * 2f).toInt(), placement.fixedContainerWidthPx)
+        assertEquals((PlayerSurfacePolicy.EDGE_PILL_HEIGHT_DP * 2f).toInt(), placement.fixedContainerHeightPx)
+        assertTrue(placement.verticalPill)
     }
 
     @Test
-    fun `large seek and speed stay centered with center max width`() {
-        for (kind in listOf(PlayerGestureFeedbackKind.SEEK, PlayerGestureFeedbackKind.PLAYBACK_SPEED)) {
+    fun `large seek speed and pinch stay top-centered and horizontal`() {
+        for (kind in listOf(PlayerGestureFeedbackKind.SEEK, PlayerGestureFeedbackKind.PLAYBACK_SPEED, PlayerGestureFeedbackKind.PINCH)) {
             val placement = PlayerSurfacePolicy.placementFor(kind, PlayerSurfaceClass.LARGE, 2f)
             assertEquals(Gravity.TOP or Gravity.CENTER_HORIZONTAL, placement.gravity)
             assertEquals((PlayerSurfacePolicy.CENTER_FEEDBACK_MAX_WIDTH_DP * 2f).toInt(), placement.maxWidthPx)
+            assertFalse(placement.verticalPill)
         }
     }
 
     @Test
-    fun `edge placement is inset aware`() {
+    fun `edge pill is inset aware`() {
         val placement = PlayerSurfacePolicy.placementFor(
             PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfaceClass.LARGE, 2f,
             insetStartPx = 20, insetEndPx = 30,
@@ -95,5 +104,15 @@ class PlayerSurfacePolicyTest {
         )
         assertEquals((16 * 2f).toInt(), placement.marginStartPx)
         assertEquals((16 * 2f).toInt(), placement.marginEndPx)
+    }
+
+    @Test
+    fun `edge pill height caps to a fraction of short surfaces`() {
+        val density = 2f
+        val desired = (PlayerSurfacePolicy.EDGE_PILL_HEIGHT_DP * density).toInt()
+        assertEquals(desired, PlayerSurfacePolicy.edgePillHeightPx(density, 0))
+        assertEquals(desired, PlayerSurfacePolicy.edgePillHeightPx(density, desired * 10))
+        val shortSurface = 400
+        assertEquals((shortSurface * 0.45f).toInt(), PlayerSurfacePolicy.edgePillHeightPx(density, shortSurface))
     }
 }

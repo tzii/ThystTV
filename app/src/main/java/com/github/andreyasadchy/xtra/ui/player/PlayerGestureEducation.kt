@@ -41,7 +41,12 @@ object PlayerGestureGuideContent {
  */
 object PlayerGestureEducationState {
 
-    const val GUIDE_VERSION = 1
+    /**
+     * Version 2: horizontal zones swapped — the upper zone now controls
+     * playback speed and the lower zone seeks. Users who dismissed version 1
+     * see the corrected guide once.
+     */
+    const val GUIDE_VERSION = 2
 
     fun shouldShowGuide(storedVersion: Int): Boolean = storedVersion < GUIDE_VERSION
 

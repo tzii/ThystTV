@@ -6,12 +6,7 @@ import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
 import com.github.andreyasadchy.xtra.R
-import com.google.android.material.progressindicator.LinearProgressIndicator
 import kotlin.math.abs
 
 interface PlayerGestureCallback {
@@ -131,18 +126,21 @@ class PlayerGestureListener(
                      startVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                  }
              } else {
-                 // Horizontal Swipes (VoD only: Seek / Speed)
+                 // Horizontal Swipes (seekable media only: Speed / Seek)
                  if (callback.getPlayerVideoType() != PlayerFragment.STREAM) {
-                     // Split top/bottom using configured zone split ratio
-                     if (e1.y < height * zoneSplit) {
-                         // Top Zone -> Seek
-                         isSeek = true
-                         startPosition = callback.getCurrentPosition() ?: 0L
-                         duration = callback.getDuration()
-                     } else {
-                         // Bottom Zone -> Speed
-                         isSpeed = true
-                         startSpeed = callback.getCurrentSpeed() ?: 1f
+                     // Split top/bottom using the configured zone split ratio
+                     when (PlayerGestureZonePolicy.horizontalZone(e1.y, height, zoneSplit)) {
+                         PlayerHorizontalGestureZone.PLAYBACK_SPEED -> {
+                             // Upper zone -> Playback speed
+                             isSpeed = true
+                             startSpeed = callback.getCurrentSpeed() ?: 1f
+                         }
+                         PlayerHorizontalGestureZone.SEEK -> {
+                             // Lower zone -> Seek
+                             isSeek = true
+                             startPosition = callback.getCurrentPosition() ?: 0L
+                             duration = callback.getDuration()
+                         }
                      }
                  }
              }
@@ -174,66 +172,54 @@ class PlayerGestureListener(
 
         val percentY = (gestureStartY - e2.y) / height
         val percentX = (e2.x - gestureStartX) / width // Left to Right is positive
-        
-        val feedback = callback.getGestureFeedbackView()
-        val container = feedback.findViewById<LinearLayout>(R.id.feedbackContainer)
-        val icon = feedback.findViewById<ImageView>(R.id.feedbackIcon)
-        val progress = feedback.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)
-        val text = feedback.findViewById<TextView>(R.id.feedbackText)
 
         if (isBrightness) {
-            progress.visibility = View.VISIBLE
-            text.maxLines = 1
-            container.minimumWidth = dpToPx(148)
-            container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             val rawBrightness = startBrightness + percentY
             val isAuto = rawBrightness < 0.05f
             val newBrightness = if (isAuto) -1f else rawBrightness.coerceIn(0.05f, 1.0f)
-            
+
             val lp = callback.windowAttributes
             lp.screenBrightness = newBrightness
             callback.setWindowAttributes(lp)
-            
-            icon.setImageResource(R.drawable.ic_brightness_medium_black_24dp)
 
-            if (isAuto) {
-                progress.progress = 0
-                text.text = labeledText(PlayerGestureFeedbackKind.BRIGHTNESS, "Auto")
-            } else {
-                progress.progress = (newBrightness * 100).toInt()
-                text.text = labeledText(PlayerGestureFeedbackKind.BRIGHTNESS, "%d%%".format((newBrightness * 100).toInt()))
-            }
-            presentFeedback(feedback, container, PlayerGestureFeedbackKind.BRIGHTNESS)
+            val percent = if (isAuto) 0 else (newBrightness * 100).toInt()
+            val valueText = if (isAuto) "Auto" else "%d%%".format(percent)
+            presentFeedback(
+                kind = PlayerGestureFeedbackKind.BRIGHTNESS,
+                iconRes = R.drawable.ic_brightness_medium_black_24dp,
+                level = percent,
+                visibleText = valueText,
+                a11yText = if (isAuto) {
+                    context.getString(R.string.gesture_feedback_auto_brightness)
+                } else {
+                    labeledA11y(PlayerGestureFeedbackKind.BRIGHTNESS, valueText)
+                },
+            )
             return true
         }
-        
+
         if (isVolume) {
-            progress.visibility = View.VISIBLE
-            text.maxLines = 1
-            container.minimumWidth = dpToPx(148)
-            container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val newVolume = (startVolume + (percentY * maxVolume)).toInt().coerceIn(0, maxVolume)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
-            
-            icon.setImageResource(if (newVolume == 0) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24)
 
-            progress.progress = ((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt()
-            text.text = labeledText(
-                PlayerGestureFeedbackKind.DEVICE_VOLUME,
-                "%d".format(((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt()),
+            val percent = ((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt()
+            presentFeedback(
+                kind = PlayerGestureFeedbackKind.DEVICE_VOLUME,
+                iconRes = if (newVolume == 0) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24,
+                level = percent,
+                visibleText = "%d".format(percent),
+                a11yText = labeledA11y(
+                    PlayerGestureFeedbackKind.DEVICE_VOLUME,
+                    if (newVolume == 0) context.getString(R.string.gesture_feedback_muted) else "%d%%".format(percent),
+                ),
             )
-            presentFeedback(feedback, container, PlayerGestureFeedbackKind.DEVICE_VOLUME)
             return true
         }
 
         if (isSeek) {
             if (duration > 0) {
-                progress.visibility = View.GONE
-                text.maxLines = 1
-                container.minimumWidth = 0
-                container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
                 val newPosition = helper.calculateResponsiveSeekPosition(
                     currentPosition = startPosition,
                     duration = duration,
@@ -244,74 +230,97 @@ class PlayerGestureListener(
                 val seekAmount = newPosition - startPosition
                 callback.seek(newPosition)
 
-                icon.setImageResource(if (seekAmount > 0) R.drawable.baseline_add_black_24 else R.drawable.baseline_remove_black_24)
-
-                text.text = labeledText(
-                    PlayerGestureFeedbackKind.SEEK,
-                    "${helper.formatDuration(newPosition)} / ${helper.formatDuration(duration)}",
+                val valueText = "${helper.formatDuration(newPosition)} / ${helper.formatDuration(duration)}"
+                presentFeedback(
+                    kind = PlayerGestureFeedbackKind.SEEK,
+                    iconRes = if (seekAmount > 0) R.drawable.baseline_add_black_24 else R.drawable.baseline_remove_black_24,
+                    level = null,
+                    visibleText = labeledText(PlayerGestureFeedbackKind.SEEK, valueText),
+                    a11yText = labeledA11y(PlayerGestureFeedbackKind.SEEK, valueText),
                 )
-                presentFeedback(feedback, container, PlayerGestureFeedbackKind.SEEK)
             }
             return true
         }
 
         if (isSpeed) {
-            progress.visibility = View.GONE
-            text.maxLines = 1
-            container.minimumWidth = 0
-            container.layoutParams = container.layoutParams.apply { this.width = ViewGroup.LayoutParams.WRAP_CONTENT }
             // Speed logic: 0.05x increments
             // Swipe full width = 1.0x change, adjusted by sensitivity
             val speedChange = (percentX * 2.0f * sensitivity)
             // Round to nearest 0.05
             var newSpeed = startSpeed + speedChange
             newSpeed = (Math.round(newSpeed * 20) / 20.0f).coerceIn(0.25f, 4.0f)
-            
+
             if (newSpeed != callback.getCurrentSpeed()) {
                 callback.setPlaybackSpeed(newSpeed)
             }
 
-            icon.setImageResource(R.drawable.baseline_speed_black_24)
-
-            text.text = labeledText(PlayerGestureFeedbackKind.PLAYBACK_SPEED, "%.2fx".format(newSpeed))
-            presentFeedback(feedback, container, PlayerGestureFeedbackKind.PLAYBACK_SPEED)
+            val valueText = "%.2fx".format(newSpeed)
+            presentFeedback(
+                kind = PlayerGestureFeedbackKind.PLAYBACK_SPEED,
+                iconRes = R.drawable.baseline_speed_black_24,
+                level = null,
+                visibleText = labeledText(PlayerGestureFeedbackKind.PLAYBACK_SPEED, valueText),
+                a11yText = labeledA11y(PlayerGestureFeedbackKind.PLAYBACK_SPEED, valueText),
+            )
             return true
         }
 
         return false
     }
 
-    private fun dpToPx(value: Int): Int {
-        return (value * context.resources.displayMetrics.density).toInt()
-    }
-
     private fun surfaceClass(): PlayerSurfaceClass {
         return PlayerSurfacePolicy.classify(callback.playerWidth, context.resources.displayMetrics.density)
     }
 
+    private fun labelRes(kind: PlayerGestureFeedbackKind): Int {
+        return when (kind) {
+            PlayerGestureFeedbackKind.BRIGHTNESS -> R.string.gesture_feedback_brightness
+            PlayerGestureFeedbackKind.DEVICE_VOLUME -> R.string.gesture_feedback_device_volume
+            PlayerGestureFeedbackKind.SEEK -> R.string.gesture_feedback_seek
+            PlayerGestureFeedbackKind.PLAYBACK_SPEED -> R.string.gesture_feedback_playback_speed
+            PlayerGestureFeedbackKind.PINCH -> R.string.gesture_feedback_pinch
+        }
+    }
+
     private fun labeledText(kind: PlayerGestureFeedbackKind, value: String): String {
         return if (surfaceClass() == PlayerSurfaceClass.LARGE) {
-            val labelRes = when (kind) {
-                PlayerGestureFeedbackKind.BRIGHTNESS -> R.string.gesture_feedback_brightness
-                PlayerGestureFeedbackKind.DEVICE_VOLUME -> R.string.gesture_feedback_device_volume
-                PlayerGestureFeedbackKind.SEEK -> R.string.gesture_feedback_seek
-                PlayerGestureFeedbackKind.PLAYBACK_SPEED -> R.string.gesture_feedback_playback_speed
-                PlayerGestureFeedbackKind.PINCH -> R.string.gesture_feedback_pinch
-            }
-            context.getString(labelRes) + " \u00B7 " + value
+            context.getString(labelRes(kind)) + " \u00B7 " + value
         } else {
             value
         }
     }
 
-    private fun presentFeedback(feedback: View, container: LinearLayout, kind: PlayerGestureFeedbackKind) {
+    /**
+     * Accessibility text always carries the control name; visible text on
+     * large surfaces does too, while the vertical edge pill drops visible text
+     * entirely and relies on this description.
+     */
+    private fun labeledA11y(kind: PlayerGestureFeedbackKind, value: String): String {
+        return context.getString(labelRes(kind)) + " \u00B7 " + value
+    }
+
+    private fun presentFeedback(
+        kind: PlayerGestureFeedbackKind,
+        iconRes: Int,
+        level: Int?,
+        visibleText: String,
+        a11yText: String,
+    ) {
         PlayerSurfacePolicy.presentFeedback(
             context = context,
-            feedbackRoot = feedback,
-            container = container,
+            feedbackRoot = callback.getGestureFeedbackView(),
             kind = kind,
             surfaceWidthPx = callback.playerWidth,
+            surfaceHeightPx = callback.playerHeight,
             insets = callback.playerGestureInsets,
+            presentation = PlayerGestureFeedbackState.presentation(
+                kind = kind,
+                surfaceClass = surfaceClass(),
+                level = level,
+                text = visibleText,
+            ),
+            iconRes = iconRes,
+            a11yText = a11yText,
             hideRunnable = callback.getHideGestureRunnable(),
         )
     }

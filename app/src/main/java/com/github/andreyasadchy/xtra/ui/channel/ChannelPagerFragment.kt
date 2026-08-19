@@ -119,7 +119,7 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
                 appBar.setExpanded(false, false)
             }
             if (viewModel.stream.value == null) {
-                watchLive.setOnClickListener {
+                openPlayer.setOnClickListener {
                     activity.startStream(
                         Stream(
                             id = args.streamId,
@@ -557,7 +557,10 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
         with(binding) {
             val activity = requireActivity() as MainActivity
             if (stream?.viewerCount != null) {
-                watchLive.text = getString(R.string.watch_live)
+                // Live: the red pill replaces the neutral Open player entry
+                // and doubles as the live indicator.
+                watchLive.visibility = View.VISIBLE
+                openPlayer.visibility = View.GONE
                 watchLive.setOnClickListener { activity.startStream(stream) }
             }
             stream?.channelImage.let {
@@ -607,7 +610,6 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
             }
             if (!stream?.title.isNullOrBlank()) {
                 streamLayout.visibility = View.VISIBLE
-                liveBadge.visibility = View.VISIBLE
                 title.visibility = View.VISIBLE
                 title.text = stream.title?.trim()
             } else {

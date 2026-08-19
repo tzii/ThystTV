@@ -42,6 +42,14 @@ class PlayerGestureEducationTest {
     }
 
     @Test
+    fun `guide version bump resurfaces the guide once for prior dismissals`() {
+        val priorVersion = PlayerGestureEducationState.GUIDE_VERSION - 1
+        assertTrue(PlayerGestureEducationState.shouldShowGuide(priorVersion))
+        // After dismissing the current version it does not appear again.
+        assertFalse(PlayerGestureEducationState.shouldShowGuide(PlayerGestureEducationState.GUIDE_VERSION))
+    }
+
+    @Test
     fun `pinch hint requires current guide, unshown hint, unused pinch, later session`() {
         val version = PlayerGestureEducationState.GUIDE_VERSION
         assertTrue(

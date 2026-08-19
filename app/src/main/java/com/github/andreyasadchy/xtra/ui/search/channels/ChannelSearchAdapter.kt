@@ -52,7 +52,6 @@ class ChannelSearchAdapter(
             with(binding) {
                 if (item != null) {
                     val context = fragment.requireContext()
-                    val canWatchLive = com.github.andreyasadchy.xtra.repository.ChannelSearchMapper.canWatchLive(item)
                     root.setOnClickListener { navigateToProfile(item) }
                     if (item.profileImage != null) {
                         userImage.visibility = View.VISIBLE
@@ -86,9 +85,24 @@ class ChannelSearchAdapter(
                         userName.visibility = View.GONE
                     }
                     if (item.isLive == true) {
-                        liveBadge.visibility = View.VISIBLE
+                        // The pill is the single live element: indicator and
+                        // direct watch action in one; the card still opens the
+                        // profile everywhere else.
+                        watchLive.visibility = View.VISIBLE
+                        watchLive.setOnClickListener {
+                            (fragment.activity as? MainActivity)?.startStream(
+                                Stream(
+                                    id = item.streamId ?: item.id,
+                                    channelId = item.id,
+                                    channelLogin = item.login,
+                                    channelName = item.name,
+                                    channelImageURL = item.profileImage,
+                                )
+                            )
+                        }
                     } else {
-                        liveBadge.visibility = View.GONE
+                        watchLive.visibility = View.GONE
+                        watchLive.setOnClickListener(null)
                     }
                     if (item.isLive == true && !item.streamTitle.isNullOrBlank()) {
                         streamTitle.visibility = View.VISIBLE
@@ -122,28 +136,6 @@ class ChannelSearchAdapter(
                         )
                     } else {
                         userFollowers.visibility = View.GONE
-                    }
-                    if (canWatchLive) {
-                        watchLive.visibility = View.VISIBLE
-                        watchLive.isEnabled = true
-                        watchLive.setOnClickListener {
-                            (fragment.activity as? MainActivity)?.startStream(
-                                Stream(
-                                    id = item.streamId ?: item.id,
-                                    channelId = item.id,
-                                    channelLogin = item.login,
-                                    channelName = item.name,
-                                    channelImageURL = item.profileImage,
-                                )
-                            )
-                        }
-                    } else if (item.isLive == true) {
-                        // Live status exists but playback identity is insufficient.
-                        watchLive.visibility = View.VISIBLE
-                        watchLive.isEnabled = false
-                        watchLive.setOnClickListener(null)
-                    } else {
-                        watchLive.visibility = View.GONE
                     }
                 }
             }

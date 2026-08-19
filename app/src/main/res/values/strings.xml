@@ -812,6 +812,8 @@
     <string name="gesture_feedback_seek" tools:ignore="MissingTranslation">Seek</string>
     <string name="gesture_feedback_playback_speed" tools:ignore="MissingTranslation">Playback speed</string>
     <string name="gesture_feedback_pinch" tools:ignore="MissingTranslation">Pinch</string>
+    <string name="gesture_feedback_auto_brightness" tools:ignore="MissingTranslation">Auto brightness</string>
+    <string name="gesture_feedback_muted" tools:ignore="MissingTranslation">Muted</string>
     <string name="display_mode_fit" tools:ignore="MissingTranslation">Fit</string>
     <string name="display_mode_fill" tools:ignore="MissingTranslation">Fill</string>
     <string name="display_mode_stretch" tools:ignore="MissingTranslation">Stretch</string>
@@ -827,8 +829,8 @@
     <string name="player_gesture_guide_settings_summary" tools:ignore="MissingTranslation">Show the player gesture guide</string>
     <string name="gesture_row_brightness" tools:ignore="MissingTranslation">Left vertical</string>
     <string name="gesture_row_device_volume" tools:ignore="MissingTranslation">Right vertical</string>
-    <string name="gesture_row_seek" tools:ignore="MissingTranslation">Upper horizontal</string>
-    <string name="gesture_row_playback_speed" tools:ignore="MissingTranslation">Lower horizontal</string>
+    <string name="gesture_row_seek" tools:ignore="MissingTranslation">Lower horizontal</string>
+    <string name="gesture_row_playback_speed" tools:ignore="MissingTranslation">Upper horizontal</string>
     <string name="gesture_row_pinch" tools:ignore="MissingTranslation">Pinch</string>
     <string name="gesture_row_double_tap" tools:ignore="MissingTranslation">Double tap</string>
     <string name="gesture_action_seek_settings" tools:ignore="MissingTranslation">Seek on VODs and seekable videos</string>

@@ -206,6 +206,39 @@
         <item name="android:minHeight">24dp</item>
     </style>
 
+    <!-- Single live element: status indicator and watch action in one red pill. -->
+    <style name="LiveWatchPill" parent="Widget.Material3.Button">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:minHeight">34dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="backgroundTint">@color/liveStreamRed</item>
+        <item name="cornerRadius">32dp</item>
+        <item name="icon">@drawable/ic_live_dot</item>
+        <item name="iconTint">@android:color/white</item>
+        <item name="iconSize">8dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="rippleColor">#33FFFFFF</item>
+    </style>
+
+    <!-- Offline counterpart of LiveWatchPill: player entry without a live signal. -->
+    <style name="OpenPlayerPill" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:minHeight">34dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="cornerRadius">32dp</item>
+    </style>
+
     <style name="BaseDarkThemeCompactText" parent="BaseDarkTheme">
         <item name="textAppearanceDisplayLarge">@style/CompactTextDisplayLarge</item>
         <item name="textAppearanceDisplayMedium">@style/CompactTextDisplayMedium</item>

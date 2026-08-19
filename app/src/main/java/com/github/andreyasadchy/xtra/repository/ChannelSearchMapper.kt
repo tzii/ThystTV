@@ -56,12 +56,4 @@ object ChannelSearchMapper {
             startedAt = channel.startedAt,
         )
     }
-
-    /**
-     * Direct Watch-live eligibility: live status exists and playback identity
-     * (channel id) is sufficient to construct a Stream.
-     */
-    fun canWatchLive(item: ChannelSearchItem): Boolean {
-        return item.isLive == true && !item.id.isNullOrBlank()
-    }
 }

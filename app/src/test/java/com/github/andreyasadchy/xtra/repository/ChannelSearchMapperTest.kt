@@ -86,15 +86,6 @@ class ChannelSearchMapperTest {
     }
 
     @Test
-    fun `watch live requires live status and playback identity`() {
-        assertTrue(ChannelSearchMapper.canWatchLive(ChannelSearchItem(id = "42", isLive = true, streamId = "7")))
-        assertTrue(ChannelSearchMapper.canWatchLive(ChannelSearchItem(id = "42", isLive = true)))
-        assertFalse(ChannelSearchMapper.canWatchLive(ChannelSearchItem(id = null, isLive = true)))
-        assertFalse(ChannelSearchMapper.canWatchLive(ChannelSearchItem(id = "42", isLive = false)))
-        assertFalse(ChannelSearchMapper.canWatchLive(ChannelSearchItem(id = "42", isLive = null)))
-    }
-
-    @Test
     fun `content equality detects live-state and metadata changes`() {
         val offline = ChannelSearchItem(id = "42", login = "gorgc", followerCount = 10)
         val live = offline.copy(isLive = true, streamTitle = "Ranked grind", viewerCount = 500)

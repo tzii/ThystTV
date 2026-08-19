@@ -34,7 +34,7 @@
             android:layout_marginBottom="7dp"
             android:orientation="vertical"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/layout2"
+            app:layout_constraintEnd_toStartOf="@id/watchLive"
             app:layout_constraintStart_toEndOf="@id/userImage"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -45,19 +45,6 @@
                 android:textAppearance="?attr/textAppearanceTitleMedium"
                 android:visibility="gone"
                 tools:text="Gorgc"
-                tools:visibility="visible" />
-
-            <TextView
-                android:id="@+id/liveBadge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/live"
-                android:textAllCaps="true"
-                android:textAppearance="?attr/textAppearanceLabelMedium"
-                android:textColor="@color/liveStreamRed"
-                android:textStyle="bold"
-                android:visibility="gone"
                 tools:visibility="visible" />
 
             <TextView
@@ -105,30 +92,20 @@
                 tools:visibility="visible" />
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/layout2"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/watchLive"
+            style="@style/LiveWatchPill"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
-            android:layout_marginEnd="7dp"
-            android:layout_marginBottom="10dp"
-            android:gravity="end"
-            android:orientation="vertical"
+            android:layout_marginEnd="10dp"
+            android:text="@string/live"
+            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/layout1"
-            app:layout_constraintTop_toTopOf="parent">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/watchLive"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/watch_live"
-                android:textAppearance="?attr/textAppearanceLabelMedium"
-                android:visibility="gone"
-                tools:visibility="visible" />
-        </LinearLayout>
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="Live"
+            tools:visibility="visible" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>
