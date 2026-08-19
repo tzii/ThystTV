@@ -8,7 +8,7 @@ The ThystTV gesture system provides intuitive touch controls for video playback,
 *   **Location:** `ui/player/PlayerGestureListener.kt`
 *   **Role:** The central state machine. It extends `GestureDetector.SimpleOnGestureListener` to handle raw touch events from the Android `GestureDetector`.
 *   **Responsibilities:**
-    *   Detects gesture types based on screen zones (Left/Right for Volume/Brightness, Top/Bottom for Seek/Speed).
+    *   Detects gesture types based on screen zones (Left/Right for Volume/Brightness, Top/Bottom for Speed/Seek).
     *   Manages the gesture lifecycle (Down -> Scroll -> Up/Cancel).
     *   Prevents conflicts with other gestures (e.g., tap controls, minimize gesture).
     *   Applies settings (sensitivity, zone split, haptics).
@@ -50,9 +50,15 @@ The `PlayerGestureListener` uses a set of boolean flags to track the current ges
 *   **Vertical Swipes:**
     *   Left 50%: Brightness
     *   Right 50%: Volume
-*   **Horizontal Swipes (VoD Only):**
-    *   Top X%: Seek (Configurable via `zoneSplit`)
-    *   Bottom Y%: Playback Speed
+*   **Horizontal Swipes (seekable media only):**
+    *   Top X%: Playback Speed (Configurable via `zoneSplit`)
+    *   Bottom Y%: Seek
+    *   Zone selection is pure logic in `PlayerGestureZonePolicy`; a start position exactly on the split line belongs to the lower (seek) zone.
+
+### Pinch Display Modes
+*   Pinch feedback uses a directional bar (`PlayerGestureFeedbackState.pinchLevel`): half-full at neutral, growing to full while arming Fill and emptying while arming Fit, so the bar alone shows the pinch direction.
+*   Video previews interpolate a uniform scale over Fit rendering (`PlayerDisplayModePreviewer`). Neutral releases settle animated: committed Fit eases back to (1,1); committed Fill eases to the Fill scale then switches to canonical Fill. Stretch and pre-N devices snap.
+*   Canonical surface geometry is owned by `PlayerFragment.finalizePinchSurface()`, which cancels any settle and applies the committed mode's resize mode and unit scale. New pinch starts, `selectDisplayMode`, minimize/restore visual state, and `onDestroyView` all route through it so a partially transformed surface cannot survive.
 
 ## Adding New Gestures
 
@@ -64,4 +70,6 @@ The `PlayerGestureListener` uses a set of boolean flags to track the current ges
 ## Testing
 
 *   **`PlayerGestureHelperTest`**: Unit tests for the math and logic (pure functions). Mocks `Context` for `AudioManager`.
-*   **Integration**: Currently, `PlayerGestureListener` logic is verified via manual testing due to `MotionEvent` mocking complexities in unit tests.
+*   **`PlayerGestureZonePolicyTest`**: Unit tests for horizontal zone selection, including the split-line boundary.
+*   **`PlayerGestureFeedbackStateTest` / `PlayerSurfacePolicyTest`**: Unit tests for feedback presentation and placement (compact top-centered pill, wide vertical edge pills, always-visible pinch bar).
+*   **Integration**: Remaining `PlayerGestureListener` wiring is verified via manual testing due to `MotionEvent` mocking complexities in unit tests.

@@ -29,6 +29,9 @@ data class PlayerGestureFeedbackPresentation(
 
 object PlayerGestureFeedbackState {
 
+    /** Neutral center of the directional pinch bar. */
+    const val PINCH_LEVEL_NEUTRAL = 50
+
     fun clampLevel(level: Int): Int = level.coerceIn(0, 100)
 
     /**
@@ -69,15 +72,35 @@ object PlayerGestureFeedbackState {
     }
 
     /**
+     * Directional pinch bar: half-full at neutral, growing to full as the
+     * pinch arms Fill and emptying as it arms Fit, so the bar alone expresses
+     * which way the pinch points. Stretch is never a pinch target; a neutral
+     * preview from Stretch parks at the center.
+     */
+    fun pinchLevel(progress: Float, toward: PlayerDisplayMode): Int {
+        val clamped = progress.coerceIn(0f, 1f)
+        return when (toward) {
+            PlayerDisplayMode.FILL -> clampLevel((PINCH_LEVEL_NEUTRAL + PINCH_LEVEL_NEUTRAL * clamped).toInt())
+            PlayerDisplayMode.FIT -> clampLevel((PINCH_LEVEL_NEUTRAL - PINCH_LEVEL_NEUTRAL * clamped).toInt())
+            PlayerDisplayMode.STRETCH -> PINCH_LEVEL_NEUTRAL
+        }
+    }
+
+    /**
      * Pinch feedback always shows its determinate bar, including zero-progress
      * and no-preview states, so the Fit/Fill transition stays visible for the
      * entire active pinch.
      */
-    fun pinchPresentation(surfaceClass: PlayerSurfaceClass, progress: Float, targetLabel: String): PlayerGestureFeedbackPresentation {
+    fun pinchPresentation(
+        surfaceClass: PlayerSurfaceClass,
+        progress: Float,
+        toward: PlayerDisplayMode,
+        targetLabel: String,
+    ): PlayerGestureFeedbackPresentation {
         return presentation(
             kind = PlayerGestureFeedbackKind.PINCH,
             surfaceClass = surfaceClass,
-            level = clampLevel((progress * 100f).toInt()),
+            level = pinchLevel(progress, toward),
             text = targetLabel,
         )
     }

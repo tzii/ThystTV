@@ -1,7 +1,6 @@
 package com.github.andreyasadchy.xtra.ui.player
 
 import android.app.Dialog
-import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -9,7 +8,6 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
 import android.text.TextUtils
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -19,7 +17,6 @@ import android.view.Window
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.setPadding
 import androidx.fragment.app.DialogFragment
@@ -245,46 +242,18 @@ class PlayerQualityDialog : DialogFragment() {
     }
 
     private fun resolveColors(): QualityDialogColors {
-        val context = requireContext()
-        val fallbackSurface = if (isLightTheme(context)) Color.WHITE else Color.rgb(18, 18, 18)
-        val panel = themeColor(context, com.google.android.material.R.attr.colorSurfaceContainer, fallbackSurface)
-        val onPanel = themeColor(
-            context,
-            com.google.android.material.R.attr.colorOnSurface,
-            if (ColorUtils.calculateLuminance(panel) > 0.5) Color.rgb(28, 28, 28) else Color.WHITE
-        )
-        val primary = themeColor(context, androidx.appcompat.R.attr.colorPrimary, Color.rgb(0, 125, 202))
-        val lightPanel = ColorUtils.calculateLuminance(panel) > 0.5
-        val rowBlend = if (lightPanel) 0.08f else 0.16f
-        val selectedBlend = if (lightPanel) 0.18f else 0.32f
-        val strokeAlpha = if (lightPanel) 0.16f else 0.22f
+        val shared = PlayerPanelTheme.resolve(requireContext())
+        val lightPanel = ColorUtils.calculateLuminance(shared.panel) > 0.5
         return QualityDialogColors(
-            panel = panel,
-            onPanel = onPanel,
-            selectedText = if (lightPanel) onPanel else Color.WHITE,
-            secondaryText = ColorUtils.setAlphaComponent(onPanel, if (lightPanel) 150 else 178),
-            panelStroke = ColorUtils.blendARGB(panel, onPanel, strokeAlpha),
-            chip = ColorUtils.blendARGB(panel, onPanel, rowBlend),
-            selectedChip = ColorUtils.blendARGB(panel, primary, selectedBlend),
-            handle = ColorUtils.setAlphaComponent(onPanel, if (lightPanel) 96 else 128),
+            panel = shared.panel,
+            onPanel = shared.onPanel,
+            selectedText = if (lightPanel) shared.onPanel else Color.WHITE,
+            secondaryText = shared.secondaryText,
+            panelStroke = shared.panelStroke,
+            chip = shared.controlFill,
+            selectedChip = shared.selectedFill,
+            handle = shared.handle,
         )
-    }
-
-    private fun isLightTheme(context: Context): Boolean {
-        val value = TypedValue()
-        return context.theme.resolveAttribute(androidx.appcompat.R.attr.isLightTheme, value, true) && value.data != 0
-    }
-
-    private fun themeColor(context: Context, attr: Int, fallback: Int): Int {
-        val value = TypedValue()
-        if (!context.theme.resolveAttribute(attr, value, true)) {
-            return fallback
-        }
-        return if (value.resourceId != 0) {
-            ContextCompat.getColor(context, value.resourceId)
-        } else {
-            value.data
-        }
     }
 
     private fun chipBackground(normalColor: Int, selectedColor: Int): StateListDrawable {

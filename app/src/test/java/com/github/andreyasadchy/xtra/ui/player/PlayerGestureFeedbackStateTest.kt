@@ -84,13 +84,37 @@ class PlayerGestureFeedbackStateTest {
     }
 
     @Test
-    fun `pinch bar is visible from zero progress through armed`() {
-        for (progress in listOf(0f, 0.25f, 0.99f, 1f)) {
-            val presentation = PlayerGestureFeedbackState.pinchPresentation(PlayerSurfaceClass.LARGE, progress, "Fill")
+    fun `pinch bar is visible from zero progress through armed and grows toward Fill`() {
+        for (progress in listOf(0f, 0.25f, 0.5f, 0.99f, 1f)) {
+            val presentation = PlayerGestureFeedbackState.pinchPresentation(PlayerSurfaceClass.LARGE, progress, PlayerDisplayMode.FILL, "Fill")
             assertTrue(presentation.levelVisible)
-            assertEquals(PlayerGestureFeedbackState.clampLevel((progress * 100f).toInt()), presentation.level)
+            assertEquals(PlayerGestureFeedbackState.pinchLevel(progress, PlayerDisplayMode.FILL), presentation.level)
             assertEquals("Fill", presentation.text)
         }
+        assertEquals(50, PlayerGestureFeedbackState.pinchLevel(0f, PlayerDisplayMode.FILL))
+        assertEquals(100, PlayerGestureFeedbackState.pinchLevel(1f, PlayerDisplayMode.FILL))
+        assertEquals(75, PlayerGestureFeedbackState.pinchLevel(0.5f, PlayerDisplayMode.FILL))
+    }
+
+    @Test
+    fun `pinch bar shrinks toward Fit from the same neutral center`() {
+        assertEquals(50, PlayerGestureFeedbackState.pinchLevel(0f, PlayerDisplayMode.FIT))
+        assertEquals(25, PlayerGestureFeedbackState.pinchLevel(0.5f, PlayerDisplayMode.FIT))
+        assertEquals(0, PlayerGestureFeedbackState.pinchLevel(1f, PlayerDisplayMode.FIT))
+    }
+
+    @Test
+    fun `neutral preview from Stretch parks at the bar center`() {
+        assertEquals(50, PlayerGestureFeedbackState.pinchLevel(0f, PlayerDisplayMode.STRETCH))
+        assertEquals(50, PlayerGestureFeedbackState.pinchLevel(1f, PlayerDisplayMode.STRETCH))
+    }
+
+    @Test
+    fun `pinch progress clamps to the arm range before mapping`() {
+        // Out-of-range progress pins at the nearest end: over-arm completes
+        // Fill; anything below neutral stays at the center.
+        assertEquals(100, PlayerGestureFeedbackState.pinchLevel(1.5f, PlayerDisplayMode.FILL))
+        assertEquals(50, PlayerGestureFeedbackState.pinchLevel(-1f, PlayerDisplayMode.FIT))
     }
 
     @Test
@@ -106,7 +130,7 @@ class PlayerGestureFeedbackStateTest {
         val presentations = listOf(
             PlayerGestureFeedbackState.presentation(PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfaceClass.LARGE, 80, "80%"),
             PlayerGestureFeedbackState.presentation(PlayerGestureFeedbackKind.SEEK, PlayerSurfaceClass.LARGE, null, "12:00 / 24:00"),
-            PlayerGestureFeedbackState.pinchPresentation(PlayerSurfaceClass.LARGE, 0.5f, "Fit"),
+            PlayerGestureFeedbackState.pinchPresentation(PlayerSurfaceClass.LARGE, 0.5f, PlayerDisplayMode.FILL, "Fill"),
             PlayerGestureFeedbackState.presentation(PlayerGestureFeedbackKind.DEVICE_VOLUME, PlayerSurfaceClass.COMPACT, 0, "0"),
         )
         // Each presentation fully describes visibility, level, layout, and text;

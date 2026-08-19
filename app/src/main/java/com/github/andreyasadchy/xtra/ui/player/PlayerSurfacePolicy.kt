@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.core.view.isVisible
 import com.github.andreyasadchy.xtra.R
 import com.google.android.material.progressindicator.LinearProgressIndicator
 
@@ -175,10 +176,25 @@ object PlayerSurfacePolicy {
     }
 
     /**
+     * A visible pill visibly jumps when its geometry changes, so a placement
+     * change must be applied while hidden; an already-hidden pill can
+     * reposition freely, and an unchanged placement just refreshes content.
+     */
+    fun requiresCleanReposition(
+        lastPlacement: PlayerFeedbackPlacement?,
+        nextPlacement: PlayerFeedbackPlacement,
+        isVisible: Boolean,
+    ): Boolean {
+        return isVisible && lastPlacement != nextPlacement
+    }
+
+    /**
      * Places, styles, and shows a gesture-feedback pill from a complete
      * presentation. Every visual property is written on every call, so no
      * visibility, orientation, width, progress, or text state can leak between
-     * gesture kinds, then the shared idle-hold hide is scheduled.
+     * gesture kinds, then the shared idle-hold hide is scheduled. The last
+     * applied placement is stored on the view itself so multiple player
+     * instances never share state.
      */
     fun presentFeedback(
         context: Context,
@@ -201,18 +217,29 @@ object PlayerSurfacePolicy {
         val density = context.resources.displayMetrics.density
         val vertical = presentation.layout == PlayerGestureFeedbackLayout.EDGE_VERTICAL
 
+        feedbackRoot.animate().cancel()
+        val placement = placementFor(
+            kind = kind,
+            surfaceClass = classify(surfaceWidthPx, density),
+            density = density,
+            insetStartPx = insets?.left ?: 0,
+            insetEndPx = insets?.right ?: 0,
+            surfaceHeightPx = surfaceHeightPx,
+        )
+        val lastPlacement = feedbackRoot.getTag(R.id.feedbackPlacement) as? PlayerFeedbackPlacement
+        if (requiresCleanReposition(lastPlacement, placement, feedbackRoot.isVisible)) {
+            // Swap geometry while invisible so the pill cannot be seen
+            // teleporting from one gesture's position to another's.
+            feedbackRoot.removeCallbacks(hideRunnable)
+            feedbackRoot.visibility = View.GONE
+            feedbackRoot.alpha = 1f
+        }
         applyPlacement(
             feedbackRoot = feedbackRoot,
             container = container,
-            placement = placementFor(
-                kind = kind,
-                surfaceClass = classify(surfaceWidthPx, density),
-                density = density,
-                insetStartPx = insets?.left ?: 0,
-                insetEndPx = insets?.right ?: 0,
-                surfaceHeightPx = surfaceHeightPx,
-            ),
+            placement = placement,
         )
+        feedbackRoot.setTag(R.id.feedbackPlacement, placement)
 
         icon?.setImageResource(iconRes)
         icon?.visibility = View.VISIBLE
@@ -237,7 +264,6 @@ object PlayerSurfacePolicy {
         text?.maxLines = 1
 
         feedbackRoot.contentDescription = a11yText
-        feedbackRoot.animate().cancel()
         feedbackRoot.alpha = 1f
         feedbackRoot.visibility = View.VISIBLE
         feedbackRoot.removeCallbacks(hideRunnable)

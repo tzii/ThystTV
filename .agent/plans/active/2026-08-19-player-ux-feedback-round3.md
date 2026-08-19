@@ -161,17 +161,18 @@ semantics and player overlay motion, which are high-risk surfaces per
 
 Automated checks:
 
-- [ ] Unit test: Fill grows the pinch bar from 50 to 100 and Fit shrinks it
+- [x] Unit test: Fill grows the pinch bar from 50 to 100 and Fit shrinks it
       from 50 to 0 across the arm range, including clamps, neutral states,
-      and commit levels.
-- [ ] Unit test: same-placement updates do not reset; placement changes while
+      and commit levels. (`PlayerGestureFeedbackStateTest`)
+- [x] Unit test: same-placement updates do not reset; placement changes while
       visible reset; changes while hidden do not; insets-only changes count
-      as placement changes.
-- [ ] Existing pinch/previewer/surface-policy/feedback-state tests stay green.
-- [ ] `./gradlew assembleDebug`
-- [ ] `./gradlew test`
-- [ ] `./gradlew lintDebug`
-- [ ] Debug APK alignment/signature verification
+      as placement changes. (`PlayerSurfacePolicyTest.requiresCleanReposition`)
+- [x] Existing pinch/previewer/surface-policy/feedback-state tests stay green.
+- [x] `./gradlew assembleDebug`
+- [x] `./gradlew test` (295 tests)
+- [x] `./gradlew lintDebug`
+- [x] Debug APK alignment/signature verification (zipaligned; debug cert;
+      newer than every non-test source)
 
 Human QA required:
 
@@ -215,6 +216,32 @@ Human QA completed:
   presentation mapping, preview scale lifecycle, feedback view placement
   switching (LayoutTransition + mid-fade repositioning), and the volume
   overlay's layout/anchoring versus the dialog panels.
+- 2026-08-19: Applied reviewer corrections: mode-aware settle targets (Fit to
+  (1,1); Fill to fillRatio then canonical; Stretch and pre-N snap),
+  centralized `finalizePinchSurface()` cleanup invoked from new pinch,
+  `selectDisplayMode`, minimize/maximize visual state, and `onDestroyView`;
+  per-view placement storage (id-keyed tag) with cancel-fade / remove-callback
+  / hide / reposition / show sequencing; embedded volume panel with
+  player-surface-relative gravity, width from the player layout, and inset
+  margins; expanded shared theme including primary, control, selected, and
+  slider colors; added docs, QA, and checkpoint items.
+- 2026-08-19: Checkpointed rounds 1-2 as commit 635c48d0 before round-3 edits;
+  preserved the round-2 APK as `app/build/outputs/apk/debug/app-debug-round2-before.apk`
+  (local artifact only, not committed) for before/after comparison.
+- 2026-08-19: Implemented round 3 (directional pinch bar, settle + cleanup,
+  per-view reposition reset, no LayoutTransition, PlayerPanelTheme extraction,
+  volume panel rebuild with dialog-parity placement, tap-outside dismissal
+  already covered by the drag-view path). `assembleDebug`, `test` (295 green),
+  `lintDebug` pass; APK zipaligned, debug-signed, newer than all non-test
+  sources. Emulator screenshots not possible on this machine (no emulator,
+  system image, or device installed): before/after capture remains a human-QA
+  artifact; `docs/GESTURE_SYSTEM.md` updated.
+- 2026-08-20: Round-4 review found a defect in the implemented settle:
+  `settlePinchPreview` animates to the Fill scale regardless of the committed
+  mode, so a Fit-origin neutral release grows toward Fill and then snaps back,
+  contradicting the mode-aware settle decision above (Fit must settle to
+  (1,1)). Fixed in round 4
+  (`.agent/plans/active/2026-08-19-player-ux-pinch-elastic-round4.md`).
 
 ## Decisions
 
@@ -268,11 +295,17 @@ Human QA completed:
 
 ## Final PR summary draft
 
-Summary: Directional pinch bar with a smooth release settle, teleport-free
-gesture feedback pill, and a volume popup rebuilt to match the quality/speed
-panel family.
-Tests: Pending Gradle checks after implementation approval.
-Human QA: Required for pinch direction/settle, rapid gesture switching, and
-the volume popup's new look, placement, and dismissal.
+Summary: Directional pinch bar with a mode-aware animated release settle and
+centralized surface cleanup, teleport-free gesture feedback pill via per-view
+placement tracking, and a volume popup rebuilt as an embedded sibling of the
+quality/speed panels with one shared panel theme.
+Tests: `assembleDebug`, `test` (295 green; new directional-bar and
+reposition-decision coverage), `lintDebug` pass; APK zipaligned and
+debug-signed. Rounds 1-2 checkpointed as commit 635c48d0.
+Human QA: Required for pinch direction/settle (incl. Fill-origin, quick
+re-pinch, minimize/restore, rotation, PiP), rapid gesture switching (incl.
+mid-fade and inset changes), and the volume popup's new look, placement, and
+dismissal; before/after screenshots are a human-QA artifact (no emulator on
+the build machine).
 Risks: Player overlay motion changes need device validation; pinch and
 display-mode logic is intentionally untouched beyond presentation.

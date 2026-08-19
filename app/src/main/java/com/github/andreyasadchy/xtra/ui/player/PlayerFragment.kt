@@ -12,6 +12,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.Icon
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -90,6 +91,7 @@ import com.github.andreyasadchy.xtra.util.isKeyboardShown
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
@@ -176,6 +178,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pinchPointerId2 = -1
     private var pinchAnchorSpan = 0f
     private var pinchLastArmedTarget: PlayerDisplayMode? = null
+    private var pinchSettleAnimator: ViewPropertyAnimator? = null
 
     // Stream volume overlay (ThystTV playback volume, independent of device volume)
     private val volumeOverlayDismissRunnable = Runnable {
@@ -290,6 +293,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun applyMinimizedPlayerVisualState() {
+        cancelPinchSettle()
         binding.aspectRatioFrameLayout.scaleX = 1f
         binding.aspectRatioFrameLayout.scaleY = 1f
         binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -299,6 +303,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun applyMaximizedPlayerVisualState() {
+        cancelPinchSettle()
         binding.aspectRatioFrameLayout.scaleX = 1f
         binding.aspectRatioFrameLayout.scaleY = 1f
         binding.aspectRatioFrameLayout.resizeMode = if (isPortrait) {
@@ -317,11 +322,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun selectDisplayMode(mode: PlayerDisplayMode) {
         displayMode = mode
         displayModeStore.saveDisplayMode(mode)
-        binding.aspectRatioFrameLayout.scaleX = 1f
-        binding.aspectRatioFrameLayout.scaleY = 1f
-        if (!isPortrait && isMaximized) {
-            binding.aspectRatioFrameLayout.resizeMode = mode.resizeMode
-        }
+        finalizePinchSurface()
     }
 
     fun getCurrentDisplayMode(): PlayerDisplayMode = displayMode
@@ -429,6 +430,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             aspectRatioFrameLayout.setAspectRatio(16f / 9f)
             initLayout()
             setupVolumeOverlayListeners()
+            applyVolumeOverlayPanelTheme()
             playerLayout.doOnLayout { updateQuickPlayerControls() }
             playerLayout.post { maybeShowGestureGuide() }
             changePlayerMode()
@@ -1619,18 +1621,57 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
+    /**
+     * Panel placement mirrors the quality/speed dialogs but stays embedded in
+     * the player layout: centered on large surfaces, bottom-centered on
+     * compact ones, sized by the shared panel-width policy, and honoring the
+     * system gesture insets. Anchoring above the volume button is retired.
+     */
     private fun positionVolumeOverlay() {
-        val anchor = if (binding.playerControls.volume.isVisible) binding.playerControls.volume else binding.playerControls.root
-        val anchorLocation = IntArray(2)
-        val playerLocation = IntArray(2)
-        anchor.getLocationOnScreen(anchorLocation)
-        binding.playerLayout.getLocationOnScreen(playerLocation)
-        volumeOverlayRoot.doOnPreDraw {
-            val margin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics)
-            val x = (anchorLocation[0] - playerLocation[0]).toFloat().coerceAtLeast(margin)
-            val y = (anchorLocation[1] - playerLocation[1]) - volumeOverlayRoot.height - margin
-            volumeOverlayRoot.translationX = x
-            volumeOverlayRoot.translationY = y.coerceAtLeast(margin)
+        val root = volumeOverlayRoot
+        val density = resources.displayMetrics.density
+        val surfaceWidth = binding.playerLayout.width
+        val insets = gestureInsets
+        val params = root.layoutParams
+        if (params is FrameLayout.LayoutParams) {
+            params.width = PlayerDialogSizing.panelWidthPx(surfaceWidth, density)
+            if (PlayerDialogSizing.isLargeSurface(surfaceWidth, density)) {
+                params.gravity = Gravity.CENTER
+                params.setMargins(insets?.left ?: 0, 0, insets?.right ?: 0, 0)
+            } else {
+                params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                val margin = (16 * density).toInt()
+                params.setMargins(insets?.left ?: 0, 0, insets?.right ?: 0, margin + (insets?.bottom ?: 0))
+            }
+            root.layoutParams = params
+        }
+        root.translationX = 0f
+        root.translationY = 0f
+    }
+
+    private fun applyVolumeOverlayPanelTheme() {
+        val colors = PlayerPanelTheme.resolve(requireContext())
+        with(binding.volumeOverlay) {
+            (root as? MaterialCardView)?.apply {
+                setCardBackgroundColor(colors.panel)
+                strokeWidth = (resources.displayMetrics.density).toInt()
+                setStrokeColor(colors.panelStroke)
+            }
+            volumeOverlayHandle.background = GradientDrawable().apply {
+                setColor(colors.handle)
+                cornerRadius = (3 * resources.displayMetrics.density)
+            }
+            volumeOverlayTitle.setTextColor(colors.onPanel)
+            volumeOverlayPercent.setTextColor(colors.onPanel)
+            volumeOverlayMute.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(colors.controlFill)
+            }
+            volumeOverlayMute.imageTintList = android.content.res.ColorStateList.valueOf(colors.onPanel)
+            volumeOverlaySlider.thumbTintList = android.content.res.ColorStateList.valueOf(colors.sliderActive)
+            volumeOverlaySlider.trackActiveTintList = android.content.res.ColorStateList.valueOf(colors.sliderActive)
+            volumeOverlaySlider.trackInactiveTintList = android.content.res.ColorStateList.valueOf(colors.sliderInactive)
+            volumeOverlaySlider.haloTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
         }
     }
 
@@ -2889,6 +2930,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun onDestroyView() {
+        finalizePinchSurface()
         _binding?.playerLayout?.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
             feedback.animate().cancel()
             feedback.removeCallbacks(hideGestureRunnable)
@@ -2912,6 +2954,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
         private const val PINCH_SCALE_CLAIM_DEADZONE = 0.02f
         private const val PINCH_FEEDBACK_LINGER_MS = 400L
+        private const val PINCH_SETTLE_MS = 180L
         private const val VOLUME_OVERLAY_DISMISS_MS = 1500L
         private const val PINCH_HINT_LINGER_MS = 3000L
 
@@ -3307,6 +3350,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             // pinch does not toggle chat.
             cycleChatMode()
         }
+        finalizePinchSurface()
         pinchController.begin(effectivePinchDisplayMode())
         pinchLastArmedTarget = null
         isSwipeGestureInProgress = true
@@ -3337,7 +3381,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             is PinchDisplayModeController.Event.NoPreview -> {
                 showPinchFeedback(pinchEvent.from, 0f)
-                clearPinchPreview(pinchEvent.from)
+                // The live preview already sits at the committed anchor
+                // geometry, so snapping to canonical here is seamless.
+                finalizePinchSurface()
             }
             is PinchDisplayModeController.Event.Armed -> {
                 if (pinchEvent.target != pinchController.committedMode && pinchEvent.target != pinchLastArmedTarget) {
@@ -3361,11 +3407,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 hidePinchFeedback()
             }
             is PinchDisplayModeController.Event.Restore -> {
-                clearPinchPreview(pinchEvent.mode)
+                settlePinchPreview(pinchEvent.mode)
                 hidePinchFeedback()
             }
             is PinchDisplayModeController.Event.Cancelled -> {
-                clearPinchPreview(pinchEvent.mode)
+                settlePinchPreview(pinchEvent.mode)
                 hidePinchFeedback()
             }
         }
@@ -3381,6 +3427,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         if (isPortrait || !isMaximized) {
             return
         }
+        cancelPinchSettle()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val ratio = PlayerDisplayModePreviewer.fillToFitRatio(videoAspectRatio, binding.playerLayout.width, binding.playerLayout.height)
             val scale = PlayerDisplayModePreviewer.previewScale(from, toward, progress, ratio)
@@ -3392,12 +3439,68 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
-    private fun clearPinchPreview(restore: PlayerDisplayMode) {
-        binding.aspectRatioFrameLayout.scaleX = 1f
-        binding.aspectRatioFrameLayout.scaleY = 1f
-        if (!isPortrait && isMaximized) {
-            binding.aspectRatioFrameLayout.resizeMode = restore.resizeMode
+    private fun cancelPinchSettle() {
+        pinchSettleAnimator?.cancel()
+        pinchSettleAnimator = null
+    }
+
+    /**
+     * Single owner of canonical surface geometry: cancels any running settle
+     * and applies the committed display mode's canonical resize mode and
+     * unit scale. Every path that interrupts pinch state (new pinch, mode
+     * selection, minimize/restore, orientation or PiP mode changes, view
+     * destruction) must run through here so a partially transformed surface
+     * can never survive; a cancelled settle finalizes through the animator's
+     * end action, which simply re-enters this function.
+     */
+    private fun finalizePinchSurface() {
+        cancelPinchSettle()
+        _binding?.aspectRatioFrameLayout?.let { frame ->
+            frame.scaleX = 1f
+            frame.scaleY = 1f
+            if (!isPortrait && isMaximized) {
+                frame.resizeMode = displayMode.resizeMode
+            }
         }
+    }
+
+    /**
+     * Neutral release: animate back toward the committed geometry instead of
+     * snapping. Fit settles straight to canonical (1,1). Fill settles to the
+     * Fill scale first, then switches to canonical Fill - seamless because
+     * Fit rendering at the Fill scale equals Fill. Stretch is not on the
+     * uniform Fit/Fill continuum and pre-N previews step rather than scale,
+     * so both fall back to an immediate canonical finalize.
+     */
+    private fun settlePinchPreview(committed: PlayerDisplayMode) {
+        val frame = _binding?.aspectRatioFrameLayout ?: return
+        if (isPortrait || !isMaximized ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.N ||
+            committed == PlayerDisplayMode.STRETCH
+        ) {
+            finalizePinchSurface()
+            return
+        }
+        val ratio = PlayerDisplayModePreviewer.fillToFitRatio(
+            videoAspectRatio,
+            binding.playerLayout.width,
+            binding.playerLayout.height,
+        )
+        if (ratio <= 1f || frame.scaleX <= 0f) {
+            finalizePinchSurface()
+            return
+        }
+        cancelPinchSettle()
+        frame.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+        pinchSettleAnimator = frame.animate()
+            .scaleX(ratio)
+            .scaleY(ratio)
+            .setDuration(PINCH_SETTLE_MS)
+            .withEndAction {
+                pinchSettleAnimator = null
+                finalizePinchSurface()
+            }
+            .also { it.start() }
     }
 
     private fun showPinchFeedback(target: PlayerDisplayMode, progress: Float) {
@@ -3419,6 +3522,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             presentation = PlayerGestureFeedbackState.pinchPresentation(
                 surfaceClass = PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density),
                 progress = progress,
+                toward = target,
                 targetLabel = targetLabel,
             ),
             iconRes = R.drawable.baseline_aspect_ratio_black_24,

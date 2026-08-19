@@ -115,4 +115,39 @@ class PlayerSurfacePolicyTest {
         val shortSurface = 400
         assertEquals((shortSurface * 0.45f).toInt(), PlayerSurfacePolicy.edgePillHeightPx(density, shortSurface))
     }
+
+    @Test
+    fun `unchanged placement refreshes content in place`() {
+        val placement = PlayerSurfacePolicy.placementFor(
+            PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfaceClass.LARGE, 2f,
+            insetStartPx = 20, surfaceHeightPx = 1600,
+        )
+        val same = PlayerSurfacePolicy.placementFor(
+            PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfaceClass.LARGE, 2f,
+            insetStartPx = 20, surfaceHeightPx = 1600,
+        )
+        assertFalse(PlayerSurfacePolicy.requiresCleanReposition(placement, same, isVisible = true))
+    }
+
+    @Test
+    fun `placement change while visible requires a clean reposition`() {
+        val brightness = PlayerSurfacePolicy.placementFor(PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfaceClass.LARGE, 2f)
+        val seek = PlayerSurfacePolicy.placementFor(PlayerGestureFeedbackKind.SEEK, PlayerSurfaceClass.LARGE, 2f)
+        assertTrue(PlayerSurfacePolicy.requiresCleanReposition(brightness, seek, isVisible = true))
+        // A pill already hidden (for example mid-fade-out) can move freely.
+        assertFalse(PlayerSurfacePolicy.requiresCleanReposition(brightness, seek, isVisible = false))
+        // A visible pill with no stored placement resets defensively.
+        assertTrue(PlayerSurfacePolicy.requiresCleanReposition(null, seek, isVisible = true))
+    }
+
+    @Test
+    fun `inset-only changes count as placement changes`() {
+        val withoutInset = PlayerSurfacePolicy.placementFor(
+            PlayerGestureFeedbackKind.DEVICE_VOLUME, PlayerSurfaceClass.LARGE, 2f, surfaceHeightPx = 1600,
+        )
+        val withInset = PlayerSurfacePolicy.placementFor(
+            PlayerGestureFeedbackKind.DEVICE_VOLUME, PlayerSurfaceClass.LARGE, 2f, insetEndPx = 40, surfaceHeightPx = 1600,
+        )
+        assertTrue(PlayerSurfacePolicy.requiresCleanReposition(withoutInset, withInset, isVisible = true))
+    }
 }
