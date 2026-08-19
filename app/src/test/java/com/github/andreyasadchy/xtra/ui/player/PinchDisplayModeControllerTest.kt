@@ -51,10 +51,64 @@ class PinchDisplayModeControllerTest {
     }
 
     @Test
-    fun `fit inward has no target`() {
+    fun `fit inward emits elastic deformation and never arms`() {
         controller.begin(PlayerDisplayMode.FIT)
-        val events = controller.update(0.9f)
+        val elastic = controller.update(0.9f).filterIsInstance<Event.Elastic>().first()
+        assertEquals(PlayerDisplayMode.FIT, elastic.from)
+        assertEquals(0.5f, elastic.deformation, 0.001f)
+
+        val saturated = controller.update(0.7f).filterIsInstance<Event.Elastic>().first()
+        assertEquals(1f, saturated.deformation, 0.001f)
+
+        val events = controller.update(0.6f)
+        assertTrue(events.filterIsInstance<Event.Armed>().isEmpty())
+        assertTrue(controller.release() is Event.Restore)
+    }
+
+    @Test
+    fun `elastic deformation recedes when the pinch reverses toward neutral`() {
+        controller.begin(PlayerDisplayMode.FIT)
+        controller.update(0.8f)
+        val receding = controller.update(0.9f).filterIsInstance<Event.Elastic>().first()
+        assertEquals(0.5f, receding.deformation, 0.001f)
+    }
+
+    @Test
+    fun `neutral before direction established emits no preview`() {
+        controller.begin(PlayerDisplayMode.FIT)
+        val events = controller.update(1.0002f)
         assertTrue(events.filterIsInstance<Event.NoPreview>().isNotEmpty())
+        assertTrue(events.filterIsInstance<Event.Elastic>().isEmpty())
+    }
+
+    @Test
+    fun `established gesture crossing neutral emits zero deformation instead of no preview`() {
+        controller.begin(PlayerDisplayMode.FIT)
+        controller.update(0.9f)
+        val events = controller.update(1.0002f)
+        assertTrue(events.filterIsInstance<Event.NoPreview>().isEmpty())
+        val elastic = events.filterIsInstance<Event.Elastic>().first()
+        assertEquals(PlayerDisplayMode.FIT, elastic.from)
+        assertEquals(0f, elastic.deformation, 0.0001f)
+    }
+
+    @Test
+    fun `begin resets establishment from a previous sequence`() {
+        controller.begin(PlayerDisplayMode.FIT)
+        controller.update(0.9f)
+        controller.begin(PlayerDisplayMode.FIT)
+        val events = controller.update(1.0002f)
+        assertTrue(events.filterIsInstance<Event.NoPreview>().isNotEmpty())
+    }
+
+    @Test
+    fun `fit inward through neutral to outward fill preview stays continuous`() {
+        controller.begin(PlayerDisplayMode.FIT)
+        controller.update(0.85f)
+        controller.update(1.0002f)
+        val preview = preview(controller.update(1.05f))
+        assertEquals(PlayerDisplayMode.FILL, preview?.toward)
+        assertEquals(0.625f, preview?.progress ?: -1f, 0.001f)
     }
 
     @Test
@@ -79,10 +133,36 @@ class PinchDisplayModeControllerTest {
     }
 
     @Test
-    fun `fill outward has no target`() {
+    fun `fill outward emits elastic deformation and never arms`() {
         controller.begin(PlayerDisplayMode.FILL)
-        val events = controller.update(1.2f)
-        assertTrue(events.filterIsInstance<Event.NoPreview>().isNotEmpty())
+        val elastic = controller.update(1.1f).filterIsInstance<Event.Elastic>().first()
+        assertEquals(PlayerDisplayMode.FILL, elastic.from)
+        assertEquals(0.5f, elastic.deformation, 0.001f)
+
+        val events = controller.update(1.4f)
+        assertTrue(events.filterIsInstance<Event.Armed>().isEmpty())
+        assertTrue(controller.release() is Event.Restore)
+    }
+
+    @Test
+    fun `fill outward through neutral to inward fit preview stays continuous`() {
+        controller.begin(PlayerDisplayMode.FILL)
+        controller.update(1.2f)
+        controller.update(0.9998f)
+        val preview = preview(controller.update(0.95f))
+        assertEquals(PlayerDisplayMode.FIT, preview?.toward)
+        assertEquals(0.625f, preview?.progress ?: -1f, 0.001f)
+    }
+
+    @Test
+    fun `stretch always has a live target and never emits deformation`() {
+        controller.begin(PlayerDisplayMode.STRETCH)
+        val outward = controller.update(1.2f)
+        assertTrue(outward.filterIsInstance<Event.Preview>().isNotEmpty())
+        assertTrue(outward.filterIsInstance<Event.Elastic>().isEmpty())
+        val inward = controller.update(0.8f)
+        assertTrue(inward.filterIsInstance<Event.Preview>().isNotEmpty())
+        assertTrue(inward.filterIsInstance<Event.Elastic>().isEmpty())
     }
 
     @Test

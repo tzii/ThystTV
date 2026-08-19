@@ -56,8 +56,10 @@ The `PlayerGestureListener` uses a set of boolean flags to track the current ges
     *   Zone selection is pure logic in `PlayerGestureZonePolicy`; a start position exactly on the split line belongs to the lower (seek) zone.
 
 ### Pinch Display Modes
-*   Pinch feedback uses a directional bar (`PlayerGestureFeedbackState.pinchLevel`): half-full at neutral, growing to full while arming Fill and emptying while arming Fit, so the bar alone shows the pinch direction.
-*   Video previews interpolate a uniform scale over Fit rendering (`PlayerDisplayModePreviewer`). Neutral releases settle animated: committed Fit eases back to (1,1); committed Fill eases to the Fill scale then switches to canonical Fill. Stretch and pre-N devices snap.
+*   Pinch feedback uses a directional bar (`PlayerGestureFeedbackState.pinchLevel`): half-full at neutral, growing to full while arming Fill and emptying while arming Fit, so the bar alone shows the pinch direction. Dead-direction pinches (inward from Fit, outward from Fill) keep the neutral bar with the committed mode's label.
+*   Video previews interpolate a uniform scale over Fit rendering (`PlayerDisplayModePreviewer`). Every resting geometry is an `anchorScale` (Fit = 1, Fill/Stretch = the Fill-to-Fit ratio): previews interpolate between anchors, and neutral releases settle animated back to the committed mode's anchor — committed Fit eases to (1,1); committed Fill eases to the Fill scale then switches to canonical Fill. Stretch and pre-N devices snap.
+*   Dead-direction pinches emit `PinchDisplayModeController.Event.Elastic` with a normalized 0..1 deformation (saturation at 20% span deviation) that renders as a restrained ~5% view-scale deformation past the committed anchor, springing back through the same settle on release. The controller's `update()` takes the cumulative span scale relative to pinch start (1.0 = neutral), never an incremental detector factor.
+*   Establishment rule: once a gesture has emitted Preview or Elastic, crossing neutral emits zero-deformation Elastic instead of `NoPreview`, so no event finalizes the surface between manipulation start and release/cancel; `NoPreview` (and its canonical finalize) only occurs before a direction is established.
 *   Canonical surface geometry is owned by `PlayerFragment.finalizePinchSurface()`, which cancels any settle and applies the committed mode's resize mode and unit scale. New pinch starts, `selectDisplayMode`, minimize/restore visual state, and `onDestroyView` all route through it so a partially transformed surface cannot survive.
 
 ## Adding New Gestures
@@ -72,4 +74,5 @@ The `PlayerGestureListener` uses a set of boolean flags to track the current ges
 *   **`PlayerGestureHelperTest`**: Unit tests for the math and logic (pure functions). Mocks `Context` for `AudioManager`.
 *   **`PlayerGestureZonePolicyTest`**: Unit tests for horizontal zone selection, including the split-line boundary.
 *   **`PlayerGestureFeedbackStateTest` / `PlayerSurfacePolicyTest`**: Unit tests for feedback presentation and placement (compact top-centered pill, wide vertical edge pills, always-visible pinch bar).
+*   **`PinchDisplayModeControllerTest` / `PlayerDisplayModePreviewerTest`**: Unit tests for the pinch state machine (arm/hysteresis, elastic dead-direction deformation, neutral-crossing continuity) and the preview geometry (anchors, interpolation, elastic scales).
 *   **Integration**: Remaining `PlayerGestureListener` wiring is verified via manual testing due to `MotionEvent` mocking complexities in unit tests.

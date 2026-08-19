@@ -64,4 +64,41 @@ class PlayerDisplayModePreviewerTest {
         assertEquals(ratio, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FIT, PlayerDisplayMode.FILL, 1.5f, ratio), 0.0001f)
         assertEquals(1f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FIT, PlayerDisplayMode.FILL, -0.5f, ratio), 0.0001f)
     }
+
+    @Test
+    fun `anchor scale is one for fit and ratio for fill and stretch`() {
+        val ratio = 4f / 3f
+        assertEquals(1f, PlayerDisplayModePreviewer.anchorScale(PlayerDisplayMode.FIT, ratio), 0.0001f)
+        assertEquals(ratio, PlayerDisplayModePreviewer.anchorScale(PlayerDisplayMode.FILL, ratio), 0.0001f)
+        assertEquals(ratio, PlayerDisplayModePreviewer.anchorScale(PlayerDisplayMode.STRETCH, ratio), 0.0001f)
+        assertEquals(1f, PlayerDisplayModePreviewer.anchorScale(PlayerDisplayMode.FILL, 0.5f), 0.0001f)
+    }
+
+    @Test
+    fun `elastic scale deforms below the fit anchor`() {
+        val ratio = 2f
+        assertEquals(1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 0f, ratio), 0.0001f)
+        assertEquals(0.975f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 0.5f, ratio), 0.0001f)
+        assertEquals(0.95f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 1f, ratio), 0.0001f)
+    }
+
+    @Test
+    fun `elastic scale deforms above the fill anchor`() {
+        val ratio = 2f
+        assertEquals(2f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 0f, ratio), 0.0001f)
+        assertEquals(2.05f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 0.5f, ratio), 0.0001f)
+        assertEquals(2.1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 1f, ratio), 0.0001f)
+    }
+
+    @Test
+    fun `elastic deformation is clamped`() {
+        assertEquals(0.95f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 2f, 2f), 0.0001f)
+        assertEquals(1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, -1f, 2f), 0.0001f)
+    }
+
+    @Test
+    fun `elastic scale applies at a collapsed ratio`() {
+        assertEquals(0.95f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 1f, 1f), 0.0001f)
+        assertEquals(1.05f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 1f, 1f), 0.0001f)
+    }
 }
