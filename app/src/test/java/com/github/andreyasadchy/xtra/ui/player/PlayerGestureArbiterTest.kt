@@ -13,7 +13,7 @@ class PlayerGestureArbiterTest {
 
     @Before
     fun setUp() {
-        arbiter = PlayerGestureArbiter(pinchSpanSlopPx = 24f, scaleClaimDeadzone = 0.02f)
+        arbiter = PlayerGestureArbiter(scaleClaimDeadzone = 0.02f)
     }
 
     private fun startSequence() {
@@ -23,7 +23,7 @@ class PlayerGestureArbiterTest {
     private fun pinchClaim(): Boolean {
         val secondPointer = arbiter.onPointerAdded(2)
         assertTrue(secondPointer)
-        return arbiter.onScaleUpdate(cumulativeScale = 1.1f, spanTravelPx = 60f)
+        return arbiter.onScaleUpdate(cumulativeScale = 1.1f)
     }
 
     @Test
@@ -46,40 +46,40 @@ class PlayerGestureArbiterTest {
     fun `merely placing two fingers never claims pinch`() {
         startSequence()
         arbiter.onPointerAdded(2)
-        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.0f, spanTravelPx = 0f))
+        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.0f))
         assertEquals(Owner.IDLE, arbiter.owner)
     }
 
     @Test
-    fun `movement below span slop does not claim pinch`() {
+    fun `relative scale claims independently of absolute finger travel`() {
         startSequence()
         arbiter.onPointerAdded(2)
-        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.1f, spanTravelPx = 10f))
-        assertEquals(Owner.IDLE, arbiter.owner)
+        assertTrue(arbiter.onScaleUpdate(cumulativeScale = 1.03f))
+        assertEquals(Owner.PINCH_DISPLAY_MODE, arbiter.owner)
     }
 
     @Test
     fun `movement below scale deadzone does not claim pinch`() {
         startSequence()
         arbiter.onPointerAdded(2)
-        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.01f, spanTravelPx = 60f))
+        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.01f))
         assertEquals(Owner.IDLE, arbiter.owner)
     }
 
     @Test
-    fun `crossing slop and deadzone claims pinch exactly once`() {
+    fun `crossing the scale deadzone claims pinch exactly once`() {
         startSequence()
         arbiter.onPointerAdded(2)
-        assertTrue(arbiter.onScaleUpdate(cumulativeScale = 1.1f, spanTravelPx = 60f))
+        assertTrue(arbiter.onScaleUpdate(cumulativeScale = 1.1f))
         assertEquals(Owner.PINCH_DISPLAY_MODE, arbiter.owner)
-        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.2f, spanTravelPx = 90f))
+        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.2f))
         assertEquals(Owner.PINCH_DISPLAY_MODE, arbiter.owner)
     }
 
     @Test
     fun `single finger claims each gesture kind when no candidate`() {
         for (owner in PlayerGestureArbiter.SINGLE_FINGER_OWNERS) {
-            val fresh = PlayerGestureArbiter(24f, 0.02f)
+            val fresh = PlayerGestureArbiter(0.02f)
             fresh.onSequenceStarted()
             assertTrue(fresh.tryClaimSingleFinger(owner))
             assertEquals(owner, fresh.owner)
@@ -100,7 +100,7 @@ class PlayerGestureArbiterTest {
         assertTrue(arbiter.tryClaimSingleFinger(Owner.PLAYBACK_SPEED))
         assertFalse(arbiter.onPointerAdded(2))
         assertFalse(arbiter.isPinchCandidate)
-        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.1f, spanTravelPx = 60f))
+        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.1f))
         assertEquals(Owner.PLAYBACK_SPEED, arbiter.owner)
     }
 
@@ -115,7 +115,7 @@ class PlayerGestureArbiterTest {
     fun `lifting a finger dissolves an unclaimed candidate and restores single-finger eligibility`() {
         startSequence()
         arbiter.onPointerAdded(2)
-        arbiter.onPointerRemoved(1)
+        assertFalse(arbiter.onPointerRemoved(1))
         assertFalse(arbiter.isPinchCandidate)
         assertTrue(arbiter.tryClaimSingleFinger(Owner.SEEK))
     }
@@ -123,7 +123,7 @@ class PlayerGestureArbiterTest {
     @Test
     fun `lifting one finger after pinch owns suppresses single-finger events`() {
         assertTrue(pinchClaim())
-        arbiter.onPointerRemoved(1)
+        assertTrue(arbiter.onPointerRemoved(1))
         assertTrue(arbiter.isSingleFingerSuppressed)
         assertFalse(arbiter.tryClaimSingleFinger(Owner.BRIGHTNESS))
         assertEquals(Owner.PINCH_DISPLAY_MODE, arbiter.owner)
@@ -156,7 +156,7 @@ class PlayerGestureArbiterTest {
         startSequence()
         assertTrue(arbiter.onDoubleTapClaimed())
         assertTrue(arbiter.onPointerAdded(2))
-        assertTrue(arbiter.onScaleUpdate(cumulativeScale = 1.1f, spanTravelPx = 60f))
+        assertTrue(arbiter.onScaleUpdate(cumulativeScale = 1.1f))
         assertEquals(Owner.PINCH_DISPLAY_MODE, arbiter.owner)
     }
 
@@ -182,6 +182,14 @@ class PlayerGestureArbiterTest {
         arbiter.onSequenceFinished()
         assertEquals(Owner.IDLE, arbiter.owner)
         assertFalse(arbiter.isPinchCandidate)
+        assertFalse(arbiter.isSingleFingerSuppressed)
+    }
+
+    @Test
+    fun `removing a third pointer does not finish an owned two-finger pinch`() {
+        assertTrue(pinchClaim())
+        assertFalse(arbiter.onPointerRemoved(2))
+        assertEquals(Owner.PINCH_DISPLAY_MODE, arbiter.owner)
         assertFalse(arbiter.isSingleFingerSuppressed)
     }
 

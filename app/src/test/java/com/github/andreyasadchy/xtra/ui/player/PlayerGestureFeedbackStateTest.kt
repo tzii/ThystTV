@@ -104,6 +104,24 @@ class PlayerGestureFeedbackStateTest {
     }
 
     @Test
+    fun `endpoint elastic progress moves the committed-mode bar`() {
+        val fitElastic = PlayerGestureFeedbackState.pinchPresentation(
+            PlayerSurfaceClass.LARGE,
+            0.5f,
+            PlayerDisplayMode.FIT,
+            "Fit",
+        )
+        val fillElastic = PlayerGestureFeedbackState.pinchPresentation(
+            PlayerSurfaceClass.LARGE,
+            0.5f,
+            PlayerDisplayMode.FILL,
+            "Fill",
+        )
+        assertEquals(25, fitElastic.level)
+        assertEquals(75, fillElastic.level)
+    }
+
+    @Test
     fun `neutral preview from Stretch parks at the bar center`() {
         assertEquals(50, PlayerGestureFeedbackState.pinchLevel(0f, PlayerDisplayMode.STRETCH))
         assertEquals(50, PlayerGestureFeedbackState.pinchLevel(1f, PlayerDisplayMode.STRETCH))

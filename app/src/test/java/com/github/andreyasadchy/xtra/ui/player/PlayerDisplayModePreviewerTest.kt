@@ -2,6 +2,7 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import kotlin.math.sqrt
 
 class PlayerDisplayModePreviewerTest {
 
@@ -39,22 +40,31 @@ class PlayerDisplayModePreviewerTest {
         val ratio = 4f / 3f
         assertEquals(1f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FIT, PlayerDisplayMode.FILL, 0f, ratio), 0.0001f)
         assertEquals(ratio, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FIT, PlayerDisplayMode.FILL, 1f, ratio), 0.0001f)
-        assertEquals((1f + ratio) / 2f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FIT, PlayerDisplayMode.FILL, 0.5f, ratio), 0.0001f)
+        assertEquals(sqrt(ratio), PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FIT, PlayerDisplayMode.FILL, 0.5f, ratio), 0.0001f)
     }
 
     @Test
-    fun `fill to fit preview interpolates from ratio to one`() {
+    fun `fill to fit preview interpolates from one to inverse ratio in zoom coordinates`() {
         val ratio = 4f / 3f
-        assertEquals(ratio, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FILL, PlayerDisplayMode.FIT, 0f, ratio), 0.0001f)
-        assertEquals(1f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FILL, PlayerDisplayMode.FIT, 1f, ratio), 0.0001f)
+        assertEquals(1f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FILL, PlayerDisplayMode.FIT, 0f, ratio), 0.0001f)
+        assertEquals(1f / ratio, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FILL, PlayerDisplayMode.FIT, 1f, ratio), 0.0001f)
+        assertEquals(sqrt(1f / ratio), PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FILL, PlayerDisplayMode.FIT, 0.5f, ratio), 0.0001f)
     }
 
     @Test
-    fun `stretch previews anchor at the fill scale in both directions`() {
+    fun `fit and fill renderer previews are reciprocal at equal progress`() {
         val ratio = 4f / 3f
-        assertEquals(ratio, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.STRETCH, PlayerDisplayMode.FILL, 0f, ratio), 0.0001f)
-        assertEquals(ratio, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.STRETCH, PlayerDisplayMode.FILL, 1f, ratio), 0.0001f)
-        assertEquals(ratio, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.STRETCH, PlayerDisplayMode.FIT, 0f, ratio), 0.0001f)
+        val fitScale = PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FIT, PlayerDisplayMode.FILL, 0.37f, ratio)
+        val fillScale = PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.FILL, PlayerDisplayMode.FIT, 0.37f, ratio)
+        assertEquals(1f, fitScale * fillScale, 0.0001f)
+    }
+
+    @Test
+    fun `stretch has no uniform preview scale`() {
+        val ratio = 4f / 3f
+        assertEquals(1f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.STRETCH, PlayerDisplayMode.FILL, 0f, ratio), 0.0001f)
+        assertEquals(1f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.STRETCH, PlayerDisplayMode.FILL, 1f, ratio), 0.0001f)
+        assertEquals(1f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.STRETCH, PlayerDisplayMode.FIT, 0f, ratio), 0.0001f)
         assertEquals(1f, PlayerDisplayModePreviewer.previewScale(PlayerDisplayMode.STRETCH, PlayerDisplayMode.FIT, 1f, ratio), 0.0001f)
     }
 
@@ -66,39 +76,27 @@ class PlayerDisplayModePreviewerTest {
     }
 
     @Test
-    fun `anchor scale is one for fit and ratio for fill and stretch`() {
-        val ratio = 4f / 3f
-        assertEquals(1f, PlayerDisplayModePreviewer.anchorScale(PlayerDisplayMode.FIT, ratio), 0.0001f)
-        assertEquals(ratio, PlayerDisplayModePreviewer.anchorScale(PlayerDisplayMode.FILL, ratio), 0.0001f)
-        assertEquals(ratio, PlayerDisplayModePreviewer.anchorScale(PlayerDisplayMode.STRETCH, ratio), 0.0001f)
-        assertEquals(1f, PlayerDisplayModePreviewer.anchorScale(PlayerDisplayMode.FILL, 0.5f), 0.0001f)
-    }
-
-    @Test
     fun `elastic scale deforms below the fit anchor`() {
-        val ratio = 2f
-        assertEquals(1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 0f, ratio), 0.0001f)
-        assertEquals(0.975f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 0.5f, ratio), 0.0001f)
-        assertEquals(0.95f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 1f, ratio), 0.0001f)
+        assertEquals(1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 0f), 0.0001f)
+        assertEquals(0.975f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 0.5f), 0.0001f)
+        assertEquals(0.95f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 1f), 0.0001f)
     }
 
     @Test
-    fun `elastic scale deforms above the fill anchor`() {
-        val ratio = 2f
-        assertEquals(2f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 0f, ratio), 0.0001f)
-        assertEquals(2.05f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 0.5f, ratio), 0.0001f)
-        assertEquals(2.1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 1f, ratio), 0.0001f)
+    fun `elastic scale deforms above the fill renderer unit anchor`() {
+        assertEquals(1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 0f), 0.0001f)
+        assertEquals(1.025f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 0.5f), 0.0001f)
+        assertEquals(1.05f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 1f), 0.0001f)
     }
 
     @Test
     fun `elastic deformation is clamped`() {
-        assertEquals(0.95f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 2f, 2f), 0.0001f)
-        assertEquals(1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, -1f, 2f), 0.0001f)
+        assertEquals(0.95f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 2f), 0.0001f)
+        assertEquals(1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, -1f), 0.0001f)
     }
 
     @Test
-    fun `elastic scale applies at a collapsed ratio`() {
-        assertEquals(0.95f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FIT, 1f, 1f), 0.0001f)
-        assertEquals(1.05f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.FILL, 1f, 1f), 0.0001f)
+    fun `stretch does not receive endpoint elasticity`() {
+        assertEquals(1f, PlayerDisplayModePreviewer.elasticScale(PlayerDisplayMode.STRETCH, 1f), 0.0001f)
     }
 }

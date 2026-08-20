@@ -10,8 +10,9 @@ import kotlin.math.abs
  * Rules encoded here:
  *  - A second pointer creates a pinch candidate before an unclaimed
  *    single-finger gesture can win; merely placing two fingers claims nothing.
- *  - Pinch claims the sequence only after the minimum span travel and the
- *    configured scale deadzone are both crossed.
+ *  - Pinch claims the sequence after the configured cumulative relative-scale
+ *    deadzone is crossed; no fixed pixel gate makes sensitivity depend on the
+ *    fingers' initial distance.
  *  - If a single-finger swipe (seek, playback speed, brightness, device
  *    volume) already owns the sequence, a second finger cannot convert it.
  *  - Once pinch owns the sequence, lifting one finger suppresses remaining
@@ -22,7 +23,6 @@ import kotlin.math.abs
  *    accidentally toggle chat.
  */
 class PlayerGestureArbiter(
-    private val pinchSpanSlopPx: Float,
     private val scaleClaimDeadzone: Float,
 ) {
 
@@ -68,9 +68,12 @@ class PlayerGestureArbiter(
     /**
      * Called on ACTION_POINTER_UP with the number of pointers that remain
      * after the lift. A candidate dissolves back to a single-finger sequence;
-     * an owned pinch starts suppressing single-finger events.
+     * an owned pinch starts suppressing single-finger events. Returns true
+     * exactly when the owned two-finger pinch has ended and its caller should
+     * commit or restore immediately.
      */
-    fun onPointerRemoved(remainingPointerCount: Int) {
+    fun onPointerRemoved(remainingPointerCount: Int): Boolean {
+        val pinchEnded = owner == Owner.PINCH_DISPLAY_MODE && remainingPointerCount < 2
         if (remainingPointerCount < 2) {
             if (isPinchCandidate && owner == Owner.IDLE) {
                 isPinchCandidate = false
@@ -79,16 +82,17 @@ class PlayerGestureArbiter(
                 isSingleFingerSuppressed = true
             }
         }
+        return pinchEnded
     }
 
     /**
-     * Cumulative two-finger scale update while a candidate exists. Returns
-     * true at the single moment pinch claims the sequence.
+     * Cumulative two-finger scale update while a candidate exists. Claiming is
+     * relative-scale based so sensitivity does not change with the fingers'
+     * initial distance. Returns true at the single moment pinch claims.
      */
-    fun onScaleUpdate(cumulativeScale: Float, spanTravelPx: Float): Boolean {
+    fun onScaleUpdate(cumulativeScale: Float): Boolean {
         if (!isPinchCandidate) return false
         if (owner == Owner.PINCH_DISPLAY_MODE) return false
-        if (spanTravelPx < pinchSpanSlopPx) return false
         if (abs(cumulativeScale - 1f) < scaleClaimDeadzone) return false
         owner = Owner.PINCH_DISPLAY_MODE
         return true

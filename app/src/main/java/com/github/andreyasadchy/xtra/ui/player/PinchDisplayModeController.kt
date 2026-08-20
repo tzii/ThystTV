@@ -1,6 +1,7 @@
 package com.github.andreyasadchy.xtra.ui.player
 
 import kotlin.math.abs
+import kotlin.math.ln
 
 /**
  * Deterministic pinch state machine for Fit/Fill display-mode control.
@@ -26,10 +27,11 @@ class PinchDisplayModeController(
 ) {
 
     companion object {
-        const val OUTWARD_ARM_THRESHOLD = 1.08f
-        const val INWARD_ARM_THRESHOLD = 0.92f
-        const val REVERSAL_HYSTERESIS = 0.04f
-        const val ELASTIC_SATURATION_SCALE = 0.20f
+        const val OUTWARD_ARM_THRESHOLD = 1.15f
+        // Reciprocal of the outward threshold: equal travel in log scale.
+        const val INWARD_ARM_THRESHOLD = 0.8695652f
+        const val REVERSAL_HYSTERESIS = 0.05f
+        const val ELASTIC_SATURATION_SCALE = 0.12f
         private const val DIRECTION_EPSILON = 0.0005f
         private const val COMPARISON_EPSILON = 0.0001f
     }
@@ -191,21 +193,23 @@ class PinchDisplayModeController(
     }
 
     private fun progressToward(target: PlayerDisplayMode, cumulativeScale: Float): Float {
-        return when (target) {
-            PlayerDisplayMode.FILL -> ((cumulativeScale - 1f) / (outwardArmThreshold - 1f)).coerceIn(0f, 1f)
-            else -> ((1f - cumulativeScale) / (1f - inwardArmThreshold)).coerceIn(0f, 1f)
-        }
+        val scale = cumulativeScale.coerceAtLeast(COMPARISON_EPSILON)
+        val threshold = if (target == PlayerDisplayMode.FILL) outwardArmThreshold else inwardArmThreshold
+        return (ln(scale) / ln(threshold)).coerceIn(0f, 1f)
     }
 
     /**
-     * Normalized 0..1 endpoint deformation for a dead-direction pinch,
-     * saturating at [ELASTIC_SATURATION_SCALE] span deviation from neutral.
+     * Normalized 0..1 endpoint deformation for a dead-direction pinch. An
+     * ease-out resistance curve responds clearly near neutral and reaches
+     * zero velocity at [ELASTIC_SATURATION_SCALE], avoiding a hard linear stop.
      */
     private fun elasticDeformation(cumulativeScale: Float): Float {
         val deviation = abs(cumulativeScale - 1f)
         if (deviation < DIRECTION_EPSILON) {
             return 0f
         }
-        return (deviation / ELASTIC_SATURATION_SCALE).coerceIn(0f, 1f)
+        val normalized = (deviation / ELASTIC_SATURATION_SCALE).coerceIn(0f, 1f)
+        val remaining = 1f - normalized
+        return 1f - remaining * remaining
     }
 }

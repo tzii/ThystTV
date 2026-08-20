@@ -40,6 +40,7 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.ViewPropertyAnimator
 import android.view.inputmethod.InputMethodManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -179,6 +180,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pinchAnchorSpan = 0f
     private var pinchLastArmedTarget: PlayerDisplayMode? = null
     private var pinchSettleAnimator: ViewPropertyAnimator? = null
+    private var pinchCommitGeneration = 0
 
     // Stream volume overlay (ThystTV playback volume, independent of device volume)
     private val volumeOverlayDismissRunnable = Runnable {
@@ -325,6 +327,30 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         finalizePinchSurface()
     }
 
+    /**
+     * Commits an armed preview without exposing the asynchronous resize-mode
+     * layout. The old renderer plus its completed preview scale already has
+     * the target geometry, so retain that scale until the target renderer has
+     * laid out, then normalize to unit scale before draw.
+     */
+    private fun commitPinchDisplayMode(mode: PlayerDisplayMode) {
+        displayMode = mode
+        displayModeStore.saveDisplayMode(mode)
+        cancelPinchSettle()
+        val frame = _binding?.aspectRatioFrameLayout ?: return
+        val generation = ++pinchCommitGeneration
+        frame.resizeMode = mode.resizeMode
+        frame.doOnLayout {
+            if (_binding?.aspectRatioFrameLayout === frame &&
+                pinchCommitGeneration == generation &&
+                displayMode == mode
+            ) {
+                frame.scaleX = 1f
+                frame.scaleY = 1f
+            }
+        }
+    }
+
     fun getCurrentDisplayMode(): PlayerDisplayMode = displayMode
 
     open fun updateVideoAspectRatio(aspectRatio: Float) {
@@ -466,7 +492,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 )
             )
             gestureArbiter = PlayerGestureArbiter(
-                pinchSpanSlopPx = touchSlop * 2f,
                 scaleClaimDeadzone = PINCH_SCALE_CLAIM_DEADZONE,
             )
 
@@ -698,7 +723,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     val span = twoFingerSpan(event, pinchPointerId1, pinchPointerId2)
                                     if (span > 0f) {
                                         val supersededDoubleTap = gestureArbiter.owner == PlayerGestureArbiter.Owner.DOUBLE_TAP_CHAT
-                                        if (gestureArbiter.onScaleUpdate(span / pinchAnchorSpan, abs(span - pinchAnchorSpan))) {
+                                        if (gestureArbiter.onScaleUpdate(span / pinchAnchorSpan)) {
                                             beginPinch(supersededDoubleTap, event)
                                             updatePinch(event)
                                         }
@@ -772,7 +797,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             }
                         }
                         MotionEvent.ACTION_POINTER_UP -> {
-                            gestureArbiter.onPointerRemoved(event.pointerCount - 1)
+                            val pinchEnded = gestureArbiter.onPointerRemoved(event.pointerCount - 1)
+                            if (pinchEnded && pinchAnchorSpan > 0f) {
+                                // A pinch ends when either of its two fingers
+                                // lifts. The remaining finger stays suppressed
+                                // by the arbiter until the sequence's final UP.
+                                finishPinch(cancelled = false)
+                                resetPinchTracking()
+                            }
                             if (gestureArbiter.owner != PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
                                 val pointerIndex = event.actionIndex
                                 val pointerId = event.getPointerId(pointerIndex)
@@ -800,7 +832,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         }
                         MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                             if (gestureArbiter.owner == PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE) {
-                                finishPinch(cancelled = event.actionMasked == MotionEvent.ACTION_CANCEL)
+                                if (pinchAnchorSpan > 0f) {
+                                    finishPinch(cancelled = event.actionMasked == MotionEvent.ACTION_CANCEL)
+                                }
                                 gestureArbiter.onSequenceFinished()
                                 resetPinchTracking()
                             } else {
@@ -2954,7 +2988,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
         private const val PINCH_SCALE_CLAIM_DEADZONE = 0.02f
         private const val PINCH_FEEDBACK_LINGER_MS = 400L
-        private const val PINCH_SETTLE_MS = 180L
+        private const val PINCH_SETTLE_MS = 240L
         private const val PINCH_SETTLE_EPSILON = 0.001f
         private const val VOLUME_OVERLAY_DISMISS_MS = 1500L
         private const val PINCH_HINT_LINGER_MS = 3000L
@@ -3388,7 +3422,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 finalizePinchSurface()
             }
             is PinchDisplayModeController.Event.Elastic -> {
-                showPinchFeedback(pinchEvent.from, 0f)
+                showPinchFeedback(pinchEvent.from, pinchEvent.deformation)
                 applyPinchElastic(pinchEvent.from, pinchEvent.deformation)
             }
             is PinchDisplayModeController.Event.Armed -> {
@@ -3406,7 +3440,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             is PinchDisplayModeController.Event.Disarmed -> Unit
             is PinchDisplayModeController.Event.Commit -> {
-                selectDisplayMode(pinchEvent.mode)
+                commitPinchDisplayMode(pinchEvent.mode)
                 onSuccessfulPinch()
                 // Show the completed bar briefly before the linger hide.
                 showPinchFeedback(pinchEvent.mode, 1f)
@@ -3424,20 +3458,21 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     /**
-     * Continuous preview toward the target geometry. On API 24+ the renderer is
-     * pinned to Fit and a uniform view scale interpolates toward Fill; on older
-     * devices SurfaceView transforms are unreliable, so the preview steps to
-     * the target renderer mode only once armed.
+     * Continuous preview toward the target geometry. On API 24+ the committed
+     * renderer remains unchanged while a uniform view scale interpolates to
+     * the other geometry (Fit → ratio, Fill → inverse ratio). This avoids an
+     * asynchronous resize-mode relayout while fingers are down. Stretch and
+     * older devices step to the target renderer only once armed.
      */
     private fun applyPinchPreview(from: PlayerDisplayMode, toward: PlayerDisplayMode, progress: Float) {
         if (isPortrait || !isMaximized) {
             return
         }
         cancelPinchSettle()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && from != PlayerDisplayMode.STRETCH) {
             val ratio = PlayerDisplayModePreviewer.fillToFitRatio(videoAspectRatio, binding.playerLayout.width, binding.playerLayout.height)
             val scale = PlayerDisplayModePreviewer.previewScale(from, toward, progress, ratio)
-            binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            binding.aspectRatioFrameLayout.resizeMode = from.resizeMode
             binding.aspectRatioFrameLayout.scaleX = scale
             binding.aspectRatioFrameLayout.scaleY = scale
         } else if (progress >= 1f) {
@@ -3447,8 +3482,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     /**
      * Elastic endpoint deformation for dead-direction pinches: the renderer
-     * stays pinned to Fit and the view scales a restrained few percent past
-     * the committed anchor, releasing through [settlePinchPreview]. Portrait,
+     * stays in the committed renderer and the view scales a restrained few
+     * percent past its unit anchor, releasing through [settlePinchPreview]. Portrait,
      * non-maximized, and pre-N surfaces keep pill-only feedback (SurfaceView
      * transforms are unreliable before API 24).
      */
@@ -3458,9 +3493,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
         cancelPinchSettle()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val ratio = PlayerDisplayModePreviewer.fillToFitRatio(videoAspectRatio, binding.playerLayout.width, binding.playerLayout.height)
-            val scale = PlayerDisplayModePreviewer.elasticScale(from, deformation, ratio)
-            binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            val scale = PlayerDisplayModePreviewer.elasticScale(from, deformation)
+            binding.aspectRatioFrameLayout.resizeMode = from.resizeMode
             binding.aspectRatioFrameLayout.scaleX = scale
             binding.aspectRatioFrameLayout.scaleY = scale
         }
@@ -3481,6 +3515,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
      * end action, which simply re-enters this function.
      */
     private fun finalizePinchSurface() {
+        pinchCommitGeneration++
         cancelPinchSettle()
         _binding?.aspectRatioFrameLayout?.let { frame ->
             frame.scaleX = 1f
@@ -3493,13 +3528,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     /**
      * Neutral release: animate back toward the committed geometry instead of
-     * snapping. The target is the committed mode's anchor scale
-     * ([PlayerDisplayModePreviewer.anchorScale]): Fit settles straight to
-     * canonical (1,1); Fill settles to the Fill scale first, then switches to
-     * canonical Fill - seamless because Fit rendering at the Fill scale equals
-     * Fill. Surfaces already at the anchor finalize immediately. Stretch is
-     * not on the uniform Fit/Fill continuum and pre-N previews step rather
-     * than scale, so both fall back to an immediate canonical finalize.
+     * snapping. Fit and Fill previews remain in their committed renderer, so
+     * both settle to unit scale without a resize-mode handoff. Surfaces already
+     * at unit scale finalize immediately. Stretch is not on the uniform
+     * Fit/Fill continuum and pre-N previews step rather than scale, so both
+     * fall back to an immediate canonical finalize.
      */
     private fun settlePinchPreview(committed: PlayerDisplayMode) {
         val frame = _binding?.aspectRatioFrameLayout ?: return
@@ -3510,22 +3543,18 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             finalizePinchSurface()
             return
         }
-        val ratio = PlayerDisplayModePreviewer.fillToFitRatio(
-            videoAspectRatio,
-            binding.playerLayout.width,
-            binding.playerLayout.height,
-        )
-        val targetScale = PlayerDisplayModePreviewer.anchorScale(committed, ratio)
+        val targetScale = 1f
         if (frame.scaleX <= 0f || abs(frame.scaleX - targetScale) < PINCH_SETTLE_EPSILON) {
             finalizePinchSurface()
             return
         }
         cancelPinchSettle()
-        frame.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+        frame.resizeMode = committed.resizeMode
         pinchSettleAnimator = frame.animate()
             .scaleX(targetScale)
             .scaleY(targetScale)
             .setDuration(PINCH_SETTLE_MS)
+            .setInterpolator(DecelerateInterpolator(1.6f))
             .withEndAction {
                 pinchSettleAnimator = null
                 finalizePinchSurface()

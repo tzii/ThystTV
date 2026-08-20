@@ -59,9 +59,10 @@ grow toward Fill then snap back.
 
 ## Risks
 
-- Elastic from Fill switches the renderer ZOOM→FIT+scale at gesture start; seamless by
-  the previewer invariant (FIT at fillRatio ≡ Fill) — promoted to critical device QA,
-  including immediately after an adaptive resolution/quality change.
+- Elastic from Fill switched the renderer ZOOM→FIT+scale at gesture start. The geometry
+  is equivalent, but device QA disproved the assumption that the resize-mode relayout
+  and property-scale write are visually atomic. Round 4.1 keeps each Fit/Fill gesture in
+  its committed renderer's coordinate space and performs any commit handoff on layout.
 - Mid-gesture neutral crossing must not flip the renderer (NoPreview/finalize): handled
   by the controller establishment rule; unit-tested.
 - Settle animator vs quick re-pinch / minimize: covered by existing `cancelPinchSettle`
@@ -139,6 +140,32 @@ Required before implementation: yes — captured by approval of this plan.
 7. **Checks**: `./gradlew assembleDebug`, `./gradlew test`, `./gradlew lintDebug`;
    confirm the debug APK is fresh for device QA. Update this plan's progress log and
    verification boxes.
+8. **Round 4.1 device-QA remediation**:
+   - Render Fit-origin previews in FIT coordinates (scale 1 → ratio) and Fill-origin
+     previews in ZOOM coordinates (scale 1 → inverse ratio), eliminating the
+     ZOOM→FIT relayout at Fill gesture start.
+   - Render endpoint elasticity relative to the committed renderer's unit scale and
+     settle back to unit scale; make the elastic pill use deformation progress instead
+     of remaining frozen at neutral.
+   - Saturate the restrained 5% visual deformation at 8% span deviation so it is clearly
+     visible within the same travel that arms the useful direction.
+   - Finish and restore/commit when the first tracked pinch finger lifts; keep the
+     remaining finger suppressed until the sequence's final release.
+   - Hand an armed commit from the preview renderer to the target canonical renderer by
+     retaining the equivalent preview scale until the target resize layout completes,
+     then reset to unit scale before draw.
+9. **Round 4.2 recognition and feel remediation**:
+   - Remove the fixed absolute `2 × touchSlop` claim requirement. It makes recognition
+     depend on initial finger spacing even though cumulative relative span already has a
+     deadzone. Claim from relative scale movement only.
+   - Use reciprocal, multiplicatively symmetric Fit/Fill arm thresholds with a longer
+     transition travel than 8%, and map progress in logarithmic span space.
+   - Interpolate renderer-relative preview scale geometrically so perceived zoom tracks
+     multiplicative finger motion instead of racing linearly to the target.
+   - Replace the hard linear elastic clamp with an ease-out resistance curve that is
+     responsive near neutral and reaches zero velocity at its cap.
+   - Use a longer emphasized-decelerate settle so release is soft but non-bouncy without
+     adding another animation dependency.
 
 ## Verification
 
@@ -172,7 +199,28 @@ Human QA required (device):
 - [ ] Live and VoD playback, stream switching, floating chat coexist with pinch.
 - [ ] Pre-N device/emulator if available (else documented fallback).
 
-Human QA completed: none yet.
+Human QA completed: round-4.2 gesture acceptance reported; broader player regression QA remains open.
+
+Human QA result:
+- [x] 2026-08-20 physical-device attempt failed: the pill did not fill correctly and
+      Fit/Fill elastic deformation was unreliable. Round 4 is not accepted and remains
+      WORKING pending the round-4.1 repair and a fresh device pass.
+- [x] 2026-08-20 second physical-device attempt failed: Fit/Fill still did not recognize
+      consistently and motion was not smooth enough. Round 4.1 is not accepted; round
+      4.2 must correct recognition and response, not add another renderer workaround.
+- [x] 2026-08-20 round-4.2 physical-device result: user reports the updated gesture now
+      seems all right. Treat the Fit/Fill recognition/feel repair as accepted; do not infer
+      completion of the separate live/VoD/lifecycle/floating-chat regression checklist.
+
+Round 4.1 automated verification:
+- [x] `./gradlew assembleDebug`
+- [x] `./gradlew test` (308 tests, 0 failures)
+- [x] `./gradlew lintDebug`
+
+Round 4.2 automated verification:
+- [x] `./gradlew assembleDebug`
+- [x] `./gradlew test` (310 tests, 0 failures)
+- [x] `./gradlew lintDebug`
 
 ## Progress log
 
@@ -190,6 +238,33 @@ Human QA completed: none yet.
   guarantee verified in review: every scale write follows `cancelPinchSettle()`,
   and the settle end action nulls the animator before re-entering finalize.
   Human QA remains open.
+- 2026-08-20: Physical-device QA failed. The elastic event deliberately froze the pill
+  at neutral, 5% visual deformation required an excessive 20% span change, pinch release
+  waited for the final finger rather than the first pointer-up, and Fill previews relied
+  on a ZOOM→FIT relayout being atomic with a compensating scale write. Round 4.1 will fix
+  those integration defects before round 5 begins.
+- 2026-08-20: Implemented round 4.1. Fit previews remain in FIT coordinates and Fill
+  previews remain in ZOOM coordinates; commits keep the equivalent preview scale until
+  the target resize layout completes. Elastic bar progress now follows deformation, the
+  5% effect saturates at 8% finger-span travel, and first pointer-up ends the pinch while
+  suppressing the remaining finger. Focused gesture tests and the full checks pass:
+  `assembleDebug`, `test` (308/308), and `lintDebug`. Fresh APK:
+  `app/build/outputs/apk/debug/app-debug.apk`. Physical-device re-test remains required.
+- 2026-08-20: Second device QA still found recognition intermittent and motion rough.
+  Root-cause review found the pinch claim required both 2% relative scale and a fixed
+  `2 × touchSlop` absolute span change, so identical pinches behaved differently based on
+  initial finger spacing. The full Fit/Fill preview also completed in only 8% span travel
+  with linear progress/interpolation. Round 4.2 will remove the absolute gate and use
+  multiplicative progress, geometric preview scaling, eased resistance, and softer settle.
+- 2026-08-20: Implemented round 4.2. Pinch claim now depends only on the 2% cumulative
+  scale deadzone; Fit/Fill uses reciprocal 1.15/0.869565 arm thresholds, log-space
+  progress, and geometric renderer-relative scaling. Endpoint resistance uses a quadratic
+  ease-out to a 12% span cap and release settles over 240ms with emphasized deceleration.
+  Added reciprocal-progress/scale and relative-claim regressions. `assembleDebug`, all
+  310 tests, and `lintDebug` pass; physical-device acceptance remains required.
+- 2026-08-20: User accepted the round-4.2 gesture feel on device. Round 4 can be
+  checkpointed separately before round-5 popup implementation; broad player smoke QA is
+  still required before merge.
 
 ## Decisions
 
@@ -220,6 +295,19 @@ Human QA completed: none yet.
 - Decision: exclude pre-N and Stretch. Reason: pre-N SurfaceView transforms are
   unreliable (existing stepped fallback); Stretch always has a live target so elastic is
   unreachable there.
+- Decision: use origin-renderer-relative preview scales for Fit and Fill. Reason: property
+  scale updates are continuous, while changing `AspectRatioFrameLayout.resizeMode`
+  requests an asynchronous layout; combining both in one move event caused the device-only
+  discontinuity that pure geometry tests could not reveal. Alternatives: canonicalize all
+  resting modes as FIT+scale (too much persistent transform state); TextureView migration
+  (out of scope and higher playback risk).
+- Decision: gesture claim is relative-scale based, not absolute-pixel based. Reason: a
+  fixed span threshold changes effective sensitivity with initial finger distance and was
+  the remaining device-reported intermittency. The existing 2% relative deadzone still
+  prevents a stationary two-finger placement from claiming the sequence.
+- Decision: use log-space controller progress plus geometric view-scale interpolation.
+  Reason: pinch input and perceived zoom are multiplicative; linear 8%-travel mapping
+  amplified small finger motion into a large crop change and felt abrupt.
 
 ## Final PR summary draft
 
