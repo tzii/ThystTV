@@ -133,9 +133,9 @@ round-5 design specifying the dedicated controls and preserved pill UI.
 
 Automated checks:
 
-- [ ] `./gradlew assembleDebug`
-- [ ] `./gradlew test`
-- [ ] `./gradlew lintDebug`
+- [x] `./gradlew assembleDebug`
+- [x] `./gradlew test`
+- [x] `./gradlew lintDebug`
 
 Human QA required:
 
@@ -167,6 +167,14 @@ Human QA completed: none.
 - 2026-08-20: Added screenshot-derived Quality requirements: codec metadata must use a
   consistent secondary treatment and Audio/Chat actions must remain visible without
   scrolling the video-quality grid.
+- 2026-08-21: Implemented one embedded, player-owned host and migrated Quality, Speed,
+  Stream volume, and More. Added trigger-relative/inset-aware placement, shared motion,
+  focus restoration, controls-auto-hide coordination, and lifecycle cleanup. Quality now
+  uses stable two-line mixed-codec chips and a fixed Audio/Chat footer; More preserves the
+  existing display-mode alert as the documented nested chooser. Removed the obsolete
+  popup DialogFragments, More bottom sheet, and dialog-only sizing policy after confirming
+  there were no remaining consumers. Final `assembleDebug`, all 316 unit tests, and
+  `lintDebug` pass; human QA is still pending.
 
 ## Final PR summary draft
 
@@ -174,7 +182,7 @@ Summary: Replace the player's mixed Quality/Speed dialogs, embedded Volume overl
 More bottom sheet with one cohesive player-owned popup host. Preserve all dedicated
 buttons and existing content semantics while unifying visual treatment, anchoring,
 dismissal, motion, lifecycle, accessibility, and controls-auto-hide behavior.
-Tests: pending.
+Tests: `assembleDebug`, 316 unit tests, and `lintDebug` pass.
 Human QA: required for all four surfaces on compact/wide layouts plus player lifecycle,
 gesture, floating-chat, accessibility, and one-popup-at-a-time regression coverage.
 Risks: broad player-overlay migration, especially More's conditional actions and

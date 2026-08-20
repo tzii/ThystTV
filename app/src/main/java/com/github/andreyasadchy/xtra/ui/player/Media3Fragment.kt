@@ -677,7 +677,7 @@ class Media3Fragment : PlayerFragment() {
             } else {
                 subtitles.visibility = View.GONE
             }
-            (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setSubtitles(textTracks)
+            updateMorePopupSubtitles(textTracks)
         }
     }
 

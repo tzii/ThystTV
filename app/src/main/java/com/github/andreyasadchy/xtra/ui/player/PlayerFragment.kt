@@ -12,7 +12,6 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.Icon
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -29,7 +28,6 @@ import android.provider.Settings
 import android.view.WindowManager
 import android.os.Handler
 import android.os.Looper
-import com.google.android.material.slider.Slider
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -64,6 +62,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.TimeBar
@@ -71,6 +70,10 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.FragmentPlayerBinding
+import com.github.andreyasadchy.xtra.databinding.LayoutPlayerMorePopupBinding
+import com.github.andreyasadchy.xtra.databinding.LayoutPlayerQualityPopupBinding
+import com.github.andreyasadchy.xtra.databinding.LayoutPlayerSpeedPopupBinding
+import com.github.andreyasadchy.xtra.databinding.LayoutPlayerVolumeOverlayBinding
 import com.github.andreyasadchy.xtra.model.VideoQuality
 import com.github.andreyasadchy.xtra.model.ui.Clip
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
@@ -92,7 +95,6 @@ import com.github.andreyasadchy.xtra.util.isKeyboardShown
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
@@ -160,7 +162,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     protected var useController = true
     protected var controllerAutoHide = true
     private var controllerHideOnTouch = true
-    private val controllerHideAction = Runnable { if (view != null) hideController() }
+    private val controllerHideAction = Runnable {
+        if (view != null && activePlayerPopup == null) hideController()
+    }
     private var controllerIsAnimating = false
     private var controllerAnimation: ViewPropertyAnimator? = null
     private var backgroundColor: Int? = null
@@ -182,11 +186,18 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pinchSettleAnimator: ViewPropertyAnimator? = null
     private var pinchCommitGeneration = 0
 
-    // Stream volume overlay (ThystTV playback volume, independent of device volume)
-    private val volumeOverlayDismissRunnable = Runnable {
-        _binding?.volumeOverlay?.root?.visibility = View.GONE
-    }
+    // Stream volume popup state (ThystTV playback volume, independent of device volume)
     private val volumeOverlayState = PlayerVolumeOverlayState()
+
+    // One player-owned popup host replaces the former mixed dialog/overlay ownership.
+    private var activePlayerPopup: PlayerPopupType? = null
+    private var activePopupTrigger: View? = null
+    private var activeSpeedPopupBinder: PlayerSpeedPopupBinder? = null
+    private var activeQualityPopupBinder: PlayerQualityPopupBinder? = null
+    private var activeVolumePopupBinder: PlayerVolumePopupBinder? = null
+    private var activeMorePopupBinder: PlayerMorePopupBinder? = null
+    private var activePopupLayoutListener: View.OnLayoutChangeListener? = null
+    private var popupGeneration = 0
 
     // Gesture education
     private var gestureGuideShownThisSession = false
@@ -203,7 +214,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     private val backPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
-            minimize()
+            if (activePlayerPopup != null) {
+                hidePlayerPopup()
+            } else {
+                minimize()
+            }
         }
     }
 
@@ -233,6 +248,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     open fun downloadVideo() {}
     open fun close() {}
 
+    protected fun updateMorePopupSubtitles(subtitles: Tracks.Group?) {
+        activeMorePopupBinder?.setSubtitles(subtitles)
+    }
+
     protected fun formatPlaybackSpeed(speed: Float?): String? {
         if (speed == null) return null
         val rounded = ((speed * 100).toInt() / 100f)
@@ -251,7 +270,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             speed.text = formattedSpeed
             speed.contentDescription = getString(R.string.playback_speed) + ": " + formattedSpeed
         }
-        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setSpeed(formattedSpeed)
+        activeMorePopupBinder?.setSpeed(formattedSpeed)
     }
 
     private fun updateQuickPlayerControls() {
@@ -455,8 +474,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             displayMode = displayModeStore.loadDisplayMode()
             aspectRatioFrameLayout.setAspectRatio(16f / 9f)
             initLayout()
-            setupVolumeOverlayListeners()
-            applyVolumeOverlayPanelTheme()
             playerLayout.doOnLayout { updateQuickPlayerControls() }
             playerLayout.post { maybeShowGestureGuide() }
             changePlayerMode()
@@ -679,7 +696,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 if (!isAnimating) {
                     when (event.actionMasked) {
                         MotionEvent.ACTION_DOWN -> {
-                            if (binding.volumeOverlay.root.isVisible) {
+                            if (activePlayerPopup == PlayerPopupType.VOLUME) {
                                 hideVolumeOverlay()
                                 return@setOnTouchListener true
                             }
@@ -963,7 +980,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 if (requireContext().prefs().getBoolean(C.PLAYER_VOLUMEBUTTON, true)) {
                     volume.visibility = View.VISIBLE
                     volume.setOnClickListener {
-                        if (binding.volumeOverlay.root.isVisible) hideVolumeOverlay() else showVolumeOverlay()
+                        if (activePlayerPopup == PlayerPopupType.VOLUME) hideVolumeOverlay() else showVolumeOverlay()
                     }
                 }
                 if (requireContext().prefs().getBoolean(C.PLAYER_SETTINGS, true)) {
@@ -995,16 +1012,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
                 if (requireContext().prefs().getBoolean(C.PLAYER_MENU, true)) {
                     menu.visibility = View.VISIBLE
-                    menu.setOnClickListener {
-                        PlayerSettingsDialog.newInstance(
-                            videoType = videoType,
-                            speedText = getCurrentSpeed()?.let { speed ->
-                                requireContext().prefs().getString(C.PLAYER_SPEED_LIST, "0.25\n0.5\n0.75\n1.0\n1.25\n1.5\n1.75\n2.0\n3.0\n4.0\n8.0")
-                                    ?.split("\n")?.find { it == speed.toString() }
-                            },
-                            vodGames = !viewModel.gamesList.value.isNullOrEmpty()
-                        ).show(childFragmentManager, "closeOnPip")
-                    }
+                    menu.setOnClickListener { showMorePopup() }
                 }
                 if (videoType == STREAM) {
                     viewLifecycleOwner.lifecycleScope.launch {
@@ -1142,7 +1150,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             repeatOnLifecycle(Lifecycle.State.STARTED) {
                                 viewModel.isBookmarked.collectLatest {
                                     if (it != null) {
-                                        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setBookmarkText(it)
+                                        activeMorePopupBinder?.setBookmarkText(it)
                                         viewModel.isBookmarked.value = null
                                     }
                                 }
@@ -1158,7 +1166,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                             vodGames.visibility = View.VISIBLE
                                             vodGames.setOnClickListener { showVodGames() }
                                         }
-                                        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setVodGames()
+                                        activeMorePopupBinder?.setVodGames()
                                     }
                                 }
                             }
@@ -1589,14 +1597,39 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     fun showQualityDialog() {
-        val qualities = getQualityMap()
-        if (!qualities.isNullOrEmpty()) {
-            PlayerQualityDialog.newInstance(
-                qualities.keys,
-                qualities.values.map { it.name.toString() }.toTypedArray(),
-                viewModel.quality?.name
-            ).show(childFragmentManager, "closeOnPip")
+        if (!isMaximized) return
+        val qualities = viewModel.qualities?.takeIf { it.isNotEmpty() } ?: return
+        val panelWidth = PlayerPopupPolicy.panelWidthPx(
+            binding.playerLayout.width,
+            resources.displayMetrics.density,
+        )
+        if (panelWidth <= 0) return
+        val popupBinding = LayoutPlayerQualityPopupBinding.inflate(
+            layoutInflater,
+            binding.playerPopupHost.playerPopupPanelContainer,
+            false,
+        )
+        val trigger = if (binding.playerControls.qualityValue.isVisible) {
+            binding.playerControls.qualityValue
+        } else {
+            binding.playerControls.quality
         }
+        showPlayerPopup(
+            type = PlayerPopupType.QUALITY,
+            trigger = trigger,
+            content = popupBinding.root,
+            panelWidth = panelWidth,
+        )
+        activeQualityPopupBinder = PlayerQualityPopupBinder(
+            context = requireContext(),
+            binding = popupBinding,
+            qualities = qualities,
+            selectedTag = viewModel.quality?.name,
+            panelWidthPx = panelWidth,
+            surfaceHeightPx = binding.playerLayout.height,
+            onQualitySelected = ::selectQuality,
+            onDismissRequested = { hidePlayerPopup() },
+        ).also { it.bind() }
     }
 
     fun selectQuality(qualityName: String?) {
@@ -1620,121 +1653,264 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     fun showSpeedDialog() {
-        val speed = PlayerSpeedDialogState.initialSpeed(
+        if (!isMaximized) return
+        val speed = PlayerSpeedPopupState.initialSpeed(
             currentSpeed = getCurrentSpeed(),
             savedSpeed = requireContext().prefs().getFloat(C.PLAYER_SPEED, 1f)
         )
-        PlayerSpeedDialog.newInstance(speed).show(childFragmentManager, "closeOnPip")
+        val panelWidth = PlayerPopupPolicy.panelWidthPx(
+            binding.playerLayout.width,
+            resources.displayMetrics.density,
+        )
+        if (panelWidth <= 0) return
+        val popupBinding = LayoutPlayerSpeedPopupBinding.inflate(
+            layoutInflater,
+            binding.playerPopupHost.playerPopupPanelContainer,
+            false,
+        )
+        showPlayerPopup(
+            type = PlayerPopupType.SPEED,
+            trigger = binding.playerControls.speed,
+            content = popupBinding.root,
+            panelWidth = panelWidth,
+        )
+        activeSpeedPopupBinder = PlayerSpeedPopupBinder(
+            context = requireContext(),
+            binding = popupBinding,
+            initialSpeed = speed,
+            panelWidthPx = panelWidth,
+            onSpeedChanged = ::setPlaybackSpeed,
+            onDismissRequested = { hidePlayerPopup() },
+        ).also { it.bind() }
     }
 
-    private val volumeOverlayRoot get() = binding.volumeOverlay.root
+    private fun showMorePopup() {
+        if (!isMaximized) return
+        val panelWidth = PlayerPopupPolicy.panelWidthPx(
+            binding.playerLayout.width,
+            resources.displayMetrics.density,
+        )
+        if (panelWidth <= 0) return
+        val popupBinding = LayoutPlayerMorePopupBinding.inflate(
+            layoutInflater,
+            binding.playerPopupHost.playerPopupPanelContainer,
+            false,
+        )
+        showPlayerPopup(
+            type = PlayerPopupType.MORE,
+            trigger = binding.playerControls.menu,
+            content = popupBinding.root,
+            panelWidth = panelWidth,
+        )
+        val currentQuality = getQualityMap()?.entries?.find { it.value == viewModel.quality }?.key
+        val currentSpeed = getCurrentSpeed()?.let { speed ->
+            requireContext().prefs()
+                .getString(C.PLAYER_SPEED_LIST, "0.25\n0.5\n0.75\n1.0\n1.25\n1.5\n1.75\n2.0\n3.0\n4.0\n8.0")
+                ?.split("\n")
+                ?.find { it == speed.toString() }
+        }
+        activeMorePopupBinder = PlayerMorePopupBinder(
+            fragment = this,
+            popupBinding = popupBinding,
+            videoType = videoType,
+            speedText = currentSpeed,
+            qualityText = currentQuality,
+            vodGamesAvailable = !viewModel.gamesList.value.isNullOrEmpty(),
+            onDismissRequested = { hidePlayerPopup() },
+        )
+        activeMorePopupBinder?.bind()
+    }
+
+    private fun showPlayerPopup(
+        type: PlayerPopupType,
+        trigger: View,
+        content: View,
+        panelWidth: Int,
+    ) {
+        hidePlayerPopup(restoreFocus = false, animate = false)
+        val generation = ++popupGeneration
+        val host = binding.playerPopupHost
+        val container = host.playerPopupPanelContainer
+        activePlayerPopup = type
+        activePopupTrigger = trigger
+        container.removeAllViews()
+        container.addView(
+            content,
+            FrameLayout.LayoutParams(panelWidth, ViewGroup.LayoutParams.WRAP_CONTENT),
+        )
+        host.root.setOnClickListener { hidePlayerPopup() }
+        container.setOnClickListener { /* Consume panel taps; children own their actions. */ }
+        host.root.visibility = View.VISIBLE
+        showController(force = true)
+        binding.playerControls.root.removeCallbacks(controllerHideAction)
+
+        content.alpha = 0f
+        content.scaleX = PLAYER_POPUP_START_SCALE
+        content.scaleY = PLAYER_POPUP_START_SCALE
+        container.doOnLayout {
+            if (popupGeneration != generation || activePlayerPopup != type) return@doOnLayout
+            val placement = positionPlayerPopup(container, trigger)
+            constrainPlayerPopup(type, placement.maxHeight)
+            val layoutListener = View.OnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                val sizeChanged = right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop
+                if (sizeChanged && popupGeneration == generation && activePlayerPopup == type) {
+                    val updatedPlacement = positionPlayerPopup(container, trigger)
+                    constrainPlayerPopup(type, updatedPlacement.maxHeight)
+                }
+            }
+            activePopupLayoutListener = layoutListener
+            container.addOnLayoutChangeListener(layoutListener)
+            val focusableChildren = arrayListOf<View>()
+            content.addFocusables(focusableChildren, View.FOCUS_FORWARD)
+            focusableChildren.firstOrNull()?.requestFocus()
+            content.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(PLAYER_POPUP_OPEN_MS)
+                .start()
+        }
+    }
+
+    private fun constrainPlayerPopup(type: PlayerPopupType, maxHeight: Int) {
+        when (type) {
+            PlayerPopupType.QUALITY -> activeQualityPopupBinder?.constrainTo(maxHeight)
+            PlayerPopupType.SPEED -> activeSpeedPopupBinder?.constrainTo(maxHeight)
+            PlayerPopupType.MORE -> activeMorePopupBinder?.constrainTo(maxHeight)
+            PlayerPopupType.VOLUME -> Unit
+        }
+    }
+
+    private fun positionPlayerPopup(container: FrameLayout, trigger: View): PlayerPopupPolicy.Placement {
+        val insets = gestureInsets
+        val isRtl = binding.playerLayout.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        val placement = PlayerPopupPolicy.place(
+            surfaceWidthPx = binding.playerLayout.width,
+            surfaceHeightPx = binding.playerLayout.height,
+            measuredPanelHeightPx = container.height,
+            density = resources.displayMetrics.density,
+            insets = PlayerPopupPolicy.Insets(
+                left = insets?.left ?: 0,
+                top = insets?.top ?: 0,
+                right = insets?.right ?: 0,
+                bottom = insets?.bottom ?: 0,
+            ),
+            trigger = popupTriggerRect(trigger),
+            isRtl = isRtl,
+        )
+        container.layoutParams = (container.layoutParams as? FrameLayout.LayoutParams)?.apply {
+            width = placement.width
+            height = ViewGroup.LayoutParams.WRAP_CONTENT
+            gravity = Gravity.TOP or Gravity.START
+            marginStart = PlayerPopupPolicy.startMarginPx(
+                surfaceWidthPx = binding.playerLayout.width,
+                placementLeftPx = placement.left,
+                placementWidthPx = placement.width,
+                isRtl = isRtl,
+            )
+            topMargin = placement.top
+        } ?: container.layoutParams
+        return placement
+    }
+
+    private fun popupTriggerRect(trigger: View): PlayerPopupPolicy.Rect? {
+        if (!trigger.isAttachedToWindow || trigger.width <= 0 || trigger.height <= 0) return null
+        val playerLocation = IntArray(2)
+        val triggerLocation = IntArray(2)
+        binding.playerLayout.getLocationInWindow(playerLocation)
+        trigger.getLocationInWindow(triggerLocation)
+        val left = triggerLocation[0] - playerLocation[0]
+        val top = triggerLocation[1] - playerLocation[1]
+        return PlayerPopupPolicy.Rect(left, top, left + trigger.width, top + trigger.height)
+    }
+
+    private fun hidePlayerPopup(
+        restoreFocus: Boolean = true,
+        animate: Boolean = true,
+    ) {
+        val binding = _binding ?: return
+        if (activePlayerPopup == null && !binding.playerPopupHost.root.isVisible) return
+        val generation = ++popupGeneration
+        val trigger = activePopupTrigger
+        val host = binding.playerPopupHost
+        val container = host.playerPopupPanelContainer
+        val content = container.getChildAt(0)
+
+        fun finish() {
+            if (popupGeneration != generation) return
+            activeSpeedPopupBinder?.dispose()
+            activeSpeedPopupBinder = null
+            activeQualityPopupBinder?.dispose()
+            activeQualityPopupBinder = null
+            activeVolumePopupBinder?.dispose()
+            activeVolumePopupBinder = null
+            activeMorePopupBinder?.dispose()
+            activeMorePopupBinder = null
+            activePopupLayoutListener?.let(container::removeOnLayoutChangeListener)
+            activePopupLayoutListener = null
+            activePlayerPopup = null
+            activePopupTrigger = null
+            container.animate().cancel()
+            content?.animate()?.cancel()
+            container.removeAllViews()
+            host.root.setOnClickListener(null)
+            host.root.visibility = View.GONE
+            if (restoreFocus) {
+                trigger?.requestFocus()
+                if (controllerAutoHide && controllerHideOnTouch && !binding.playerControls.progressBar.isPressed) {
+                    binding.playerControls.root.removeCallbacks(controllerHideAction)
+                    binding.playerControls.root.postDelayed(controllerHideAction, PLAYER_POPUP_CONTROLLER_HIDE_DELAY_MS)
+                }
+            }
+        }
+
+        if (animate && content != null && host.root.isVisible) {
+            content.animate().cancel()
+            content.animate()
+                .alpha(0f)
+                .scaleX(PLAYER_POPUP_START_SCALE)
+                .scaleY(PLAYER_POPUP_START_SCALE)
+                .setDuration(PLAYER_POPUP_CLOSE_MS)
+                .withEndAction(::finish)
+                .start()
+        } else {
+            finish()
+        }
+    }
 
     fun showVolumeOverlay() {
         if (!isMaximized) return
         val current = getCurrentVolume() ?: (prefs.getInt(C.PLAYER_VOLUME, 100) / 100f)
-        volumeOverlayState.remember((current * 100).toInt())
-        volumeOverlayRoot.visibility = View.VISIBLE
-        applyVolumeOverlayValue(current)
-        positionVolumeOverlay()
+        val panelWidth = PlayerPopupPolicy.panelWidthPx(
+            binding.playerLayout.width,
+            resources.displayMetrics.density,
+        )
+        if (panelWidth <= 0) return
+        val popupBinding = LayoutPlayerVolumeOverlayBinding.inflate(
+            layoutInflater,
+            binding.playerPopupHost.playerPopupPanelContainer,
+            false,
+        )
+        showPlayerPopup(
+            type = PlayerPopupType.VOLUME,
+            trigger = binding.playerControls.volume,
+            content = popupBinding.root,
+            panelWidth = panelWidth,
+        )
+        activeVolumePopupBinder = PlayerVolumePopupBinder(
+            context = requireContext(),
+            binding = popupBinding,
+            state = volumeOverlayState,
+            initialValue = current,
+            dismissDelayMs = VOLUME_OVERLAY_DISMISS_MS,
+            onVolumeChanged = ::changeVolume,
+            onDismissRequested = { hidePlayerPopup() },
+        ).also { it.bind() }
     }
 
     fun hideVolumeOverlay() {
-        volumeOverlayRoot.removeCallbacks(volumeOverlayDismissRunnable)
-        volumeOverlayRoot.visibility = View.GONE
-    }
-
-    private fun applyVolumeOverlayValue(value: Float) {
-        with(binding.volumeOverlay) {
-            volumeOverlaySlider.value = (value * 100).coerceIn(0f, 100f)
-            volumeOverlayPercent.text = "${(value * 100).toInt()}%"
-            volumeOverlayMute.setImageResource(
-                if (value <= 0f) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24
-            )
-            root.removeCallbacks(volumeOverlayDismissRunnable)
-            root.postDelayed(volumeOverlayDismissRunnable, VOLUME_OVERLAY_DISMISS_MS)
-        }
-    }
-
-    /**
-     * Panel placement mirrors the quality/speed dialogs but stays embedded in
-     * the player layout: centered on large surfaces, bottom-centered on
-     * compact ones, sized by the shared panel-width policy, and honoring the
-     * system gesture insets. Anchoring above the volume button is retired.
-     */
-    private fun positionVolumeOverlay() {
-        val root = volumeOverlayRoot
-        val density = resources.displayMetrics.density
-        val surfaceWidth = binding.playerLayout.width
-        val insets = gestureInsets
-        val params = root.layoutParams
-        if (params is FrameLayout.LayoutParams) {
-            params.width = PlayerDialogSizing.panelWidthPx(surfaceWidth, density)
-            if (PlayerDialogSizing.isLargeSurface(surfaceWidth, density)) {
-                params.gravity = Gravity.CENTER
-                params.setMargins(insets?.left ?: 0, 0, insets?.right ?: 0, 0)
-            } else {
-                params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                val margin = (16 * density).toInt()
-                params.setMargins(insets?.left ?: 0, 0, insets?.right ?: 0, margin + (insets?.bottom ?: 0))
-            }
-            root.layoutParams = params
-        }
-        root.translationX = 0f
-        root.translationY = 0f
-    }
-
-    private fun applyVolumeOverlayPanelTheme() {
-        val colors = PlayerPanelTheme.resolve(requireContext())
-        with(binding.volumeOverlay) {
-            (root as? MaterialCardView)?.apply {
-                setCardBackgroundColor(colors.panel)
-                strokeWidth = (resources.displayMetrics.density).toInt()
-                setStrokeColor(colors.panelStroke)
-            }
-            volumeOverlayHandle.background = GradientDrawable().apply {
-                setColor(colors.handle)
-                cornerRadius = (3 * resources.displayMetrics.density)
-            }
-            volumeOverlayTitle.setTextColor(colors.onPanel)
-            volumeOverlayPercent.setTextColor(colors.onPanel)
-            volumeOverlayMute.background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(colors.controlFill)
-            }
-            volumeOverlayMute.imageTintList = android.content.res.ColorStateList.valueOf(colors.onPanel)
-            volumeOverlaySlider.thumbTintList = android.content.res.ColorStateList.valueOf(colors.sliderActive)
-            volumeOverlaySlider.trackActiveTintList = android.content.res.ColorStateList.valueOf(colors.sliderActive)
-            volumeOverlaySlider.trackInactiveTintList = android.content.res.ColorStateList.valueOf(colors.sliderInactive)
-            volumeOverlaySlider.haloTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
-        }
-    }
-
-    private fun setupVolumeOverlayListeners() {
-        with(binding.volumeOverlay) {
-            volumeOverlaySlider.addOnChangeListener { _, value, fromUser ->
-                if (fromUser) {
-                    volumeOverlayState.remember(value.toInt())
-                    changeVolume(value / 100f)
-                    applyVolumeOverlayValue(value / 100f)
-                }
-            }
-            volumeOverlaySlider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
-                override fun onStartTrackingTouch(slider: Slider) {
-                    root.removeCallbacks(volumeOverlayDismissRunnable)
-                }
-
-                override fun onStopTrackingTouch(slider: Slider) {
-                    prefs.edit { putInt(C.PLAYER_VOLUME, slider.value.toInt()) }
-                    applyVolumeOverlayValue(slider.value / 100f)
-                }
-            })
-            volumeOverlayMute.setOnClickListener {
-                val target = volumeOverlayState.targetAfterToggle(volumeOverlaySlider.value.toInt())
-                val value = target.coerceIn(0, 100) / 100f
-                changeVolume(value)
-                prefs.edit { putInt(C.PLAYER_VOLUME, target.coerceIn(0, 100)) }
-                applyVolumeOverlayValue(value)
-            }
+        if (activePlayerPopup == PlayerPopupType.VOLUME) {
+            hidePlayerPopup()
         }
     }
 
@@ -1837,7 +2013,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     fun setQualityText() {
         val label = getQualityMap()?.entries?.find { it.value == viewModel.quality }?.key
-        (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setQuality(label)
+        activeMorePopupBinder?.setQuality(label)
         if (binding.playerControls.qualityValue.isVisible) {
             binding.playerControls.qualityValue.text = label
         }
@@ -2464,7 +2640,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (isPortrait && !wasPortrait) {
                 restoreBrightness()
             }
-            hideVolumeOverlay()
+            hidePlayerPopup(restoreFocus = false, animate = false)
             if (isMaximized) {
                 enableBackground()
             } else {
@@ -2483,7 +2659,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (!isPortrait && isMaximized) {
                 maybeShowGestureGuide()
             }
-            (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.dismiss()
         }
     }
 
@@ -2491,6 +2666,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         with(binding) {
             if (isInPictureInPictureMode) {
                 restoreBrightness()
+                hidePlayerPopup(restoreFocus = false, animate = false)
                 if (!isMaximized) {
                     isMaximized = true
                     requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback)
@@ -2555,7 +2731,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             isMaximized = false
             // Restore original brightness when minimizing
             restoreBrightness()
-            hideVolumeOverlay()
+            hidePlayerPopup(restoreFocus = false, animate = false)
             // Hide floating chat when minimizing - it should only appear in fullscreen
             if (isFloatingChatEnabled) {
                 floatingChatRoot.visibility = View.GONE
@@ -2965,11 +3141,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     override fun onDestroyView() {
         finalizePinchSurface()
+        hidePlayerPopup(restoreFocus = false, animate = false)
         _binding?.playerLayout?.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
             feedback.animate().cancel()
             feedback.removeCallbacks(hideGestureRunnable)
         }
-        _binding?.volumeOverlay?.root?.removeCallbacks(volumeOverlayDismissRunnable)
         // Restore original brightness when fragment is destroyed
         restoreBrightness()
         super.onDestroyView()
@@ -2992,6 +3168,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         private const val PINCH_SETTLE_EPSILON = 0.001f
         private const val VOLUME_OVERLAY_DISMISS_MS = 1500L
         private const val PINCH_HINT_LINGER_MS = 3000L
+        private const val PLAYER_POPUP_OPEN_MS = 150L
+        private const val PLAYER_POPUP_CLOSE_MS = 100L
+        private const val PLAYER_POPUP_CONTROLLER_HIDE_DELAY_MS = 3000L
+        private const val PLAYER_POPUP_START_SCALE = 0.97f
 
         internal const val STREAM = "stream"
         internal const val VIDEO = "video"
@@ -3603,6 +3783,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
      */
     fun maybeShowGestureGuide() {
         if (isPortrait || !isMaximized || gestureGuideShownThisSession) return
+        if (activePlayerPopup != null) return
         if (childFragmentManager.findFragmentByTag("closeOnPip") != null) return
         if (PlayerGestureEducationState.shouldShowGuide(prefs.getInt(C.PLAYER_GESTURE_GUIDE_VERSION, 0))) {
             showGestureGuide()
@@ -3632,6 +3813,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
      */
     private fun maybeShowPinchHint() {
         if (isPortrait || !isMaximized) return
+        if (activePlayerPopup != null) return
         if (childFragmentManager.findFragmentByTag("closeOnPip") != null) return
         if (!PlayerGestureEducationState.shouldShowPinchHint(
                 guideStoredVersion = prefs.getInt(C.PLAYER_GESTURE_GUIDE_VERSION, 0),

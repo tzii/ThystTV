@@ -8,7 +8,7 @@ import androidx.core.graphics.ColorUtils
 
 /**
  * Shared palette for the player's control panels (Quality, Speed, Stream
- * volume). One resolver keeps the three surfaces visually identical in both
+ * volume, and More). One resolver keeps the four surfaces visually identical in both
  * themes; every panel applies these colors in code instead of XML defaults.
  */
 data class PlayerPanelColors(

@@ -711,7 +711,7 @@ class ExoPlayerFragment : PlayerFragment() {
             } else {
                 subtitles.visibility = View.GONE
             }
-            (childFragmentManager.findFragmentByTag("closeOnPip") as? PlayerSettingsDialog?)?.setSubtitles(textTracks)
+            updateMorePopupSubtitles(textTracks)
         }
     }
 

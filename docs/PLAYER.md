@@ -19,6 +19,8 @@ The paths below are a map, not a guarantee. If code has moved, search for the cu
 - Stream switching must not leave old audio playing.
 - UI controls should stay responsive during live/VoD transitions.
 - Overlay surfaces should remain readable over arbitrary video content.
+- Quality, Speed, Stream volume, and More share one player-owned popup host; only one
+  can be attached at a time, and teardown/minimize/PiP must remove it with the player view.
 
 ## High-Risk Files
 
@@ -37,10 +39,26 @@ Update this list as the code evolves.
 
 - For issue #5, logs did not show a clean app `FATAL EXCEPTION`; the safer fix was the narrow Media3/ExoPlayer rollback and HLS parser compatibility change, not broad WIP player sync.
 - Quality menu labels can regress to HLS variant indices after chat-only -> auto transitions. Preserve readable labels derived from labels, format height/frame rate, or URL path.
+- Mixed-codec Quality choices keep resolution as the primary label and show a standardized
+  codec name as secondary metadata. Audio-only and Chat-only stay outside the scrolling
+  video grid so they remain reachable in compact landscape players.
 - VoD and live menus may legitimately differ. Do not add chat-only to VoD unless the data/model supports it.
 - Floating chat should use a dark translucent video-overlay palette in both app themes; background opacity remains user-controlled.
 - Stats/player overlay controls need compact and landscape checks because label clipping and stacked graph labels have happened before.
 - Any view adapter tied to fragments can leak destroyed views. Clear listeners/adapters in `onDestroyView()` when changing RecyclerView or fragment lifecycles.
+
+## Player Popup Ownership
+
+`PlayerFragment` owns the full-player dismissal host and delegates each popup's controls
+to a short-lived binder. Quality, Speed, Stream volume, and More use the same bounded,
+inset-aware, trigger-relative placement and alpha/scale motion. The host consumes panel
+and outside touches, keeps controls visible while open, closes on back/outside tap, and
+restores focus plus the normal control auto-hide timer on dismissal.
+
+More keeps its existing grouped action order and preference gates. Its display-mode row
+intentionally opens the existing single-choice alert above the embedded host; the four
+top-level player popups themselves must not return to DialogFragment or bottom-sheet
+ownership.
 
 ## Required Checks For Player Work
 
@@ -88,6 +106,8 @@ At minimum, player work should request human verification for:
 - old stream audio continues after opening a new stream
 - player view is black after minimize/restore
 - controls show stale speed/quality
+- more than one player popup is visible, or popup content survives minimize/PiP/rotation
+- controls auto-hide while a popup is open or fail to resume auto-hide after dismissal
 - sleep timer closes the wrong player
 - PiP remains enabled after player close
 - orientation recreates UI with stale player state

@@ -60,10 +60,10 @@
                 android:layout_height="match_parent" />
 
             <include
-                android:id="@+id/volumeOverlay"
-                layout="@layout/layout_player_volume_overlay"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:id="@+id/playerPopupHost"
+                layout="@layout/layout_player_popup_host"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
                 android:visibility="gone" />
 
         </com.github.andreyasadchy.xtra.ui.view.PlayerLayout>
