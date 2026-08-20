@@ -1,15 +1,15 @@
 # ThystTV current state
 
-Status:  WORKING
+Status:  REVIEW
 Agent:   Codex
 
-Focus:   Implement the round-5 cohesive fullscreen popup redesign after the accepted pinch checkpoint.
-Next:    Build the shared popup placement/ownership foundation and migrate Playback Speed first.
+Focus:   Validate the completed round-5 cohesive Quality, Speed, Volume, and More popup redesign.
+Next:    Run the round-5 physical-device popup and player lifecycle QA checklist.
 Pointer: codex/player-ux-tablet-live-discovery
-As-of:   2026-08-20 · 75add03d
+As-of:   2026-08-21 · 8d2ab345
 
-Notes:   User accepted round-4.2 gesture behavior on device; broad player smoke QA remains.
-         Round 4.2 is checkpointed at 8d6cb91b; 310 tests and required checks passed.
-         Round-5 plan now requires standardized codecs and always-visible Audio/Chat.
-         Round-5 popup implementation has started with the shared host/Speed slice.
-         No open PR exists; round-5 implementation is local on the current branch.
+Notes:   Round 5 is committed at 8d2ab345 with one embedded host for all four popups.
+         `assembleDebug`, all 316 unit tests, and `lintDebug` pass.
+         Quality codec metadata is standardized; Audio/Chat stays outside its scroll area.
+         Fresh QA APK: app/build/outputs/apk/debug/app-debug.apk.
+         No open PR exists; physical-device QA and the full player smoke pass remain.

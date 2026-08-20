@@ -1,5 +1,6 @@
 # Session log — append one line per handoff, newest on top, keep last 20
 
+- 2026-08-21 · Codex · 8d2ab345 · Completed and checked round 5; device-test all four popups and player lifecycle next.
 - 2026-08-20 · Codex · 75add03d · Checkpointed accepted round 4.2 and the round-5 plan; implement the shared popup host next.
 - 2026-08-20 · Codex · a91f7995 · Renamed repository task tracking to tool-neutral `.agent` state files.
 - 2026-08-20 · Codex · a91f7995 · User accepted round-4.2 gesture behavior; checkpoint it separately, then start round 5.
