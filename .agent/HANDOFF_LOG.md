@@ -1,0 +1,8 @@
+# Session log — append one line per handoff, newest on top, keep last 20
+
+- 2026-08-20 · Codex · 75add03d · Checkpointed accepted round 4.2 and the round-5 plan; implement the shared popup host next.
+- 2026-08-20 · Codex · a91f7995 · Renamed repository task tracking to tool-neutral `.agent` state files.
+- 2026-08-20 · Codex · a91f7995 · User accepted round-4.2 gesture behavior; checkpoint it separately, then start round 5.
+- 2026-08-20 · Codex · a91f7995 · Reworked pinch recognition and multiplicative motion; device-test round 4.2 before popup implementation.
+- 2026-08-20 · Codex · a91f7995 · Repaired round-4 pinch integration and formalized round 5; device-test the fresh APK next.
+- 2026-08-20 · Codex · a91f7995 · Recorded failed round-4 device QA; reproduce and fix pinch pill and elastic behavior next.
