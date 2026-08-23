@@ -6,11 +6,11 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     app:cardBackgroundColor="@android:color/black"
-    app:cardCornerRadius="18dp"
-    app:cardElevation="8dp"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="4dp"
     app:contentPaddingLeft="16dp"
-    app:contentPaddingTop="16dp"
-    app:contentPaddingRight="16dp"
+    app:contentPaddingTop="14dp"
+    app:contentPaddingRight="12dp"
     app:contentPaddingBottom="16dp"
     app:strokeWidth="1dp">
 
@@ -40,18 +40,28 @@
                 android:id="@+id/currentSpeedText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
                 android:includeFontPadding="false"
                 android:textColor="@android:color/white"
-                android:textSize="18sp"
+                android:textSize="17sp"
                 android:textStyle="bold"
                 tools:text="1.25x" />
+
+            <ImageButton
+                android:id="@+id/speedPopupClose"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/close"
+                android:src="@drawable/baseline_close_black_36"
+                app:tint="@android:color/white" />
 
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="10dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -68,8 +78,8 @@
                 android:id="@+id/speedSlider"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
                 android:layout_weight="1"
                 android:valueFrom="0.25"
                 android:valueTo="8.0"
@@ -92,23 +102,13 @@
 
         </LinearLayout>
 
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/speedPresetScroll"
+        <LinearLayout
+            android:id="@+id/speedPresetRows"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:clipToPadding="false"
-            android:fillViewport="false"
-            android:overScrollMode="ifContentScrolls">
-
-            <LinearLayout
-                android:id="@+id/speedPresetRows"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_horizontal"
-                android:orientation="vertical" />
-
-        </androidx.core.widget.NestedScrollView>
+            android:layout_marginTop="8dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical" />
 
     </LinearLayout>
 

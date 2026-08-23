@@ -42,6 +42,10 @@ Update this list as the code evolves.
 - Mixed-codec Quality choices keep resolution as the primary label and show a standardized
   codec name as secondary metadata. Audio-only and Chat-only stay outside the scrolling
   video grid so they remain reachable in compact landscape players.
+- Selected Quality/Speed chips render as solid primary pills with luminance-matched
+  content color (`PlayerPanelColors.onSelected`); do not revert to low-contrast blends.
+- Quality chip column counts are derived from measured bold label widths so labels such
+  as "1080p60" never truncate; do not return to fixed 4-column grids with silent clipping.
 - VoD and live menus may legitimately differ. Do not add chat-only to VoD unless the data/model supports it.
 - Floating chat should use a dark translucent video-overlay palette in both app themes; background opacity remains user-controlled.
 - Stats/player overlay controls need compact and landscape checks because label clipping and stacked graph labels have happened before.
@@ -55,10 +59,46 @@ inset-aware, trigger-relative placement and alpha/scale motion. The host consume
 and outside touches, keeps controls visible while open, closes on back/outside tap, and
 restores focus plus the normal control auto-hide timer on dismissal.
 
+Dismissal affordances by mode: anchored cards close via outside tap or back. Full-surface
+sheets additionally close from blank sheet-area taps (the shared viewport handles them),
+an explicit header close button, and a light non-clickable scrim behind the panel that
+passes taps through to the host's outside-dismiss handler. Quality, Speed, and More have
+header close buttons; Stream volume keeps its auto-dismiss timer instead.
+
 More keeps its existing grouped action order and preference gates. Its display-mode row
 intentionally opens the existing single-choice alert above the embedded host; the four
 top-level player popups themselves must not return to DialogFragment or bottom-sheet
 ownership.
+
+Placement rules: popups prefer the space above their trigger, fall back to below it, and
+when the surface is too short for either they pin to the edge nearest the trigger
+(bottom-bar buttons such as Stream volume stay bottom-anchored; top-bar triggers such as
+Quality, Speed, and More stay top-anchored). Horizontally, left-side controls align the
+panel's left edge and right-side controls align its right edge before bounds clamping, so
+placement remains visibly tied to the button rather than drifting around the surface.
+Each popup is measured at natural height and then clamped inside the safe surface area by
+a shared scroll viewport
+(`playerPopupViewport`), so short portrait surfaces scroll whole-panel content instead of
+clipping it. Do not reintroduce per-popup inner height shrinking or fixed reserved-height
+estimates; they caused the portrait clipping regression.
+
+Full-surface sheets: Quality and Speed opt into expansion (`allowFullSurface`). When
+their natural height overflows the safe surface area — typical short portrait video
+strips — they expand into a sheet covering the entire safe player area instead of a
+small anchored card; content that still overflows scrolls in the shared viewport, and
+content that fits stretches the card to fill the surface. Volume and More never expand:
+Volume stays a small trigger-anchored panel and More stays bounded and scrollable.
+Popup content is bound before the host is shown, and `showPlayerPopup` places the
+container (explicit measure, no layout pass needed) before the host becomes visible,
+so the reveal animation's first frame is already at the anchored geometry. Placement
+application is idempotent (geometry written only on change), the container repositions
+on any geometry delta, and the first valid trigger rect is cached as the popup's anchor
+for its whole lifetime: while the cache is empty the trigger is re-read (a popup that
+opened from fallback geometry corrects itself when the trigger gains bounds, for
+example controls were GONE at open time), but once cached, later control-bar reflows —
+quality-label or viewer-count text changes — must not drag a visible popup around.
+Do not remove these guards; stale inherited margins, reveal-before-place frame races,
+and untracked trigger moves caused jump/multi-press misplacement reports.
 
 ## Required Checks For Player Work
 

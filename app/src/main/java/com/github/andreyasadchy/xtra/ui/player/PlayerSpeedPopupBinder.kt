@@ -5,6 +5,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -42,6 +43,7 @@ internal class PlayerSpeedPopupBinder(
 
     fun bind() {
         applyTheme()
+        binding.speedPopupClose.setOnClickListener { onDismissRequested() }
         binding.speedSlider.value = selectedSpeed
         buildPresetRows(loadSpeedPresets())
         updateSpeedDisplay(selectedSpeed)
@@ -65,20 +67,12 @@ internal class PlayerSpeedPopupBinder(
     }
 
     fun dispose() {
+        binding.speedPopupClose.setOnClickListener(null)
         binding.speedSlider.clearOnChangeListeners()
         binding.speedSlider.clearOnSliderTouchListeners()
         binding.btnDecreaseSpeed.setOnClickListener(null)
         binding.btnIncreaseSpeed.setOnClickListener(null)
         binding.speedPresetRows.removeAllViews()
-    }
-
-    fun constrainTo(maxPanelHeight: Int) {
-        val overflow = (binding.root.measuredHeight - maxPanelHeight).coerceAtLeast(0)
-        if (overflow > 0) {
-            binding.speedPresetScroll.layoutParams = binding.speedPresetScroll.layoutParams.apply {
-                height = (binding.speedPresetScroll.measuredHeight - overflow).coerceAtLeast(0)
-            }
-        }
     }
 
     private fun applyTheme() {
@@ -87,6 +81,7 @@ internal class PlayerSpeedPopupBinder(
             speedPopupCard.setStrokeColor(colors.panelStroke)
             speedPopupTitle.setTextColor(colors.onPanel)
             currentSpeedText.setTextColor(colors.onPanel)
+            speedPopupClose.imageTintList = ColorStateList.valueOf(colors.secondaryText)
             btnDecreaseSpeed.background = ovalDrawable(colors.controlFill)
             btnIncreaseSpeed.background = ovalDrawable(colors.controlFill)
             btnDecreaseSpeed.imageTintList = ColorStateList.valueOf(colors.onPanel)
@@ -112,9 +107,13 @@ internal class PlayerSpeedPopupBinder(
     }
 
     private fun buildPresetRows(speeds: List<Float>) {
-        val presetsPerRow = if (panelWidthPx < dp(460f)) 3 else 5
-        val horizontalGap = dp(8f)
-        val availableWidth = panelWidthPx - dp(32f)
+        val presetsPerRow = when {
+            panelWidthPx >= dp(288f) -> 5
+            panelWidthPx >= dp(232f) -> 4
+            else -> 3
+        }
+        val horizontalGap = dp(6f)
+        val availableWidth = panelWidthPx - dp(24f)
         val presetWidth = (availableWidth - horizontalGap * (presetsPerRow - 1)) / presetsPerRow
         binding.speedPresetRows.removeAllViews()
 
@@ -126,7 +125,7 @@ internal class PlayerSpeedPopupBinder(
             binding.speedPresetRows.addView(
                 row,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                    if (rowIndex > 0) topMargin = dp(8f)
+                    if (rowIndex > 0) topMargin = dp(6f)
                 },
             )
 
@@ -137,10 +136,17 @@ internal class PlayerSpeedPopupBinder(
                     background = presetBackground(colors.controlFill, colors.selectedFill)
                     gravity = Gravity.CENTER
                     includeFontPadding = false
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
                     isClickable = true
                     isFocusable = true
                     minHeight = dp(48f)
-                    setTextColor(colors.onPanel)
+                    setTextColor(
+                        ColorStateList(
+                            arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
+                            intArrayOf(colors.onSelected, colors.onPanel),
+                        ),
+                    )
                     textSize = 16f
                     setOnClickListener {
                         applySpeed(speed)
@@ -192,8 +198,8 @@ internal class PlayerSpeedPopupBinder(
     }
 
     private fun presetBackground(normalColor: Int, selectedColor: Int) = StateListDrawable().apply {
-        addState(intArrayOf(android.R.attr.state_selected), roundedDrawable(selectedColor, 18f))
-        addState(intArrayOf(), roundedDrawable(normalColor, 18f))
+        addState(intArrayOf(android.R.attr.state_selected), roundedDrawable(selectedColor, 20f))
+        addState(intArrayOf(), roundedDrawable(normalColor, 20f))
     }
 
     private fun roundedDrawable(color: Int, radiusDp: Float) = GradientDrawable().apply {

@@ -175,6 +175,10 @@ Human QA completed: none.
   popup DialogFragments, More bottom sheet, and dialog-only sizing policy after confirming
   there were no remaining consumers. Final `assembleDebug`, all 316 unit tests, and
   `lintDebug` pass; human QA is still pending.
+- 2026-08-21: Device feedback found portrait clipping and placement drift. Added one
+  whole-panel scroll viewport, natural-height measurement, nearest-trigger vertical edge
+  pinning, and regression tests. A separate popup/stats density follow-up now covers
+  trigger-side horizontal alignment and compact Quality/Speed content.
 
 ## Final PR summary draft
 

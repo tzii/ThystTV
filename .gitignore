@@ -73,3 +73,7 @@ fastlane/test_output
 
 ### Optional local Google config
 # google-services.json
+
+# local agent tool sessions
+.commandcode/
+.zcode/

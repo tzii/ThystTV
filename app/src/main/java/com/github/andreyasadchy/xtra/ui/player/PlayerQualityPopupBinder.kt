@@ -1,14 +1,19 @@
 package com.github.andreyasadchy.xtra.ui.player
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.text.TextPaint
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerQualityPopupBinding
 import com.github.andreyasadchy.xtra.model.VideoQuality
@@ -21,10 +26,13 @@ internal class PlayerQualityPopupBinder(
     qualities: List<VideoQuality>,
     private val selectedTag: String?,
     private val panelWidthPx: Int,
-    private val surfaceHeightPx: Int,
     private val onQualitySelected: (String) -> Unit,
     private val onDismissRequested: () -> Unit,
 ) {
+
+    companion object {
+        private const val PRIMARY_LABEL_TEXT_SIZE_SP = 14f
+    }
 
     private val density = context.resources.displayMetrics.density
     private val colors = PlayerPanelTheme.resolve(context)
@@ -40,30 +48,33 @@ internal class PlayerQualityPopupBinder(
 
     fun bind() {
         applyTheme()
+        binding.qualityPopupClose.setOnClickListener { onDismissRequested() }
         val video = options.filter { it.kind == PlayerQualityPopupOption.Kind.VIDEO }
         val utilities = options.filter { it.kind != PlayerQualityPopupOption.Kind.VIDEO }
-        buildGrid(binding.qualityVideoRows, video, columns = 3, stableCodecHeight = video.any { it.codecLabel != null })
+        val maxVideoColumns = if (panelWidthPx >= dp(320f)) 4 else 3
+        buildGrid(
+            binding.qualityVideoRows,
+            video,
+            maxColumns = maxVideoColumns,
+            stableCodecHeight = video.any { it.codecLabel != null },
+        )
         if (utilities.isNotEmpty()) {
             binding.qualityUtilitySection.visibility = View.VISIBLE
-            buildGrid(binding.qualityUtilityRows, utilities, columns = utilities.size.coerceAtMost(2), stableCodecHeight = false)
+            buildGrid(
+                binding.qualityUtilityRows,
+                utilities,
+                maxColumns = 2,
+                stableCodecHeight = false,
+            )
         } else {
             binding.qualityUtilitySection.visibility = View.GONE
         }
-        constrainVideoScroll(video.size, utilities.isNotEmpty(), video.any { it.codecLabel != null })
     }
 
     fun dispose() {
+        binding.qualityPopupClose.setOnClickListener(null)
         binding.qualityVideoRows.removeAllViews()
         binding.qualityUtilityRows.removeAllViews()
-    }
-
-    fun constrainTo(maxPanelHeight: Int) {
-        val overflow = (binding.root.measuredHeight - maxPanelHeight).coerceAtLeast(0)
-        if (overflow > 0) {
-            binding.qualityVideoScroll.layoutParams = binding.qualityVideoScroll.layoutParams.apply {
-                height = (binding.qualityVideoScroll.measuredHeight - overflow).coerceAtLeast(0)
-            }
-        }
     }
 
     private fun applyTheme() {
@@ -72,18 +83,25 @@ internal class PlayerQualityPopupBinder(
         binding.qualityPopupTitle.setTextColor(colors.onPanel)
         binding.videoQualitySectionTitle.setTextColor(colors.secondaryText)
         binding.audioChatSectionTitle.setTextColor(colors.secondaryText)
+        binding.qualityPopupClose.imageTintList = ColorStateList.valueOf(colors.secondaryText)
     }
 
     private fun buildGrid(
         target: LinearLayout,
         entries: List<PlayerQualityPopupOption>,
-        columns: Int,
+        maxColumns: Int,
         stableCodecHeight: Boolean,
     ) {
         target.removeAllViews()
         if (entries.isEmpty()) return
-        val horizontalGap = dp(8f)
-        val availableWidth = panelWidthPx - dp(32f)
+        val horizontalGap = dp(6f)
+        val availableWidth = panelWidthPx - dp(24f)
+        val columns = columnsForLabels(
+            labels = entries.map { it.primaryLabel },
+            availableWidthPx = availableWidth,
+            maxColumns = maxColumns,
+            gapPx = horizontalGap,
+        )
         val chipWidth = (availableWidth - horizontalGap * (columns - 1)) / columns
         entries.chunked(columns).forEachIndexed { rowIndex, rowEntries ->
             val row = LinearLayout(context).apply {
@@ -93,18 +111,45 @@ internal class PlayerQualityPopupBinder(
             target.addView(
                 row,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                    if (rowIndex > 0) topMargin = dp(8f)
+                    if (rowIndex > 0) topMargin = dp(6f)
                 },
             )
             rowEntries.forEachIndexed { chipIndex, option ->
                 row.addView(
                     qualityChip(option, stableCodecHeight),
-                    LinearLayout.LayoutParams(chipWidth, if (stableCodecHeight) dp(60f) else dp(48f)).apply {
+                    LinearLayout.LayoutParams(chipWidth, if (stableCodecHeight) dp(56f) else dp(48f)).apply {
                         if (chipIndex > 0) marginStart = horizontalGap
                     },
                 )
             }
         }
+    }
+
+    /**
+     * Picks the widest column count whose chips still fit the longest label so
+     * primary labels like "1080p60" are never truncated by construction. Bold
+     * is assumed because the selected chip renders bold.
+     */
+    private fun columnsForLabels(
+        labels: List<String>,
+        availableWidthPx: Int,
+        maxColumns: Int,
+        gapPx: Int,
+    ): Int {
+        if (availableWidthPx <= 0 || labels.isEmpty()) return 1
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = PRIMARY_LABEL_TEXT_SIZE_SP * context.resources.displayMetrics.scaledDensity
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val longestLabel = labels.maxOf { paint.measureText(it) }
+        val requiredChipWidth = longestLabel + dp(12f)
+        var columns = maxColumns.coerceAtLeast(1)
+        while (columns > 1) {
+            val chipWidth = (availableWidthPx - gapPx * (columns - 1)) / columns
+            if (chipWidth >= requiredChipWidth) break
+            columns--
+        }
+        return columns
     }
 
     private fun qualityChip(option: PlayerQualityPopupOption, stableCodecHeight: Boolean): View {
@@ -117,26 +162,27 @@ internal class PlayerQualityPopupBinder(
             isClickable = true
             isFocusable = true
             contentDescription = listOfNotNull(option.primaryLabel, option.codecLabel).joinToString(", ")
-            setPadding(dp(8f), dp(6f), dp(8f), dp(6f))
+            setPadding(dp(4f), dp(4f), dp(4f), dp(4f))
 
             addView(TextView(context).apply {
                 text = option.primaryLabel
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 maxLines = 1
-                setTextColor(colors.onPanel)
-                textSize = 15f
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(chipPrimaryTextColors())
+                textSize = PRIMARY_LABEL_TEXT_SIZE_SP
                 setTypeface(typeface, if (selected) Typeface.BOLD else Typeface.NORMAL)
             })
-            if (stableCodecHeight) {
+            if (stableCodecHeight && option.codecLabel != null) {
                 addView(TextView(context).apply {
-                    text = option.codecLabel.orEmpty()
+                    text = option.codecLabel
                     gravity = Gravity.CENTER
                     includeFontPadding = false
                     maxLines = 1
-                    setTextColor(colors.secondaryText)
+                    ellipsize = TextUtils.TruncateAt.END
+                    setTextColor(chipSecondaryTextColors())
                     textSize = 12f
-                    visibility = if (option.codecLabel == null) View.INVISIBLE else View.VISIBLE
                 })
             }
             setOnClickListener {
@@ -145,6 +191,20 @@ internal class PlayerQualityPopupBinder(
             }
         }
     }
+
+    /** Selected chips render on the solid accent fill and need its content color. */
+    private fun chipPrimaryTextColors() = ColorStateList(
+        arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
+        intArrayOf(colors.onSelected, colors.onPanel),
+    )
+
+    private fun chipSecondaryTextColors() = ColorStateList(
+        arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
+        intArrayOf(
+            ColorUtils.setAlphaComponent(colors.onSelected, 235),
+            ColorUtils.setAlphaComponent(colors.onPanel, 212),
+        ),
+    )
 
     private fun isSelected(option: PlayerQualityPopupOption): Boolean {
         val selected = selectedTag.normalizedValue()
@@ -155,21 +215,9 @@ internal class PlayerQualityPopupBinder(
         }
     }
 
-    private fun constrainVideoScroll(videoCount: Int, hasUtilityFooter: Boolean, codecRows: Boolean) {
-        val rows = (videoCount + 2) / 3
-        val rowHeight = dp(if (codecRows) 60f else 48f)
-        val estimated = rows * rowHeight + (rows - 1).coerceAtLeast(0) * dp(8f)
-        val reserved = dp(if (hasUtilityFooter) 190f else 112f)
-        val available = (surfaceHeightPx - reserved).coerceAtLeast(dp(96f))
-        val maxVideoHeight = minOf(dp(240f), available)
-        binding.qualityVideoScroll.layoutParams = binding.qualityVideoScroll.layoutParams.apply {
-            height = if (estimated > maxVideoHeight) maxVideoHeight else ViewGroup.LayoutParams.WRAP_CONTENT
-        }
-    }
-
     private fun chipBackground(normalColor: Int, selectedColor: Int) = StateListDrawable().apply {
-        addState(intArrayOf(android.R.attr.state_selected), roundedDrawable(selectedColor, 18f))
-        addState(intArrayOf(), roundedDrawable(normalColor, 18f))
+        addState(intArrayOf(android.R.attr.state_selected), roundedDrawable(selectedColor, 20f))
+        addState(intArrayOf(), roundedDrawable(normalColor, 20f))
     }
 
     private fun roundedDrawable(color: Int, radiusDp: Float) = GradientDrawable().apply {

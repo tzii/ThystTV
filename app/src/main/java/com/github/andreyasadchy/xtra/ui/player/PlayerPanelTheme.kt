@@ -20,6 +20,7 @@ data class PlayerPanelColors(
     val primary: Int,
     val controlFill: Int,
     val selectedFill: Int,
+    val onSelected: Int,
     val sliderActive: Int,
     val sliderInactive: Int,
 )
@@ -37,17 +38,24 @@ object PlayerPanelTheme {
         val primary = themeColor(context, androidx.appcompat.R.attr.colorPrimary, Color.rgb(0, 125, 202))
         val lightPanel = ColorUtils.calculateLuminance(panel) > 0.5
         val controlBlend = if (lightPanel) 0.08f else 0.16f
-        val selectedBlend = if (lightPanel) 0.18f else 0.32f
         val strokeAlpha = if (lightPanel) 0.16f else 0.22f
+        // Selected options render as solid accent pills; their content color is
+        // derived from the primary's luminance so any brand hue stays readable.
+        val onPrimary =
+            if (ColorUtils.calculateLuminance(primary) > 0.5) Color.rgb(20, 20, 20) else Color.WHITE
         return PlayerPanelColors(
             panel = panel,
             onPanel = onPanel,
-            secondaryText = ColorUtils.setAlphaComponent(onPanel, if (lightPanel) 150 else 178),
+            // Secondary text sits on panels that overlay bright video; keep it
+            // clearly readable instead of atmosphere-subtle, especially on the
+            // short full-surface portrait sheets.
+            secondaryText = ColorUtils.setAlphaComponent(onPanel, if (lightPanel) 176 else 210),
             panelStroke = ColorUtils.blendARGB(panel, onPanel, strokeAlpha),
             handle = ColorUtils.setAlphaComponent(onPanel, if (lightPanel) 96 else 128),
             primary = primary,
             controlFill = ColorUtils.blendARGB(panel, onPanel, controlBlend),
-            selectedFill = ColorUtils.blendARGB(panel, primary, selectedBlend),
+            selectedFill = primary,
+            onSelected = onPrimary,
             sliderActive = primary,
             sliderInactive = ColorUtils.setAlphaComponent(onPanel, if (lightPanel) 52 else 64),
         )

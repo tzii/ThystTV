@@ -6,9 +6,15 @@ import kotlin.math.min
  * Pure sizing and placement policy for the player-owned popup host.
  *
  * Popups prefer the space immediately above their trigger and clamp within
- * the visible player surface. If trigger geometry is unavailable, they fall
- * back to the bottom-end edge (bottom-start in RTL) instead of drifting to the
- * center on large screens.
+ * the visible player surface. Their near horizontal edge follows the trigger
+ * side, so left and right controls have a stable visual relationship with the
+ * panel. If trigger geometry is unavailable, they fall back to the bottom-end
+ * edge (bottom-start in RTL) instead of drifting to the center on large screens.
+ *
+ * Quality and Speed additionally opt into [place]'s expandToSurface: when their
+ * natural height would overflow the safe player area (short portrait video
+ * strips), they expand into a sheet covering the whole safe surface instead of
+ * a small scrolling card.
  */
 object PlayerPopupPolicy {
 
@@ -40,6 +46,7 @@ object PlayerPopupPolicy {
         val top: Int,
         val width: Int,
         val maxHeight: Int,
+        val fullSurface: Boolean = false,
     )
 
     fun panelWidthPx(surfaceWidthPx: Int, density: Float): Int {
@@ -64,6 +71,13 @@ object PlayerPopupPolicy {
         }.coerceAtLeast(0)
     }
 
+    fun shouldExpandToSurface(measuredPanelHeightPx: Int, maxHeightPx: Int): Boolean {
+        // Expand into a full-surface sheet only when the anchored card would
+        // overflow the safe player area, i.e. exactly when whole-panel scrolling
+        // would otherwise be needed.
+        return maxHeightPx > 0 && measuredPanelHeightPx > maxHeightPx
+    }
+
     fun place(
         surfaceWidthPx: Int,
         surfaceHeightPx: Int,
@@ -72,6 +86,7 @@ object PlayerPopupPolicy {
         insets: Insets = Insets(),
         trigger: Rect? = null,
         isRtl: Boolean = false,
+        expandToSurface: Boolean = false,
     ): Placement {
         val large = density > 0f &&
             PlayerSurfacePolicy.classify(surfaceWidthPx, density) == PlayerSurfaceClass.LARGE
@@ -85,9 +100,30 @@ object PlayerPopupPolicy {
         val maxHeight = (safeBottom - safeTop).coerceAtLeast(0)
         val height = measuredPanelHeightPx.coerceIn(0, maxHeight)
 
+        val fullSurface = expandToSurface && shouldExpandToSurface(measuredPanelHeightPx, maxHeight)
+        if (fullSurface && surfaceWidthPx > 0) {
+            // Full-surface sheet: cover the whole safe player area regardless of
+            // trigger geometry. Content taller than the sheet still scrolls in
+            // the shared viewport.
+            return Placement(
+                left = safeLeft,
+                top = safeTop,
+                width = safeRight - safeLeft,
+                maxHeight = maxHeight,
+                fullSurface = true,
+            )
+        }
+
         val validTrigger = trigger?.takeIf { it.isValid }
         val fallbackLeft = if (isRtl) safeLeft else safeRight - width
-        val desiredLeft = validTrigger?.let { it.centerX - width / 2 } ?: fallbackLeft
+        val surfaceCenterX = safeLeft + (safeRight - safeLeft) / 2
+        val desiredLeft = validTrigger?.let {
+            if (it.centerX <= surfaceCenterX) {
+                it.left
+            } else {
+                it.right - width
+            }
+        } ?: fallbackLeft
         val maxLeft = (safeRight - width).coerceAtLeast(safeLeft)
         val left = desiredLeft.coerceIn(safeLeft, maxLeft)
 
@@ -96,9 +132,20 @@ object PlayerPopupPolicy {
         val top = when {
             desiredAbove != null && desiredAbove >= safeTop -> desiredAbove
             desiredBelow != null && desiredBelow + height <= safeBottom -> desiredBelow
-            validTrigger != null -> (validTrigger.top - gap - height).coerceIn(safeTop, (safeBottom - height).coerceAtLeast(safeTop))
-            else -> (safeBottom - height).coerceAtLeast(safeTop)
-        }
+            // Neither side fits: pin to the edge nearest the trigger so a
+            // bottom-bar button keeps its popup above it instead of drifting
+            // to the top of the surface.
+            validTrigger != null -> {
+                val triggerCenterY = (validTrigger.top + validTrigger.bottom) / 2
+                val surfaceCenterY = (safeTop + safeBottom) / 2
+                if (triggerCenterY < surfaceCenterY) {
+                    safeTop
+                } else {
+                    safeBottom - height
+                }
+            }
+            else -> safeBottom - height
+        }.coerceIn(safeTop, (safeBottom - height).coerceAtLeast(safeTop))
 
         return Placement(left = left, top = top, width = width, maxHeight = maxHeight)
     }

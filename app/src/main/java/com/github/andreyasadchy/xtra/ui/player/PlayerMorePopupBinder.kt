@@ -1,12 +1,12 @@
 package com.github.andreyasadchy.xtra.ui.player
 
+import android.content.res.ColorStateList
 import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.edit
 import androidx.core.view.isVisible
-import androidx.core.view.updateLayoutParams
 import androidx.media3.common.Tracks
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerMorePopupBinding
@@ -32,6 +32,7 @@ internal class PlayerMorePopupBinder(
 
     fun bind() {
         applyTheme()
+        popupBinding.morePopupClose.setOnClickListener { onDismissRequested() }
         with(binding) {
             val prefs = context.prefs()
             val showSpeedMenu = PlayerSpeedControls.shouldShowSpeedMenu(
@@ -148,17 +149,8 @@ internal class PlayerMorePopupBinder(
     }
 
     fun dispose() {
+        popupBinding.morePopupClose.setOnClickListener(null)
         actionViews().forEach { it.setOnClickListener(null) }
-    }
-
-    fun constrainTo(maxPanelHeight: Int) {
-        val titleParams = popupBinding.morePopupTitle.layoutParams as? ViewGroup.MarginLayoutParams
-        val titleBlockHeight = popupBinding.morePopupTitle.measuredHeight +
-            (titleParams?.topMargin ?: 0) + (titleParams?.bottomMargin ?: 0)
-        val availableScrollHeight = (maxPanelHeight - titleBlockHeight).coerceAtLeast(0)
-        if (binding.root.measuredHeight > availableScrollHeight) {
-            binding.root.updateLayoutParams { height = availableScrollHeight }
-        }
     }
 
     fun setQuality(text: String?) {
@@ -281,6 +273,7 @@ internal class PlayerMorePopupBinder(
             setStrokeColor(colors.panelStroke)
         }
         popupBinding.morePopupTitle.setTextColor(colors.onPanel)
+        popupBinding.morePopupClose.imageTintList = ColorStateList.valueOf(colors.secondaryText)
         tintText(binding.root, colors.onPanel)
         listOf(
             binding.streamGroupHeader,
