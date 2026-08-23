@@ -807,6 +807,37 @@
     <string name="player_gestures_haptic_summary" tools:ignore="MissingTranslation">Vibrate when changing volume or brightness</string>
     <string name="player_gestures_sensitivity" tools:ignore="MissingTranslation">Sensitivity</string>
     <string name="player_gestures_zone_split" tools:ignore="MissingTranslation">Zone split</string>
+    <string name="gesture_feedback_brightness" tools:ignore="MissingTranslation">Brightness</string>
+    <string name="gesture_feedback_device_volume" tools:ignore="MissingTranslation">Device volume</string>
+    <string name="gesture_feedback_seek" tools:ignore="MissingTranslation">Seek</string>
+    <string name="gesture_feedback_playback_speed" tools:ignore="MissingTranslation">Playback speed</string>
+    <string name="gesture_feedback_pinch" tools:ignore="MissingTranslation">Pinch</string>
+    <string name="gesture_feedback_auto_brightness" tools:ignore="MissingTranslation">Auto brightness</string>
+    <string name="gesture_feedback_muted" tools:ignore="MissingTranslation">Muted</string>
+    <string name="display_mode_fit" tools:ignore="MissingTranslation">Fit</string>
+    <string name="display_mode_fill" tools:ignore="MissingTranslation">Fill</string>
+    <string name="display_mode_stretch" tools:ignore="MissingTranslation">Stretch</string>
+    <string name="display_mode" tools:ignore="MissingTranslation">Display mode</string>
+    <string name="stream_volume" tools:ignore="MissingTranslation">Stream volume</string>
+    <string name="more_group_stream" tools:ignore="MissingTranslation">Stream</string>
+    <string name="more_group_chat" tools:ignore="MissingTranslation">Chat</string>
+    <string name="more_group_playback" tools:ignore="MissingTranslation">Playback</string>
+    <string name="more_group_help" tools:ignore="MissingTranslation">Help</string>
+    <string name="more_player_gestures" tools:ignore="MissingTranslation">Player gestures</string>
+    <string name="player_gesture_guide_title" tools:ignore="MissingTranslation">Player gestures</string>
+    <string name="player_gesture_guide_got_it" tools:ignore="MissingTranslation">Got it</string>
+    <string name="player_gesture_guide_settings_summary" tools:ignore="MissingTranslation">Show the player gesture guide</string>
+    <string name="gesture_row_brightness" tools:ignore="MissingTranslation">Left vertical</string>
+    <string name="gesture_row_device_volume" tools:ignore="MissingTranslation">Right vertical</string>
+    <string name="gesture_row_seek" tools:ignore="MissingTranslation">Lower horizontal</string>
+    <string name="gesture_row_playback_speed" tools:ignore="MissingTranslation">Upper horizontal</string>
+    <string name="gesture_row_pinch" tools:ignore="MissingTranslation">Pinch</string>
+    <string name="gesture_row_double_tap" tools:ignore="MissingTranslation">Double tap</string>
+    <string name="gesture_action_seek_settings" tools:ignore="MissingTranslation">Seek on VODs and seekable videos</string>
+    <string name="gesture_action_playback_speed_settings" tools:ignore="MissingTranslation">Playback speed on supported non-live media</string>
+    <string name="gesture_action_pinch" tools:ignore="MissingTranslation">Fit / Fill</string>
+    <string name="gesture_action_toggle_chat" tools:ignore="MissingTranslation">Toggle chat</string>
+    <string name="pinch_hint" tools:ignore="MissingTranslation">Pinch to fit or fill video</string>
     <string name="less_rounded_corners">Less rounded</string>
     <string name="reduced_padding">Reduced padding</string>
     <string name="compact_text">Compact text</string>
@@ -819,4 +850,5 @@
     <string name="external_tv_login_message">To get access to all features, you need to login as an Android TV device.\n\nFollow these steps:\n• Copy the code shown on the screen.\n• Press the \"Open URL\" button.\n• Enter the code and press \"Activate\".\n• Press \"Authorize\".\n• Return to Xtra and press \"Next\".</string>
     <string name="activate_notifications_when_following">Activate notifications when following</string>
     <string name="account">Account</string>
+    <string name="close">Close</string>
 </resources>

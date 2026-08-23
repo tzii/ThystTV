@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Keyed tag on the gesture-feedback view holding its last applied placement. -->
+    <item name="feedbackPlacement" type="id" />
+    <!-- Whole-panel scroll viewport inside the shared player popup host. -->
+    <item name="playerPopupViewport" type="id" />
+</resources>

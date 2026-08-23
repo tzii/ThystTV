@@ -65,6 +65,18 @@ On Windows PowerShell, use:
 - If mapped paths are stale, search the repo, use the current path, and update the map.
 - Never commit secrets, keystores, tokens, private crash logs, private APKs, or personal local notes.
 
+## Task State
+
+`.agent/STATE.md` holds this repo's current focus only — never a task list.
+
+- Status words (identical to the user's DEV board): BACKLOG · NEXT · WORKING · REVIEW · BLOCKED · DONE
+- BLOCKED means parked by explicit decision; waiting on a person is still REVIEW/WORKING.
+- Status describes the task, never the session; switching agents changes only `Agent`.
+- At handoff, update `.agent/STATE.md` (Status, Next, Pointer, As-of = date + head SHA)
+  and append one line to `.agent/HANDOFF_LOG.md`. That is the entire write obligation.
+- If `.agent/STATE.md` disagrees with git or GitHub, git/GitHub wins — fix the file first.
+- REVIEW for this repo means: implementation, relevant Gradle checks, docs, and regression review are complete; only required human QA, review, or a merge decision remains.
+
 ## Player Safety
 
 Player changes are high risk. Always list required human QA for:

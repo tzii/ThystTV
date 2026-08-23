@@ -1,6 +1,6 @@
 package com.github.andreyasadchy.xtra.ui.player
 
-object PlayerSpeedDialogState {
+object PlayerSpeedPopupState {
 
     fun initialSpeed(currentSpeed: Float?, savedSpeed: Float): Float {
         return currentSpeed ?: savedSpeed
