@@ -99,6 +99,19 @@ A task is done only when:
 
 - relevant Gradle checks pass, or failures are documented
 - required human QA is listed
+- manual QA is marked completed only when a real human/device check actually occurred
 - docs are updated if behavior/process changed
 - the diff is reviewed for regressions
 - remaining risks are stated
+
+## Repo-local skills
+
+Procedural skills live in `.agents/skills/`:
+
+- `grilling`: interrogate a design or UX decision before implementation.
+- `diagnosing-bugs`: reproduce the exact player/app symptom before fixing it.
+- `blast-radius`: inspect lifecycle, persistence, updater, release, and upstream consequences beyond direct callers.
+- `wizard`: build a human-run procedure for steps an agent cannot perform without inventing dashboard or device evidence.
+
+These skills supplement the project map and task-specific docs above. Release, secret-handling,
+ExecPlan, and manual-QA rules in this repository remain authoritative.
