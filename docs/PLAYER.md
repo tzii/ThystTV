@@ -10,6 +10,10 @@ The paths below are a map, not a guarantee. If code has moved, search for the cu
 
 ## Core Invariants
 
+The opt-in [Twitch resume compatibility probe](research/TWITCH_RESUME_PROBE.md) is a manual
+VoD diagnostic. It uses the existing player, requires explicit actions to seek or send a
+position, and does not migrate local history or change live reporting.
+
 - Only one active player session should exist.
 - Starting a new player should close or safely replace the old player.
 - Closing a player should release playback resources.

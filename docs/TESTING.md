@@ -15,6 +15,11 @@ For release-related work also run:
 
 For UI/resources/player work, also run `./gradlew lintDebug`.
 
+For the opt-in Twitch resume probe, follow the [account round-trip and regression checks](research/TWITCH_RESUME_PROBE.md).
+Protocol tests cover identity validation, seconds conversion, zero/rewind, HTTP/GraphQL
+failures, bounded responses, accepted-but-unverified writes and cancellation. Real Twitch
+authorization and official-app resume behavior require the separate device experiment.
+
 Android resource/layout regression tests use Robolectric with Android resources enabled.
 They run on API 28 with Conscrypt disabled (these tests do not perform networking; its
 JNI provider is unavailable on the Windows test host). `PlayerPopupContentTest` checks

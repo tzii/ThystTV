@@ -109,4 +109,12 @@
         app:iconSpaceReserved="false"
         app:singleLineTitle="false" />
 
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:key="debug_twitch_resume_probe"
+        android:title="@string/resume_probe_setting"
+        android:summary="@string/resume_probe_setting_summary"
+        app:iconSpaceReserved="false"
+        app:singleLineTitle="false" />
+
 </androidx.preference.PreferenceScreen>

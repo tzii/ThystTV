@@ -1,0 +1,33 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="resume_probe_title">Twitch resume test</string>
+    <string name="resume_probe_setting">Enable Twitch resume test</string>
+    <string name="resume_probe_setting_summary">Adds a manual test to the VoD player’s More menu. Automatic synchronization stays off.</string>
+    <string name="resume_probe_intro">Experimental account compatibility test.\nAccount ID: %1$s\nVoD: %2$s\n\nReads preserve local progress. Sending requires confirmation and changes this VoD’s resume position on Twitch. Keep other Twitch players closed during the test.</string>
+    <string name="resume_probe_read">Read Twitch position</string>
+    <string name="resume_probe_seek">Seek to the Twitch position</string>
+    <string name="resume_probe_recent">Read Continue Watching</string>
+    <string name="resume_probe_send">Send current playback position…</string>
+    <string name="resume_probe_send_confirm">Send and verify</string>
+    <string name="resume_probe_confirm">Send %1$s for account %2$s, VoD %3$s?\n\nThis replaces the Twitch resume position, including when rewinding. Only this captured player position is sent. Local history is preserved.</string>
+    <string name="resume_probe_ready">Choose a test. No request has been sent.</string>
+    <string name="resume_probe_loading">Checking account and contacting Twitch…</string>
+    <string name="resume_probe_read_result">Account verified. Twitch position: %1$s. Reading has not moved the player.</string>
+    <string name="resume_probe_no_position">No saved position</string>
+    <string name="resume_probe_empty">Account verified. Continue Watching returned no entries.</string>
+    <string name="resume_probe_verified">Write accepted and read back at %1$s. Close this player, then check the official Twitch app to complete the test. This does not verify watch-streak credit.</string>
+    <string name="resume_probe_accepted_unverified">Twitch accepted the write, but verification could not finish: %1$s. Read the position again before deciding to send another write.</string>
+    <string name="resume_probe_different">Twitch accepted %1$s, but readback returned %2$s. Another player or Twitch processing may have changed it. Automatic sync is still off.</string>
+    <string name="resume_probe_write_uncertain">If a request reached Twitch before the failure, the position may have changed. Read it again before retrying. Nothing will retry automatically.</string>
+    <string name="resume_probe_sign_in">A signed-in account and GraphQL token/client ID are required. A Helix login alone is insufficient.</string>
+    <string name="resume_probe_account_mismatch">The token belongs to a different account. No further operation was sent.</string>
+    <string name="resume_probe_client_mismatch">The token’s client ID does not match the configured GraphQL client. Check the account settings.</string>
+    <string name="resume_probe_session_changed">The account, credentials or player session changed. Close and reopen this test.</string>
+    <string name="resume_probe_authentication">Twitch rejected authentication or integrity, or the token expired. Refresh the app login before testing again.</string>
+    <string name="resume_probe_unsupported">Twitch no longer recognizes this captured operation. A current protocol capture is needed.</string>
+    <string name="resume_probe_graphql">Twitch returned a GraphQL error. This operation has not been verified.</string>
+    <string name="resume_probe_http">Twitch returned an unsuccessful HTTP response. No automatic retry will occur.</string>
+    <string name="resume_probe_network">The request failed or timed out. No automatic retry will occur.</string>
+    <string name="resume_probe_invalid_response">Twitch returned an unexpected response or identity. The result was not applied locally.</string>
+    <string name="resume_probe_unavailable">This VoD is unavailable for the position query.</string>
+    <string name="resume_probe_wait_for_player">Wait for the VoD to load and play before capturing its position.</string>
+</resources>

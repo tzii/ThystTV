@@ -260,6 +260,22 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     open fun downloadVideo() {}
     open fun close() {}
 
+    internal fun resumeProbeVideoId(): String? =
+        if (videoType == VIDEO) arguments?.getString(KEY_VIDEO_ID) else null
+
+    internal fun showTwitchResumeProbe() {
+        if (!prefs.getBoolean(TwitchResumeProbeDialog.PREFERENCE, false) || !isMaximized ||
+            childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(TwitchResumeProbeDialog.TAG) != null
+        ) return
+        resumeProbeVideoId()?.let {
+            TwitchResumeProbeDialog.newInstance(it).show(childFragmentManager, TwitchResumeProbeDialog.TAG)
+        }
+    }
+
+    private fun dismissTwitchResumeProbe() {
+        (childFragmentManager.findFragmentByTag(TwitchResumeProbeDialog.TAG) as? TwitchResumeProbeDialog)?.dismissAllowingStateLoss()
+    }
+
     protected fun updateMorePopupSubtitles(subtitles: Tracks.Group?) {
         activeMorePopupBinder?.setSubtitles(subtitles)
     }
@@ -2768,6 +2784,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
+        dismissTwitchResumeProbe()
         super.onConfigurationChanged(newConfig)
         with(binding) {
             val wasPortrait = isPortrait
@@ -2799,6 +2816,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+        dismissTwitchResumeProbe()
         with(binding) {
             if (isInPictureInPictureMode) {
                 restoreBrightness()
@@ -2863,6 +2881,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     fun minimize() {
+        dismissTwitchResumeProbe()
         with(binding) {
             isMaximized = false
             // Restore original brightness when minimizing

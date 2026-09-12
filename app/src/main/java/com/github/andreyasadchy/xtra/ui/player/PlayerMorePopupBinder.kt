@@ -92,6 +92,10 @@ internal class PlayerMorePopupBinder(
             }
 
             if (videoType == PlayerFragment.VIDEO) {
+                if (prefs.getBoolean(TwitchResumeProbeDialog.PREFERENCE, false)) {
+                    menuResumeProbe.visibility = View.VISIBLE
+                    menuResumeProbe.setOnClickListener { dismissThen(fragment::showTwitchResumeProbe) }
+                }
                 if (vodGamesAvailable) setVodGames()
                 if (prefs.getBoolean(C.PLAYER_MENU_BOOKMARK, true)) fragment.checkBookmark()
             }
@@ -314,6 +318,7 @@ internal class PlayerMorePopupBinder(
             menuMediaPlaylistTags,
             menuMultivariantPlaylistTags,
             menuGestureGuide,
+            menuResumeProbe,
         )
     }
 }
