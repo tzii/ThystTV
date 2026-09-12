@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/icons/launcher/store-512.png" width="112" height="112" alt="ThystTV violet gem with a cyan play symbol">
+  <img src="docs/images/banners/minimal/readme-clean.png" width="100%" alt="ThystTV — violet gem logo and white and cyan wordmark on a dark geometric background">
 </p>
 
 <h1 align="center">ThystTV</h1>
