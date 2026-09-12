@@ -101,6 +101,16 @@ the platform's double-tap timing or actual playback.
 - `HeadingFixPluginTest`: actual CommonMark parsing of compact/ordinary/setext
   headings, Unicode, nested containers, links, code and non-heading hashes.
 
+### Player ports on the 1.3 probe branch
+
+- `PlayerShareLinkTest` checks public link identity, long/zero/unknown timestamps and
+  exclusion of local files or malformed identifiers.
+- `PlayerShareMenuTest` exercises the real More binder's visibility, accessible row
+  size, dismissal ordering and listener disposal, plus the fragment's chooser intent.
+- `SeekIncrementPreferenceTest` inflates the real preferences and checks existing
+  millisecond presets, custom seconds, repeated reopening, independent directions,
+  invalid input and overflow limits. Real device/editor and playback QA remains required.
+
 ### Player basics
 
 - `PlayerSystemUiListenerTest`: real View callback dispatch, view-lifecycle destroy,

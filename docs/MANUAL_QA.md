@@ -44,6 +44,23 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 | Icon/banner assets look correct | [ ] | [ ] | |
 | No private account data exposed | [ ] | [ ] | |
 
+### 1.3 probe rebase and selective player ports
+
+Required; not yet device-verified for this branch:
+
+- Share from a live stream, VoD and clip; cancel the chooser and return to playback.
+  Open the shared VoD link in official Twitch, including after a rewind and at zero.
+  Verify the Share setting hides the action and offline playback offers no public link.
+- Set different custom rewind/forward values (for example 7 and 23 seconds), reopen
+  the player, and check button labels, button/gesture seeks and headset seek commands.
+  Existing presets survive an upgrade. Empty, negative, decimal, zero and excessive
+  input must not replace a saved value. Check phone/tablet, large fonts and rotation.
+- Repeat live/VoD playback, switching, minimize/restore, close/reopen, PiP/background,
+  speed/quality controls, gestures and floating chat; no stale player/audio or popup.
+- Run the [Twitch probe round trip](research/TWITCH_RESUME_PROBE.md), including identity
+  validation, read/list, explicit seek, confirmed write/readback and official-app resume.
+  Automated request fixtures do not establish real Twitch authorization or streak credit.
+
 ## Evidence
 
 Screenshots, videos, logs, or APK links:

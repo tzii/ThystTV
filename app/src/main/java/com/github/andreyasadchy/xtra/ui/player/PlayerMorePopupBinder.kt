@@ -103,6 +103,11 @@ internal class PlayerMorePopupBinder(
                 menuDownload.visibility = View.VISIBLE
                 menuDownload.setOnClickListener { dismissThen(fragment::showDownloadDialog) }
             }
+            if (prefs.getBoolean(C.PLAYER_MENU_SHARE, true) && fragment.playerShareUrl() != null) {
+                menuShare.visibility = View.VISIBLE
+                menuShare.setText(if (videoType == PlayerFragment.VIDEO) R.string.player_share_position else R.string.share)
+                menuShare.setOnClickListener { dismissThen(fragment::sharePlayback) }
+            }
             if (videoType != PlayerFragment.CLIP && prefs.getBoolean(C.PLAYER_MENU_SLEEP, true)) {
                 menuTimer.visibility = View.VISIBLE
                 menuTimer.setOnClickListener { dismissThen(fragment::showSleepTimerDialog) }
@@ -254,7 +259,7 @@ internal class PlayerMorePopupBinder(
     private fun updateGroupVisibilities() {
         with(binding) {
             streamGroupHeader.isVisible =
-                listOf(menuViewerList, menuVodGames, menuDownload, menuBookmark, menuTimer, menuRestart).any { it.isVisible }
+                listOf(menuViewerList, menuVodGames, menuDownload, menuShare, menuBookmark, menuTimer, menuRestart).any { it.isVisible }
             chatGroupHeader.isVisible =
                 listOf(menuChatBar, menuChatToggle, menuTranslateAll, menuReloadEmotes, menuChatDisconnect).any { it.isVisible }
             playbackGroupHeader.isVisible =
@@ -304,6 +309,7 @@ internal class PlayerMorePopupBinder(
             menuViewerList,
             menuVodGames,
             menuDownload,
+            menuShare,
             menuBookmark,
             menuTimer,
             menuRestart,

@@ -8,10 +8,10 @@ new audits go here.
 
 ## Latest audit
 
-- **Date checked:** 2026-08-10
-- **Branch audited:** `master` at PR #12 merge `dfde12117`
+- **Date checked:** 2026-09-13
+- **Branch audited:** `codex/twitch-sync-probe`, rebased onto published `v1.3.0` (`cceaa6f14`)
 - **Upstream remote:** `upstream` -> `https://github.com/crackededed/Xtra.git`
-- **Latest upstream head checked:** `345cff59a2236d87574c6caab8f49980d8c3858b` (`fix 404 errors`)
+- **Latest upstream head checked:** `a8e239ef00678eb8178bc7dc5e88f5e8f4aba291` (`switch proxy on timeout`, 2026-09-04)
 - **Merge base with upstream:** `b063872f` (`quality model`, 2026-03-19)
 - **Commands used:**
 
@@ -26,6 +26,38 @@ exactly (may still be partially/manually ported — see notes).
 
 PR #12 changed 22 files (`+1482/-91`). Post-Hilt upstream changes remain manual-port-only by
 default (see the watershed note below).
+
+## 2026-09-13 player intake on 1.3
+
+Fresh fetches confirmed the published 1.3 tag and upstream head above. Rebased only
+the opt-in Twitch resume probe checkpoint onto the release; its code applied without
+conflicts. The release removed internal task notes from Git; they remain local.
+
+Manually adapted these two useful player features, preserving ThystTV's player and
+settings storage instead of copying upstream service/DI and version changes:
+
+| Upstream source | Accepted behavior / adaptation |
+| --- | --- |
+| [`8a0ea86090f122b95040c48a9784b7b24ce41c5b`](https://github.com/crackededed/Xtra/commit/8a0ea86090f122b95040c48a9784b7b24ce41c5b) — share video link from player menu | More opens the Android text-sharing chooser for live/VoD/clips. VoDs include the current whole-second timestamp, including zero. The player-owned popup closes first; the menu setting is respected. Only public Twitch identifiers are shared. Local-file sharing stays in Downloads; upstream's URI grant logic was omitted. |
+| [`069a9877b2c7a924ed153cb55767ffd905bb1d57`](https://github.com/crackededed/Xtra/commit/069a9877b2c7a924ed153cb55767ffd905bb1d57) — seek button custom values | Rewind/forward accept 1–3600 whole seconds. A preference adapter retains the existing keys and millisecond values, so presets and all current player/headset readers continue to work. Invalid/overflowing input cannot replace a saved value; reopen the player to apply changes. No migration to upstream's V2 keys. |
+
+Checked against actual release code: `e4299f7d` completed-VoD restart, `f5f03a1a`
+headset seeking and corrected `a6dcee18` Markdown headings already ship in 1.3.
+The earlier replay-delay, followed-page, Twitch-autocomplete and social-host fixes
+also ship there. Their older deferrals below are historical, not the current status.
+
+Skipped `f43e3bf0` clip-to-VoD metadata loading for this intake: its implementation
+depends on the rewritten playback service and needs its own metadata lifecycle work.
+Proxy failover, database/quality-model changes, service/DI rewrites and dependency
+bumps remain deferred. Upstream still ends at the September 4 commit; no newer
+commits were available in the fetched branch.
+
+Verification on 2026-09-13: `assembleDebug test lintDebug` passed (534 tests, zero
+failures/errors/skips; lint zero errors and 345 warnings). Focused tests cover link
+identity/timestamps, chooser contents and popup disposal, real preference XML
+inflation, legacy values, independent directions, bounds and invalid input. Device
+QA is required in [MANUAL_QA.md](MANUAL_QA.md); authenticated Twitch compatibility
+remains a separate [round-trip experiment](research/TWITCH_RESUME_PROBE.md).
 
 ## The Hilt watershed (read this before any cherry-pick)
 

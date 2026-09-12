@@ -131,6 +131,7 @@ object C {
     const val PLAYER_MENU_GAMES = "player_menu_games"
     const val PLAYER_MENU_BOOKMARK = "player_menu_bookmark"
     const val PLAYER_MENU_DOWNLOAD = "player_menu_download"
+    const val PLAYER_MENU_SHARE = "player_menu_share"
     const val PLAYER_MENU_SLEEP = "player_menu_sleep"
     const val PLAYER_MENU_VOLUME = "player_menu_volume"
     const val PLAYER_MENU_SUBTITLES = "player_menu_subtitles"

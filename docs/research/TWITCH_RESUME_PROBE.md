@@ -2,8 +2,10 @@
 
 This branch implements the first stage of the supplied [research handoff](TWITCH_SYNC_HANDOFF.md).
 It does not enable automatic sync, migrate old positions, change local Stats, or change live
-watch reporting. It starts from `c9a055d0`; the seek-preview experiment remains in a separate
-worktree and is not included in this APK.
+watch reporting. Originally built from `c9a055d0`, it was rebased on 2026-09-13 onto
+published `v1.3.0` (`cceaa6f14`). The seek-preview experiment remains in a separate
+worktree and is not included in this APK. The two additional player ports are recorded
+in the [upstream ledger](../UPSTREAM_SYNC_LEDGER.md).
 
 ## Verified evidence and remaining boundary
 
@@ -75,6 +77,11 @@ This experiment verifies resume compatibility, not complete watch history or str
   naturally changes the current playback position.
 
 ## Human regression QA
+
+Rebase verification on 2026-09-13: `assembleDebug test lintDebug` passed on the 1.3
+base with the two player ports. All 534 tests passed, including the 23 probe tests
+and 14 new player-port tests. Lint reported zero errors and 345 warnings. The APK is
+`1.3.0-DEBUG` (code 12). No device or authenticated Twitch test was performed.
 
 Build verification on 2026-09-08: `assembleDebug test lintDebug` passed after the final
 credential-header fix. All 373 tests passed, including 23 probe tests. Lint reported zero

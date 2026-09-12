@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
 import android.content.Context
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
@@ -2252,6 +2253,25 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun restartPlayer() {
         if (viewModel.quality?.name != CHAT_ONLY_QUALITY) {
             loadStream()
+        }
+    }
+
+    internal fun playerShareUrl(): String? = PlayerShareLink.create(
+        videoType, arguments?.getString(KEY_CHANNEL_LOGIN), arguments?.getString(KEY_VIDEO_ID),
+        arguments?.getString(KEY_CLIP_ID), getCurrentPosition(),
+    )
+
+    internal fun sharePlayback() {
+        val url = playerShareUrl() ?: return
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, url)
+            putExtra(Intent.EXTRA_TITLE, arguments?.getString(KEY_TITLE) ?: arguments?.getString(KEY_CHANNEL_NAME))
+        }
+        try {
+            startActivity(Intent.createChooser(intent, getString(R.string.share)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(requireContext(), R.string.player_share_unavailable, Toast.LENGTH_SHORT).show()
         }
     }
 

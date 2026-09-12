@@ -1,0 +1,6 @@
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="player_share_position">Share at current position</string>
+    <string name="player_share_unavailable">No sharing app is available</string>
+    <string name="seek_increment_help">Enter whole seconds from 1 to 3600. Reopen the player to apply the change.</string>
+    <string name="seek_increment_invalid">Enter a whole number from 1 to 3600 seconds</string>
+</resources>

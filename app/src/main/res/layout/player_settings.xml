@@ -115,6 +115,16 @@
             tools:visibility="visible" />
 
         <TextView
+            android:id="@+id/menuShare"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:padding="10dp"
+            android:text="@string/share"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/menuBookmark"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

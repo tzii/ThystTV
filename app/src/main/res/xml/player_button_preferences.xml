@@ -167,22 +167,16 @@
         app:iconSpaceReserved="false"
         app:singleLineTitle="false" />
 
-    <ListPreference
+    <com.github.andreyasadchy.xtra.ui.settings.SeekIncrementPreference
         android:defaultValue="10000"
         android:key="playerRewind"
-        android:entries="@array/playerSeekEntries"
-        android:entryValues="@array/playerSeekValues"
-        android:summary="@string/seconds_full"
         android:title="@string/rewind"
         app:iconSpaceReserved="false"
         app:singleLineTitle="false" />
 
-    <ListPreference
+    <com.github.andreyasadchy.xtra.ui.settings.SeekIncrementPreference
         android:defaultValue="10000"
         android:key="playerForward"
-        android:entries="@array/playerSeekEntries"
-        android:entryValues="@array/playerSeekValues"
-        android:summary="@string/seconds_full"
         android:title="@string/forward"
         app:iconSpaceReserved="false"
         app:singleLineTitle="false" />

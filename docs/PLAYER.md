@@ -79,6 +79,19 @@ callback, lifecycle and decor references, including on replacement. Do not insta
 a raw fragment-capturing callback on the activity window: the decor can outlive
 the player and retain a closed fragment after rotation/stream switching.
 
+## Sharing and custom seek intervals
+
+The More menu shares a public live/clip link or a VoD link at the current playback
+timestamp. It uses Android's chooser after dismissing the player popup. The Share
+menu preference controls visibility; downloaded-file sharing remains in Downloads.
+Unknown playback positions omit the timestamp; zero is an explicit timestamp.
+
+Settings -> Player -> Player buttons -> Rewind / Forward accepts 1–3600 whole
+seconds. `SeekIncrementPreference` displays seconds and stores the original
+`playerRewind` / `playerForward` millisecond strings. Existing presets remain valid;
+do not multiply these values again in player/service code. Reopen the player after
+changing intervals. No player instance or playback-service migration is introduced.
+
 ## Player Popup Ownership
 
 Quality uses the same 48dp gear button on compact, landscape, tablet and resized
