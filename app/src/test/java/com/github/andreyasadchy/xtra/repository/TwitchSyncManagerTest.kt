@@ -84,6 +84,7 @@ class TwitchSyncManagerTest {
             Failure.SIGN_IN_REQUIRED to R.string.resume_probe_sign_in,
             Failure.ACCOUNT_MISMATCH to R.string.resume_probe_account_mismatch,
             Failure.CLIENT_MISMATCH to R.string.resume_probe_client_mismatch,
+            Failure.TOKEN_REJECTED to R.string.resume_probe_token_rejected,
             Failure.AUTHENTICATION to R.string.resume_probe_authentication,
         )) {
             doAnswer { throw ProbeException(failure) }.whenever(repository).recent(any(), any())

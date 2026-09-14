@@ -22,7 +22,8 @@
     <string name="resume_probe_account_mismatch">The token belongs to a different account. No further operation was sent.</string>
     <string name="resume_probe_client_mismatch">The token’s client ID does not match the configured GraphQL client. Check the account settings.</string>
     <string name="resume_probe_session_changed">The account, credentials or player session changed. Close and reopen this test.</string>
-    <string name="resume_probe_authentication">Twitch rejected authentication or integrity, or the token expired. Refresh the app login before testing again.</string>
+    <string name="resume_probe_token_rejected">Twitch rejected the saved sync token during account validation. Sign in again, then refresh.</string>
+    <string name="resume_probe_authentication">Twitch accepted the account token, but the viewing-history request could not authenticate. Other app features may still work.</string>
     <string name="resume_probe_unsupported">Twitch no longer recognizes this captured operation. A current protocol capture is needed.</string>
     <string name="resume_probe_graphql">Twitch returned a GraphQL error. This operation has not been verified.</string>
     <string name="resume_probe_http">Twitch returned an unsuccessful HTTP response. No automatic retry will occur.</string>

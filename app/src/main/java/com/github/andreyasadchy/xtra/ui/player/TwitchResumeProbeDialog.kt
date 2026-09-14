@@ -186,6 +186,7 @@ class TwitchResumeProbeDialog : DialogFragment() {
         Failure.ACCOUNT_MISMATCH -> R.string.resume_probe_account_mismatch
         Failure.CLIENT_MISMATCH -> R.string.resume_probe_client_mismatch
         Failure.SESSION_CHANGED -> R.string.resume_probe_session_changed
+        Failure.TOKEN_REJECTED -> R.string.resume_probe_token_rejected
         Failure.AUTHENTICATION -> R.string.resume_probe_authentication
         Failure.UNSUPPORTED_OPERATION -> R.string.resume_probe_unsupported
         Failure.GRAPHQL -> R.string.resume_probe_graphql

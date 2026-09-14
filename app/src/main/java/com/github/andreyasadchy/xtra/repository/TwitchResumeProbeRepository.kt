@@ -42,7 +42,7 @@ class TwitchResumeProbeRepository @Inject constructor(okHttpClient: OkHttpClient
 
     enum class Failure {
         SIGN_IN_REQUIRED, ACCOUNT_MISMATCH, CLIENT_MISMATCH, SESSION_CHANGED,
-        AUTHENTICATION, UNSUPPORTED_OPERATION, GRAPHQL, HTTP, NETWORK, INVALID_RESPONSE,
+        TOKEN_REJECTED, AUTHENTICATION, UNSUPPORTED_OPERATION, GRAPHQL, HTTP, NETWORK, INVALID_RESPONSE,
         UNAVAILABLE_VIDEO, INVALID_POSITION,
     }
 
@@ -125,13 +125,23 @@ class TwitchResumeProbeRepository @Inject constructor(okHttpClient: OkHttpClient
         ) fail(Failure.SIGN_IN_REQUIRED)
         val clientId = account.headers.entries.lastOrNull { it.key.equals("Client-ID", true) }?.value
             ?.takeIf { it.isNotBlank() } ?: fail(Failure.SIGN_IN_REQUIRED)
-        val data = request(Request.Builder().url("https://id.twitch.tv/oauth2/validate")
-            .header("Authorization", "OAuth $token").build(), isCurrent) as? JsonObject
-            ?: fail(Failure.INVALID_RESPONSE)
+        val data = try {
+            request(Request.Builder().url("https://id.twitch.tv/oauth2/validate")
+                .header("Authorization", "OAuth $token").build(), isCurrent) as? JsonObject
+                ?: fail(Failure.INVALID_RESPONSE)
+        } catch (error: ProbeException) {
+            if (error.failure == Failure.AUTHENTICATION) fail(Failure.TOKEN_REJECTED)
+            throw error
+        }
         if (data.string("user_id") != account.id) fail(Failure.ACCOUNT_MISMATCH)
         if (data.string("client_id") != clientId) fail(Failure.CLIENT_MISMATCH)
-        if ((data["expires_in"] as? JsonPrimitive)?.longOrNull?.let { it <= 0 } != false) {
-            fail(Failure.AUTHENTICATION)
+        // Twitch's live validation response determines validity. Legacy tokens can
+        // have expires_in=0 (or omit it) without being expired; never cache that as
+        // permanent authorization. https://dev.twitch.tv/docs/authentication/validate-tokens/
+        val expiry = data["expires_in"]
+        if (expiry != null && (expiry as? JsonPrimitive)?.takeUnless { it.isString }
+                ?.longOrNull?.let { it >= 0 } != true) {
+            fail(Failure.INVALID_RESPONSE)
         }
     }
 

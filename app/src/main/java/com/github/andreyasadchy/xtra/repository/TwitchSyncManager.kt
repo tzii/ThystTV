@@ -321,6 +321,7 @@ class TwitchSyncManager @Inject constructor(
             Failure.SIGN_IN_REQUIRED -> R.string.resume_probe_sign_in
             Failure.ACCOUNT_MISMATCH -> R.string.resume_probe_account_mismatch
             Failure.CLIENT_MISMATCH -> R.string.resume_probe_client_mismatch
+            Failure.TOKEN_REJECTED -> R.string.resume_probe_token_rejected
             Failure.AUTHENTICATION -> R.string.resume_probe_authentication
             Failure.NETWORK -> if (history) R.string.resume_probe_network else R.string.twitch_sync_retry
             Failure.HTTP -> if (history) R.string.resume_probe_http else R.string.twitch_sync_retry

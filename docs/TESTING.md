@@ -41,6 +41,9 @@ For the opt-in Twitch resume probe, follow the [account round-trip and regressio
 Protocol tests cover identity validation, seconds conversion, zero/rewind, HTTP/GraphQL
 failures, bounded responses, accepted-but-unverified writes and cancellation. Real Twitch
 authorization and official-app resume behavior require the separate device experiment.
+Token-validation regressions cover valid zero/omitted expiry, malformed expiry,
+account/client mismatch, HTTP token rejection versus later history rejection, and
+revocation between a successful read and a write. Zero expiry never skips revalidation.
 
 Android resource/layout regression tests use Robolectric with Android resources enabled.
 They run on API 28 with Conscrypt disabled (these tests do not perform networking; its

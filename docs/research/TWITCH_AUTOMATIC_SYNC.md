@@ -25,6 +25,16 @@ New sync text currently uses the project's English fallback convention in other 
   client-ID mismatch and Twitch rejection/expiry. An app username or Helix-only
   login does not prove the GraphQL credentials needed for this experiment are present.
   Only fixed error descriptions are displayed; tokens and server error bodies stay hidden.
+- Token validation accepts a successful response with matching account/client even
+  when `expires_in` is zero or omitted. Some legacy tokens have no scheduled expiry;
+  zero must not be treated as proof of expiry. Each operation still validates again,
+  and HTTP 401/403, identity mismatch or malformed expiry prevents the operation.
+  Errors distinguish rejection during token validation from a later history request
+  that could not authenticate after the token was accepted.
+
+This follows Twitch's [validation endpoint contract](https://dev.twitch.tv/docs/authentication/validate-tokens/)
+and [reported non-expiring legacy tokens](https://discuss.dev.twitch.com/t/not-understanding-token-expirations/46777).
+Successful validation proves token identity, not permission for every private history request.
 
 ## VoD behavior
 
@@ -121,7 +131,7 @@ succeeds. Pending positions must survive the update and failed refreshes. Also c
 empty successful history, cached history while offline, reopening/cancelling refresh,
 and account changes. Never include tokens in QA reports.
 
-Latest debug assembly and all 583 unit tests passed (eight additional status regression
+The September 14 debug assembly and all 583 unit tests passed (eight additional status regression
 tests in this follow-up, no failures/errors/skips).
 Lint passed with zero errors and 345 warnings, matching the pre-change warning count.
 The full suite used the bounded Windows test-process profile documented in
@@ -132,3 +142,32 @@ The first incremental KSP run failed internally; the complete checks passed with
 Development tools did not access a real Twitch account or install on a connected
 device. User feedback above is the available device evidence; a successful account
 round trip and streak credit remain unverified.
+
+## Token validation follow-up on 2026-09-15
+
+User feedback shows the combined authentication/integrity/expiry error while ordinary
+Following is available. Inspection found that sync rejected `expires_in: 0`, unlike
+the app login path. That is a reproducible code defect and a possible explanation of
+the reported failure; no real token response was collected to confirm it for this account.
+The fix accepts the legacy validation shape while retaining fresh validation and
+account/client checks. A rejected validation token is now distinct from later history
+authentication failure. Saved positions and credential selection are unchanged.
+
+Six transport regressions were added for zero/omitted expiry, malformed values,
+identity mismatch, history rejection after validation and later token revocation.
+Existing zero-position write and manager error-mapping cases were extended.
+Code review and `assembleDebug test lintDebug` passed. All 589 tests passed with no
+failures, errors or skips, including all 29 transport tests. Lint reports zero errors
+and 345 warnings, unchanged from the prior build. The full suite used the bounded
+Windows worker profile in [TESTING](../TESTING.md); no tests were excluded.
+The built APK contains the new error code and both updated authentication messages.
+Its signing certificate matches the previous debug APK; package/version remain
+`com.tzii.thysttv.debug`, `1.3.0-DEBUG`, code 12, supporting an ordinary app update.
+Development tools did not use a real Twitch account; the user's token response and
+successful official-app interoperability remain unverified.
+
+Install the September 15 debug APK over the current debug app and press Refresh
+in Twitch sync. Record whether it loads history, rejects the saved token during
+validation, or accepts the token but cannot authenticate the history request. Check
+the two queued positions remain present until verified, then continue the account
+round-trip and live-report QA matrix. Do not infer real sync success from fixture tests.

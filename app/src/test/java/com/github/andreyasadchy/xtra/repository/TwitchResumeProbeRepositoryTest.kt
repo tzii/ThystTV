@@ -96,11 +96,70 @@ class TwitchResumeProbeRepositoryTest {
         assertEquals(1, requests.size)
     }
 
-    @Test fun `expired token fails closed`() {
-        assertFailure(Failure.AUTHENTICATION) {
-            repository(validation.replace("3600", "0")).read(account, "456") { true }
+    @Test fun `token rejected by Twitch cannot issue a history operation`() {
+        for (code in listOf(401, 403)) {
+            requests.clear()
+            assertFailure(Failure.TOKEN_REJECTED) {
+                repository("""{"message":"invalid access token"}""", codeAt = 0 to code).read(account, "456") { true }
+            }
+            assertEquals(1, requests.size)
         }
-        assertEquals(1, requests.size)
+    }
+
+    @Test fun `successful validation with zero expiry can read history`() = runBlocking {
+        val result = repository(validation.replace("3600", "0"), readResponse(20)).read(account, "456") { true }
+        assertEquals(20L, result.seconds)
+        assertEquals(2, requests.size)
+    }
+
+    @Test fun `successful legacy validation without expiry can read history`() = runBlocking {
+        val legacy = """{"user_id":"123","client_id":"test-client"}"""
+        assertEquals(20L, repository(legacy, readResponse(20)).read(account, "456") { true }.seconds)
+        assertEquals(2, requests.size)
+    }
+
+    @Test fun `malformed expiry remains a protocol error and cannot write`() {
+        for (expiry in listOf("null", "-1", "1.5", "\"0\"", "false", "[]", "{}")) {
+            requests.clear()
+            assertFailure(Failure.INVALID_RESPONSE) {
+                repository(validation.replace("3600", expiry)).writeAndReadBack(account, "456", 5000) { true }
+            }
+            assertEquals(1, requests.size)
+        }
+    }
+
+    @Test fun `zero expiry still requires matching account and client before writing`() {
+        for ((body, failure) in listOf(
+            validation.replace("123", "999") to Failure.ACCOUNT_MISMATCH,
+            validation.replace("test-client", "other-client") to Failure.CLIENT_MISMATCH,
+        )) {
+            requests.clear()
+            assertFailure(failure) {
+                repository(body.replace("3600", "0")).writeAndReadBack(account, "456", 5000) { true }
+            }
+            assertEquals(1, requests.size)
+        }
+    }
+
+    @Test fun `history rejection after valid login is distinct from token rejection`() {
+        for (code in listOf(401, 403, 200)) {
+            requests.clear()
+            assertFailure(Failure.AUTHENTICATION) {
+                repository(validation.replace("3600", "0"),
+                    """[{"errors":[{"message":"failed integrity check"}]}]""", codeAt = 1 to code)
+                    .recent(account) { true }
+            }
+            assertEquals(2, requests.size)
+        }
+    }
+
+    @Test fun `zero expiry is revalidated and revocation blocks the next mutation`() = runBlocking {
+        val repo = repository(validation.replace("3600", "0"), readResponse(20),
+            """{"message":"invalid access token"}""", codeAt = 2 to 401)
+        assertEquals(20L, repo.read(account, "456") { true }.seconds)
+        assertFailure(Failure.TOKEN_REJECTED) { repo.writeAndReadBack(account, "456", 5000) { true } }
+        assertEquals(3, requests.size)
+        assertEquals("id.twitch.tv", requests[2].url.host)
     }
 
     @Test fun `missing token performs no request`() {
@@ -163,7 +222,7 @@ class TwitchResumeProbeRepositoryTest {
     }
 
     @Test fun `restart at zero can be sent and verified`() = runBlocking {
-        assertTrue(repository(validation, writeAck, readResponse(0)).writeAndReadBack(account, "456", 0) { true }.matched)
+        assertTrue(repository(validation.replace("3600", "0"), writeAck, readResponse(0)).writeAndReadBack(account, "456", 0) { true }.matched)
     }
 
     @Test fun `different readback is not reported as verified`() = runBlocking {

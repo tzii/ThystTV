@@ -48,6 +48,12 @@ The diagnostic uses the existing app GQL headers (including configured integrity
 and app OkHttp transport, regardless of the selected Cronet/HttpEngine preference. It does
 not substitute a Helix token or change client IDs to force authorization. Validation success
 alone is not proof that the private read/list/write operation is authorized.
+Successful validation with matching identity may report zero or omit `expires_in`
+for legacy tokens. The transport no longer mistakes that for an expired login;
+it still validates on every operation and rejects actual validation failure. Errors
+now distinguish a rejected token from history authentication failure after validation.
+See the [automatic sync follow-up](TWITCH_AUTOMATIC_SYNC.md#token-validation-follow-up-on-2026-09-15)
+for build status and device checks.
 
 ## Required account experiment
 
