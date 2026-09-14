@@ -55,11 +55,14 @@ class TwitchSyncManager @Inject constructor(
     private val halted = mutableSetOf<String>()
     private val messages = mutableMapOf<String, Int>()
     private val liveMessages = mutableMapOf<String, Int>()
+    private val historyMessages = mutableMapOf<String, Int>()
+    private var refreshRevision = 0L
     // Keep a strong reference: SharedPreferences stores listeners weakly.
     private val tokenListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
         scope.launch {
             worker?.cancel(); liveJob?.cancel()
             previous = null; owned = false; sampleAccount = null; clock.reset()
+            refreshRevision++; historyMessages.clear()
         }
     }
 
@@ -72,6 +75,7 @@ class TwitchSyncManager @Inject constructor(
     private fun current(account: Account) = same(account) && vodEnabled(account.id)
 
     fun status(id: String, live: Boolean = false): Int = (if (live) liveMessages else messages)[id] ?: R.string.twitch_sync_ready
+    fun historyStatus(id: String): Int = historyMessages[id] ?: R.string.twitch_sync_history_not_loaded
 
     fun configure(id: String, kind: String, enabled: Boolean) {
         if (id != account().id) return
@@ -201,15 +205,27 @@ class TwitchSyncManager @Inject constructor(
     suspend fun refresh(): List<TwitchRecentVideo> {
         val account = account()
         if (account.id.isBlank()) return emptyList()
+        val revision = ++refreshRevision
+        val isCurrent = { same(account) && refreshRevision == revision }
+        historyMessages[account.id] = R.string.twitch_sync_history_loading
         halted.remove(account.id)
         return try {
-            val recent = repository.recent(account) { same(account) }.map { TwitchRecentVideo(it.videoId, it.title, it.seconds) }
-            if (same(account)) store.update(account.id) { it.copy(recent = recent) }
+            val recent = repository.recent(account, isCurrent).map { TwitchRecentVideo(it.videoId, it.title, it.seconds) }
+            if (!isCurrent()) return emptyList()
+            store.update(account.id) { it.copy(recent = recent) }
+            historyMessages[account.id] = if (recent.isEmpty()) R.string.resume_probe_empty else R.string.twitch_sync_refreshed
             messages[account.id] = R.string.twitch_sync_refreshed
             wake()
             recent
         } catch (error: CancellationException) { throw error
-        } catch (error: Exception) { failure(account.id, error); runCatching { store.read(account.id).recent }.getOrDefault(emptyList()) }
+        } catch (error: Exception) {
+            if (!isCurrent()) return emptyList()
+            historyMessages[account.id] = failureMessage(error, history = true)
+            failure(account.id, error)
+            runCatching { store.read(account.id).recent }.getOrDefault(emptyList())
+        } finally {
+            if (isCurrent() && historyMessages[account.id] == R.string.twitch_sync_history_loading) historyMessages.remove(account.id)
+        }
     }
 
     fun resolve(video: String, keepLocal: Boolean) {
@@ -289,19 +305,29 @@ class TwitchSyncManager @Inject constructor(
     }
 
     private fun failure(id: String, error: Exception) {
+        messages[id] = failureMessage(error)
         if (error is kotlinx.serialization.SerializationException || error is TwitchSyncStore.OutboxFullException) {
-            messages[id] = if (error is TwitchSyncStore.OutboxFullException) R.string.twitch_sync_queue_full else R.string.twitch_sync_storage_error
             halted.add(id)
             return
         }
         val reason = (error as? ProbeException)?.failure
-        messages[id] = when (reason) {
-            Failure.SIGN_IN_REQUIRED, Failure.AUTHENTICATION, Failure.ACCOUNT_MISMATCH, Failure.CLIENT_MISMATCH -> R.string.twitch_sync_sign_in
+        if (reason != null && reason !in listOf(Failure.NETWORK, Failure.HTTP, Failure.SESSION_CHANGED)) halted.add(id)
+    }
+
+    private fun failureMessage(error: Exception, history: Boolean = false): Int {
+        if (error is kotlinx.serialization.SerializationException) return R.string.twitch_sync_storage_error
+        if (error is TwitchSyncStore.OutboxFullException) return R.string.twitch_sync_queue_full
+        return when ((error as? ProbeException)?.failure) {
+            Failure.SIGN_IN_REQUIRED -> R.string.resume_probe_sign_in
+            Failure.ACCOUNT_MISMATCH -> R.string.resume_probe_account_mismatch
+            Failure.CLIENT_MISMATCH -> R.string.resume_probe_client_mismatch
+            Failure.AUTHENTICATION -> R.string.resume_probe_authentication
+            Failure.NETWORK -> if (history) R.string.resume_probe_network else R.string.twitch_sync_retry
+            Failure.HTTP -> if (history) R.string.resume_probe_http else R.string.twitch_sync_retry
             Failure.UNSUPPORTED_OPERATION, Failure.GRAPHQL, Failure.INVALID_RESPONSE -> R.string.twitch_sync_unsupported
             Failure.SESSION_CHANGED -> R.string.twitch_sync_ready
             else -> R.string.twitch_sync_retry
         }
-        if (reason != null && reason !in listOf(Failure.NETWORK, Failure.HTTP, Failure.SESSION_CHANGED)) halted.add(id)
     }
 
     fun observeIrc(message: String, id: String?, channel: String?) {

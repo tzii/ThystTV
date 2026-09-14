@@ -7,6 +7,11 @@
     <string name="twitch_sync_vod_option">Automatically sync VoD progress</string>
     <string name="twitch_sync_live_option">Count live playback toward Twitch streaks</string>
     <string name="twitch_sync_ready">Waiting for playback or a refresh.</string>
+    <string name="twitch_sync_vod_status">VoD sync: %1$s</string>
+    <string name="twitch_sync_live_status">Live reports: %1$s</string>
+    <string name="twitch_sync_history_not_loaded">History has not been loaded in this session.</string>
+    <string name="twitch_sync_history_loading">Checking account and loading Twitch history…</string>
+    <string name="twitch_sync_history_cached">Showing previously saved entries.</string>
     <string name="twitch_sync_refresh">Refresh Twitch history / retry sync</string>
     <string name="twitch_sync_refreshed">Twitch Continue Watching refreshed.</string>
     <string name="twitch_sync_verified">Last VoD upload matched Twitch readback.</string>

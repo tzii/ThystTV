@@ -47,9 +47,12 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 ### Automatic Twitch sync
 
 Follow the [automatic sync account/device matrix](research/TWITCH_AUTOMATIC_SYNC.md).
-User-confirmed so far: sharing and custom intervals only. Official-app resume/history
-and streak credit remain unverified. Cover all playback engines and account changes;
-test fixtures are not evidence that Twitch credited a real account.
+User-confirmed so far: sharing and custom intervals. First sync screenshot shows an
+authentication error and two queued positions; the original empty-history label was
+misleading. Retest the corrected status UI and report its specific authentication
+message. Official-app resume/history and streak credit remain unverified. Cover all
+playback engines and account changes; test fixtures are not evidence that Twitch
+credited a real account.
 
 ### 1.3 probe rebase and selective player ports
 

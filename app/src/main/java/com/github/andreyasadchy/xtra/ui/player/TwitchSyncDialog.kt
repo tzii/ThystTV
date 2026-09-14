@@ -94,7 +94,8 @@ class TwitchSyncDialog : DialogFragment() {
             container.addView(TextView(requireContext()).apply { setText(R.string.twitch_sync_storage_error) })
             return
         }
-        val signature = "${state.recent}:${state.streaks}:${state.progress.count { it.pending }}:${state.progress.filter { it.conflict || it.unavailable }}:${sync.status(accountId)}:${sync.status(accountId, true)}"
+        val historyStatus = sync.historyStatus(accountId)
+        val signature = "${state.recent}:${state.streaks}:${state.progress.count { it.pending }}:${state.progress.filter { it.conflict || it.unavailable }}:${sync.status(accountId)}:${sync.status(accountId, true)}:$historyStatus"
         if (signature == displayed) return
         displayed = signature
         container.removeAllViews()
@@ -109,8 +110,8 @@ class TwitchSyncDialog : DialogFragment() {
         })
         fun position(seconds: Long?) = seconds?.let(DateUtils::formatElapsedTime) ?: getString(R.string.resume_probe_no_position)
         text(getString(R.string.twitch_sync_account, requireContext().tokenPrefs().getString(C.USERNAME, null)?.takeIf { it.isNotBlank() } ?: accountId))
-        text(getString(sync.status(accountId)))
-        text(getString(sync.status(accountId, true)))
+        text(getString(R.string.twitch_sync_vod_status, getString(sync.status(accountId))))
+        text(getString(R.string.twitch_sync_live_status, getString(sync.status(accountId, true))))
         text(getString(R.string.twitch_sync_pending, state.progress.count { it.pending }))
         state.progress.filter { it.conflict }.forEach { item ->
             text(getString(R.string.twitch_sync_conflict_detail, item.title.ifBlank { item.videoId }, position(item.seconds), position(item.remote)))
@@ -123,7 +124,8 @@ class TwitchSyncDialog : DialogFragment() {
             action(getString(R.string.twitch_sync_dismiss_upload)) { sync.unavailableVideo(item.videoId, false); render() }
         }
         text(getString(R.string.twitch_sync_recent))
-        if (state.recent.isEmpty()) text(getString(R.string.resume_probe_empty))
+        text(getString(historyStatus))
+        if (state.recent.isNotEmpty() && historyStatus != R.string.twitch_sync_refreshed) text(getString(R.string.twitch_sync_history_cached))
         state.recent.forEach { video ->
             action("${video.title.ifBlank { video.videoId }} · ${position(video.seconds)}") {
                 startActivity(Intent(requireContext(), MainActivity::class.java).apply {

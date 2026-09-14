@@ -2,15 +2,18 @@ package com.github.andreyasadchy.xtra.repository
 
 import android.app.Application
 import org.robolectric.RuntimeEnvironment
+import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.repository.TwitchResumeProbeRepository.Failure
 import com.github.andreyasadchy.xtra.repository.TwitchResumeProbeRepository.Position
 import com.github.andreyasadchy.xtra.repository.TwitchResumeProbeRepository.ProbeException
+import com.github.andreyasadchy.xtra.repository.TwitchResumeProbeRepository.Recent
 import com.github.andreyasadchy.xtra.repository.TwitchResumeProbeRepository.WriteResult
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -67,6 +70,101 @@ class TwitchSyncManagerTest {
             manager.detach("player")
             runCurrent()
         }
+    }
+
+    @Test fun `empty local history does not claim account verification`() = syncTest {
+        assertTrue(store.read("1").recent.isEmpty())
+        assertEquals(R.string.twitch_sync_history_not_loaded, manager.historyStatus("1"))
+        verifyNoInteractions(repository)
+    }
+
+    @Test fun `history authentication failures stay specific and preserve pending uploads`() = syncTest {
+        pending()
+        for ((failure, message) in listOf(
+            Failure.SIGN_IN_REQUIRED to R.string.resume_probe_sign_in,
+            Failure.ACCOUNT_MISMATCH to R.string.resume_probe_account_mismatch,
+            Failure.CLIENT_MISMATCH to R.string.resume_probe_client_mismatch,
+            Failure.AUTHENTICATION to R.string.resume_probe_authentication,
+        )) {
+            doAnswer { throw ProbeException(failure) }.whenever(repository).recent(any(), any())
+            assertTrue(manager.refresh().isEmpty())
+            assertEquals(message, manager.historyStatus("1"))
+            assertEquals(message, manager.status("1"))
+            assertTrue(item().pending)
+        }
+        verify(repository, never()).writeAndReadBack(any(), any(), any(), any())
+    }
+
+    @Test fun `verified empty history is shown only after successful response`() = syncTest {
+        val gate = CompletableDeferred<List<Recent>>()
+        whenever(repository.recent(any(), any())).doSuspendableAnswer { gate.await() }
+        val refresh = async { manager.refresh() }
+        runCurrent()
+        assertEquals(R.string.twitch_sync_history_loading, manager.historyStatus("1"))
+        gate.complete(emptyList())
+        assertTrue(refresh.await().isEmpty())
+        assertEquals(R.string.resume_probe_empty, manager.historyStatus("1"))
+    }
+
+    @Test fun `failed history refresh preserves cached entries without claiming refresh success`() = syncTest {
+        whenever(repository.recent(any(), any())).thenReturn(listOf(Recent("2", 100, null, "Saved VoD")))
+        val saved = manager.refresh()
+        assertEquals(R.string.twitch_sync_refreshed, manager.historyStatus("1"))
+        doAnswer { throw ProbeException(Failure.NETWORK) }.whenever(repository).recent(any(), any())
+        assertEquals(saved, manager.refresh())
+        assertEquals(saved, store.read("1").recent)
+        assertEquals(R.string.resume_probe_network, manager.historyStatus("1"))
+    }
+
+    @Test fun `cancelled history request stops showing loading without claiming verification`() = syncTest {
+        val gate = CompletableDeferred<List<Recent>>()
+        whenever(repository.recent(any(), any())).doSuspendableAnswer { gate.await() }
+        val refresh = async { manager.refresh() }
+        runCurrent()
+        refresh.cancel()
+        refresh.join()
+        assertEquals(R.string.twitch_sync_history_not_loaded, manager.historyStatus("1"))
+        assertTrue(store.read("1").recent.isEmpty())
+    }
+
+    @Test fun `older history request cannot overwrite a newer refresh result`() = syncTest {
+        val gate = CompletableDeferred<List<Recent>>()
+        whenever(repository.recent(any(), any())).doSuspendableAnswer { gate.await() }
+        val old = async { manager.refresh() }
+        runCurrent()
+        doReturn(emptyList<Recent>()).whenever(repository).recent(any(), any())
+        manager.refresh()
+        gate.complete(listOf(Recent("2", 100, null, "Old response")))
+        assertTrue(old.await().isEmpty())
+        assertEquals(R.string.resume_probe_empty, manager.historyStatus("1"))
+        assertTrue(store.read("1").recent.isEmpty())
+    }
+
+    @Test fun `credential change invalidates history status and ignores in-flight result`() = syncTest {
+        whenever(repository.recent(any(), any())).thenReturn(emptyList())
+        manager.refresh()
+        val gate = CompletableDeferred<List<Recent>>()
+        whenever(repository.recent(any(), any())).doSuspendableAnswer { gate.await() }
+        val old = async { manager.refresh() }
+        runCurrent()
+        context.tokenPrefs().edit().putString(C.GQL_TOKEN2, "replacement-fixture").commit()
+        runCurrent()
+        assertEquals(R.string.twitch_sync_history_not_loaded, manager.historyStatus("1"))
+        gate.complete(listOf(Recent("2", 100, null, "Old credentials")))
+        assertTrue(old.await().isEmpty())
+        assertTrue(store.read("1").recent.isEmpty())
+    }
+
+    @Test fun `upload authentication error does not replace the actual history outcome`() = syncTest {
+        pending()
+        whenever(repository.recent(any(), any())).thenReturn(emptyList())
+        whenever(repository.read(any(), eq("2"), any())).thenAnswer { throw ProbeException(Failure.CLIENT_MISMATCH) }
+        manager.refresh()
+        advanceTimeBy(1100); runCurrent()
+        assertEquals(R.string.resume_probe_client_mismatch, manager.status("1"))
+        assertEquals(R.string.resume_probe_empty, manager.historyStatus("1"))
+        assertTrue(item().pending)
+        verify(repository, never()).writeAndReadBack(any(), any(), any(), any())
     }
 
     @Test fun `closing immediately after rewind checkpoints the final position`() = syncTest {

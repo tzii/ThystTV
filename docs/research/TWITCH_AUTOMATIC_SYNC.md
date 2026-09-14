@@ -17,6 +17,14 @@ New sync text currently uses the project's English fallback convention in other 
   Watching shelf (up to 20 VoDs), and last confirmed channel streak milestones.
 - Refresh reads Twitch's shelf and retries paused sync. A shelf entry opens the same
   normal player/deep-link path with its timestamp. It is not a full history archive.
+- History status follows the actual request: not loaded, loading, successful or failed.
+  An empty local cache does not prove account verification. A failed refresh keeps
+  cached entries marked as previously saved; cancelled or superseded requests cannot
+  publish a successful result. VoD and live-report statuses have separate labels.
+- Authentication errors distinguish missing GraphQL credentials, account mismatch,
+  client-ID mismatch and Twitch rejection/expiry. An app username or Helix-only
+  login does not prove the GraphQL credentials needed for this experiment are present.
+  Only fixed error descriptions are displayed; tokens and server error bodies stay hidden.
 
 ## VoD behavior
 
@@ -102,9 +110,25 @@ clock gating, trusted discovery/form encoding, malformed responses and milestone
 
 ## Validation on 2026-09-14
 
-Debug assembly and all 575 unit tests passed (41 new tests, no failures/errors/skips).
+First device feedback showed a generic authentication error with two pending VoD
+positions. The original dialog incorrectly displayed the verified-empty-history label
+whenever its cache was empty, including after a failed request. The follow-up corrects
+that label and exposes the transport's specific authentication reasons. The screenshot
+does not establish which authentication check failed or any successful Twitch sync.
+Retest by installing the updated debug APK, opening Twitch sync, and pressing Refresh.
+Record the VoD/history status; only proceed with the round trip once authentication
+succeeds. Pending positions must survive the update and failed refreshes. Also check
+empty successful history, cached history while offline, reopening/cancelling refresh,
+and account changes. Never include tokens in QA reports.
+
+Latest debug assembly and all 583 unit tests passed (eight additional status regression
+tests in this follow-up, no failures/errors/skips).
 Lint passed with zero errors and 345 warnings, matching the pre-change warning count.
 The full suite used the bounded Windows test-process profile documented in
 [TESTING](../TESTING.md). The APK remains `1.3.0-DEBUG`, version code 12,
 package `com.tzii.thysttv.debug`. New text uses the existing English fallback convention.
-No Android device was connected and no authenticated Twitch account test was performed.
+The first incremental KSP run failed internally; the complete checks passed with
+`-Pksp.incremental=false`. The packaged APK's updated status labels were verified.
+Development tools did not access a real Twitch account or install on a connected
+device. User feedback above is the available device evidence; a successful account
+round trip and streak credit remain unverified.
