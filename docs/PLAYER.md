@@ -12,7 +12,10 @@ The paths below are a map, not a guarantee. If code has moved, search for the cu
 
 The opt-in [Twitch resume compatibility probe](research/TWITCH_RESUME_PROBE.md) is a manual
 VoD diagnostic. It uses the existing player, requires explicit actions to seek or send a
-position, and does not migrate local history or change live reporting.
+position, and does not migrate local history. The separate [automatic account sync](research/TWITCH_AUTOMATIC_SYNC.md)
+reads resume before startup and observes immutable playback samples; it creates no player.
+Actual playback now owns live minute reports instead of the chat connection. Imported
+positions and Twitch channel milestones remain separate from local viewing Stats.
 
 - Only one active player session should exist.
 - Starting a new player should close or safely replace the old player.

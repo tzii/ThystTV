@@ -44,6 +44,13 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 | Icon/banner assets look correct | [ ] | [ ] | |
 | No private account data exposed | [ ] | [ ] | |
 
+### Automatic Twitch sync
+
+Follow the [automatic sync account/device matrix](research/TWITCH_AUTOMATIC_SYNC.md).
+User-confirmed so far: sharing and custom intervals only. Official-app resume/history
+and streak credit remain unverified. Cover all playback engines and account changes;
+test fixtures are not evidence that Twitch credited a real account.
+
 ### 1.3 probe rebase and selective player ports
 
 Required; not yet device-verified for this branch:

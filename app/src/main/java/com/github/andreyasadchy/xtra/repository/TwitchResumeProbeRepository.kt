@@ -32,7 +32,7 @@ import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** Explicit compatibility experiments only. Never reads or writes local progress/Stats. */
+/** Twitch compatibility transport shared by the manual probe and account sync. No local Stats writes. */
 @Singleton
 class TwitchResumeProbeRepository @Inject constructor(okHttpClient: OkHttpClient, private val json: Json) {
     class Account(val id: String, headers: Map<String, String>) {
@@ -86,7 +86,7 @@ class TwitchResumeProbeRepository @Inject constructor(okHttpClient: OkHttpClient
         }
     }
 
-    /** Caller confirms a snapshot from this VoD's player; no automatic retries or legacy upload. */
+    /** Caller owns opt-in, conflict checks and retry policy. This transport never uploads legacy data. */
     suspend fun writeAndReadBack(
         account: Account, videoId: String, positionMs: Long, isCurrent: () -> Boolean,
     ): WriteResult = withContext(Dispatchers.IO) {
@@ -112,7 +112,7 @@ class TwitchResumeProbeRepository @Inject constructor(okHttpClient: OkHttpClient
         }
     }
 
-    private suspend fun validate(account: Account, isCurrent: () -> Boolean) {
+    suspend fun validate(account: Account, isCurrent: () -> Boolean): Unit = withContext(Dispatchers.IO) {
         checkCurrent(isCurrent)
         // Request.Builder.header replaces names case-insensitively: the last entry wins.
         // Validate that exact value even if custom integrity headers contain case variants.

@@ -15,6 +15,28 @@ For release-related work also run:
 
 For UI/resources/player work, also run `./gradlew lintDebug`.
 
+For automatic sync, follow the [account/device matrix](research/TWITCH_AUTOMATIC_SYNC.md).
+`TwitchSyncStateTest`, `TwitchSyncStoreTest`, `TwitchSyncManagerTest`,
+`TwitchStreakParserTest` and `TwitchLiveWatchRepositoryTest` cover the outbox, account
+isolation, real-playback clock, conflicts/retries, milestones and reporting transport.
+
+For a memory-constrained Windows test run, an untracked Gradle init script at
+`build/sync-test-memory.gradle` can isolate Robolectric batches:
+
+```groovy
+allprojects {
+    tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        maxHeapSize = '768m'
+        maxParallelForks = 1
+        forkEvery = 20
+    }
+}
+```
+
+Add `--init-script build/sync-test-memory.gradle` to the normal Gradle command.
+This changes only test process limits, with the full suite still selected. Sync tests
+cancel application-owned jobs in `finally`, including when an assertion fails.
+
 For the opt-in Twitch resume probe, follow the [account round-trip and regression checks](research/TWITCH_RESUME_PROBE.md).
 Protocol tests cover identity validation, seconds conversion, zero/rewind, HTTP/GraphQL
 failures, bounded responses, accepted-but-unverified writes and cancellation. Real Twitch

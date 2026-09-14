@@ -13,10 +13,12 @@ ThystTV is viewer-first. Protect stable playback, fast VoD controls, floating ch
 Read:
 
 - `docs/ROADMAP.md`
-- `docs/RELEASE_1_2_PLAN.md`
+- `docs/RELEASE_1_3_REVIEW.md`
 - `CHANGELOG.md`
 
-The 1.2 line should focus on quality, player UX, visual polish, and release readiness. Do not turn 1.2 work into broad architecture churn.
+This branch is based on published v1.3.0. Its active experiment is account-scoped
+Twitch sync; see `docs/research/TWITCH_AUTOMATIC_SYNC.md` for code boundaries and QA.
+The older roadmap retains historical 1.2 planning; use tags/CHANGELOG for release state.
 
 ## Contribution And Style Conventions
 

@@ -1,6 +1,11 @@
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <Preference
+        android:key="twitch_sync"
+        android:title="@string/twitch_sync_title"
+        app:iconSpaceReserved="false" />
+
     <ListPreference
         android:defaultValue="auto"
         android:entries="@array/languageEntries"

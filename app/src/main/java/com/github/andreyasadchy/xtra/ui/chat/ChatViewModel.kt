@@ -78,6 +78,8 @@ class ChatViewModel @Inject constructor(
     private val json: Json,
 ) : ViewModel() {
 
+    @Inject lateinit var twitchSync: com.github.andreyasadchy.xtra.repository.TwitchSyncManager
+
     val integrity = MutableStateFlow<String?>(null)
 
     private var chatReadIRC: ChatReadIRC? = null
@@ -909,6 +911,7 @@ class ChatViewModel @Inject constructor(
         }
 
         override suspend fun onChatMessage(message: String, userNotice: Boolean) {
+            if (userNotice) twitchSync.observeIrc(message, accountId, channelId)
             if (!userNotice || showUserNotice) {
                 val chatMessage = ChatUtils.parseChatMessage(message, userNotice)
                 if (chatMessage.reply?.message != null) {
@@ -1062,6 +1065,7 @@ class ChatViewModel @Inject constructor(
         }
 
         override suspend fun onUserNotice(event: JSONObject, timestamp: String?) {
+            twitchSync.observeEventSub(event, timestamp, accountId, channelId)
             if (showUserNotice) {
                 onChatMessage(EventSubUtils.parseUserNotice(event, timestamp), networkLibrary, isLoggedIn, accountId, channelId)
             }
@@ -1173,16 +1177,6 @@ class ChatViewModel @Inject constructor(
 
                         }
                     }
-                }
-            }
-        }
-
-        override suspend fun onMinuteWatched() {
-            if (!streamId.isNullOrBlank()) {
-                try {
-                    playerRepository.sendMinuteWatched(networkLibrary, accountId, streamId, channelId, channelLogin)
-                } catch (e: Exception) {
-
                 }
             }
         }

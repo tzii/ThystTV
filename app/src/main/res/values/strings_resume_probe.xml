@@ -1,7 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="resume_probe_title">Twitch resume test</string>
     <string name="resume_probe_setting">Enable Twitch resume test</string>
-    <string name="resume_probe_setting_summary">Adds a manual test to the VoD player’s More menu. Automatic synchronization stays off.</string>
+    <string name="resume_probe_setting_summary">Adds a manual test to the VoD player’s More menu. Automatic sync has separate account controls in Twitch sync.</string>
     <string name="resume_probe_intro">Experimental account compatibility test.\nAccount ID: %1$s\nVoD: %2$s\n\nReads preserve local progress. Sending requires confirmation and changes this VoD’s resume position on Twitch. Keep other Twitch players closed during the test.</string>
     <string name="resume_probe_read">Read Twitch position</string>
     <string name="resume_probe_seek">Seek to the Twitch position</string>

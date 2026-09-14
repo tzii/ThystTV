@@ -99,6 +99,9 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
+import com.github.andreyasadchy.xtra.repository.TwitchSyncManager
+import javax.inject.Inject
+import java.util.UUID
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -112,6 +115,10 @@ import java.util.Locale
 @OptIn(UnstableApi::class)
 @AndroidEntryPoint
 abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment.OnSortOptionChanged, IntegrityDialog.CallbackListener, PlayerGestureCallback {
+
+    @Inject lateinit var twitchSync: TwitchSyncManager
+    private val twitchSyncSession = UUID.randomUUID().toString()
+    open fun isPlaybackActive(): Boolean = false
 
     private var _binding: FragmentPlayerBinding? = null
     private val systemUiListener = PlayerSystemUiListener()
@@ -264,6 +271,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     internal fun resumeProbeVideoId(): String? =
         if (videoType == VIDEO) arguments?.getString(KEY_VIDEO_ID) else null
 
+    internal fun showTwitchSync() {
+        if (!childFragmentManager.isStateSaved && childFragmentManager.findFragmentByTag(TwitchSyncDialog.TAG) == null) {
+            TwitchSyncDialog().show(childFragmentManager, TwitchSyncDialog.TAG)
+        }
+    }
+
     internal fun showTwitchResumeProbe() {
         if (!prefs.getBoolean(TwitchResumeProbeDialog.PREFERENCE, false) || !isMaximized ||
             childFragmentManager.isStateSaved || childFragmentManager.findFragmentByTag(TwitchResumeProbeDialog.TAG) != null
@@ -274,6 +287,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun dismissTwitchResumeProbe() {
+        (childFragmentManager.findFragmentByTag(TwitchSyncDialog.TAG) as? TwitchSyncDialog)?.dismissAllowingStateLoss()
         (childFragmentManager.findFragmentByTag(TwitchResumeProbeDialog.TAG) as? TwitchResumeProbeDialog)?.dismissAllowingStateLoss()
     }
 
@@ -414,6 +428,32 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     @SuppressLint("ClickableViewAccessibility")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        twitchSync.attach(twitchSyncSession)
+        viewLifecycleOwner.lifecycleScope.launch {
+            // Keep observing actual PiP/background audio while this player's view exists.
+            while (true) {
+                val args = arguments
+                val live = videoType == STREAM
+                val stream = viewModel.stream.value?.takeIf {
+                    SystemClock.elapsedRealtime() - viewModel.streamInfoUpdatedAt in 0..360_000 &&
+                        (it.channelId?.let { id -> id == args?.getString(KEY_CHANNEL_ID) } == true ||
+                            it.channelLogin?.equals(args?.getString(KEY_CHANNEL_LOGIN), true) == true)
+                }
+                val playback = try { Triple(getCurrentPosition() ?: 0, getDuration(), isPlaybackActive()) }
+                    catch (_: IllegalStateException) { Triple(0L, 0L, false) }
+                twitchSync.sample(twitchSyncSession, TwitchSyncManager.Sample(
+                    videoId = if (videoType == VIDEO) args?.getString(KEY_VIDEO_ID) else null,
+                    title = args?.getString(KEY_TITLE).orEmpty(),
+                    positionMs = playback.first,
+                    durationMs = playback.second,
+                    playing = playback.third && viewModel.quality?.name != CHAT_ONLY_QUALITY && !viewModel.playingAds,
+                    broadcastId = if (live) stream?.id else null,
+                    channelId = if (live) stream?.channelId ?: args?.getString(KEY_CHANNEL_ID) else null,
+                    channelLogin = if (live) stream?.channelLogin ?: args?.getString(KEY_CHANNEL_LOGIN) else null,
+                ))
+                delay(1_000)
+            }
+        }
         with(binding) {
             viewLifecycleOwner.lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -2686,7 +2726,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     channelId = requireArguments().getString(KEY_CHANNEL_ID),
                     channelLogin = requireArguments().getString(KEY_CHANNEL_LOGIN),
                     viewerCount = requireArguments().getInt(KEY_VIEWER_COUNT).takeIf { it != -1 },
-                    loop = requireContext().prefs().getBoolean(C.CHAT_DISABLE, false) ||
+                    loop = twitchSync.liveEnabled(twitchSync.account().id) || requireContext().prefs().getBoolean(C.CHAT_DISABLE, false) ||
                             !requireContext().prefs().getBoolean(C.CHAT_PUBSUB_ENABLED, true) ||
                             (requireContext().prefs().getBoolean(C.CHAT_POINTS_COLLECT, true) &&
                                     !requireContext().tokenPrefs().getString(C.USER_ID, null).isNullOrBlank() &&
@@ -2698,13 +2738,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 )
             }
             VIDEO -> {
-                if (requireContext().prefs().getBoolean(C.PLAYER_USE_VIDEOPOSITIONS, true)) {
+                val useLocal = requireContext().prefs().getBoolean(C.PLAYER_USE_VIDEOPOSITIONS, true)
+                if (useLocal || twitchSync.vodEnabled(twitchSync.account().id)) {
                     val id = requireArguments().getString(KEY_VIDEO_ID)?.toLongOrNull()
                     if (id != null) {
                         val explicitPosition = if (requireArguments().getBoolean(KEY_IGNORE_SAVED_POSITION)) {
                             requireArguments().getLong(KEY_OFFSET).takeIf { it != -1L } ?: 0L
                         } else null
-                        viewModel.getVideoPosition(id, requireArguments().getInt(KEY_DURATION_SECONDS), explicitPosition)
+                        viewModel.getVideoPosition(id, requireArguments().getInt(KEY_DURATION_SECONDS), explicitPosition, useLocal) { local -> twitchSync.resume(id.toString(), local) }
                         requireArguments().putBoolean(KEY_IGNORE_SAVED_POSITION, false)
                         requireArguments().putLong(KEY_OFFSET, -1L)
                     } else {
@@ -2880,6 +2921,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     protected fun savePosition() {
+        if (videoType == VIDEO) {
+            arguments?.getString(KEY_VIDEO_ID)?.let { id ->
+                try { twitchSync.checkpointNow(twitchSyncSession, id, getCurrentPosition(), getDuration()) }
+                catch (_: IllegalStateException) { /* A released player has no newer sample to save. */ }
+            }
+        }
         when (videoType) {
             VIDEO -> {
                 if (requireContext().prefs().getBoolean(C.PLAYER_USE_VIDEOPOSITIONS, true)) {
@@ -3315,6 +3362,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun onDestroyView() {
+        twitchSync.detach(twitchSyncSession)
         doubleTapChatSnapshot = null
         systemUiListener.detach()
         finalizePinchSurface()

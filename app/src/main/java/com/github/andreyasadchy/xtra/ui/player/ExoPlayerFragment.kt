@@ -621,6 +621,8 @@ class ExoPlayerFragment : PlayerFragment() {
         }
     }
 
+    override fun isPlaybackActive() = player?.isPlaying == true
+
     override fun getCurrentPosition() = player?.currentPosition
 
     override fun getDuration() = player?.duration ?: 0L

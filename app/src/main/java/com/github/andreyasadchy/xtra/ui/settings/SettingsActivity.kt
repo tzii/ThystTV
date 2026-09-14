@@ -487,6 +487,10 @@ class SettingsActivity : AppCompatActivity() {
                 })
                 true
             }
+            findPreference<Preference>("twitch_sync")?.setOnPreferenceClickListener {
+                com.github.andreyasadchy.xtra.ui.player.TwitchSyncDialog().show(childFragmentManager, com.github.andreyasadchy.xtra.ui.player.TwitchSyncDialog.TAG)
+                true
+            }
             findPreference<Preference>("debug_settings")?.setOnPreferenceClickListener {
                 requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
                 findNavController().navigate(SettingsNavGraphDirections.actionGlobalDebugSettingsFragment())

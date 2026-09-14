@@ -550,6 +550,10 @@ class MediaPlayerFragment : PlayerFragment() {
         }
     }
 
+    override fun isPlaybackActive(): Boolean = try {
+        player?.isPlaying == true && binding.bufferingIndicator.visibility != View.VISIBLE
+    } catch (_: IllegalStateException) { false }
+
     override fun getCurrentPosition(): Long? = player?.currentPosition?.toLong()
 
     override fun getDuration() = player?.duration?.toLong() ?: 0L

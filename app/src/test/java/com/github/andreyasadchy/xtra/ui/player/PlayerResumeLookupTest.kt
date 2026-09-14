@@ -61,6 +61,31 @@ class PlayerResumeLookupTest {
         verifyNoInteractions(playerRepository)
     }
 
+    @Test fun `remote resume respects explicit zero and completed video policy`() = runTest {
+        val vm = viewModel()
+        vm.getVideoPosition(1L, 60, explicitPosition = 0) { 30_000L }
+        advanceUntilIdle()
+        assertEquals(0L, vm.savedPosition.value)
+        verifyNoInteractions(playerRepository)
+        vm.getVideoPosition(1L, 60) { 60_000L }
+        advanceUntilIdle()
+        assertEquals(0L, vm.savedPosition.value)
+        vm.getVideoPosition(1L, 60) { 20_000L }
+        advanceUntilIdle()
+        assertEquals(20_000L, vm.savedPosition.value)
+    }
+
+    @Test fun `remote sync can resume while local position storage is disabled`() = runTest {
+        val vm = viewModel()
+        vm.getVideoPosition(1L, 60, useLocal = false) { local ->
+            assertEquals(null, local)
+            20_000L
+        }
+        advanceUntilIdle()
+        assertEquals(20_000L, vm.savedPosition.value)
+        verifyNoInteractions(playerRepository)
+    }
+
     @Test fun `unknown network duration preserves saved position`() = runTest {
         whenever(playerRepository.getVideoPosition(1L)).thenReturn(VideoPosition(1L, 60_000L))
         val vm = viewModel()

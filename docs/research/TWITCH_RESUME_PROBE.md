@@ -1,8 +1,9 @@
 # Twitch VoD resume compatibility experiment
 
-This branch implements the first stage of the supplied [research handoff](TWITCH_SYNC_HANDOFF.md).
-It does not enable automatic sync, migrate old positions, change local Stats, or change live
-watch reporting. Originally built from `c9a055d0`, it was rebased on 2026-09-13 onto
+This document covers the manual diagnostic stage of the supplied [research handoff](TWITCH_SYNC_HANDOFF.md).
+The branch now also offers [account-scoped automatic sync](TWITCH_AUTOMATIC_SYNC.md).
+The diagnostic itself remains explicit and does not migrate old positions or local Stats.
+Originally built from `c9a055d0`, it was rebased on 2026-09-13 onto
 published `v1.3.0` (`cceaa6f14`). The seek-preview experiment remains in a separate
 worktree and is not included in this APK. The two additional player ports are recorded
 in the [upstream ledger](../UPSTREAM_SYNC_LEDGER.md).
@@ -97,7 +98,7 @@ Confirm local history and Stats are unaffected by diagnostic reads or remote wri
 
 ## Next stages
 
-After the account experiment passes, tackle playback-owned live credit reporting and
-own-account milestone observations as a separate change. Account-scoped automatic VoD
-sync and conservative legacy migration follow their own tests. Existing local rows lack
-ownership and timestamps, so neither bulk upload nor maximum-position merging is safe.
+The user subsequently requested automatic sync before performing the account experiment.
+See [automatic sync](TWITCH_AUTOMATIC_SYNC.md) for its options and remaining device QA.
+Existing local rows lack ownership and timestamps; no bulk migration or maximum-position
+merge is performed. Keep automatic sync disabled when isolating the manual probe test.

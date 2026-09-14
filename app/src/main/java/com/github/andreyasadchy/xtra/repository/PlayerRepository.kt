@@ -3,7 +3,6 @@ package com.github.andreyasadchy.xtra.repository
 import android.net.http.HttpEngine
 import android.os.Build
 import android.os.ext.SdkExtensions
-import android.util.Base64
 import androidx.core.net.toUri
 import com.apollographql.apollo.api.CustomScalarAdapters
 import com.apollographql.apollo.api.json.buildJsonString
@@ -405,117 +404,6 @@ class PlayerRepository @Inject constructor(
                         }.build().toString()
                         VideoQuality(name, quality.codecs, url)
                     } else null
-                }
-            }
-        }
-    }
-
-    suspend fun sendMinuteWatched(networkLibrary: String?, userId: String?, streamId: String?, channelId: String?, channelLogin: String?) = withContext(Dispatchers.IO) {
-        val pageResponse = channelLogin?.let {
-            when {
-                networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                    val response = suspendCancellableCoroutine { continuation ->
-                        httpEngine.get().newUrlRequestBuilder("https://www.twitch.tv/${channelLogin}", cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
-                    }
-                    String(response.second)
-                }
-                networkLibrary == "Cronet" && cronetEngine != null -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        val request = UrlRequestCallbacks.forStringBody(RedirectHandlers.alwaysFollow())
-                        cronetEngine.get().newUrlRequestBuilder("https://www.twitch.tv/${channelLogin}", request.callback, cronetExecutor).build().start()
-                        request.future.get().responseBody as String
-                    } else {
-                        val response = suspendCancellableCoroutine { continuation ->
-                            cronetEngine.get().newUrlRequestBuilder("https://www.twitch.tv/${channelLogin}", getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
-                        }
-                        String(response.second)
-                    }
-                }
-                else -> {
-                    okHttpClient.newCall(Request.Builder().url("https://www.twitch.tv/${channelLogin}").build()).execute().use { response ->
-                        response.body.string()
-                    }
-                }
-            }
-        }
-        if (!pageResponse.isNullOrBlank()) {
-            val settingsRegex = Regex("https://[\\w.]+/config/settings\\.\\w+?\\.js")
-            val settingsUrl = settingsRegex.find(pageResponse)?.value
-            val settingsResponse = settingsUrl?.let {
-                when {
-                    networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                        val response = suspendCancellableCoroutine { continuation ->
-                            httpEngine.get().newUrlRequestBuilder(settingsUrl, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).build().start()
-                        }
-                        String(response.second)
-                    }
-                    networkLibrary == "Cronet" && cronetEngine != null -> {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                            val request = UrlRequestCallbacks.forStringBody(RedirectHandlers.alwaysFollow())
-                            cronetEngine.get().newUrlRequestBuilder(settingsUrl, request.callback, cronetExecutor).build().start()
-                            request.future.get().responseBody as String
-                        } else {
-                            val response = suspendCancellableCoroutine { continuation ->
-                                cronetEngine.get().newUrlRequestBuilder(settingsUrl, getByteArrayCronetCallback(continuation), cronetExecutor).build().start()
-                            }
-                            String(response.second)
-                        }
-                    }
-                    else -> {
-                        okHttpClient.newCall(Request.Builder().url(settingsUrl).build()).execute().use { response ->
-                            response.body.string()
-                        }
-                    }
-                }
-            }
-            if (!settingsResponse.isNullOrBlank()) {
-                val spadeRegex = Regex("\"(?:beacon_url|spade_url)\":\"(.*?)\"")
-                val spadeUrl = spadeRegex.find(settingsResponse)?.groups?.get(1)?.value
-                if (!spadeUrl.isNullOrBlank()) {
-                    val body = buildJsonObject {
-                        put("event", "minute-watched")
-                        putJsonObject("properties") {
-                            put("channel_id", channelId)
-                            put("broadcast_id", streamId)
-                            put("player", "site")
-                            put("user_id", userId?.toLong())
-                        }
-                    }.toString()
-                    val spadeRequest = "data=" + Base64.encodeToString(body.toByteArray(), Base64.NO_WRAP)
-                    when {
-                        networkLibrary == "HttpEngine" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S) >= 7 && httpEngine != null -> {
-                            suspendCancellableCoroutine { continuation ->
-                                httpEngine.get().newUrlRequestBuilder(spadeUrl, cronetExecutor, HttpEngineUtils.byteArrayUrlCallback(continuation)).apply {
-                                    addHeader("Content-Type", "application/x-www-form-urlencoded")
-                                    setUploadDataProvider(HttpEngineUtils.byteArrayUploadProvider(spadeRequest.toByteArray()), cronetExecutor)
-                                }.build().start()
-                            }
-                        }
-                        networkLibrary == "Cronet" && cronetEngine != null -> {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                val request = UrlRequestCallbacks.forStringBody(RedirectHandlers.alwaysFollow())
-                                cronetEngine.get().newUrlRequestBuilder(spadeUrl, request.callback, cronetExecutor).apply {
-                                    addHeader("Content-Type", "application/x-www-form-urlencoded")
-                                    setUploadDataProvider(UploadDataProviders.create(spadeRequest.toByteArray()), cronetExecutor)
-                                }.build().start()
-                                request.future.get().responseBody as String
-                            } else {
-                                suspendCancellableCoroutine<Pair<org.chromium.net.UrlResponseInfo, ByteArray>> { continuation ->
-                                    cronetEngine.get().newUrlRequestBuilder(spadeUrl, getByteArrayCronetCallback(continuation), cronetExecutor).apply {
-                                        addHeader("Content-Type", "application/x-www-form-urlencoded")
-                                        setUploadDataProvider(UploadDataProviders.create(spadeRequest.toByteArray()), cronetExecutor)
-                                    }.build().start()
-                                }
-                            }
-                        }
-                        else -> {
-                            okHttpClient.newCall(Request.Builder().apply {
-                                url(spadeUrl)
-                                header("Content-Type", "application/x-www-form-urlencoded")
-                                post(spadeRequest.toRequestBody())
-                            }.build()).execute()
-                        }
-                    }
                 }
             }
         }

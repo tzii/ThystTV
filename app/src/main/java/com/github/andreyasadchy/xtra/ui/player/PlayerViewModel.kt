@@ -87,6 +87,8 @@ class PlayerViewModel @Inject constructor(
 
     val streamResult = MutableStateFlow<String?>(null)
     val stream = MutableStateFlow<Stream?>(null)
+    var streamInfoUpdatedAt = 0L
+        private set
     private var streamJob: Job? = null
     var useCustomProxy = false
     var playingAds = false
@@ -404,11 +406,14 @@ class PlayerViewModel @Inject constructor(
                 response.data!!.user.stream?.let {
                     Stream(
                         id = it.id,
+                        channelId = channelId,
+                        channelLogin = channelLogin,
                         viewerCount = it.viewersCount,
                     )
                 }
             }
         }
+        streamInfoUpdatedAt = android.os.SystemClock.elapsedRealtime()
     }
 
     fun loadVideo(networkLibrary: String?, gqlHeaders: Map<String, String>, videoId: String?, playerType: String?, supportedCodecs: String?, enableIntegrity: Boolean) {
@@ -427,10 +432,11 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun getVideoPosition(id: Long, durationSeconds: Int, explicitPosition: Long? = null) {
+    fun getVideoPosition(id: Long, durationSeconds: Int, explicitPosition: Long? = null, useLocal: Boolean = true, resolve: suspend (Long?) -> Long? = { it }) {
         viewModelScope.launch {
+            val resolved = resolve(if (explicitPosition == null && useLocal) playerRepository.getVideoPosition(id)?.position else null)
             savedPosition.value = explicitPosition ?: videoResumePosition(
-                playerRepository.getVideoPosition(id)?.position,
+                resolved,
                 durationSeconds.toLong() * 1000L,
             )
         }

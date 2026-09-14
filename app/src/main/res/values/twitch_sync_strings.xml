@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- New feature text uses the existing English fallback convention until localized. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="twitch_sync_title">Twitch sync</string>
+    <string name="twitch_sync_intro">Sync VoD positions with Twitch and report live viewing for channel streaks. Options apply to this account. Local viewing stats stay on this device.</string>
+    <string name="twitch_sync_account">Twitch account: %1$s</string>
+    <string name="twitch_sync_vod_option">Automatically sync VoD progress</string>
+    <string name="twitch_sync_live_option">Count live playback toward Twitch streaks</string>
+    <string name="twitch_sync_ready">Waiting for playback or a refresh.</string>
+    <string name="twitch_sync_refresh">Refresh Twitch history / retry sync</string>
+    <string name="twitch_sync_refreshed">Twitch Continue Watching refreshed.</string>
+    <string name="twitch_sync_verified">Last VoD upload matched Twitch readback.</string>
+    <string name="twitch_sync_pending">Pending VoD positions: %1$d</string>
+    <string name="twitch_sync_retry">Sync unavailable. Pending positions are saved; retrying while the app is running.</string>
+    <string name="twitch_sync_storage_error">Saved sync data could not be read. Sync is paused to preserve it.</string>
+    <string name="twitch_sync_queue_full">The sync queue has 500 pending VoDs. Reconnect and resolve pending uploads before adding more.</string>
+    <string name="twitch_sync_video_unavailable">This VoD is unavailable for sync. Its progress is saved; other VoDs can still sync.</string>
+    <string name="twitch_sync_retry_video">Retry this VoD</string>
+    <string name="twitch_sync_dismiss_upload">Dismiss this upload</string>
+    <string name="twitch_sync_sign_in">Sign in with a matching Twitch account, then refresh to retry.</string>
+    <string name="twitch_sync_unsupported">Twitch did not accept the sync request. Uploads are paused; refresh to retry.</string>
+    <string name="twitch_sync_conflict">A VoD changed on Twitch. Choose which position to keep below.</string>
+    <string name="twitch_sync_conflict_detail">%1$s\nThystTV: %2$s · Twitch: %3$s</string>
+    <string name="twitch_sync_keep_local">Keep ThystTV position</string>
+    <string name="twitch_sync_keep_remote">Keep Twitch position on next open</string>
+    <string name="twitch_sync_recent">Continue Watching on Twitch (up to 20 recent VoDs)</string>
+    <string name="twitch_sync_streaks">Last Twitch-confirmed channel streaks</string>
+    <string name="twitch_sync_no_streaks">No milestone received for this account yet. Keep live chat connected to receive Twitch confirmations. This is not a complete list of current streaks.</string>
+    <string name="twitch_sync_streak_detail">%1$s · Confirmed %3$s\nConsecutive broadcasts: %2$d</string>
+    <string name="twitch_sync_live_sent">Last live minute sent. Twitch decides whether it earns streak or channel-points credit.</string>
+    <string name="twitch_sync_live_failed">Last live report failed. Reporting resumes with the next watched minute.</string>
+</resources>

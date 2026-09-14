@@ -91,6 +91,10 @@ internal class PlayerMorePopupBinder(
                 }
             }
 
+            if (videoType == PlayerFragment.VIDEO || videoType == PlayerFragment.STREAM) {
+                menuTwitchSync.visibility = View.VISIBLE
+                menuTwitchSync.setOnClickListener { dismissThen(fragment::showTwitchSync) }
+            }
             if (videoType == PlayerFragment.VIDEO) {
                 if (prefs.getBoolean(TwitchResumeProbeDialog.PREFERENCE, false)) {
                     menuResumeProbe.visibility = View.VISIBLE
@@ -325,6 +329,7 @@ internal class PlayerMorePopupBinder(
             menuMultivariantPlaylistTags,
             menuGestureGuide,
             menuResumeProbe,
+            menuTwitchSync,
         )
     }
 }
