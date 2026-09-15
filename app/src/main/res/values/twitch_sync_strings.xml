@@ -6,7 +6,7 @@
     <string name="twitch_sync_account">Twitch account: %1$s</string>
     <string name="twitch_sync_vod_option">Automatically sync VoD progress</string>
     <string name="twitch_sync_live_option">Count live playback toward Twitch streaks</string>
-    <string name="twitch_sync_ready">Waiting for playback or a refresh.</string>
+    <string name="twitch_sync_ready">No VoD upload checked in this app session.</string>
     <string name="twitch_sync_vod_status">VoD sync: %1$s</string>
     <string name="twitch_sync_live_status">Live reports: %1$s</string>
     <string name="twitch_sync_history_not_loaded">History has not been loaded in this session.</string>
@@ -34,4 +34,12 @@
     <string name="twitch_sync_streak_detail">%1$s · Confirmed %3$s\nConsecutive broadcasts: %2$d</string>
     <string name="twitch_sync_live_sent">Last live minute sent. Twitch decides whether it earns streak or channel-points credit.</string>
     <string name="twitch_sync_live_failed">Last live report failed. Reporting resumes with the next watched minute.</string>
+    <string name="twitch_sync_live_not_attempted">No live report attempted in this app session.</string>
+    <string name="twitch_sync_live_disabled">Live reporting is off.</string>
+    <string name="twitch_sync_live_no_player">No live player is being observed.</string>
+    <string name="twitch_sync_live_metadata">Waiting for current broadcast and channel information.</string>
+    <string name="twitch_sync_live_paused">Playback is paused, buffering, chat-only or showing ads.</string>
+    <string name="twitch_sync_live_not_advancing">Waiting for the playback position to advance.</string>
+    <string name="twitch_sync_live_counting">Live playback is being counted.</string>
+    <string name="twitch_sync_live_observation">%1$s\nObserved toward the next report: %2$d/60 seconds</string>
 </resources>

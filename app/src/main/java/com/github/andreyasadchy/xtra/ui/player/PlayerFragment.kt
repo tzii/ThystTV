@@ -447,6 +447,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     positionMs = playback.first,
                     durationMs = playback.second,
                     playing = playback.third && viewModel.quality?.name != CHAT_ONLY_QUALITY && !viewModel.playingAds,
+                    live = live,
                     broadcastId = if (live) stream?.id else null,
                     channelId = if (live) stream?.channelId ?: args?.getString(KEY_CHANNEL_ID) else null,
                     channelLogin = if (live) stream?.channelLogin ?: args?.getString(KEY_CHANNEL_LOGIN) else null,

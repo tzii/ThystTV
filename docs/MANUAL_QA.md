@@ -49,15 +49,24 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 Follow the [automatic sync account/device matrix](research/TWITCH_AUTOMATIC_SYNC.md).
 User-confirmed so far: sharing, custom intervals, and authenticated Continue Watching
 reads. September 15 post-fix screenshots show a successful refresh with populated VoD
-titles/timestamps. Two positions remain pending and no milestone has been received;
-the upload/live-report status lines were above the captured scroll position.
+titles/timestamps. Two positions remain pending and no milestone has been received.
+The later top screenshot repeats shelf success as upload status and shows no live
+result; the user confirms watching both live and VoD for at least two minutes.
 Upload/readback, official-app resume in both directions and streak credit remain
 unverified. Cover all playback engines and account changes; test fixtures are not
 evidence that Twitch credited a real account.
 The September 15 follow-up fixes incorrectly rejecting a successfully validated token
 with zero/omitted expiry. Its debug build, 589 tests and lint passed (0 errors, 345
-warnings); signing identity matches the previous APK. Use this September 15 build
-for the remaining upload/readback and live-report checks.
+warnings); signing identity matches the previous APK. The next diagnostics fix preserves
+upload results across successful shelf refresh, wakes retry backoff without cancelling
+a write, and shows live sampling eligibility/seconds. Follow the updated matrix:
+pause a VoD and refresh to check pending/readback, then open More → Twitch sync while
+a live stream plays and capture its counter/reason and report result. Result labels
+reset on app-process restart; stored progress/history/milestones must survive. Check
+live/VoD, switching, minimize/restore, close/reopen, PiP/background, speed/quality,
+gestures and floating chat, plus scrolling at large font sizes on phone/tablet.
+The diagnostics build passed `assembleDebug test lintDebug`: 597 tests, no failures,
+errors or skips; lint 0 errors/345 warnings. Its signature matches the preceding APK.
 
 ### 1.3 probe rebase and selective player ports
 

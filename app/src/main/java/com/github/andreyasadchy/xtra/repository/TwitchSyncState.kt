@@ -48,6 +48,9 @@ class TwitchPlaybackClock {
     private var previousPosition = 0L
     private var wasPlaying = false
     private var watched = 0L
+    var advancing = false
+        private set
+    val observedSeconds: Int get() = (watched / 1000).toInt()
 
     fun sample(key: String, now: Long, position: Long, playing: Boolean): Boolean {
         if (identity != key) {
@@ -56,7 +59,8 @@ class TwitchPlaybackClock {
             wasPlaying = false
         }
         val elapsed = now - previousTime
-        if (playing && wasPlaying && position > previousPosition && elapsed in 1..2500) watched += elapsed
+        advancing = playing && wasPlaying && position > previousPosition && elapsed in 1..2500
+        if (advancing) watched += elapsed
         previousTime = now
         previousPosition = position
         wasPlaying = playing
@@ -65,5 +69,5 @@ class TwitchPlaybackClock {
         return true
     }
 
-    fun reset() { identity = null; wasPlaying = false; watched = 0 }
+    fun reset() { identity = null; wasPlaying = false; watched = 0; advancing = false }
 }

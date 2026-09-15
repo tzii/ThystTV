@@ -32,6 +32,7 @@ class TwitchSyncDialog : DialogFragment() {
     private var displayed = ""
     private var observer: Job? = null
     private var refreshJob: Job? = null
+    private var liveObservationView: TextView? = null
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val context = requireContext()
@@ -95,6 +96,10 @@ class TwitchSyncDialog : DialogFragment() {
             return
         }
         val historyStatus = sync.historyStatus(accountId)
+        val observation = sync.liveObservation(accountId)
+        val liveDetail = getString(R.string.twitch_sync_live_observation, getString(observation.message), observation.seconds)
+        // The live counter updates independently so it cannot rebuild the history list each second.
+        liveObservationView?.text = liveDetail
         val signature = "${state.recent}:${state.streaks}:${state.progress.count { it.pending }}:${state.progress.filter { it.conflict || it.unavailable }}:${sync.status(accountId)}:${sync.status(accountId, true)}:$historyStatus"
         if (signature == displayed) return
         displayed = signature
@@ -112,6 +117,8 @@ class TwitchSyncDialog : DialogFragment() {
         text(getString(R.string.twitch_sync_account, requireContext().tokenPrefs().getString(C.USERNAME, null)?.takeIf { it.isNotBlank() } ?: accountId))
         text(getString(R.string.twitch_sync_vod_status, getString(sync.status(accountId))))
         text(getString(R.string.twitch_sync_live_status, getString(sync.status(accountId, true))))
+        text(liveDetail)
+        liveObservationView = container.getChildAt(container.childCount - 1) as TextView
         text(getString(R.string.twitch_sync_pending, state.progress.count { it.pending }))
         state.progress.filter { it.conflict }.forEach { item ->
             text(getString(R.string.twitch_sync_conflict_detail, item.title.ifBlank { item.videoId }, position(item.seconds), position(item.remote)))
@@ -144,7 +151,7 @@ class TwitchSyncDialog : DialogFragment() {
         }
     }
 
-    override fun onDestroyView() { content = null; displayed = ""; super.onDestroyView() }
+    override fun onDestroyView() { content = null; liveObservationView = null; displayed = ""; super.onDestroyView() }
 
     override fun onStop() {
         observer?.cancel(); refreshJob?.cancel()

@@ -64,6 +64,11 @@ still change progress between preflight and mutation. Use one active player for 
 first account test. Account/client validation and credential checks guard every request;
 logout or credential changes cancel active uploads/reports and invalidate reads. Authentication/protocol failures pause
 uploads until refresh. Transient failures retain progress and back off up to five minutes.
+Successful history refresh preserves the last upload result and wakes an existing
+retry wait promptly. It never cancels an in-flight mutation or creates a second writer.
+Cancelled/failed refreshes do not clear an authentication pause. Upload and live result
+labels describe this app process/session; they reset on process restart or credential
+change, while the outbox, shelf and confirmed milestones remain stored.
 No old local positions are bulk-uploaded, and remote positions never become local Stats
 watch time. Clips and downloads remain outside this sync path.
 
@@ -74,6 +79,12 @@ time only across consecutive advancing, playing samples. Pause, buffering, chat-
 ads and long sampling gaps do not earn time. Account, broadcast and player switches reset
 the partial minute. PiP/background audio can count while the player view still exists
 and playback actually advances. Reporting stops when that owner is destroyed.
+The sync dialog separately shows live eligibility and observed seconds toward the
+next minute. Missing broadcast/channel information, paused/ineligible playback and
+a non-advancing position have distinct labels. This counter updates its own text view
+without rebuilding the scrollable shelf each second. The last report result remains
+visible after closing the player in the same app session; validation rejection is
+distinct from a generic reporting failure. Refreshing history sends no live report.
 
 The old Hermes/chat timer is removed, avoiding duplicate or chat-only reporting. One
 `minute-watched` event is attempted per observed minute, with no replay/backfill of missed
@@ -174,7 +185,40 @@ token response was collected, so the exact expiry value remains unknown.
 The screenshots still show two pending VoD positions and no received channel-streak
 milestone. Upload acknowledgement/readback, actual player resume in both directions,
 and Twitch streak credit remain unverified. A populated shelf does not prove writes;
-an empty milestone cache does not establish failure of live reporting. The VoD sync
-and Live reports status lines are above the captured scroll position. Read those next,
-then continue the account round-trip and live-report QA matrix. Do not infer real sync
-success from fixture tests.
+an empty milestone cache does not establish failure of live reporting.
+
+The subsequent top-of-dialog screenshot shows the VoD line repeating shelf refresh
+success and the live line waiting for playback. The user confirms watching both live
+and VoD for at least two minutes after installing the token fix. Inspection found two
+reproducible issues: a successful shelf read overwrites the actual upload result, and
+manual retry can leave the writer in its existing backoff. These are corrected without
+changing the private request protocol or saved progress. The screenshot cannot identify
+why live reporting has no result: status was process-local, and the old UI did not show
+sampling eligibility or progress. Added live diagnostics make that next check observable.
+
+Retest with the diagnostics build:
+
+1. Watch a VoD, pause, open Twitch sync and refresh once. Keep the app open for a minute.
+   Record the VoD result and pending count; successful shelf reads must not replace the
+   upload result. Check official Twitch only after matching readback and no pending
+   updates for that VoD. Exercise a failed request followed by retry and refresh during
+   an upload; queued progress must not be lost or duplicated.
+2. With a live stream playing, open its More → Twitch sync panel. Observe the live
+   reason and seconds for at least two minutes. A counted minute should produce a sent
+   or failure result. If time does not advance, record its reason. Repeat after pause,
+   stream switch and closing/reopening; a new app process legitimately resets result
+   labels, but must preserve the saved outbox/history/milestones.
+3. Repeat the complete player/account matrix above, including chat-connected milestone
+   checks and official Twitch comparison. Sent reports alone do not prove earned credit.
+
+Eight new coordinator regressions cover status preservation, immediate retry, in-flight
+write safety, cancelled refresh, live eligibility/progress and token rejection/recovery.
+`assembleDebug test lintDebug` passed in 10m 55s using the bounded Windows profile.
+All 597 tests passed without failures/errors/skips, including 32 coordinator tests.
+Lint reports zero errors and the same 345 warnings as before. The APK's new status
+and live-counter resources were checked; its debug signature verifies and matches the
+previous build. Package/version remain `com.tzii.thysttv.debug`, `1.3.0-DEBUG`, code 12.
+The diff was reviewed for writer duplication, cancellation, account isolation, clock
+gating and dialog update cost. No authenticated development requests or phone installs
+were performed. Official-app round trips, live-report acceptance/credit and the player
+device matrix remain human QA; fixture success does not establish Twitch interoperability.

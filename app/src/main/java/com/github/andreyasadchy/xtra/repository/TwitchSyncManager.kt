@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -38,12 +39,16 @@ class TwitchSyncManager @Inject constructor(
     data class Sample(
         val videoId: String? = null, val title: String = "", val positionMs: Long = 0,
         val durationMs: Long = 0, val playing: Boolean = false,
+        val live: Boolean = false,
         val broadcastId: String? = null, val channelId: String? = null, val channelLogin: String? = null,
     )
+
+    data class LiveObservation(val message: Int, val seconds: Int = 0)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val writer = Mutex()
     private var worker: Job? = null
+    private var retrySignal: Channel<Unit>? = null
     private var liveJob: Job? = null
     private val clock = TwitchPlaybackClock()
     private var owner: String? = null
@@ -55,6 +60,7 @@ class TwitchSyncManager @Inject constructor(
     private val halted = mutableSetOf<String>()
     private val messages = mutableMapOf<String, Int>()
     private val liveMessages = mutableMapOf<String, Int>()
+    private val liveObservations = mutableMapOf<String, LiveObservation>()
     private val historyMessages = mutableMapOf<String, Int>()
     private var refreshRevision = 0L
     // Keep a strong reference: SharedPreferences stores listeners weakly.
@@ -63,6 +69,7 @@ class TwitchSyncManager @Inject constructor(
             worker?.cancel(); liveJob?.cancel()
             previous = null; owned = false; sampleAccount = null; clock.reset()
             refreshRevision++; historyMessages.clear()
+            messages.clear(); liveMessages.clear(); liveObservations.clear()
         }
     }
 
@@ -74,8 +81,13 @@ class TwitchSyncManager @Inject constructor(
     private fun same(account: Account): Boolean = this.account().let { it.id == account.id && it.headers == account.headers }
     private fun current(account: Account) = same(account) && vodEnabled(account.id)
 
-    fun status(id: String, live: Boolean = false): Int = (if (live) liveMessages else messages)[id] ?: R.string.twitch_sync_ready
+    fun status(id: String, live: Boolean = false): Int = if (live) liveMessages[id] ?: R.string.twitch_sync_live_not_attempted
+        else messages[id] ?: R.string.twitch_sync_ready
     fun historyStatus(id: String): Int = historyMessages[id] ?: R.string.twitch_sync_history_not_loaded
+    fun liveObservation(id: String): LiveObservation = when {
+        !liveEnabled(id) -> LiveObservation(R.string.twitch_sync_live_disabled)
+        else -> liveObservations[id] ?: LiveObservation(R.string.twitch_sync_live_no_player)
+    }
 
     fun configure(id: String, kind: String, enabled: Boolean) {
         if (id != account().id) return
@@ -86,12 +98,14 @@ class TwitchSyncManager @Inject constructor(
             if (enabled) wake()
         } else {
             liveJob?.cancel(); clock.reset()
+            liveObservations.remove(id)
         }
     }
 
     fun attach(session: String) {
         owner = session
         previous = null; owned = false; suppressedVideo = null; clock.reset()
+        liveObservations.remove(account().id)
         wake()
     }
 
@@ -99,6 +113,7 @@ class TwitchSyncManager @Inject constructor(
         if (owner != session) return
         previous?.let { checkpoint(it, force = true) }
         owner = null; previous = null; owned = false; clock.reset()
+        liveObservations.remove(account().id)
         liveJob?.cancel()
         wake()
     }
@@ -118,21 +133,42 @@ class TwitchSyncManager @Inject constructor(
         val broadcast = value.broadcastId
         val channel = value.channelId
         val login = value.channelLogin
-        if (!liveEnabled(account.id) || broadcast.isNullOrBlank() || channel.isNullOrBlank() || login.isNullOrBlank()) {
+        val unavailable = when {
+            account.id.isBlank() -> R.string.resume_probe_sign_in
+            !liveEnabled(account.id) -> R.string.twitch_sync_live_disabled
+            !value.live -> R.string.twitch_sync_live_no_player
+            broadcast.isNullOrBlank() || channel.isNullOrBlank() || login.isNullOrBlank() -> R.string.twitch_sync_live_metadata
+            else -> null
+        }
+        if (unavailable != null) {
             clock.reset()
+            liveObservations[account.id] = LiveObservation(unavailable)
             return
         }
+        requireNotNull(broadcast); requireNotNull(channel); requireNotNull(login)
         val key = "$session:${account.id}:$channel:$broadcast"
-        if (clock.sample(key, SystemClock.elapsedRealtime(), value.positionMs, value.playing) && liveJob?.isActive != true) {
+        val minute = clock.sample(key, SystemClock.elapsedRealtime(), value.positionMs, value.playing)
+        liveObservations[account.id] = LiveObservation(when {
+            !value.playing -> R.string.twitch_sync_live_paused
+            !clock.advancing -> R.string.twitch_sync_live_not_advancing
+            else -> R.string.twitch_sync_live_counting
+        }, clock.observedSeconds)
+        if (minute && liveJob?.isActive != true) {
             liveJob = scope.launch {
                 val isCurrent = { same(account) && liveEnabled(account.id) && owner == session &&
                     previous?.broadcastId == broadcast && previous?.channelId == channel }
                 try {
                     repository.validate(account, isCurrent)
                     liveRepository.send(account.id, broadcast, channel, login, isCurrent)
-                    liveMessages[account.id] = R.string.twitch_sync_live_sent
+                    if (isCurrent()) liveMessages[account.id] = R.string.twitch_sync_live_sent
                 } catch (error: CancellationException) { throw error
-                } catch (_: Exception) { liveMessages[account.id] = R.string.twitch_sync_live_failed }
+                } catch (error: Exception) {
+                    if (isCurrent()) liveMessages[account.id] = when ((error as? ProbeException)?.failure) {
+                        Failure.SIGN_IN_REQUIRED, Failure.ACCOUNT_MISMATCH, Failure.CLIENT_MISMATCH,
+                        Failure.TOKEN_REJECTED -> failureMessage(error)
+                        else -> R.string.twitch_sync_live_failed
+                    }
+                }
             }
         }
     }
@@ -208,14 +244,14 @@ class TwitchSyncManager @Inject constructor(
         val revision = ++refreshRevision
         val isCurrent = { same(account) && refreshRevision == revision }
         historyMessages[account.id] = R.string.twitch_sync_history_loading
-        halted.remove(account.id)
         return try {
             val recent = repository.recent(account, isCurrent).map { TwitchRecentVideo(it.videoId, it.title, it.seconds) }
             if (!isCurrent()) return emptyList()
             store.update(account.id) { it.copy(recent = recent) }
             historyMessages[account.id] = if (recent.isEmpty()) R.string.resume_probe_empty else R.string.twitch_sync_refreshed
-            messages[account.id] = R.string.twitch_sync_refreshed
-            wake()
+            // A shelf read is not evidence that a queued position was uploaded.
+            halted.remove(account.id)
+            wake(retry = true)
             recent
         } catch (error: CancellationException) { throw error
         } catch (error: Exception) {
@@ -251,9 +287,15 @@ class TwitchSyncManager @Inject constructor(
         wake()
     }
 
-    private fun wake() {
+    private fun wake(retry: Boolean = false) {
         val account = account()
-        if (!vodEnabled(account.id) || account.id in halted || worker?.isActive == true) return
+        if (!vodEnabled(account.id) || account.id in halted) return
+        if (worker?.isActive == true) {
+            if (retry) retrySignal?.trySend(Unit)
+            return
+        }
+        val signal = Channel<Unit>(Channel.CONFLATED)
+        retrySignal = signal
         worker = scope.launch {
             var backoff = 30_000L
             // Coalesce rapid seek/pause samples before taking a snapshot.
@@ -274,7 +316,9 @@ class TwitchSyncManager @Inject constructor(
                     failure(account.id, error)
                     backoff = (backoff * 2).coerceAtMost(300_000)
                 }
-                delay(backoff)
+                if (account.id in halted) break
+                // Refresh wakes the same writer; never cancel a possibly accepted mutation.
+                withTimeoutOrNull(backoff) { signal.receive() }
             }
         }
     }

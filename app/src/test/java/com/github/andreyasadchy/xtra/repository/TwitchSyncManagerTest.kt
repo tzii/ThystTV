@@ -168,6 +168,89 @@ class TwitchSyncManagerTest {
         verify(repository, never()).writeAndReadBack(any(), any(), any(), any())
     }
 
+    @Test fun `opening history preserves the last verified upload result`() = syncTest {
+        pending()
+        whenever(repository.read(any(), eq("2"), any())).thenReturn(Position("2", 200))
+        whenever(repository.recent(any(), any())).thenReturn(emptyList())
+        manager.attach("player")
+        advanceTimeBy(1100); runCurrent()
+        assertEquals(R.string.twitch_sync_verified, manager.status("1"))
+        manager.refresh()
+        assertEquals(R.string.twitch_sync_verified, manager.status("1"))
+        assertEquals(R.string.resume_probe_empty, manager.historyStatus("1"))
+    }
+
+    @Test fun `history success cannot imply an upload when none was attempted`() = syncTest {
+        whenever(repository.recent(any(), any())).thenReturn(listOf(Recent("2", 100, null, "Saved VoD")))
+        manager.refresh()
+        assertEquals(R.string.twitch_sync_ready, manager.status("1"))
+        assertEquals(R.string.twitch_sync_refreshed, manager.historyStatus("1"))
+    }
+
+    @Test fun `refresh wakes network backoff without waiting another minute`() = syncTest {
+        pending()
+        whenever(repository.read(any(), eq("2"), any())).thenAnswer { throw ProbeException(Failure.NETWORK) }
+            .thenReturn(Position("2", 200))
+        whenever(repository.recent(any(), any())).thenReturn(emptyList())
+        manager.attach("player")
+        advanceTimeBy(1100); runCurrent()
+        assertEquals(R.string.twitch_sync_retry, manager.status("1"))
+        manager.refresh()
+        assertEquals(R.string.twitch_sync_retry, manager.status("1"))
+        runCurrent()
+        assertFalse(item().pending)
+        verify(repository, times(2)).read(any(), eq("2"), any())
+        assertEquals(R.string.twitch_sync_verified, manager.status("1"))
+    }
+
+    @Test fun `refresh restarts halted uploads and preserves rejection until retry completes`() = syncTest {
+        pending()
+        whenever(repository.read(any(), eq("2"), any())).thenAnswer { throw ProbeException(Failure.AUTHENTICATION) }
+            .thenReturn(Position("2", 200))
+        whenever(repository.recent(any(), any())).thenReturn(emptyList())
+        manager.attach("player")
+        advanceTimeBy(1100); runCurrent()
+        manager.refresh()
+        assertEquals(R.string.resume_probe_authentication, manager.status("1"))
+        advanceTimeBy(1100); runCurrent()
+        assertFalse(item().pending)
+        assertEquals(R.string.twitch_sync_verified, manager.status("1"))
+    }
+
+    @Test fun `refresh during an upload neither cancels nor duplicates the mutation`() = syncTest {
+        pending()
+        val gate = CompletableDeferred<WriteResult>()
+        whenever(repository.read(any(), eq("2"), any())).thenReturn(Position("2", 100))
+        whenever(repository.writeAndReadBack(any(), any(), any(), any())).doSuspendableAnswer { gate.await() }
+        whenever(repository.recent(any(), any())).thenReturn(emptyList())
+        manager.attach("player")
+        advanceTimeBy(1100); runCurrent()
+        repeat(3) { manager.refresh(); runCurrent() }
+        assertTrue(item().pending)
+        assertFalse(gate.isCancelled)
+        gate.complete(WriteResult(200, 200))
+        runCurrent()
+        assertFalse(item().pending)
+        verify(repository).writeAndReadBack(any(), any(), any(), any())
+    }
+
+    @Test fun `cancelled refresh does not unpause rejected uploads`() = syncTest {
+        pending()
+        whenever(repository.read(any(), eq("2"), any())).thenAnswer { throw ProbeException(Failure.AUTHENTICATION) }
+        manager.attach("player")
+        advanceTimeBy(1100); runCurrent()
+        val gate = CompletableDeferred<List<Recent>>()
+        whenever(repository.recent(any(), any())).doSuspendableAnswer { gate.await() }
+        val refresh = async { manager.refresh() }
+        runCurrent()
+        refresh.cancel(); refresh.join()
+        manager.attach("player")
+        advanceTimeBy(61_000); runCurrent()
+        verify(repository).read(any(), eq("2"), any())
+        assertTrue(item().pending)
+        assertEquals(R.string.resume_probe_authentication, manager.status("1"))
+    }
+
     @Test fun `closing immediately after rewind checkpoints the final position`() = syncTest {
         pending()
         manager.attach("player")
@@ -327,7 +410,7 @@ class TwitchSyncManagerTest {
 
     @Test fun `only actual live playback sends a minute and displaced owner is ignored`() = syncTest {
         manager.attach("player")
-        val sample = TwitchSyncManager.Sample(broadcastId = "3", channelId = "2", channelLogin = "channel", playing = true)
+        val sample = TwitchSyncManager.Sample(live = true, broadcastId = "3", channelId = "2", channelLogin = "channel", playing = true)
         for (second in 0L..60) {
             ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
             manager.sample("stale-player", sample.copy(positionMs = second * 1000))
@@ -340,5 +423,59 @@ class TwitchSyncManagerTest {
             runCurrent()
         }
         verify(live).send(eq("1"), eq("3"), eq("2"), eq("channel"), any())
+    }
+
+    @Test fun `live diagnostics distinguish missing metadata stalled paused and advancing playback`() = syncTest {
+        manager.attach("player")
+        val sample = TwitchSyncManager.Sample(live = true, playing = true)
+        manager.sample("player", sample)
+        assertEquals(R.string.twitch_sync_live_metadata, manager.liveObservation("1").message)
+        val identified = sample.copy(broadcastId = "3", channelId = "2", channelLogin = "channel")
+        for (second in 0L..65) {
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            manager.sample("player", identified.copy(positionMs = 1000))
+            runCurrent()
+        }
+        assertEquals(R.string.twitch_sync_live_not_advancing, manager.liveObservation("1").message)
+        assertEquals(0, manager.liveObservation("1").seconds)
+        verifyNoInteractions(repository, live)
+        for (second in 2L..11) {
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            manager.sample("player", identified.copy(positionMs = second * 1000))
+        }
+        assertEquals(R.string.twitch_sync_live_counting, manager.liveObservation("1").message)
+        assertEquals(10, manager.liveObservation("1").seconds)
+        manager.sample("player", identified.copy(playing = false, positionMs = 11_000))
+        assertEquals(R.string.twitch_sync_live_paused, manager.liveObservation("1").message)
+        assertEquals(10, manager.liveObservation("1").seconds)
+        manager.detach("player")
+        assertEquals(R.string.twitch_sync_live_no_player, manager.liveObservation("1").message)
+        assertEquals(R.string.twitch_sync_live_not_attempted, manager.status("1", true))
+    }
+
+    @Test fun `live token rejection is specific and successful report survives closing the player`() = syncTest {
+        manager.attach("player")
+        whenever(repository.validate(any(), any())).thenAnswer { throw ProbeException(Failure.TOKEN_REJECTED) }
+        val sample = TwitchSyncManager.Sample(live = true, broadcastId = "3", channelId = "2", channelLogin = "channel", playing = true)
+        for (second in 0L..60) {
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            manager.sample("player", sample.copy(positionMs = second * 1000))
+            runCurrent()
+        }
+        assertEquals(R.string.resume_probe_token_rejected, manager.status("1", true))
+        verifyNoInteractions(live)
+        doReturn(Unit).whenever(repository).validate(any(), any())
+        for (second in 61L..120) {
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            manager.sample("player", sample.copy(positionMs = second * 1000))
+            runCurrent()
+        }
+        assertEquals(R.string.twitch_sync_live_sent, manager.status("1", true))
+        manager.detach("player")
+        assertEquals(R.string.twitch_sync_live_sent, manager.status("1", true))
+        assertEquals(R.string.twitch_sync_live_no_player, manager.liveObservation("1").message)
+        verify(live).send(eq("1"), eq("3"), eq("2"), eq("channel"), any())
+        manager.configure("1", "live", false)
+        assertEquals(R.string.twitch_sync_live_disabled, manager.liveObservation("1").message)
     }
 }

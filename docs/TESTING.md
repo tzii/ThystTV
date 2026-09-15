@@ -36,6 +36,9 @@ allprojects {
 Add `--init-script build/sync-test-memory.gradle` to the normal Gradle command.
 This changes only test process limits, with the full suite still selected. Sync tests
 cancel application-owned jobs in `finally`, including when an assertion fails.
+Coordinator regressions also cover history refresh preserving upload status, prompt
+retry during backoff, no cancellation/duplicate mutation on refresh, cancelled refresh
+retaining an authentication pause, and live eligibility/counter/token-error reporting.
 
 For the opt-in Twitch resume probe, follow the [account round-trip and regression checks](research/TWITCH_RESUME_PROBE.md).
 Protocol tests cover identity validation, seconds conversion, zero/rewind, HTTP/GraphQL
