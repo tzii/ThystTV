@@ -47,17 +47,17 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 ### Automatic Twitch sync
 
 Follow the [automatic sync account/device matrix](research/TWITCH_AUTOMATIC_SYNC.md).
-User-confirmed so far: sharing and custom intervals. First sync screenshot shows an
-authentication error and two queued positions; the original empty-history label was
-misleading. Retest the corrected status UI and report its specific authentication
-message. Official-app resume/history and streak credit remain unverified. Cover all
-playback engines and account changes; test fixtures are not evidence that Twitch
-credited a real account.
+User-confirmed so far: sharing, custom intervals, and authenticated Continue Watching
+reads. September 15 post-fix screenshots show a successful refresh with populated VoD
+titles/timestamps. Two positions remain pending and no milestone has been received;
+the upload/live-report status lines were above the captured scroll position.
+Upload/readback, official-app resume in both directions and streak credit remain
+unverified. Cover all playback engines and account changes; test fixtures are not
+evidence that Twitch credited a real account.
 The September 15 follow-up fixes incorrectly rejecting a successfully validated token
 with zero/omitted expiry. Its debug build, 589 tests and lint passed (0 errors, 345
-warnings); signing identity matches the previous APK. Use this September 15 build,
-refresh with the current login before signing out, and distinguish
-token validation rejection from a history request that fails after validation.
+warnings); signing identity matches the previous APK. Use this September 15 build
+for the remaining upload/readback and live-report checks.
 
 ### 1.3 probe rebase and selective player ports
 

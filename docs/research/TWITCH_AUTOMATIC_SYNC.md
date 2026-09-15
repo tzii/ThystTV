@@ -166,8 +166,15 @@ Its signing certificate matches the previous debug APK; package/version remain
 Development tools did not use a real Twitch account; the user's token response and
 successful official-app interoperability remain unverified.
 
-Install the September 15 debug APK over the current debug app and press Refresh
-in Twitch sync. Record whether it loads history, rejects the saved token during
-validation, or accepts the token but cannot authenticate the history request. Check
-the two queued positions remain present until verified, then continue the account
-round-trip and live-report QA matrix. Do not infer real sync success from fixture tests.
+Post-fix device screenshots on September 15 show **Twitch Continue Watching refreshed**
+with a populated list of VoD titles and resume timestamps, including zero. Account
+validation and authenticated Continue Watching reads are now device-verified. No raw
+token response was collected, so the exact expiry value remains unknown.
+
+The screenshots still show two pending VoD positions and no received channel-streak
+milestone. Upload acknowledgement/readback, actual player resume in both directions,
+and Twitch streak credit remain unverified. A populated shelf does not prove writes;
+an empty milestone cache does not establish failure of live reporting. The VoD sync
+and Live reports status lines are above the captured scroll position. Read those next,
+then continue the account round-trip and live-report QA matrix. Do not infer real sync
+success from fixture tests.
