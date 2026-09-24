@@ -244,7 +244,9 @@ class ChannelPagerViewModel @Inject constructor(
             viewModelScope.launch {
                 try {
                     if (!channelId.isNullOrBlank()) {
-                        if (setting == 0 && !userId.isNullOrBlank() && userId != channelId) {
+                        if (setting == 0 && !userId.isNullOrBlank() && userId != channelId &&
+                            (!gqlHeaders[C.HEADER_TOKEN].isNullOrBlank() || !helixHeaders[C.HEADER_TOKEN].isNullOrBlank())
+                        ) {
                             try {
                                 if (gqlHeaders[C.HEADER_TOKEN].isNullOrBlank()) throw Exception()
                                 val follower = graphQLRepository.loadQueryFollowingUser(

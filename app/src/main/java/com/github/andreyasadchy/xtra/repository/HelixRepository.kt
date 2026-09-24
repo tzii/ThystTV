@@ -12,6 +12,7 @@ import com.github.andreyasadchy.xtra.model.helix.chat.EmoteSetsResponse
 import com.github.andreyasadchy.xtra.model.helix.chat.UserEmotesResponse
 import com.github.andreyasadchy.xtra.model.helix.clip.ClipsResponse
 import com.github.andreyasadchy.xtra.model.helix.follows.FollowsResponse
+import com.github.andreyasadchy.xtra.model.helix.follower.FollowersResponse
 import com.github.andreyasadchy.xtra.model.helix.game.GamesResponse
 import com.github.andreyasadchy.xtra.model.helix.stream.StreamsResponse
 import com.github.andreyasadchy.xtra.model.helix.user.UsersResponse
@@ -494,7 +495,7 @@ class HelixRepository @Inject constructor(
         }
     }
 
-    suspend fun getUserFollowers(networkLibrary: String?, headers: Map<String, String>, userId: String?, targetId: String? = null, limit: Int? = null, offset: String? = null): FollowsResponse = withContext(Dispatchers.IO) {
+    suspend fun getUserFollowers(networkLibrary: String?, headers: Map<String, String>, userId: String?, targetId: String? = null, limit: Int? = null, offset: String? = null): FollowersResponse = withContext(Dispatchers.IO) {
         val url = "https://api.twitch.tv/helix/channels/followers".toUri().buildUpon().apply {
             targetId?.let { appendQueryParameter("user_id", it) }
             userId?.let { appendQueryParameter("broadcaster_id", it) }
@@ -508,7 +509,7 @@ class HelixRepository @Inject constructor(
                         headers.forEach { addHeader(it.key, it.value) }
                     }.build().start()
                 }
-                json.decodeFromString<FollowsResponse>(String(response.second))
+                json.decodeFromString<FollowersResponse>(String(response.second))
             }
             networkLibrary == "Cronet" && cronetEngine != null -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -517,14 +518,14 @@ class HelixRepository @Inject constructor(
                         headers.forEach { addHeader(it.key, it.value) }
                     }.build().start()
                     val response = request.future.get().responseBody as String
-                    json.decodeFromString<FollowsResponse>(response)
+                    json.decodeFromString<FollowersResponse>(response)
                 } else {
                     val response = suspendCancellableCoroutine { continuation ->
                         cronetEngine.get().newUrlRequestBuilder(url, getByteArrayCronetCallback(continuation), cronetExecutor).apply {
                             headers.forEach { addHeader(it.key, it.value) }
                         }.build().start()
                     }
-                    json.decodeFromString<FollowsResponse>(String(response.second))
+                    json.decodeFromString<FollowersResponse>(String(response.second))
                 }
             }
             else -> {
@@ -532,7 +533,7 @@ class HelixRepository @Inject constructor(
                     url(url)
                     headers(headers.toHeaders())
                 }.build()).execute().use { response ->
-                    json.decodeFromString<FollowsResponse>(response.body.string())
+                    json.decodeFromString<FollowersResponse>(response.body.string())
                 }
             }
         }
@@ -1212,7 +1213,7 @@ class HelixRepository @Inject constructor(
                     }.build().start()
                 }
                 if (response.first.httpStatusCode in 200..299) {
-                    null
+                    parseChatColorResponse(String(response.second))
                 } else {
                     String(response.second)
                 }
@@ -1225,7 +1226,7 @@ class HelixRepository @Inject constructor(
                     }.build().start()
                     val response = request.future.get()
                     if (response.urlResponseInfo.httpStatusCode in 200..299) {
-                        json.decodeFromString<JsonElement>(response.responseBody as String).jsonObject["data"]?.jsonArray?.firstOrNull()?.jsonObject?.get("color")?.jsonPrimitive?.contentOrNull
+                        parseChatColorResponse(response.responseBody as String)
                     } else {
                         response.responseBody as String
                     }
@@ -1236,7 +1237,7 @@ class HelixRepository @Inject constructor(
                         }.build().start()
                     }
                     if (response.first.httpStatusCode in 200..299) {
-                        null
+                        parseChatColorResponse(String(response.second))
                     } else {
                         String(response.second)
                     }
@@ -1248,7 +1249,7 @@ class HelixRepository @Inject constructor(
                     headers(headers.toHeaders())
                 }.build()).execute().use { response ->
                     if (response.isSuccessful) {
-                        json.decodeFromString<JsonElement>(response.body.string()).jsonObject["data"]?.jsonArray?.firstOrNull()?.jsonObject?.get("color")?.jsonPrimitive?.contentOrNull
+                        parseChatColorResponse(response.body.string())
                     } else {
                         response.body.string()
                     }
@@ -1256,6 +1257,9 @@ class HelixRepository @Inject constructor(
             }
         }
     }
+
+    internal fun parseChatColorResponse(body: String): String? =
+        json.decodeFromString<JsonElement>(body).jsonObject["data"]?.jsonArray?.firstOrNull()?.jsonObject?.get("color")?.jsonPrimitive?.contentOrNull
 
     suspend fun updateChatColor(networkLibrary: String?, headers: Map<String, String>, userId: String?, color: String?): String? = withContext(Dispatchers.IO) {
         val url = "https://api.twitch.tv/helix/chat/color".toUri().buildUpon().apply {

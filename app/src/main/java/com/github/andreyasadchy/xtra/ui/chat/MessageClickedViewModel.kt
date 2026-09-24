@@ -7,6 +7,7 @@ import com.github.andreyasadchy.xtra.repository.GraphQLRepository
 import com.github.andreyasadchy.xtra.repository.HelixRepository
 import com.github.andreyasadchy.xtra.util.C
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -46,6 +47,8 @@ class MessageClickedViewModel @Inject constructor(
                             followedAt = it.follow?.followedAt?.toString(),
                         )
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     if (!helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
                         try {
@@ -55,6 +58,20 @@ class MessageClickedViewModel @Inject constructor(
                                 ids = channelId?.let { listOf(it) },
                                 logins = if (channelId.isNullOrBlank()) channelLogin?.let { listOf(it) } else null
                             ).data.firstOrNull()?.let {
+                                val followedAt = if (!targetId.isNullOrBlank() && !it.id.isNullOrBlank()) {
+                                    try {
+                                        helixRepository.getUserFollowers(
+                                            networkLibrary = networkLibrary,
+                                            headers = helixHeaders,
+                                            userId = targetId,
+                                            targetId = it.id,
+                                        ).data.firstOrNull { follower -> follower.id == it.id }?.followedAt
+                                    } catch (e: CancellationException) {
+                                        throw e
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                } else null
                                 User(
                                     id = it.id,
                                     login = it.login,
@@ -63,8 +80,11 @@ class MessageClickedViewModel @Inject constructor(
                                     type = it.type,
                                     broadcasterType = it.broadcasterType,
                                     createdAt = it.createdAt,
+                                    followedAt = followedAt,
                                 )
                             }
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             null
                         }

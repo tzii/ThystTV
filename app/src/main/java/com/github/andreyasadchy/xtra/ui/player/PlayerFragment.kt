@@ -2668,7 +2668,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         val explicitPosition = if (requireArguments().getBoolean(KEY_IGNORE_SAVED_POSITION)) {
                             requireArguments().getLong(KEY_OFFSET).takeIf { it != -1L } ?: 0L
                         } else null
-                        viewModel.getVideoPosition(id, requireArguments().getInt(KEY_DURATION_SECONDS), explicitPosition)
+                        viewModel.getVideoPosition(
+                            id, requireArguments().getInt(KEY_DURATION_SECONDS),
+                            requireArguments().getString(KEY_THUMBNAIL), explicitPosition,
+                        )
                         requireArguments().putBoolean(KEY_IGNORE_SAVED_POSITION, false)
                         requireArguments().putLong(KEY_OFFSET, -1L)
                     } else {

@@ -43,10 +43,10 @@ class PlayerResumeLookupTest {
     @Test fun `network lookup converts seconds before resetting completion`() = runTest {
         whenever(playerRepository.getVideoPosition(1L)).thenReturn(VideoPosition(1L, 60_000L))
         val vm = viewModel()
-        vm.getVideoPosition(1L, 60)
+        vm.getVideoPosition(1L, 60, "https://example.com/vod.jpg")
         advanceUntilIdle()
         assertEquals(0L, vm.savedPosition.value)
-        vm.getVideoPosition(1L, 61)
+        vm.getVideoPosition(1L, 61, "https://example.com/vod.jpg")
         advanceUntilIdle()
         assertEquals(60_000L, vm.savedPosition.value)
     }
@@ -54,7 +54,7 @@ class PlayerResumeLookupTest {
     @Test fun `explicit bookmark clip and deep link timestamps bypass saved resume`() = runTest {
         val vm = viewModel()
         for (offset in listOf(0L, 30_000L, 60_000L, 70_000L)) {
-            vm.getVideoPosition(1L, 60, explicitPosition = offset)
+            vm.getVideoPosition(1L, 60, "https://example.com/vod.jpg", explicitPosition = offset)
             advanceUntilIdle()
             assertEquals(offset, vm.savedPosition.value)
         }
@@ -64,7 +64,7 @@ class PlayerResumeLookupTest {
     @Test fun `unknown network duration preserves saved position`() = runTest {
         whenever(playerRepository.getVideoPosition(1L)).thenReturn(VideoPosition(1L, 60_000L))
         val vm = viewModel()
-        vm.getVideoPosition(1L, 0)
+        vm.getVideoPosition(1L, 0, "https://example.com/vod.jpg")
         advanceUntilIdle()
         assertEquals(60_000L, vm.savedPosition.value)
     }
@@ -80,6 +80,20 @@ class PlayerResumeLookupTest {
         vm.getOfflineVideoPosition(1)
         advanceUntilIdle()
         assertEquals(59_999L, vm.savedOfflineVideoPosition.value)
+    }
+
+    @Test fun `processing and bookmarked vods retain positions beyond stale duration`() = runTest {
+        whenever(playerRepository.getVideoPosition(1L)).thenReturn(VideoPosition(1L, 70_000L))
+        val vm = viewModel()
+        for (thumbnail in listOf(null, "", "https://vod-secure.twitch.tv/_404/404_processing_320x180.png", "/files/thumbnails/1")) {
+            vm.getVideoPosition(1L, 60, thumbnail)
+            advanceUntilIdle()
+            assertEquals(70_000L, vm.savedPosition.value)
+        }
+        // Once the broadcast has final metadata, completed automatic resume restarts.
+        vm.getVideoPosition(1L, 60, "https://example.com/final.jpg")
+        advanceUntilIdle()
+        assertEquals(0L, vm.savedPosition.value)
     }
 
     @Test fun `missing download record starts from zero`() = runTest {
