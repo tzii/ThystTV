@@ -45,15 +45,15 @@ class PlayerSurfacePolicyTest {
     }
 
     @Test
-    fun `large brightness is a start-edge vertical pill with compact fixed size`() {
+    fun `large brightness has a visibly larger start-edge pill`() {
         val placement = PlayerSurfacePolicy.placementFor(
             PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfaceClass.LARGE, 2f,
             surfaceHeightPx = 1600,
         )
         assertEquals(Gravity.CENTER_VERTICAL or Gravity.START, placement.gravity)
         assertEquals((PlayerSurfacePolicy.EDGE_PILL_WIDTH_DP * 2f).toInt(), placement.maxWidthPx)
-        assertEquals((PlayerSurfacePolicy.EDGE_PILL_WIDTH_DP * 2f).toInt(), placement.fixedContainerWidthPx)
-        assertEquals((PlayerSurfacePolicy.EDGE_PILL_HEIGHT_DP * 2f).toInt(), placement.fixedContainerHeightPx)
+        assertEquals(128, placement.fixedContainerWidthPx)
+        assertEquals(432, placement.fixedContainerHeightPx)
         assertEquals(0, placement.topPaddingPx)
         assertTrue(placement.verticalPill)
     }
@@ -114,6 +114,27 @@ class PlayerSurfacePolicyTest {
         assertEquals(desired, PlayerSurfacePolicy.edgePillHeightPx(density, desired * 10))
         val shortSurface = 400
         assertEquals((shortSurface * 0.45f).toInt(), PlayerSurfacePolicy.edgePillHeightPx(density, shortSurface))
+    }
+
+    @Test
+    fun `resized player uses its current bounds instead of device dimensions`() {
+        val fullTablet = PlayerSurfacePolicy.placementFor(
+            PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfacePolicy.classify(1280, 1f), 1f,
+            surfaceHeightPx = 720,
+        )
+        val shortVideo = PlayerSurfacePolicy.placementFor(
+            PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfacePolicy.classify(720, 1f), 1f,
+            surfaceHeightPx = 160,
+        )
+        val narrowVideo = PlayerSurfacePolicy.placementFor(
+            PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfacePolicy.classify(560, 1f), 1f,
+            surfaceHeightPx = 720,
+        )
+        assertEquals(216, fullTablet.fixedContainerHeightPx)
+        assertEquals(72, shortVideo.fixedContainerHeightPx)
+        assertFalse(narrowVideo.verticalPill)
+        assertNull(narrowVideo.fixedContainerHeightPx)
+        assertTrue(PlayerSurfacePolicy.requiresCleanReposition(fullTablet, shortVideo, isVisible = true))
     }
 
     @Test
