@@ -700,7 +700,7 @@
     <string name="filters">Filtros</string>
     <string name="sort_by">Ordenar por: %1$s</string>
     <string name="following_tabs">Pestañas en "Siguiendo"</string>
-    <string name="saved_tabs">Pestañas en "Guardado""</string>
+    <string name="saved_tabs">Pestañas en \"Guardado\"</string>
     <string name="channel_tabs">Pestañas en canal</string>
     <string name="game_tabs">Pestañas en "Juegos"</string>
     <string name="search_tabs">Pestañas en búsqueda</string>
@@ -708,7 +708,7 @@
     <string name="save_filters">Guardar filtros</string>
     <string name="delete_filter_message">¿Estás seguro de que deseas eliminar este filtro?</string>
     <string name="use_custom_playback_service">Usar servicio de reproducción personalizado</string>
-    <string name="move_player_freely">Move minimized player freely</string>
+    <string name="move_player_freely">Mover el reproductor minimizado libremente</string>
     <string name="store_recent_searches">Almacenar búsquedas recientes</string>
     <string name="delete_recent_searches">Eliminar búsquedas recientes</string>
     <string name="delete_recent_searches_message">¿Estás seguro de que deseas eliminar las búsquedas recientes?</string>
@@ -724,7 +724,7 @@
     <string name="old_username">Nombre anterior: %s</string>
     <string name="default_cellular_quality">Calidad de reproducción predeterminada en la red celular</string>
     <string name="player">Reproductor</string>
-    <string name="compact_number_formatting">Compact number formatting</string>
+    <string name="compact_number_formatting">Formato de números compactos</string>
     <string name="less_rounded_corners">Menos redondeado</string>
     <string name="reduced_padding">Relleno reducido</string>
     <string name="compact_text">Texto compacto</string>
@@ -735,7 +735,7 @@
     <string name="loading">Cargando...</string>
     <string name="copy_code">Copiar código</string>
     <string name="external_tv_login_message">Para acceder a todas las funciones, necesitas iniciar sesión como un dispositivo Android TV.\n\nSigue estos pasos:\n• Copia el código que se muestra en la pantalla.\n• Presiona el botón \"Abrir URL\".\n• Introduce el código y presiona \"Activar\".\n• Presiona \"Autorizar\".\n• Regresa a Xtra y presiona \"Siguiente\".</string>
-    <string name="activate_notifications_when_following">Activate notifications when following</string>
-    <string name="account">Account</string>
+    <string name="activate_notifications_when_following">Activar notificaciones al seguir</string>
+    <string name="account">Cuenta</string>
     <string name="close">Cerrar</string>
 </resources>
