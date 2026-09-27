@@ -16,12 +16,12 @@
         android:paddingHorizontal="16dp"
         android:paddingVertical="8dp">
 
-        <ImageView
+        <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/feedbackIcon"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/baseline_volume_up_black_24"
-            android:tint="@android:color/white"
+            app:tint="@android:color/white"
             tools:ignore="ContentDescription" />
 
         <com.google.android.material.progressindicator.LinearProgressIndicator

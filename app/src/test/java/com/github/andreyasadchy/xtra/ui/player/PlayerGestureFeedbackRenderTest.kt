@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.graphics.Insets
+import androidx.core.widget.ImageViewCompat
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.ui.UiTestRender
 import com.google.android.material.progressindicator.LinearProgressIndicator
@@ -57,7 +58,7 @@ class PlayerGestureFeedbackRenderTest {
             assertEquals(216, pill.height)
             assertEquals(32, icon.width)
             assertEquals(32, icon.height)
-            assertEquals(Color.WHITE, icon.imageTintList?.defaultColor)
+            assertEquals(Color.WHITE, ImageViewCompat.getImageTintList(icon)?.defaultColor)
             assertEquals(8, level.width)
             assertEquals(148, level.height)
             assertEquals(65, level.progress)
