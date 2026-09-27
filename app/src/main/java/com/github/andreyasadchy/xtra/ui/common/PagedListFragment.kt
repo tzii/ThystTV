@@ -2,7 +2,9 @@ package com.github.andreyasadchy.xtra.ui.common
 
 import android.view.View
 import androidx.core.view.isVisible
+import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
@@ -18,24 +20,33 @@ import kotlinx.coroutines.launch
 abstract class PagedListFragment : BaseNetworkFragment(), IntegrityDialog.CallbackListener {
 
     fun <T : Any, VH : RecyclerView.ViewHolder> setAdapter(recyclerView: RecyclerView, adapter: PagingDataAdapter<T, VH>) {
-        adapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
-
+        var firstInsertion = true
+        val observer = object : RecyclerView.AdapterDataObserver() {
             override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
-                adapter.unregisterAdapterDataObserver(this)
-                adapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
-                    override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
-                        try {
-                            if (positionStart == 0) {
-                                recyclerView.scrollToPosition(0)
-                            }
-                        } catch (e: Exception) {
-
+                if (firstInsertion) {
+                    firstInsertion = false
+                } else {
+                    try {
+                        if (positionStart == 0) {
+                            recyclerView.scrollToPosition(0)
                         }
+                    } catch (e: Exception) {
+
                     }
-                })
+                }
+            }
+        }
+        adapter.registerAdapterDataObserver(observer)
+        recyclerView.adapter = adapter
+        viewLifecycleOwner.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                adapter.unregisterAdapterDataObserver(observer)
+                if (recyclerView.adapter === adapter) {
+                    recyclerView.adapter = null
+                }
+                owner.lifecycle.removeObserver(this)
             }
         })
-        recyclerView.adapter = adapter
     }
 
     fun shouldShowButton(recyclerView: RecyclerView): Boolean {
