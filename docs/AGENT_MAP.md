@@ -13,10 +13,12 @@ ThystTV is viewer-first. Protect stable playback, fast VoD controls, floating ch
 Read:
 
 - `docs/ROADMAP.md`
-- `docs/RELEASE_1_2_PLAN.md`
+- `docs/release-notes/1.3.0.md`
 - `CHANGELOG.md`
 
-The 1.2 line should focus on quality, player UX, visual polish, and release readiness. Do not turn 1.2 work into broad architecture churn.
+The published baseline is 1.3. Current update work focuses on larger side-gesture
+feedback and selective upstream corrections. Keep player lifecycle and experimental
+Twitch sync work separate; no new release version is selected by this update.
 
 ## Contribution And Style Conventions
 
@@ -51,6 +53,7 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
 ### Upstream Xtra Sync
 
 - Policy: `docs/UPSTREAM_SYNC.md`
+- Living ledger: `docs/UPSTREAM_SYNC_LEDGER.md`
 - 1.2 ledger: `docs/RELEASE_1_2_UPSTREAM_COMMITS.md`
 
 ### Visual And Repo Presentation

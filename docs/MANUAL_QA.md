@@ -15,6 +15,35 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### September 25 large-screen and upstream update — required, not completed
+
+- [ ] On tablet and landscape phone, brightness/volume side feedback is easy to
+  see over bright/dark video, with larger icons and a thicker level track. Check
+  both ends of each level; its pill must stay within the video and system insets.
+- [ ] Resize to short split-screen and narrow side-chat video; return to full
+  screen. Compact feedback, seek/speed/pinch indicators and chat touches remain
+  correct. Repeat with large fonts and RTL.
+- [ ] Live/VoD playback, stream switching without old audio, minimize/restore,
+  close/reopen, PiP/background, speed/quality, all gestures, floating-chat
+  open/drag/resize, and Stats load/rotate/range smoke.
+- [ ] Refresh individual and multiple saved bookmarks, reopen Saved/relaunch and
+  confirm updated title/duration/art persists without duplicate entries.
+- [ ] Resume a VoD while its broadcast is still live, with a saved position past
+  the listed duration. It must retain position. Repeat via cached bookmarks;
+  completed VoDs with final metadata still restart, explicit timestamps win and
+  downloaded segments retain their own duration behavior.
+- [ ] With no API tokens but a retained account ID, player/channel buttons reflect
+  local follows. Repeat signed in through GQL and Helix fallback.
+- [ ] Open chat profiles using moderator permissions and Helix fallback; follow
+  dates belong to the selected viewer. Ordinary accounts without follower permission
+  still show profiles. Check profiles in floating chat and ordinary followed lists.
+- [ ] `/color` displays the current color through HttpEngine and legacy Cronet
+  where supported; existing OkHttp/Cronet behavior remains intact.
+- [ ] German/Japanese/Spanish/Russian UI: inspect changed settings, quoted labels,
+  plural/count values, formatted percentages and Russian ThystTV login text.
+
+No device or platform-backend acceptance has yet been recorded for this build.
+
 | Area | Required | Completed | Notes |
 | --- | --- | --- | --- |
 | App launches | [ ] | [ ] | |

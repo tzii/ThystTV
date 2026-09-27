@@ -8,17 +8,19 @@ new audits go here.
 
 ## Latest audit
 
-- **Date checked:** 2026-08-10
-- **Branch audited:** `master` at PR #12 merge `dfde12117`
+- **Date checked:** 2026-09-25
+- **Branch audited:** `codex/large-screen-upstream-update`, based on public main `fc45301d4`
 - **Upstream remote:** `upstream` -> `https://github.com/crackededed/Xtra.git`
-- **Latest upstream head checked:** `345cff59a2236d87574c6caab8f49980d8c3858b` (`fix 404 errors`)
+- **Latest upstream head checked:** `cadfb8b7c38e29416b02b16cc0ba6c23e137bfcf` (`fix reply id`, September 22)
 - **Merge base with upstream:** `b063872f` (`quality model`, 2026-03-19)
 - **Commands used:**
 
 ```bash
-git fetch upstream master
-git cherry -v master upstream/master
+git fetch origin
+git fetch upstream
+git log --oneline a8e239ef..upstream/master
 git show --stat <commit>   # per-commit review
+git show <commit> -- <path> # compare candidate hunks with the current ThystTV files
 ```
 
 `git cherry` legend: `-` = patch already present (directly or equivalent), `+` = not present
@@ -26,6 +28,64 @@ exactly (may still be partially/manually ported — see notes).
 
 PR #12 changed 22 files (`+1482/-91`). Post-Hilt upstream changes remain manual-port-only by
 default (see the watershed note below).
+
+## September 25 small-update intake
+
+This update manually adapts selected hunks from **nine upstream commits**, together
+with ThystTV's larger side-gesture feedback. It starts from public main, preserving
+the experimental Twitch sync branch separately. No upstream merge, version,
+dependency, service, DI, proxy, updater or release-workflow migration is included.
+
+| Upstream commit | Adapted behavior |
+| --- | --- |
+| `3918379a14a1a9106961a3c20ddde0f3e5f74e41` | Preserve the Room primary key when refreshing single/batch bookmark metadata, and include thumbnail changes in adapter comparison. Keep immutable replacement objects so old adapter snapshots remain intact; no database schema migration. |
+| `4567823a13ef93225b091e9e9b5b9ceb0884a520` | Preserve automatic resume past stale duration for processing/live VoDs. Central lookup checks artwork: processing/missing/local cached thumbnails cannot establish completion. Final remote thumbnails retain completed-VoD restart; explicit offsets and local-download duration policy remain intact. |
+| `6513c0772d2816b7b0f9a5ca8fc5c7a022d3a6a5` | Player/channel follow status uses local follows when a retained account ID has no usable API tokens; keep authenticated GQL and Helix fallback. Omit broader notification/game/UI refactors. |
+| `adc53a76b2c086ca7725999a56ccace297fbd0cc` | Parse successful chat-color responses on HttpEngine and legacy Cronet, sharing existing parsing across all backends. Omit the command/coroutine rewrite and moderation syntax changes. |
+| `3e4bd045141e15b9a61c36e956d372e71af60598` | Decode follower `user_*` fields separately from followed-channel `broadcaster_*` fields; request authenticated GQL profile metadata and add guarded Helix follow-date fallback. Permission failures preserve profiles; cancellation propagates. Keep the existing `follows` package. |
+| `08e29b1c072216770e6b9cc0bd8f493724d5ac6d` | Two compatible German translations. |
+| `c303f618f2ef089c91d88ed6c9787b2352f6921b` | 196 Japanese strings and three plurals, preserving current feature meanings and units. |
+| `4654de0a13c9f7ea8b1d182575c9f5800ec183d2` | Five compatible Spanish strings; Android quote escaping retained. |
+| `cf95006c2f7e53b523b934289ec685c8b3850f9a` | Nineteen Russian strings, preserving ThystTV branding and compact-number meaning. |
+
+The 225 localized entries retain existing keys/attributes/plural quantities and
+match current English format arguments. Existing updater translations, fork-only
+features and incompatible proxy formatting remain unchanged. German commits
+`5e91e455`, `b2411e8b`, `c51adf90` and `51517e11b` were audited but add no compatible
+missing changes: their keys target absent features, or introduce an incompatible
+`proxy_error` placeholder. They are not counted as ports.
+
+All fourteen new commits after the previously inspected `a8e239ef` were checked:
+
+| New commit | Disposition |
+| --- | --- |
+| `51517e11b` German translations | No compatible missing keys; see above. |
+| `bca10f761` setup-java bump | N/A to ThystTV's separately pinned workflows. |
+| `cf95006c2` Russian translations | Adapted as above. |
+| `fd63cd3fa`, `524d1828f` audio-only transitions/restoration | Deferred: target upstream's newer quality/service flow. ThystTV backends already disable video in several restoration paths; require a reproduced backend-specific failure before lifecycle adaptation. |
+| `34e673144` codec proxy parameters | Deferred with proxy compatibility work. |
+| `c54331819` proxy token-request timeout | Depends on the deferred timeout/failover series. |
+| `3918379a1`, `4567823a1` bookmark update / live VoD resume | Adapted as above. |
+| `8814b5bb2`, `e03010e23` highlight / other VoD chat timing | Fix regressions in upstream's unported `createdAt` timing migration. ThystTV keeps millisecond replay and its existing minimum-1ms wait. |
+| `adc53a76b`, `3e4bd0451` chat commands / moderator follow dates | Selected hunks adapted as above. |
+| `cadfb8b7c` reply ID | Already correct in ThystTV; fixes a regression from the unported command rewrite. |
+
+Older candidates were also rechecked. Emote caching (`419898ad`) substantially
+overlaps ThystTV's existing `EmoteCache`/`ChatAssetLoader`. Controls timeout
+(`ea0c7b869`) and player link sharing (`8a0ea8609`) remain separate UX work.
+Quality/bitrate identity, GIF/parser expansion, seek-value settings, proxy/network
+migrations and broad service rewrites remain deferred for dedicated validation.
+
+Earlier manual ports already shipped in public 1.3 are not counted again:
+`17587ada` (minimum chat-replay wait), `9500c9c5` (follow pagination), `5e7f6a46`
+(Twitch autocomplete), `f10e3abf` (social hosts), `f5f03a1a` (legacy headset seek),
+`e4299f7d` (completed resume) and `a6dcee18` (compact headings). These supersede
+the corresponding historical deferrals below; no patch-equivalence claim is made.
+
+`assembleDebug test lintDebug` passed on the final source: 520 tests without
+failures/errors/skips, lint 0 errors and 342 existing warnings. Independent source
+review and native feedback preview inspection passed. Details and remaining device
+checks are recorded in `TESTING.md` and `MANUAL_QA.md`; no physical-device QA is claimed.
 
 ## The Hilt watershed (read this before any cherry-pick)
 

@@ -143,8 +143,11 @@ and untracked trigger moves caused jump/multi-press misplacement reports.
 ## Saved resume and headset fallback
 
 `PlayerViewModel` resolves automatic saved positions for all player backends. A
-position at or beyond a known positive duration restarts at zero; unknown/invalid
-durations and unfinished positions are retained. Network argument durations are
+position at or beyond a known positive duration restarts at zero when a network
+VoD has final remote thumbnail metadata. A processing thumbnail, absent thumbnail
+or locally cached bookmark image cannot establish completion: the broadcast may
+still be live and growing, so its saved position is retained. Unknown/invalid
+durations and unfinished positions are also retained. Network argument durations are
 seconds converted to Long milliseconds; downloaded videos use their own duration,
 not the source VoD offset. No eager database reset is needed; normal playback saves
 the new position. Explicit timestamp requests bypass automatic resume, and existing
@@ -156,6 +159,22 @@ only for unhandled previous/next key-down events. It checks seek command availab
 and ignores cancelled/release events. The default Media3 path and platform
 MediaPlayer path are unchanged; never introduce a second handler that repeats an
 already-handled seek. Test actual headset and background dispatch on devices.
+
+## Side gesture feedback
+
+Brightness and device-volume feedback use larger 64 × 216dp edge pills on player
+surfaces at least 600dp wide, with 32dp icons and 8dp level tracks. Icons use an
+explicit AppCompat image views with white tint for readability over video. Surface classification
+uses the measured video/player width, so side chat and resized windows can return
+to the unchanged compact horizontal treatment. Edge pill height is capped to 45%
+of the measured player height; padding, icon and spacing shrink together below
+96dp pill height to keep a visible level track in short windows. Returning to a
+compact or non-side gesture resets icon size, spacing and pill corners.
+
+`PlayerGestureFeedbackRenderTest` checks native Android layout, edge placement,
+progress/accessibility updates, very short players and compact restoration, and
+renders phone/tablet feedback previews. Device gesture timing, playback and actual
+window insets still require the human player matrix below.
 
 ## Required Checks For Player Work
 

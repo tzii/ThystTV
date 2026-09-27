@@ -30,6 +30,35 @@ or animation smoothness. Human checks below remain required.
 
 ## Manual regression checklist
 
+### September 25 large-screen and upstream update
+
+- `PlayerGestureFeedbackRenderTest` measures actual inflated views on tablet,
+  short/resized, compact and side-chat-sized surfaces, including transitions back
+  to compact feedback. Native PNGs under `app/build/ui-previews/gesture-*` compare
+  new feedback with a reproduction of the prior dimensions (not an old-app run).
+- `BookmarkMetadataUpdateTest` exercises single/batch ViewModel refreshes and
+  checks that repository updates retain persisted identity and old adapter snapshots.
+- `PlayerResumeLookupTest` covers processing/missing/cached artwork and stale
+  duration, plus final metadata, explicit offsets and downloaded segment policy.
+- `LocalFollowFallbackTest` checks player/channel local follow resolution without
+  tokens and preservation of authenticated Helix fallback.
+- `HelixChatMetadataTest` covers actual intercepted follower/followed endpoint
+  requests and response identity fields, plus shared chat-color parsing fixtures.
+- `MessageClickedViewModelTest` covers moderator follow-date fallback, denied
+  permission, absent/mismatched users, no token and cancellation.
+- `LocalizedStringsTest` checks representative packaged formatting, Japanese
+  plurals, Spanish quoting and Russian branding after the compatible locale intake.
+
+Transport fixtures do not exercise platform HttpEngine/legacy Cronet or real
+moderator permissions; native renders do not certify playback or device gestures.
+The September 25 pass in `MANUAL_QA.md` remains required.
+
+Final Windows validation on September 25 (reports rechecked September 27):
+`assembleDebug test lintDebug` passed, with **520 tests, no failures/errors/skips,
+and lint 0 errors / 342 existing warnings**. Native previews were visually checked
+for tablet brightness/volume, compact, narrow and short player surfaces. Independent
+regression review found no actionable issues. Physical-device QA remains open.
+
 `PlayerPinchChatTest` covers pinch takeover from hidden/sidebar/floating chat,
 floating-chat disabled, unchanged ordinary pinches, normal double-tap transitions,
 rejected duplicate claims and preservation of an unset chat preference. It invokes
