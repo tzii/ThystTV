@@ -6,10 +6,12 @@
 - Adapt compatible upstream correctness and localization changes with explicit
   regression coverage and a commit-by-commit ledger.
 - Keep experimental Twitch sync isolated on its existing branch.
+- Add D-pad navigation and visible focus for the existing Android TV interface
+  (issue #24), checked with automated view tests and a TV emulator.
 - Validate player, compact/wide/resized layouts and accepted API changes on devices.
 
-No new release version or publication is selected yet. Full Android TV support
-remains separate work (issue #24).
+No new release version or publication is selected yet. Physical TV/OEM validation
+and a dedicated television layout remain outside this small navigation update.
 
 ## Previous 1.2 priorities (historical)
 

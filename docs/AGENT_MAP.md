@@ -17,8 +17,9 @@ Read:
 - `CHANGELOG.md`
 
 The published baseline is 1.3. Current update work focuses on larger side-gesture
-feedback and selective upstream corrections. Keep player lifecycle and experimental
-Twitch sync work separate; no new release version is selected by this update.
+feedback, selective upstream corrections and TV remote navigation. Keep player
+lifecycle and experimental Twitch sync work separate; no new release version is
+selected by this update.
 
 ## Contribution And Style Conventions
 
@@ -35,6 +36,7 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
 - App module: `app/`
 - Build config: `app/build.gradle.kts`
 - Main activity / app-level player entry point: `app/src/main/java/com/github/andreyasadchy/xtra/ui/main/MainActivity.kt`
+- TV focus routing: `ui/main/TvNavigationFocus.kt`, `ui/player/PlayerTvFocus.kt` and `util/TvUi.kt` under the app's Kotlin package.
 - Player area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/player/`
 - Chat/floating chat area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/chat/`
 - Stats area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/stats/`

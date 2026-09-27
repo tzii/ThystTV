@@ -15,7 +15,11 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
-### September 25 large-screen and upstream update — required, not completed
+### September 25 large-screen and upstream update
+
+On September 27 the maintainer reported that the delivered debug build seemed
+fine. No device/backend/scenario breakdown was supplied, so the detailed rows
+below remain a regression reference rather than a claim that every case passed.
 
 - [ ] On tablet and landscape phone, brightness/volume side feedback is easy to
   see over bright/dark video, with larger icons and a thicker level track. Check
@@ -42,7 +46,35 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 - [ ] German/Japanese/Spanish/Russian UI: inspect changed settings, quoted labels,
   plural/count values, formatted percentages and Russian ThystTV login text.
 
-No device or platform-backend acceptance has yet been recorded for this build.
+### September 27 Android TV remote navigation
+
+The maintainer has no TV available. Codex checked an isolated Android TV
+emulator and native Android view/key tests. Physical TV/OEM remote and codec
+behavior remain unverified; emulator results are recorded separately in
+`TESTING.md`.
+
+- [ ] Remote-only launch: visible focus, left/right across enabled bottom items,
+  CENTER selects; UP enters content and Back at a root page returns to navigation.
+- [ ] Popular, Following, Games, Saved and Stats; tabs, long feeds, empty pages,
+  search, settings and dialogs; nested Back returns normally and repeated Back exits.
+- [ ] Following/Saved tabs, Stats ranges and channel Videos/Chat/Clips tabs remain
+  fully visible while focused, after selection and after scrolling the page.
+- [ ] Channel entry shows visible focus; profile details collapse while toolbar
+  and tabs remain available and leave room for video cards.
+- [ ] Live/VoD controls: reveal with D-pad, play/pause, seek, quality, speed,
+  volume, More, popup Back/focus restoration; keyboard slider changes persist.
+- [ ] Minimize, focus/restore mini-player, close/reopen, stream switching,
+  PiP/background and chat controls. No focus reaches covered browse content.
+- [ ] Phone/tablet gestures and floating-chat interaction remain regression areas.
+
+### Following view cleanup
+
+- [ ] Open available Following tabs, leave and return repeatedly, then rotate or
+  recreate the screen. Tabs and lists still load; first insertion keeps position
+  and later prepends still scroll to the top.
+- [ ] After leaving Following, inspect a fresh LeakCanary result from the rebuilt
+  APK. The previous destroyed pager/RecyclerView retention groups must not recur.
+  Keep heap dumps and private analysis out of public issues and commits.
 
 | Area | Required | Completed | Notes |
 | --- | --- | --- | --- |
