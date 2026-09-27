@@ -6,13 +6,20 @@ import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Looper
 import android.view.ContextThemeWrapper
+import android.view.InputEvent
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.core.view.marginTop
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.FragmentChannelBinding
+import com.github.andreyasadchy.xtra.ui.main.TvNavigationFocus
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.appbar.CollapsingToolbarLayout
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.tabs.TabLayout
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -25,6 +32,7 @@ import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.ConscryptMode
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
@@ -36,34 +44,49 @@ class ChannelPagerHeaderTest {
 
     @Before fun setup() {
         InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
-        activity = Robolectric.buildActivity(Activity::class.java).setup().visible()
+        activity = Robolectric.buildActivity(Activity::class.java).setup().visible().windowFocusChanged(true)
     }
 
     @After fun teardown() {
         activity.pause().stop().destroy()
     }
 
-    @Test fun `TV channel header stays visible through Videos Chat and Clips transitions`() {
+    @Test fun `TV channel tabs stay focused above usable content through Chat and Clips transitions`() {
         val (fragment, binding) = fixture(television = true)
         val params = binding.collapsingToolbar.layoutParams as AppBarLayout.LayoutParams
         val originalFlags = params.scrollFlags
         assertTrue(binding.appBar.totalScrollRange > 0)
-        binding.appBar.setExpanded(false, false)
+        TvNavigationFocus(BottomNavigationView(binding.root.context), { binding.viewPager }, { binding.appBar }).prepareContent()
+        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                // The production pager callback delegates to this same transition.
+                fragment.updateTabHeader(isChat = tab.position == 1, originalScrollFlags = originalFlags)
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+            override fun onTabReselected(tab: TabLayout.Tab) = Unit
+        })
+        fragment.updateTabHeader(isChat = false, originalScrollFlags = originalFlags)
         settle(binding.root)
-        assertTrue("The fixture must reproduce a collapsed channel header", binding.appBar.top < 0)
-
-        for (tabIndex in listOf(0, 1, 2, 1, 0)) {
-            // Exercise the same production transition invoked by onPageSelected.
-            fragment.updateTabHeader(isChat = tabIndex == 1, originalScrollFlags = originalFlags)
-            binding.tabLayout.getTabAt(tabIndex)!!.select()
-            settle(binding.root)
+        val tabRow = binding.tabLayout.getChildAt(0) as ViewGroup
+        assertTrue(tabRow.getChildAt(0).requestFocus())
+        assertFullyVisible(tabRow.getChildAt(0))
+        assertFullyVisible(binding.toolbar)
+        for ((keyCode, tabIndex) in listOf(KeyEvent.KEYCODE_DPAD_RIGHT to 1, KeyEvent.KEYCODE_DPAD_RIGHT to 2,
+            KeyEvent.KEYCODE_DPAD_LEFT to 1, KeyEvent.KEYCODE_DPAD_LEFT to 0)) {
+            sendRemoteKey(binding.root, keyCode)
+            sendRemoteKey(binding.root, KeyEvent.KEYCODE_DPAD_CENTER)
             val tab = (binding.tabLayout.getChildAt(0) as ViewGroup).getChildAt(tabIndex)
             binding.viewPager.requestRectangleOnScreen(Rect(0, 0, binding.viewPager.width, binding.viewPager.height), false)
             settle(binding.root)
-            assertEquals(0, params.scrollFlags)
-            assertEquals(0, binding.appBar.totalScrollRange)
-            assertFullyVisible(binding.appBar)
+            assertEquals(tabIndex, binding.tabLayout.selectedTabPosition)
+            assertTrue("Remote tab focus survives the header transition", tab.isFocused)
+            assertEquals(AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL or AppBarLayout.LayoutParams.SCROLL_FLAG_EXIT_UNTIL_COLLAPSED, params.scrollFlags)
+            assertTrue(binding.appBar.top < 0)
+            assertFullyVisible(binding.toolbar)
             assertFullyVisible(tab)
+            val content = Rect()
+            assertTrue(binding.viewPager.getGlobalVisibleRect(content))
+            assertTrue("The compact header leaves most of the browse region for video cards", content.height() >= binding.root.height / 2)
         }
         fragment.onDestroyView()
     }
@@ -101,16 +124,39 @@ class ChannelPagerHeaderTest {
         binding.userLayout.visibility = View.VISIBLE
         binding.userImage.visibility = View.VISIBLE
         binding.userName.apply { visibility = View.VISIBLE; text = "Channel" }
+        binding.userCreated.apply { visibility = View.VISIBLE; text = "Created January 2015" }
+        binding.userFollowers.apply { visibility = View.VISIBLE; text = "100,000 followers" }
+        binding.streamLayout.visibility = View.VISIBLE
+        binding.title.apply { visibility = View.VISIBLE; text = "A live stream with a detailed title and featured category" }
+        binding.gameName.apply { visibility = View.VISIBLE; text = "Featured category" }
+        binding.watchLive.visibility = View.VISIBLE
         listOf("Videos", "Chat", "Clips").forEach { binding.tabLayout.addTab(binding.tabLayout.newTab().setText(it)) }
-        activity.get().setContentView(binding.root)
+        activity.get().setContentView(binding.root, ViewGroup.LayoutParams(960, 460))
+        settle(binding.root)
+        // Match the existing channel callback's toolbar/tab minimum-height geometry.
+        binding.toolbarContainer.layoutParams = (binding.toolbarContainer.layoutParams as CollapsingToolbarLayout.LayoutParams).apply {
+            bottomMargin = binding.toolbarContainer2.height
+        }
+        binding.toolbar.layoutParams = binding.toolbar.layoutParams.apply {
+            height = binding.toolbarContainer.marginTop + binding.toolbarContainer2.height
+        }
         settle(binding.root)
         return fragment to binding
     }
 
     private fun settle(view: View) {
-        view.measure(View.MeasureSpec.makeMeasureSpec(960, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(540, View.MeasureSpec.EXACTLY))
-        view.layout(0, 0, 960, 540)
+        view.measure(View.MeasureSpec.makeMeasureSpec(960, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(460, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, 960, 460)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+    }
+
+    private fun sendRemoteKey(view: View, keyCode: Int) {
+        val viewRoot = ReflectionHelpers.callInstanceMethod<Any>(view, "getViewRootImpl")
+        for (action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+            ReflectionHelpers.callInstanceMethod<Unit>(viewRoot, "dispatchInputEvent",
+                ReflectionHelpers.ClassParameter.from(InputEvent::class.java, KeyEvent(action, keyCode)))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(32))
+        }
     }
 
     private fun assertFullyVisible(view: View) {

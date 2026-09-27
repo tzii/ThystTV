@@ -18,6 +18,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.platform.app.InstrumentationRegistry
@@ -30,6 +31,7 @@ import com.github.andreyasadchy.xtra.ui.stats.StatsDashboardItem
 import com.github.andreyasadchy.xtra.ui.view.GridRecyclerView
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import org.junit.After
@@ -405,6 +407,72 @@ class TvNavigationFocusTest {
             assertFullyVisible(header)
         } finally {
             mediator.detach()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp-land-television-mdpi")
+    fun `populated game and team profiles keep compact toolbars and content space on TV`() {
+        for (layout in listOf(R.layout.fragment_game, R.layout.fragment_game_pager, R.layout.fragment_team)) {
+            val fixture = fixture()
+            val page = LayoutInflater.from(fixture.root.context).inflate(layout, fixture.host, false)
+            for (id in listOf(R.id.gameLayout, R.id.gameImage, R.id.logoImage, R.id.bannerImage)) {
+                page.findViewById<View>(id)?.visibility = View.VISIBLE
+            }
+            for ((id, text) in listOf(
+                R.id.gameName to "Populated game profile",
+                R.id.viewers to "25,000 viewers",
+                R.id.followers to "500,000 followers",
+                R.id.teamName to "Populated team profile",
+                R.id.teamMembers to "100 members",
+                R.id.teamOwner to "Team owner",
+                R.id.teamDescription to "First description line\nSecond description line\nThird description line",
+            )) {
+                page.findViewById<TextView>(id)?.apply { visibility = View.VISIBLE; this.text = text }
+            }
+            page.findViewById<TabLayout>(R.id.tabLayout)?.apply {
+                listOf("Videos", "Live", "Clips").forEach { addTab(newTab().setText(it)) }
+            }
+            page.findViewById<View>(R.id.sortBar)?.visibility = View.VISIBLE
+            page.findViewById<TextView>(R.id.sortText)?.text = "Viewers: high to low"
+            val header = page.findViewById<AppBarLayout>(R.id.appBar)
+            val toolbar = page.findViewById<View>(R.id.toolbar)
+            val content: View = page.findViewById<View>(R.id.viewPager)
+                ?: page.findViewById<View>(R.id.fragmentContainer)
+                ?: page.findViewById<View>(R.id.recyclerViewLayout)
+            fixture.host.removeAllViews()
+            fixture.host.addView(page)
+            fixture.contentRoot = content
+            fixture.fallbackRoot = header
+            fixture.measure()
+            // Game fragments reserve the pinned tabs/sort row in the toolbar's
+            // collapsed minimum height after those controls have been measured.
+            page.findViewById<View>(R.id.toolbarContainer2)?.let { controls ->
+                val profile = page.findViewById<View>(R.id.toolbarContainer)
+                val params = profile.layoutParams as CollapsingToolbarLayout.LayoutParams
+                profile.layoutParams = params.apply { bottomMargin = controls.height }
+                toolbar.layoutParams = toolbar.layoutParams.apply { height = params.topMargin + params.bottomMargin }
+            }
+            fixture.helper.prepareContent()
+            fixture.measure()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+            fixture.measure()
+            val visibleHeader = Rect()
+            val visibleContent = Rect()
+            assertTrue(header.getGlobalVisibleRect(visibleHeader))
+            assertTrue(content.getGlobalVisibleRect(visibleContent))
+            assertTrue("profile banners must leave a compact header", visibleHeader.height() < fixture.host.height / 4)
+            assertTrue("the content keeps most of the page viewport", visibleContent.height() > fixture.host.height / 2)
+            assertFullyVisible(toolbar)
+            assertTrue(fixture.helper.focusNavigation())
+            sendRemoteKey(fixture.root, KeyEvent.KEYCODE_DPAD_UP)
+            val focused = fixture.root.findFocus()!!
+            assertTrue(focused.isWithin(header))
+            assertFullyVisible(focused)
+            content.requestRectangleOnScreen(Rect(0, 0, content.width, content.height), false)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            assertFullyVisible(toolbar)
+            page.findViewById<TabLayout>(R.id.tabLayout)?.let(::assertFullyVisible)
         }
     }
 

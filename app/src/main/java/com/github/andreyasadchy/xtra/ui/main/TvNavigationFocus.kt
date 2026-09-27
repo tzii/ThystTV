@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.andreyasadchy.xtra.util.applyTvFocusOutline
 import com.github.andreyasadchy.xtra.util.isTelevision
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import java.lang.ref.WeakReference
 
@@ -78,11 +79,18 @@ internal class TvNavigationFocus(
 
     private fun allowHeaderRemoteFocus(view: View) {
         if (view is AppBarLayout) {
-            // Remote focus must not collapse the tabs/ranges it is moving to.
+            // Keep simple tabs/ranges fixed, but leave room for content beneath
+            // profile banners by collapsing them only as far as their pinned toolbar.
+            var hasProfileHeader = false
             for (index in 0 until view.childCount) {
-                (view.getChildAt(index).layoutParams as? AppBarLayout.LayoutParams)?.scrollFlags = 0
+                val child = view.getChildAt(index)
+                val flags = if (child is CollapsingToolbarLayout) {
+                    hasProfileHeader = true
+                    AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL or AppBarLayout.LayoutParams.SCROLL_FLAG_EXIT_UNTIL_COLLAPSED
+                } else 0
+                (child.layoutParams as? AppBarLayout.LayoutParams)?.scrollFlags = flags
             }
-            view.setExpanded(true, false)
+            view.setExpanded(!hasProfileHeader, false)
         }
         if (view is ViewGroup) {
             // Material app bars block ordinary focus when a TV also advertises

@@ -515,8 +515,8 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
         with(binding) {
             val layoutParams = collapsingToolbar.layoutParams as AppBarLayout.LayoutParams
             layoutParams.scrollFlags = if (root.context.isTelevision()) {
-                appBar.setExpanded(true, false)
-                0
+                appBar.setExpanded(false, false)
+                AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL or AppBarLayout.LayoutParams.SCROLL_FLAG_EXIT_UNTIL_COLLAPSED
             } else if (!isChat) {
                 originalScrollFlags
             } else {
