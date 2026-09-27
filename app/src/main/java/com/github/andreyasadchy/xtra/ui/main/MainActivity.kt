@@ -476,6 +476,7 @@ class MainActivity : AppCompatActivity() {
             fallbackRoot = { screen()?.view?.findViewById<View>(R.id.appBar) },
         ).also { navigation ->
             binding.navBar.post {
+                navigation.prepareContent()
                 navigation.install()
                 if (playerFragment?.isMaximized != true) navigation.focusNavigation()
             }
@@ -487,7 +488,10 @@ class MainActivity : AppCompatActivity() {
             updateTvNavigationBack()
         }
         navController.addOnDestinationChangedListener { _, _, _ ->
-            binding.root.post { updateTvNavigationBack() }
+            binding.root.post {
+                tvNavigation?.prepareContent()
+                updateTvNavigationBack()
+            }
         }
     }
 

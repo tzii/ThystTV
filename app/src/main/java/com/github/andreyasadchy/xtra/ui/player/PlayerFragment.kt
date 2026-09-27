@@ -108,6 +108,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import java.util.Locale
 
@@ -352,7 +353,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     protected fun formatPlaybackSpeed(speed: Float?): String? {
         if (speed == null) return null
-        val rounded = ((speed * 100).toInt() / 100f)
+        val rounded = (speed * 100).roundToInt() / 100f
         return if (rounded % 1f == 0f) {
             String.format(Locale.US, "%.0fx", rounded)
         } else if ((rounded * 10f) % 1f == 0f) {

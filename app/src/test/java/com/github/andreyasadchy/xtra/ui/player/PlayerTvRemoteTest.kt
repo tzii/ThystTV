@@ -228,6 +228,29 @@ class PlayerTvRemoteTest {
         volumeBinder.dispose()
     }
 
+    @Test fun `toolbar speed rounds the remote slider value and keeps compact labels`() {
+        val (fragment, playerBinding) = player()
+        val updateSpeed = PlayerFragment::class.java.getDeclaredMethod("updatePlaybackSpeedUi", java.lang.Float::class.java).apply {
+            isAccessible = true
+        }
+        for ((speed, label) in listOf(1f to "1x", 1.5f to "1.5x", 1.25f to "1.25x")) {
+            updateSpeed.invoke(fragment, speed)
+            assertEquals(label, playerBinding.playerControls.speed.text.toString())
+        }
+        val popup = LayoutPlayerSpeedPopupBinding.inflate(LayoutInflater.from(context))
+        val binder = PlayerSpeedPopupBinder(context, popup, 1f, 384, { updateSpeed.invoke(fragment, it) }, {})
+        binder.bind()
+        popup.root.prepareTvPlayerFocus()
+        activity.get().setContentView(popup.root)
+        measure(popup.root, 384, 400)
+        assertTrue(popup.speedSlider.requestFocus())
+        press(popup.speedSlider, KeyEvent.KEYCODE_DPAD_RIGHT)
+        assertEquals(1.05f, popup.speedSlider.value, 0.0001f)
+        assertEquals("1.05x", popup.currentSpeedText.text.toString())
+        assertEquals("1.05x", playerBinding.playerControls.speed.text.toString())
+        binder.dispose()
+    }
+
     private fun player(): Pair<PlayerFragment, FragmentPlayerBinding> {
         val binding = FragmentPlayerBinding.inflate(LayoutInflater.from(context))
         val fragment = Mockito.mock(PlayerFragment::class.java, Mockito.withSettings().useConstructor().defaultAnswer(Mockito.CALLS_REAL_METHODS))

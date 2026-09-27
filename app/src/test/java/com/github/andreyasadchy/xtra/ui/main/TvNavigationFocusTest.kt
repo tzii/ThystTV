@@ -9,6 +9,7 @@ import android.os.Looper
 import android.util.AttributeSet
 import android.view.ContextThemeWrapper
 import android.view.FocusFinder
+import android.view.InputEvent
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.Menu
@@ -28,7 +29,9 @@ import com.github.andreyasadchy.xtra.ui.stats.StatsDashboardAdapter
 import com.github.andreyasadchy.xtra.ui.stats.StatsDashboardItem
 import com.github.andreyasadchy.xtra.ui.view.GridRecyclerView
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -41,6 +44,7 @@ import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.ConscryptMode
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
@@ -52,7 +56,8 @@ class TvNavigationFocusTest {
 
     @Before fun attachWindow() {
         InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
-        activity = Robolectric.buildActivity(Activity::class.java).setup().visible()
+        activity = Robolectric.buildActivity(Activity::class.java).setup().visible().windowFocusChanged(true)
+        assertTrue("remote input requires a focused window", activity.get().window.decorView.hasWindowFocus())
     }
 
     @After fun closeWindow() {
@@ -340,13 +345,67 @@ class TvNavigationFocusTest {
         fixture.measure()
         assertTrue(fixture.helper.focusNavigation())
         assertTrue(fixture.helper.focusContent())
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+        fixture.measure()
         val card = list.findViewHolderForAdapterPosition(0)!!.itemView
         assertTrue(card.requestFocus())
-        val above = card.focusSearch(View.FOCUS_UP)
-        assertNotNull("the visible range controls remain in native directional focus search", above)
-        assertTrue(above!!.id in listOf(R.id.range7Days, R.id.range30Days, R.id.rangeAllTime))
-        assertTrue(above.requestFocus())
-        assertTrue(above.isFocused)
+        sendRemoteKey(fixture.root, KeyEvent.KEYCODE_DPAD_UP)
+        val above = fixture.root.findFocus()!!
+        assertTrue(above.id in listOf(R.id.range7Days, R.id.range30Days, R.id.rangeAllTime))
+        assertFullyVisible(above)
+        sendRemoteKey(fixture.root, KeyEvent.KEYCODE_DPAD_DOWN)
+        assertTrue(card.isFocused)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+        assertFullyVisible(stats.findViewById(R.id.range7Days))
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp-land-television-mdpi")
+    fun `remote tab activation keeps the entire pager header visible`() {
+        val fixture = fixture()
+        val inflater = LayoutInflater.from(fixture.root.context)
+        val pagerRoot = inflater.inflate(R.layout.fragment_media_pager, fixture.host, false)
+        val pager = pagerRoot.findViewById<ViewPager2>(R.id.viewPager)
+        val tabs = pagerRoot.findViewById<TabLayout>(R.id.tabLayout)
+        val header = pagerRoot.findViewById<AppBarLayout>(R.id.appBar)
+        pager.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun getItemCount() = 3
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                val page = inflater.inflate(R.layout.common_recycler_view_layout, parent, false)
+                return object : RecyclerView.ViewHolder(page) {}
+            }
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) = Unit
+        }
+        val mediator = TabLayoutMediator(tabs, pager) { tab, position ->
+            tab.text = listOf("Games", "Live", "Channels")[position]
+        }.also { it.attach() }
+        try {
+            fixture.host.removeAllViews()
+            fixture.host.addView(pagerRoot)
+            fixture.contentRoot = pager
+            fixture.fallbackRoot = header
+            // Match the destination-change preparation before the first remote key.
+            fixture.helper.prepareContent()
+            fixture.measure()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+            fixture.measure()
+            assertTrue(fixture.helper.focusNavigation())
+            sendRemoteKey(fixture.root, KeyEvent.KEYCODE_DPAD_UP)
+            assertEquals(R.id.search, fixture.root.findFocus()!!.id)
+            sendRemoteKey(fixture.root, KeyEvent.KEYCODE_DPAD_DOWN)
+            val channels = (tabs.getChildAt(0) as ViewGroup).getChildAt(2)
+            assertTrue(channels.isFocused)
+            sendRemoteKey(fixture.root, KeyEvent.KEYCODE_DPAD_CENTER)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            assertEquals(2, pager.currentItem)
+            assertTrue(channels.isFocused)
+            pager.requestRectangleOnScreen(Rect(0, 0, pager.width, pager.height), false)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            assertFullyVisible(channels)
+            assertFullyVisible(header)
+        } finally {
+            mediator.detach()
+        }
     }
 
     @Test fun `focused destination remains distinct from checked destination in both themes`() {
@@ -404,6 +463,23 @@ class TvNavigationFocusTest {
         id = View.generateViewId()
         text = label
         isFocusable = true
+    }
+
+    private fun sendRemoteKey(view: View, keyCode: Int) {
+        val viewRoot = ReflectionHelpers.callInstanceMethod<Any>(view, "getViewRootImpl")
+        for (action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+            // Enter the Android input pipeline, including native directional focus search.
+            ReflectionHelpers.callInstanceMethod<Unit>(viewRoot, "dispatchInputEvent",
+                ReflectionHelpers.ClassParameter.from(InputEvent::class.java, KeyEvent(action, keyCode)))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(32))
+        }
+    }
+
+    private fun assertFullyVisible(view: View) {
+        val visible = Rect()
+        assertTrue(view.getGlobalVisibleRect(visible))
+        assertEquals("focused control must not be clipped vertically", view.height, visible.height())
+        assertEquals("focused control must not be clipped horizontally", view.width, visible.width())
     }
 
     private class Fixture(

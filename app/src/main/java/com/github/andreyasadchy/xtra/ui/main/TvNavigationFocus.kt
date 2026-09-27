@@ -8,6 +8,7 @@ import android.widget.HorizontalScrollView
 import androidx.recyclerview.widget.RecyclerView
 import com.github.andreyasadchy.xtra.util.applyTvFocusOutline
 import com.github.andreyasadchy.xtra.util.isTelevision
+import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import java.lang.ref.WeakReference
 
@@ -57,6 +58,10 @@ internal class TvNavigationFocus(
         if (view != null && isInContent(view)) lastContentFocus = WeakReference(view)
     }
 
+    fun prepareContent() {
+        fallbackRoot()?.takeIf { it.context.isTelevision() }?.let(::allowHeaderRemoteFocus)
+    }
+
     fun focusContent(): Boolean {
         val header = fallbackRoot()
         if (header?.context?.isTelevision() == true) allowHeaderRemoteFocus(header)
@@ -72,6 +77,13 @@ internal class TvNavigationFocus(
     }
 
     private fun allowHeaderRemoteFocus(view: View) {
+        if (view is AppBarLayout) {
+            // Remote focus must not collapse the tabs/ranges it is moving to.
+            for (index in 0 until view.childCount) {
+                (view.getChildAt(index).layoutParams as? AppBarLayout.LayoutParams)?.scrollFlags = 0
+            }
+            view.setExpanded(true, false)
+        }
         if (view is ViewGroup) {
             // Material app bars block ordinary focus when a TV also advertises
             // touchscreen input, leaving their visible tabs/actions unreachable.
