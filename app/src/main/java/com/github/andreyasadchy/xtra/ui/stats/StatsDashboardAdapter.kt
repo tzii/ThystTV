@@ -14,6 +14,7 @@ import com.github.andreyasadchy.xtra.databinding.ItemStatsFavoriteChannelsBindin
 import com.github.andreyasadchy.xtra.databinding.ItemStatsHeatmapBinding
 import com.github.andreyasadchy.xtra.databinding.ItemStatsScreenTimeBinding
 import com.github.andreyasadchy.xtra.databinding.ItemStatsStreakBinding
+import com.github.andreyasadchy.xtra.util.isTelevision
 
 class StatsDashboardAdapter : ListAdapter<StatsDashboardItem, RecyclerView.ViewHolder>(DiffCallback()) {
 
@@ -43,6 +44,15 @@ class StatsDashboardAdapter : ListAdapter<StatsDashboardItem, RecyclerView.ViewH
             StatsCardType.FAVORITE_CHANNELS -> FavoriteChannelsViewHolder(
                 ItemStatsFavoriteChannelsBinding.inflate(inflater, parent, false),
             )
+        }.also { holder ->
+            if (parent.context.isTelevision()) {
+                holder.itemView.isFocusable = true
+                // Long category/favorite lists retain their rows as remote targets.
+                (holder.itemView as ViewGroup).descendantFocusability = when (StatsCardType.entries[viewType]) {
+                    StatsCardType.CATEGORIES, StatsCardType.FAVORITE_CHANNELS -> ViewGroup.FOCUS_AFTER_DESCENDANTS
+                    else -> ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                }
+            }
         }
     }
 
@@ -110,6 +120,13 @@ class StatsDashboardAdapter : ListAdapter<StatsDashboardItem, RecyclerView.ViewH
             binding.categoryLegendRecyclerView.adapter = it
         }
 
+        init {
+            if (binding.root.context.isTelevision()) {
+                binding.categoryLegendRecyclerView.isFocusable = false
+                binding.categoryLegendRecyclerView.isFocusableInTouchMode = false
+            }
+        }
+
         fun bind(item: StatsDashboardItem.Categories) {
             binding.categoryPieChart.setData(item.categories.map { (it.gameName ?: "Unknown") to it.totalSeconds })
             val slices = binding.categoryPieChart.getSlices()
@@ -138,6 +155,10 @@ class StatsDashboardAdapter : ListAdapter<StatsDashboardItem, RecyclerView.ViewH
 
         init {
             binding.favoriteChannelsRecyclerView.layoutManager = LinearLayoutManager(binding.root.context)
+            if (binding.root.context.isTelevision()) {
+                binding.favoriteChannelsRecyclerView.isFocusable = false
+                binding.favoriteChannelsRecyclerView.isFocusableInTouchMode = false
+            }
         }
 
         fun bind(item: StatsDashboardItem.FavoriteChannels) {

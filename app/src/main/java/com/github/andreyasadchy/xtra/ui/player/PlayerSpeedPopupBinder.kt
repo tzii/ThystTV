@@ -17,6 +17,7 @@ import androidx.core.view.children
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerSpeedPopupBinding
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
+import com.github.andreyasadchy.xtra.util.isTelevision
 import com.google.android.material.slider.Slider
 import java.util.Locale
 import kotlin.math.abs
@@ -51,7 +52,7 @@ internal class PlayerSpeedPopupBinder(
         updateSpeedDisplay(selectedSpeed)
 
         binding.speedSlider.addOnChangeListener { _, value, fromUser ->
-            if (fromUser) applySpeed(value, save = false)
+            if (fromUser) applySpeed(value, save = context.isTelevision())
         }
         binding.speedSlider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: Slider) = Unit

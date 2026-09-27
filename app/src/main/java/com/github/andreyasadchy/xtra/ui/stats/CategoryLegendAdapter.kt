@@ -8,6 +8,7 @@
  import androidx.recyclerview.widget.RecyclerView
  import com.github.andreyasadchy.xtra.databinding.ItemCategoryLegendBinding
  import com.github.andreyasadchy.xtra.ui.view.CategoryPieChartView
+ import com.github.andreyasadchy.xtra.util.isTelevision
  
  class CategoryLegendAdapter : ListAdapter<CategoryPieChartView.Slice, CategoryLegendAdapter.ViewHolder>(DIFF_CALLBACK) {
  
@@ -15,6 +16,10 @@
          val binding = ItemCategoryLegendBinding.inflate(
              LayoutInflater.from(parent.context), parent, false
          )
+         if (parent.context.isTelevision()) {
+             binding.root.isFocusable = true
+             binding.root.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+         }
          return ViewHolder(binding)
      }
  

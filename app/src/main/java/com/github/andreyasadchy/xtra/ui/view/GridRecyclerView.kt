@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.util.C
+import com.github.andreyasadchy.xtra.util.isTelevision
 import com.github.andreyasadchy.xtra.util.prefs
 
 class GridRecyclerView : RecyclerView {
@@ -24,6 +25,10 @@ class GridRecyclerView : RecyclerView {
     private val gridLayoutManager: GridLayoutManager
 
     init {
+        if (context.isTelevision()) {
+            isFocusable = false
+            isFocusableInTouchMode = false
+        }
         val columns = getColumnsForConfiguration(resources.configuration)
         gridLayoutManager = GridLayoutManager(context, columns)
         layoutManager = gridLayoutManager
