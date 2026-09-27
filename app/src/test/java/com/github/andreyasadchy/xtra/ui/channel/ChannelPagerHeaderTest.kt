@@ -2,6 +2,7 @@ package com.github.andreyasadchy.xtra.ui.channel
 
 import android.app.Activity
 import android.app.Application
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Looper
@@ -56,7 +57,10 @@ class ChannelPagerHeaderTest {
         val params = binding.collapsingToolbar.layoutParams as AppBarLayout.LayoutParams
         val originalFlags = params.scrollFlags
         assertTrue(binding.appBar.totalScrollRange > 0)
-        TvNavigationFocus(BottomNavigationView(binding.root.context), { binding.viewPager }, { binding.appBar }).prepareContent()
+        shadowOf(binding.root.context.packageManager).setSystemFeature(PackageManager.FEATURE_TOUCHSCREEN, false)
+        assertTrue("Channel entry can initially focus Watch live", binding.watchLive.requestFocus())
+        val navigation = TvNavigationFocus(BottomNavigationView(binding.root.context), { binding.viewPager }, { binding.appBar })
+        navigation.prepareContent()
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 // The production pager callback delegates to this same transition.
@@ -68,7 +72,7 @@ class ChannelPagerHeaderTest {
         fragment.updateTabHeader(isChat = false, originalScrollFlags = originalFlags)
         settle(binding.root)
         val tabRow = binding.tabLayout.getChildAt(0) as ViewGroup
-        assertTrue(tabRow.getChildAt(0).requestFocus())
+        assertTrue("Collapse transfers an obscured profile action to the selected visible tab", tabRow.getChildAt(0).isFocused)
         assertFullyVisible(tabRow.getChildAt(0))
         assertFullyVisible(binding.toolbar)
         for ((keyCode, tabIndex) in listOf(KeyEvent.KEYCODE_DPAD_RIGHT to 1, KeyEvent.KEYCODE_DPAD_RIGHT to 2,
@@ -88,6 +92,14 @@ class ChannelPagerHeaderTest {
             assertTrue(binding.viewPager.getGlobalVisibleRect(content))
             assertTrue("The compact header leaves most of the browse region for video cards", content.height() >= binding.root.height / 2)
         }
+        binding.appBar.setExpanded(true, false)
+        settle(binding.root)
+        assertTrue(binding.watchLive.requestFocus())
+        navigation.prepareContent()
+        binding.viewPager.isFocusable = true
+        assertTrue(binding.viewPager.requestFocus())
+        settle(binding.root)
+        assertTrue("The deferred correction must not steal focus moved into content", binding.viewPager.hasFocus())
         fragment.onDestroyView()
     }
 

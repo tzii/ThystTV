@@ -5,12 +5,15 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.HorizontalScrollView
+import androidx.core.view.doOnLayout
 import androidx.recyclerview.widget.RecyclerView
+import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.util.applyTvFocusOutline
 import com.github.andreyasadchy.xtra.util.isTelevision
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.tabs.TabLayout
 import java.lang.ref.WeakReference
 
 /** Focus moves independently from destination selection; CENTER still uses the menu's click. */
@@ -91,12 +94,45 @@ internal class TvNavigationFocus(
                 (child.layoutParams as? AppBarLayout.LayoutParams)?.scrollFlags = flags
             }
             view.setExpanded(!hasProfileHeader, false)
+            if (hasProfileHeader) {
+                view.doOnLayout {
+                    // CoordinatorLayout applies the collapse offset after the app
+                    // bar's layout callback. Inspect the final pinned geometry.
+                    view.post { restoreVisibleProfileFocus(view) }
+                }
+            }
         }
         if (view is ViewGroup) {
             // Material app bars block ordinary focus when a TV also advertises
             // touchscreen input, leaving their visible tabs/actions unreachable.
             view.touchscreenBlocksFocus = false
             for (index in 0 until view.childCount) allowHeaderRemoteFocus(view.getChildAt(index))
+        }
+    }
+
+    private fun restoreVisibleProfileFocus(header: AppBarLayout) {
+        if (!header.isAttachedToWindow) return
+        val focused = header.findFocus() ?: return
+        val profile = header.findViewById<View>(R.id.toolbarContainer) ?: return
+        if (!focused.isWithin(profile)) return
+        val toolbar = header.findViewById<ViewGroup>(R.id.toolbar) ?: return
+        val focusedBounds = Rect()
+        val covered = !focused.getGlobalVisibleRect(focusedBounds) ||
+            listOfNotNull(toolbar, header.findViewById<View>(R.id.toolbarContainer2)).any { pinned ->
+                val pinnedBounds = Rect()
+                pinned.getGlobalVisibleRect(pinnedBounds) && Rect.intersects(pinnedBounds, focusedBounds)
+            }
+        if (!covered) return
+
+        val tabs = header.findViewById<TabLayout>(R.id.tabLayout)
+        val selectedTab = (tabs?.getChildAt(0) as? ViewGroup)?.let { row ->
+            tabs?.selectedTabPosition?.takeIf { it in 0 until row.childCount }?.let(row::getChildAt)
+        }
+        val candidates = listOfNotNull(selectedTab) + toolbar.getFocusables(View.FOCUS_FORWARD)
+        candidates.firstOrNull { candidate ->
+            val bounds = Rect()
+            isAvailable(candidate) && candidate.getGlobalVisibleRect(bounds) &&
+                bounds.width() == candidate.width && bounds.height() == candidate.height && candidate.requestFocus()
         }
     }
 
