@@ -35,6 +35,34 @@ transition. Clear the snapshot at pointer-sequence boundaries and view destructi
 Android containers and preferences with fragment attachment/network chat mocked.
 Device gesture timing and playback still need the manual matrix in `MANUAL_QA.md`.
 
+## Android TV remote input
+
+Television UI mode enables remote focus routing; phone/tablet input is unchanged.
+The empty activity player container is not a focus target. On browsing roots,
+Back returns to the selected bottom-navigation item; UP returns to the current
+page, without scrolling to the end of a paged feed. Focus rings are separate
+from the selected destination indicator. TV toolbars, tabs and Stats ranges stay
+visible, including on TV images that also advertise touchscreen support. Profile
+headers can collapse to their pinned toolbar/tab area so video lists retain space.
+If that collapse covers the initially focused profile action, a one-shot layout
+check moves focus to the selected visible tab or toolbar action. It preserves
+focus that has already moved into page content or the player.
+
+A first D-pad/Enter press reveals hidden player controls and focuses play/pause
+when visible, otherwise the first available action such as Quality;
+subsequent keys use native control handling. Remote input renews the hide timer.
+Visible controls and player popups contain directional focus above the browse UI.
+Back dismisses a popup, then hides controls, then uses existing minimize behavior.
+A focused mini-player restores with CENTER/Enter; a TV-only Close action invokes
+the existing player close path. Speed/volume slider changes persist from remote
+input. Speed labels round the slider's float to two decimal places before compact
+formatting, so a 1.05x setting cannot appear as 1.04x. Existing media-session
+hardware keys keep their original handling.
+
+See `TESTING.md` for emulator evidence and its limits. Real live/VoD decoding,
+switching, minimize/restore, close/reopen, PiP/background, speed/quality, gestures
+and floating-chat behavior remain the player regression checklist.
+
 ## High-Risk Files
 
 Update this list as the code evolves.
@@ -143,8 +171,11 @@ and untracked trigger moves caused jump/multi-press misplacement reports.
 ## Saved resume and headset fallback
 
 `PlayerViewModel` resolves automatic saved positions for all player backends. A
-position at or beyond a known positive duration restarts at zero; unknown/invalid
-durations and unfinished positions are retained. Network argument durations are
+position at or beyond a known positive duration restarts at zero when a network
+VoD has final remote thumbnail metadata. A processing thumbnail, absent thumbnail
+or locally cached bookmark image cannot establish completion: the broadcast may
+still be live and growing, so its saved position is retained. Unknown/invalid
+durations and unfinished positions are also retained. Network argument durations are
 seconds converted to Long milliseconds; downloaded videos use their own duration,
 not the source VoD offset. No eager database reset is needed; normal playback saves
 the new position. Explicit timestamp requests bypass automatic resume, and existing
@@ -156,6 +187,22 @@ only for unhandled previous/next key-down events. It checks seek command availab
 and ignores cancelled/release events. The default Media3 path and platform
 MediaPlayer path are unchanged; never introduce a second handler that repeats an
 already-handled seek. Test actual headset and background dispatch on devices.
+
+## Side gesture feedback
+
+Brightness and device-volume feedback use larger 64 × 216dp edge pills on player
+surfaces at least 600dp wide, with 32dp icons and 8dp level tracks. Icons use
+explicit AppCompat image views with white tint for readability over video. Surface classification
+uses the measured video/player width, so side chat and resized windows can return
+to the unchanged compact horizontal treatment. Edge pill height is capped to 45%
+of the measured player height; padding, icon and spacing shrink together below
+96dp pill height to keep a visible level track in short windows. Returning to a
+compact or non-side gesture resets icon size, spacing and pill corners.
+
+`PlayerGestureFeedbackRenderTest` checks native Android layout, edge placement,
+progress/accessibility updates, very short players and compact restoration, and
+renders phone/tablet feedback previews. Device gesture timing, playback and actual
+window insets still require the human player matrix below.
 
 ## Required Checks For Player Work
 

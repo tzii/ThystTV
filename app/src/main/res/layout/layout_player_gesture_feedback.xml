@@ -16,7 +16,7 @@
         android:paddingHorizontal="16dp"
         android:paddingVertical="8dp">
 
-        <ImageView
+        <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/feedbackIcon"
             android:layout_width="24dp"
             android:layout_height="24dp"

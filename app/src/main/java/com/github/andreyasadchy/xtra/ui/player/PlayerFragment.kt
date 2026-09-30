@@ -30,6 +30,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.RoundedCorner
 import android.view.VelocityTracker
@@ -92,6 +93,8 @@ import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.isKeyboardShown
+import com.github.andreyasadchy.xtra.util.isTelevision
+import com.github.andreyasadchy.xtra.util.applyTvFocusOutline
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -105,6 +108,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import java.util.Locale
 
@@ -169,6 +173,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
     private var controllerIsAnimating = false
     private var controllerAnimation: ViewPropertyAnimator? = null
+    private var tvRevealKeyCode: Int? = null
     private var backgroundColor: Int? = null
     private var backgroundVisible = false
     private val brightnessState = PlayerBrightnessState()
@@ -228,6 +233,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         override fun handleOnBackPressed() {
             if (activePlayerPopup != null) {
                 hidePlayerPopup()
+            } else if (context?.isTelevision() == true && binding.playerControls.root.isVisible) {
+                binding.playerControls.root.removeCallbacks(controllerHideAction)
+                hideController(force = true, immediate = true)
             } else {
                 minimize()
             }
@@ -260,13 +268,92 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     open fun downloadVideo() {}
     open fun close() {}
 
+    /** Reveal on the first remote press; visible controls retain native key handling. */
+    fun dispatchTvKeyEvent(event: KeyEvent): Boolean {
+        val binding = _binding ?: return false
+        if (context?.isTelevision() != true || !isMaximized || !useController || !binding.root.isShown) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity?.isInPictureInPictureMode == true) return false
+        if (event.keyCode !in TV_NAVIGATION_KEYS) return false
+        if (tvRevealKeyCode == event.keyCode) {
+            if (event.action == KeyEvent.ACTION_UP) {
+                tvRevealKeyCode = null
+                return true
+            }
+            if (event.repeatCount > 0) return true
+            tvRevealKeyCode = null
+        }
+        if (event.action != KeyEvent.ACTION_DOWN || event.isCanceled) return false
+        if (activePlayerPopup != null) {
+            activeVolumePopupBinder?.onRemoteInteraction()
+            return false
+        }
+        if (binding.root.findFocus()?.onCheckIsTextEditor() == true) return false
+        if (!binding.playerControls.root.isVisible) {
+            tvRevealKeyCode = event.keyCode
+            showTvController()
+            return true
+        }
+        showController(force = true)
+        if (!binding.playerControls.root.hasFocus()) {
+            focusTvController()
+            tvRevealKeyCode = event.keyCode
+            return true
+        }
+        return false
+    }
+
+    private fun showTvController() {
+        controllerAnimation?.cancel()
+        controllerIsAnimating = false
+        binding.playerControls.root.alpha = 1f
+        binding.playerControls.root.visibility = View.VISIBLE
+        updateChatButtonIcon()
+        showController(force = true)
+        focusTvController()
+    }
+
+    private fun focusTvController() {
+        with(binding.playerControls) {
+            // Live playback and user preferences can hide play/pause.
+            val candidates = listOf(playPause, quality, menu, minimize, closePlayer) +
+                root.getFocusables(View.FOCUS_FORWARD)
+            candidates.firstOrNull { it.isShown && it.isEnabled && it.isFocusable && it.requestFocus() }
+        }
+    }
+
+    private fun configureTvPlayerControls() {
+        if (context?.isTelevision() != true) return
+        binding.playerControls.closePlayer.apply {
+            isVisible = true
+            setOnClickListener { (activity as? MainActivity)?.closePlayer(this@PlayerFragment) }
+        }
+        binding.playerControls.root.prepareTvPlayerFocus()
+    }
+
+    private fun focusTvMiniPlayer() {
+        if (context?.isTelevision() != true) return
+        tvRevealKeyCode = null
+        binding.playerControls.root.clearFocus()
+        binding.slidingLayout.apply {
+            isFocusable = true
+            applyTvFocusOutline()
+            setOnKeyListener { _, keyCode, event ->
+                if (!isMaximized && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+                    if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) maximize()
+                    true
+                } else false
+            }
+            requestFocus()
+        }
+    }
+
     protected fun updateMorePopupSubtitles(subtitles: Tracks.Group?) {
         activeMorePopupBinder?.setSubtitles(subtitles)
     }
 
     protected fun formatPlaybackSpeed(speed: Float?): String? {
         if (speed == null) return null
-        val rounded = ((speed * 100).toInt() / 100f)
+        val rounded = (speed * 100).roundToInt() / 100f
         return if (rounded % 1f == 0f) {
             String.format(Locale.US, "%.0fx", rounded)
         } else if ((rounded * 10f) % 1f == 0f) {
@@ -1350,6 +1437,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     }
                 }
             }
+            configureTvPlayerControls()
             val currentChatFragment = (childFragmentManager.findFragmentById(R.id.chatFragmentContainer) as? ChatFragment)
             if (currentChatFragment != null) {
                 chatFragment = currentChatFragment
@@ -1764,6 +1852,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         )
         host.root.setOnClickListener { hidePlayerPopup() }
         container.setOnClickListener { /* Consume panel taps; children own their actions. */ }
+        content.prepareTvPlayerFocus()
         container.animate().cancel()
         container.alpha = 0f
         container.scaleX = PLAYER_POPUP_START_SCALE
@@ -1977,7 +2066,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             popupBackgroundAccessibility.forEach { (view, mode) -> view.importantForAccessibility = mode }
             popupBackgroundAccessibility = emptyList()
             if (restoreFocus) {
-                trigger?.requestFocus()
+                if (context?.isTelevision() == true) {
+                    val restored = trigger?.takeIf { it.isShown && it.isEnabled && it.isFocusable }?.requestFocus() == true
+                    if (!restored) focusTvController()
+                } else {
+                    trigger?.requestFocus()
+                }
                 if (controllerAutoHide && controllerHideOnTouch && !binding.playerControls.progressBar.isPressed) {
                     binding.playerControls.root.removeCallbacks(controllerHideAction)
                     binding.playerControls.root.postDelayed(controllerHideAction, PLAYER_POPUP_CONTROLLER_HIDE_DELAY_MS)
@@ -2418,11 +2512,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
-    private fun hideController(force: Boolean = false) {
+    private fun hideController(force: Boolean = false, immediate: Boolean = false) {
         if (!force) {
             maybeShowPinchHint()
         }
-        if (!controllerIsAnimating && binding.playerControls.root.isVisible) {
+        if (!immediate && !controllerIsAnimating && binding.playerControls.root.isVisible) {
             controllerAnimation = binding.playerControls.root.animate().apply {
                 alpha(0f)
                 setDuration(250L)
@@ -2668,7 +2762,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         val explicitPosition = if (requireArguments().getBoolean(KEY_IGNORE_SAVED_POSITION)) {
                             requireArguments().getLong(KEY_OFFSET).takeIf { it != -1L } ?: 0L
                         } else null
-                        viewModel.getVideoPosition(id, requireArguments().getInt(KEY_DURATION_SECONDS), explicitPosition)
+                        viewModel.getVideoPosition(
+                            id, requireArguments().getInt(KEY_DURATION_SECONDS),
+                            requireArguments().getString(KEY_THUMBNAIL), explicitPosition,
+                        )
                         requireArguments().putBoolean(KEY_IGNORE_SAVED_POSITION, false)
                         requireArguments().putLong(KEY_OFFSET, -1L)
                     } else {
@@ -2878,6 +2975,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             backPressedCallback.remove()
             useController = false
             hideController(true)
+            focusTvMiniPlayer()
             applyMinimizedPlayerVisualState()
             fun animate() {
                 val (minimizedScaleX, minimizedScaleY) = getScaleValues()
@@ -2947,6 +3045,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 chatFragment?.toggleBackPressedCallback(true)
             }
             useController = true
+            if (requireContext().isTelevision()) {
+                slidingLayout.isFocusable = false
+                slidingLayout.setOnKeyListener(null)
+                showTvController()
+            }
             applyMaximizedPlayerVisualState()
             if (!controllerHideOnTouch) {
                 showController(true)
@@ -3291,6 +3394,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     companion object {
+        private val TV_NAVIGATION_KEYS = setOf(
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+        )
         protected const val AUTO_QUALITY = "auto"
         protected const val AUDIO_ONLY_QUALITY = "audio_only"
         protected const val CHAT_ONLY_QUALITY = "chat_only"
@@ -3946,6 +4054,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
      * playback; a versioned preference records dismissal.
      */
     fun maybeShowGestureGuide() {
+        if (context?.isTelevision() == true) return
         if (isPortrait || !isMaximized || gestureGuideShownThisSession) return
         if (activePlayerPopup != null) return
         if (childFragmentManager.findFragmentByTag("closeOnPip") != null) return
@@ -3976,6 +4085,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
      * player surface.
      */
     private fun maybeShowPinchHint() {
+        if (context?.isTelevision() == true) return
         if (isPortrait || !isMaximized) return
         if (activePlayerPopup != null) return
         if (childFragmentManager.findFragmentByTag("closeOnPip") != null) return

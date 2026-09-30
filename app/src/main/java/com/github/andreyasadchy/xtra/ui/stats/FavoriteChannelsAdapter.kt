@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.ItemFavoriteChannelBinding
+import com.github.andreyasadchy.xtra.util.isTelevision
 
 class FavoriteChannelsAdapter : ListAdapter<FavoriteChannelRow, FavoriteChannelsAdapter.ViewHolder>(DiffCallback()) {
 
@@ -17,6 +18,10 @@ class FavoriteChannelsAdapter : ListAdapter<FavoriteChannelRow, FavoriteChannels
             parent,
             false,
         )
+        if (parent.context.isTelevision()) {
+            binding.root.isFocusable = true
+            binding.root.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        }
         return ViewHolder(binding)
     }
 

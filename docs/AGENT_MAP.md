@@ -13,10 +13,13 @@ ThystTV is viewer-first. Protect stable playback, fast VoD controls, floating ch
 Read:
 
 - `docs/ROADMAP.md`
-- `docs/RELEASE_1_2_PLAN.md`
+- `docs/release-notes/1.3.1.md`
 - `CHANGELOG.md`
 
-The 1.2 line should focus on quality, player UX, visual polish, and release readiness. Do not turn 1.2 work into broad architecture churn.
+The published baseline is 1.3.0. Candidate 1.3.1 focuses on larger side-gesture
+feedback, selective upstream corrections and TV remote navigation. Keep player
+lifecycle and experimental Twitch sync work separate. Publication is pending the
+release gates in `RELEASE_PROCESS.md`.
 
 ## Contribution And Style Conventions
 
@@ -33,6 +36,7 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
 - App module: `app/`
 - Build config: `app/build.gradle.kts`
 - Main activity / app-level player entry point: `app/src/main/java/com/github/andreyasadchy/xtra/ui/main/MainActivity.kt`
+- TV focus routing: `ui/main/TvNavigationFocus.kt`, `ui/player/PlayerTvFocus.kt` and `util/TvUi.kt` under the app's Kotlin package.
 - Player area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/player/`
 - Chat/floating chat area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/chat/`
 - Stats area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/stats/`
@@ -51,6 +55,7 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
 ### Upstream Xtra Sync
 
 - Policy: `docs/UPSTREAM_SYNC.md`
+- Living ledger: `docs/UPSTREAM_SYNC_LEDGER.md`
 - 1.2 ledger: `docs/RELEASE_1_2_UPSTREAM_COMMITS.md`
 
 ### Visual And Repo Presentation

@@ -46,8 +46,8 @@ android {
         applicationId = "com.tzii.thysttv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.3.0"
+        versionCode = 13
+        versionName = "1.3.1"
     }
 
     buildTypes {

@@ -15,6 +15,73 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### September 25 large-screen and upstream update
+
+On September 27 the maintainer reported that the delivered debug build seemed
+fine. No device/backend/scenario breakdown was supplied, so the detailed rows
+below remain a regression reference rather than a claim that every case passed.
+
+On September 30 the maintainer also reported that the latest debug APK with TV
+support seemed fine and proposed preparing 1.3.1. The supplied artifact identifies
+as `com.tzii.thysttv.debug`, version `1.3.0-DEBUG`, code 12. No additional device or
+scenario breakdown was provided. Record this as general debug smoke evidence;
+the exact signed 1.3.1 upgrade and release matrix remain pending.
+
+- [ ] On tablet and landscape phone, brightness/volume side feedback is easy to
+  see over bright/dark video, with larger icons and a thicker level track. Check
+  both ends of each level; its pill must stay within the video and system insets.
+- [ ] Resize to short split-screen and narrow side-chat video; return to full
+  screen. Compact feedback, seek/speed/pinch indicators and chat touches remain
+  correct. Repeat with large fonts and RTL.
+- [ ] Live/VoD playback, stream switching without old audio, minimize/restore,
+  close/reopen, PiP/background, speed/quality, all gestures, floating-chat
+  open/drag/resize, and Stats load/rotate/range smoke.
+- [ ] Refresh individual and multiple saved bookmarks, reopen Saved/relaunch and
+  confirm updated title/duration/art persists without duplicate entries.
+- [ ] Resume a VoD while its broadcast is still live, with a saved position past
+  the listed duration. It must retain position. Repeat via cached bookmarks;
+  completed VoDs with final metadata still restart, explicit timestamps win and
+  downloaded segments retain their own duration behavior.
+- [ ] With no API tokens but a retained account ID, player/channel buttons reflect
+  local follows. Repeat signed in through GQL and Helix fallback.
+- [ ] Open chat profiles using moderator permissions and Helix fallback; follow
+  dates belong to the selected viewer. Ordinary accounts without follower permission
+  still show profiles. Check profiles in floating chat and ordinary followed lists.
+- [ ] `/color` displays the current color through HttpEngine and legacy Cronet
+  where supported; existing OkHttp/Cronet behavior remains intact.
+- [ ] German/Japanese/Spanish/Russian UI: inspect changed settings, quoted labels,
+  plural/count values, formatted percentages and Russian ThystTV login text.
+
+### September 27 Android TV remote navigation
+
+The maintainer has no TV available. Codex checked an isolated Android TV
+emulator and native Android view/key tests. Physical TV/OEM remote and codec
+behavior remain unverified; emulator results are recorded separately in
+`TESTING.md`.
+
+- [ ] Remote-only launch: visible focus, left/right across enabled bottom items,
+  CENTER selects; UP enters content and Back at a root page returns to navigation.
+- [ ] Popular, Following, Games, Saved and Stats; tabs, long feeds, empty pages,
+  search, settings and dialogs; nested Back returns normally and repeated Back exits.
+- [ ] Following/Saved tabs, Stats ranges and channel Videos/Chat/Clips tabs remain
+  fully visible while focused, after selection and after scrolling the page.
+- [ ] Channel entry shows visible focus; profile details collapse while toolbar
+  and tabs remain available and leave room for video cards.
+- [ ] Live/VoD controls: reveal with D-pad, play/pause, seek, quality, speed,
+  volume, More, popup Back/focus restoration; keyboard slider changes persist.
+- [ ] Minimize, focus/restore mini-player, close/reopen, stream switching,
+  PiP/background and chat controls. No focus reaches covered browse content.
+- [ ] Phone/tablet gestures and floating-chat interaction remain regression areas.
+
+### Following view cleanup
+
+- [ ] Open available Following tabs, leave and return repeatedly, then rotate or
+  recreate the screen. Tabs and lists still load; first insertion keeps position
+  and later prepends still scroll to the top.
+- [ ] After leaving Following, inspect a fresh LeakCanary result from the rebuilt
+  APK. The previous destroyed pager/RecyclerView retention groups must not recur.
+  Keep heap dumps and private analysis out of public issues and commits.
+
 | Area | Required | Completed | Notes |
 | --- | --- | --- | --- |
 | App launches | [ ] | [ ] | |

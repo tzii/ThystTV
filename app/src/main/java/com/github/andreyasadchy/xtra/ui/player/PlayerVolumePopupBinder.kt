@@ -9,6 +9,7 @@ import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerVolumeOverlayBinding
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
+import com.github.andreyasadchy.xtra.util.isTelevision
 import com.google.android.material.slider.Slider
 
 /** Owns the stream-volume controls while they are attached to the player popup host. */
@@ -28,6 +29,7 @@ internal class PlayerVolumePopupBinder(
         if (fromUser) {
             state.remember(value.toInt())
             currentValue = (value / 100f).coerceIn(0f, 1f)
+            if (context.isTelevision()) context.prefs().edit { putInt(C.PLAYER_VOLUME, value.toInt()) }
             onVolumeChanged(currentValue)
             render(scheduleDismiss = true)
         }
@@ -66,6 +68,11 @@ internal class PlayerVolumePopupBinder(
         binding.volumeOverlaySlider.removeOnChangeListener(changeListener)
         binding.volumeOverlaySlider.removeOnSliderTouchListener(touchListener)
         binding.volumeOverlayMute.setOnClickListener(null)
+    }
+
+    fun onRemoteInteraction() {
+        binding.root.removeCallbacks(dismissRunnable)
+        binding.root.postDelayed(dismissRunnable, dismissDelayMs)
     }
 
     private fun render(scheduleDismiss: Boolean) {

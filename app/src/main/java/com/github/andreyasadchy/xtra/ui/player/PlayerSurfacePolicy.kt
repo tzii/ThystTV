@@ -1,6 +1,7 @@
 package com.github.andreyasadchy.xtra.ui.player
 
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -48,8 +49,8 @@ object PlayerSurfacePolicy {
 
     const val LARGE_SURFACE_MIN_WIDTH_DP = 600
     const val CENTER_FEEDBACK_MAX_WIDTH_DP = 360
-    const val EDGE_PILL_WIDTH_DP = 48
-    const val EDGE_PILL_HEIGHT_DP = 144
+    const val EDGE_PILL_WIDTH_DP = 64
+    const val EDGE_PILL_HEIGHT_DP = 216
     const val FEEDBACK_HOLD_MS = 800L
     const val FEEDBACK_FADE_MS = 150L
     private const val FEEDBACK_MARGIN_DP = 16
@@ -57,8 +58,13 @@ object PlayerSurfacePolicy {
     private const val EDGE_PILL_MAX_HEIGHT_FRACTION = 0.45f
     private const val HORIZONTAL_PILL_PADDING_H_DP = 16
     private const val HORIZONTAL_PILL_PADDING_V_DP = 8
-    private const val EDGE_PILL_PADDING_H_DP = 6
-    private const val EDGE_PILL_PADDING_V_DP = 10
+    private const val EDGE_PILL_PADDING_H_DP = 8
+    private const val EDGE_PILL_PADDING_V_DP = 12
+    private const val EDGE_PILL_ICON_SIZE_DP = 32
+    private const val EDGE_PILL_LEVEL_WIDTH_DP = 8
+    private const val EDGE_PILL_FULL_CONTENT_HEIGHT_DP = 96
+    private const val COMPACT_ICON_SIZE_DP = 24
+    private const val COMPACT_LEVEL_WIDTH_DP = 4
     private const val ICON_SPACING_DP = 12
 
     fun classify(surfaceWidthPx: Int, density: Float): PlayerSurfaceClass {
@@ -73,7 +79,7 @@ object PlayerSurfacePolicy {
     }
 
     /**
-     * Large brightness and device-volume feedback uses a compact vertical edge
+     * Large brightness and device-volume feedback uses a larger vertical edge
      * pill; every other combination keeps the top-centered horizontal pill on
      * both compact and large surfaces.
      */
@@ -158,12 +164,15 @@ object PlayerSurfacePolicy {
         container.gravity = if (placement.verticalPill) Gravity.CENTER_HORIZONTAL else Gravity.CENTER_VERTICAL
         container.minimumWidth = 0
         val density = container.resources.displayMetrics.density
+        (container.background?.mutate() as? GradientDrawable)?.cornerRadius =
+            if (placement.verticalPill) (placement.fixedContainerWidthPx ?: 0) / 2f else 24f * density
         if (placement.verticalPill) {
+            val scale = edgePillContentScale(placement, density)
             container.setPadding(
-                (EDGE_PILL_PADDING_H_DP * density).toInt(),
-                (EDGE_PILL_PADDING_V_DP * density).toInt(),
-                (EDGE_PILL_PADDING_H_DP * density).toInt(),
-                (EDGE_PILL_PADDING_V_DP * density).toInt(),
+                (EDGE_PILL_PADDING_H_DP * density * scale).toInt(),
+                (EDGE_PILL_PADDING_V_DP * density * scale).toInt(),
+                (EDGE_PILL_PADDING_H_DP * density * scale).toInt(),
+                (EDGE_PILL_PADDING_V_DP * density * scale).toInt(),
             )
         } else {
             container.setPadding(
@@ -172,6 +181,16 @@ object PlayerSurfacePolicy {
                 (HORIZONTAL_PILL_PADDING_H_DP * density).toInt(),
                 (HORIZONTAL_PILL_PADDING_V_DP * density).toInt(),
             )
+        }
+    }
+
+    private fun edgePillContentScale(placement: PlayerFeedbackPlacement, density: Float): Float {
+        // Keep room for the level even in a very short resized player. Scaling
+        // only the outer pill can otherwise leave its icon clipped and no track.
+        return if (placement.verticalPill && density > 0f) {
+            ((placement.fixedContainerHeightPx ?: 0) / (EDGE_PILL_FULL_CONTENT_HEIGHT_DP * density)).coerceIn(0f, 1f)
+        } else {
+            1f
         }
     }
 
@@ -243,8 +262,12 @@ object PlayerSurfacePolicy {
 
         icon?.setImageResource(iconRes)
         icon?.visibility = View.VISIBLE
+        val contentScale = edgePillContentScale(placement, density)
         (icon?.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-            val spacing = (ICON_SPACING_DP * density).toInt()
+            val iconSize = ((if (vertical) EDGE_PILL_ICON_SIZE_DP else COMPACT_ICON_SIZE_DP) * density * contentScale).toInt()
+            params.width = iconSize
+            params.height = iconSize
+            val spacing = (ICON_SPACING_DP * density * contentScale).toInt()
             val trailing = if (vertical) 0 else spacing
             val bottom = if (vertical) spacing else 0
             // Relative margins must be written too: setMargins() alone does
@@ -259,6 +282,11 @@ object PlayerSurfacePolicy {
         horizontalProgress?.progress = presentation.level
         verticalLevel?.visibility = if (presentation.levelVisible && vertical) View.VISIBLE else View.GONE
         verticalLevel?.progress = presentation.level
+        verticalLevel?.let { level ->
+            level.layoutParams = level.layoutParams.apply {
+                width = ((if (vertical) EDGE_PILL_LEVEL_WIDTH_DP else COMPACT_LEVEL_WIDTH_DP) * density * contentScale).toInt()
+            }
+        }
         text?.visibility = if (presentation.text != null && !vertical) View.VISIBLE else View.GONE
         text?.text = presentation.text.orEmpty()
         text?.maxLines = 1

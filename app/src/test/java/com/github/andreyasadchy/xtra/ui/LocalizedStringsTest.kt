@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import com.github.andreyasadchy.xtra.R
 import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -41,5 +42,30 @@ class LocalizedStringsTest {
             val localized = context.createConfigurationContext(configuration)
             assertEquals(locale, expected, localized.getString(resource))
         }
+    }
+
+    @Test fun `upstream translations preserve formatting quotes and plural arguments when packaged`() {
+        val context = RuntimeEnvironment.getApplication()
+        fun localized(locale: String) = context.createConfigurationContext(
+            Configuration(context.resources.configuration).apply {
+                setLocale(Locale.forLanguageTag(locale))
+            },
+        )
+
+        assertEquals("Konto", localized("de").getString(R.string.account))
+        assertEquals("Pestañas en \"Guardado\"", localized("es").getString(R.string.saved_tabs))
+
+        val japanese = localized("ja")
+        assertEquals("移動中： 42%", japanese.getString(R.string.download_moving, 42))
+        assertEquals("Chat：切断済み - Offline", japanese.getString(R.string.websocket_disconnected, "Chat", "Offline"))
+        for (quantity in listOf(1, 2)) {
+            assertEquals("言語: $quantity", japanese.resources.getQuantityString(R.plurals.languages, quantity, quantity.toString()))
+            assertEquals("タグ: $quantity", japanese.resources.getQuantityString(R.plurals.tags, quantity, quantity.toString()))
+            assertEquals("$quantity メンバー", japanese.resources.getQuantityString(R.plurals.members, quantity, quantity.toString()))
+        }
+
+        val russian = localized("ru")
+        assertEquals("Старое имя: Viewer", russian.getString(R.string.old_username, "Viewer"))
+        assertTrue(russian.getString(R.string.external_tv_login_message).endsWith("\n• Вернитесь в ThystTV и нажмите \"Далее\"."))
     }
 }

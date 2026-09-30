@@ -290,7 +290,7 @@ class BookmarksViewModel @Inject internal constructor(
                             type = video.type ?: bookmark.type,
                             duration = video.durationSeconds?.toString() ?: bookmark.duration,
                             animatedPreviewURL = video.animatedPreviewURL ?: bookmark.animatedPreviewURL
-                        )
+                        ).apply { id = bookmark.id }
                     )
                 }
             }
@@ -407,7 +407,7 @@ class BookmarksViewModel @Inject internal constructor(
                                         type = video.type ?: bookmark.type,
                                         duration = video.durationSeconds?.toString() ?: bookmark.duration,
                                         animatedPreviewURL = video.animatedPreviewURL ?: bookmark.animatedPreviewURL
-                                    )
+                                    ).apply { id = bookmark.id }
                                 )
                             }
                         }

@@ -40,6 +40,7 @@ import com.github.andreyasadchy.xtra.ui.view.DashboardSpacingItemDecoration
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
+import com.github.andreyasadchy.xtra.util.isTelevision
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import dagger.hilt.android.AndroidEntryPoint
@@ -250,6 +251,10 @@ class StatsFragment : Fragment(R.layout.fragment_stats), Scrollable {
     private fun configureDashboard(binding: FragmentStatsBinding) {
         widthTier = AdaptiveWindowInfo.widthTierFor(requireContext())
         dashboardAdapter = StatsDashboardAdapter()
+        if (requireContext().isTelevision()) {
+            binding.statsRecyclerView.isFocusable = false
+            binding.statsRecyclerView.isFocusableInTouchMode = false
+        }
 
         val configuration = resources.configuration
         val spanCount = StatsDashboardSpanPolicy.spanCountFor(

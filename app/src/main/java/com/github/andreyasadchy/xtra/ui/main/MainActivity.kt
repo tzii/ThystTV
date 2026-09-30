@@ -21,10 +21,12 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.view.Menu
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.OptIn
@@ -65,6 +67,7 @@ import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
+import com.github.andreyasadchy.xtra.ui.common.FragmentHost
 import com.github.andreyasadchy.xtra.ui.common.Scrollable
 import com.github.andreyasadchy.xtra.ui.common.UpdateAvailableDialog
 import com.github.andreyasadchy.xtra.ui.common.UpdateDialogController
@@ -81,6 +84,8 @@ import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.applyTheme
+import com.github.andreyasadchy.xtra.util.applyTvFocusOutline
+import com.github.andreyasadchy.xtra.util.isTelevision
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.tokenPrefs
 import com.github.andreyasadchy.xtra.util.update.UpdateHost
@@ -109,6 +114,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val viewModel: MainViewModel by viewModels()
     private lateinit var navController: NavController
+    private var tvNavigation: TvNavigationFocus? = null
+    private val tvNavigationBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            tvNavigation?.focusNavigation()
+            updateTvNavigationBack()
+        }
+    }
     var playerFragment: PlayerFragment? = null
         private set
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -205,6 +217,7 @@ class MainActivity : AppCompatActivity() {
 
         var initialized = savedInstanceState != null
         initNavigation()
+        if (isTelevision()) initTvNavigation()
         val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         if (!initialized) {
             val networkCapabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
@@ -441,6 +454,56 @@ class MainActivity : AppCompatActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         setNavBarColor(newConfig.orientation == Configuration.ORIENTATION_PORTRAIT)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isTelevision()) {
+            if (playerFragment?.dispatchTvKeyEvent(event) == true) return true
+            updateTvNavigationBack()
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun initTvNavigation() {
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment
+        fun screen() = host.childFragmentManager.primaryNavigationFragment
+        tvNavigation = TvNavigationFocus(
+            binding.navBar,
+            contentRoot = {
+                val fragment = screen()?.takeIf { it.view != null }
+                (fragment as? FragmentHost)?.currentFragment?.view ?: fragment?.view
+            },
+            fallbackRoot = { screen()?.view?.findViewById<View>(R.id.appBar) },
+        ).also { navigation ->
+            binding.navBar.post {
+                navigation.prepareContent()
+                navigation.install()
+                if (playerFragment?.isMaximized != true) navigation.focusNavigation()
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, tvNavigationBack)
+        binding.root.viewTreeObserver.addOnGlobalFocusChangeListener { _, focused ->
+            focused?.applyTvFocusOutline()
+            tvNavigation?.rememberContentFocus(focused)
+            updateTvNavigationBack()
+        }
+        navController.addOnDestinationChangedListener { _, _, _ ->
+            binding.root.post {
+                tvNavigation?.prepareContent()
+                updateTvNavigationBack()
+            }
+        }
+    }
+
+    private fun updateTvNavigationBack() {
+        val navigation = tvNavigation ?: return
+        val atRoot = navController.currentDestination?.id?.let {
+            binding.navBar.menu.findItem(it)?.isVisible == true
+        } == true
+        val keyboardVisible = ViewCompat.getRootWindowInsets(binding.root)
+            ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        tvNavigationBack.isEnabled = atRoot && binding.navBar.isVisible &&
+            !navigation.isNavigationFocused() && playerFragment?.isMaximized != true && !keyboardVisible
     }
 
     override fun onResume() {

@@ -62,6 +62,7 @@ import com.github.andreyasadchy.xtra.ui.settings.SettingsActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
+import com.github.andreyasadchy.xtra.util.isTelevision
 import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.reduceDragSensitivity
 import com.github.andreyasadchy.xtra.util.tokenPrefs
@@ -453,17 +454,10 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
                 collapsingToolbar.setContentScrimColor(MaterialColors.getColor(collapsingToolbar, com.google.android.material.R.attr.colorSurface))
             }
             viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-                private val layoutParams = collapsingToolbar.layoutParams as AppBarLayout.LayoutParams
-                private val originalScrollFlags = layoutParams.scrollFlags
+                private val originalScrollFlags = (collapsingToolbar.layoutParams as AppBarLayout.LayoutParams).scrollFlags
 
                 override fun onPageSelected(position: Int) {
-                    layoutParams.scrollFlags = if (tabs.getOrNull(position) != "3") {
-                        originalScrollFlags
-                    } else {
-                        appBar.setExpanded(false, isResumed)
-                        appBar.background = null
-                        AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL
-                    }
+                    updateTabHeader(isChat = tabs.getOrNull(position) == "3", originalScrollFlags = originalScrollFlags)
                     viewPager.doOnLayout {
                         childFragmentManager.findFragmentByTag("f${position}").let { fragment ->
                             if (fragment is Sortable) {
@@ -513,6 +507,22 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
                     topMargin = insets.top
                 }
                 windowInsets
+            }
+        }
+    }
+
+    internal fun updateTabHeader(isChat: Boolean, originalScrollFlags: Int) {
+        with(binding) {
+            val layoutParams = collapsingToolbar.layoutParams as AppBarLayout.LayoutParams
+            layoutParams.scrollFlags = if (root.context.isTelevision()) {
+                appBar.setExpanded(false, false)
+                AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL or AppBarLayout.LayoutParams.SCROLL_FLAG_EXIT_UNTIL_COLLAPSED
+            } else if (!isChat) {
+                originalScrollFlags
+            } else {
+                appBar.setExpanded(false, isResumed)
+                appBar.background = null
+                AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL
             }
         }
     }

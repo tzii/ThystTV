@@ -44,7 +44,8 @@ class BookmarksAdapter(
 
         override fun areContentsTheSame(oldItem: Bookmark, newItem: Bookmark): Boolean =
             oldItem.title == newItem.title &&
-                    oldItem.duration == newItem.duration
+                    oldItem.duration == newItem.duration &&
+                    oldItem.thumbnail == newItem.thumbnail
     }) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PagingViewHolder {

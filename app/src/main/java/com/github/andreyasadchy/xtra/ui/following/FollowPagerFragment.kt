@@ -39,6 +39,7 @@ class FollowPagerFragment : Fragment(), Scrollable, FragmentHost {
 
     private var _binding: FragmentMediaPagerBinding? = null
     private val binding get() = _binding!!
+    private var tabLayoutMediator: TabLayoutMediator? = null
     private var firstLaunch = true
 
     override val currentFragment: Fragment?
@@ -165,7 +166,7 @@ class FollowPagerFragment : Fragment(), Scrollable, FragmentHost {
             }
             viewPager.offscreenPageLimit = adapter.itemCount
             viewPager.reduceDragSensitivity()
-            TabLayoutMediator(tabLayout, viewPager) { tab, position ->
+            tabLayoutMediator = TabLayoutMediator(tabLayout, viewPager) { tab, position ->
                 tab.text = when (tabs.getOrNull(position)) {
                     "0" -> getString(R.string.games)
                     "1" -> getString(R.string.live)
@@ -173,7 +174,7 @@ class FollowPagerFragment : Fragment(), Scrollable, FragmentHost {
                     "3" -> getString(R.string.channels)
                     else -> getString(R.string.live)
                 }
-            }.attach()
+            }.also { it.attach() }
             ViewCompat.setOnApplyWindowInsetsListener(view) { _, windowInsets ->
                 val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
                 toolbar.updateLayoutParams<ViewGroup.MarginLayoutParams> {
@@ -190,6 +191,9 @@ class FollowPagerFragment : Fragment(), Scrollable, FragmentHost {
     }
 
     override fun onDestroyView() {
+        tabLayoutMediator?.detach()
+        tabLayoutMediator = null
+        _binding?.viewPager?.adapter = null
         super.onDestroyView()
         _binding = null
     }
