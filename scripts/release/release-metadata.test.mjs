@@ -132,23 +132,25 @@ test("verifyPromotion rejects every mismatched field", () => {
   assert.throws(() => verifyPromotion({ extra: true }, validManifestFields), /manifest schema mismatch/);
 });
 
-test("1.3.0 release metadata is finalized", () => {
+test("1.3.1 release metadata is finalized", () => {
   const buildGradle = fs.readFileSync("app/build.gradle.kts", "utf8");
   const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
   const bundledChangelog = fs.readFileSync("app/src/main/res/raw/thysttv_changelog.md", "utf8");
-  const releaseNotes = fs.readFileSync("docs/release-notes/1.3.0.md", "utf8");
-  const fastlaneNotes = fs.readFileSync("fastlane/metadata/android/en-US/changelogs/12.txt", "utf8");
+  const releaseNotes = fs.readFileSync("docs/release-notes/1.3.1.md", "utf8");
+  const fastlaneNotes = fs.readFileSync("fastlane/metadata/android/en-US/changelogs/13.txt", "utf8");
 
   assert.deepEqual(readVersionConfig(buildGradle), {
-    versionName: "1.3.0",
-    versionCode: 12,
+    versionName: "1.3.1",
+    versionCode: 13,
   });
-  assert.match(changelog, /^## \[1\.3\.0\] - \d{4}-\d{2}-\d{2}$/m);
+  assert.match(changelog, /^## \[1\.3\.1\] - \d{4}-\d{2}-\d{2}$/m);
+  assert.match(bundledChangelog, /^# ThystTV 1\.3\.1$/m);
   assert.match(bundledChangelog, /^# ThystTV 1\.3\.0$/m);
-  assert.match(releaseNotes, /^# ThystTV 1\.3\.0$/m);
+  assert.match(bundledChangelog, /^# ThystTV 1\.2\.1$/m);
+  assert.match(releaseNotes, /^# ThystTV 1\.3\.1$/m);
   assert.match(
     releaseNotes,
-    /landscape display setting migrates automatically/i,
+    /Android TV remote navigation/i,
   );
   assert.doesNotMatch(releaseNotes, /TBD|TODO|placeholder|Release notes were not found/i);
   assert.ok(fastlaneNotes.length <= 500);

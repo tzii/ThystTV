@@ -4,6 +4,26 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-09-30
+
+### Added
+- Android TV D-pad navigation and visible focus for browsing, tabs, Stats and player controls.
+
+### Changed
+- Larger brightness and volume gesture feedback on wide video surfaces, with compact sizing in short windows.
+- Updated compatible German, Japanese, Spanish and Russian translations.
+
+### Fixed
+- Keep focused TV tabs and channel headers visible, restore focus after profile collapse, and round playback-speed labels.
+- Release Following pager/list views and observers when their views are destroyed.
+- Preserve bookmark identity and refreshed metadata, including thumbnail updates.
+- Preserve resume positions for growing VoDs and bookmarks whose artwork cannot establish completion.
+- Use local follows when an account ID remains without usable API tokens.
+- Correct chat profile follow-date fallback and chat-color responses on HttpEngine and legacy Cronet.
+
+### Release metadata
+- Version 1.3.1 uses version code 13. Scope and limitations: `docs/release-notes/1.3.1.md`.
+
 ## [1.3.0] - 2026-09-11
 
 ### Added

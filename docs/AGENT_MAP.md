@@ -13,13 +13,13 @@ ThystTV is viewer-first. Protect stable playback, fast VoD controls, floating ch
 Read:
 
 - `docs/ROADMAP.md`
-- `docs/release-notes/1.3.0.md`
+- `docs/release-notes/1.3.1.md`
 - `CHANGELOG.md`
 
-The published baseline is 1.3. Current update work focuses on larger side-gesture
+The published baseline is 1.3.0. Candidate 1.3.1 focuses on larger side-gesture
 feedback, selective upstream corrections and TV remote navigation. Keep player
-lifecycle and experimental Twitch sync work separate; no new release version is
-selected by this update.
+lifecycle and experimental Twitch sync work separate. Publication is pending the
+release gates in `RELEASE_PROCESS.md`.
 
 ## Contribution And Style Conventions
 
