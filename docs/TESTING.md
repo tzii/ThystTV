@@ -2,6 +2,31 @@
 
 ## Minimum local checks before merge
 
+### Website-only changes
+
+The GitHub Pages site is plain HTML/CSS/JavaScript under `docs/`. For changes
+limited to this site and its documentation, use:
+
+```bash
+node --test docs/site.test.js
+node --check docs/script.js
+git diff --check
+python -m http.server 4173 --bind 127.0.0.1 --directory docs
+```
+
+Inspect `http://127.0.0.1:4173/` at phone, tablet, and laptop sizes in both themes.
+Check all four feature tabs, arrow/Home/End navigation, visible keyboard focus,
+the video dialog (Escape, close, focus restoration, playback pause on close),
+persisted theme/motion preferences, system reduced motion, 200% text, missing
+storage, and the readable no-JavaScript fallback. Native control-preview images
+link to their full-size originals. Verify download, APK verification, credit,
+license, and project links. Use `?theme=light` or `?theme=dark` for explicit theme
+previews. Assets and fonts are self-hosted; no app playback is simulated by the
+feature showcase. Android Gradle checks are required when Android files change,
+but are not part of a website-only verification pass.
+
+### Android changes
+
 ```bash
 ./gradlew assembleDebug
 ./gradlew test
