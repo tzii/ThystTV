@@ -15,6 +15,24 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### Website presentation
+
+- [ ] On a physical phone and laptop, accept the visual layout in both themes;
+  verify readable text and no horizontal overflow, including enlarged text.
+- [ ] Select Floating chat, Player controls, Local stats, and Room to watch.
+  Open the full-size control previews; confirm original images stay readable.
+- [ ] Use keyboard arrows/Home/End and check focus. Open/close the demo by its
+  close button, Escape, and the backdrop; focus returns to its trigger.
+- [ ] Play the demo with native video controls. Closing it or hiding the page
+  pauses playback. Confirm touch and audible playback on a real browser/device.
+- [ ] Pause decorative motion, reload, and check persistence. System reduced
+  motion stops animation; theme choice persists. Check JavaScript/storage denied.
+- [ ] Follow GitHub Releases and the APK verification guide. Check downloads on
+  the actual device; website browser QA is not Android installation evidence.
+
+These checks are separate from player/device QA. Website sample-data previews
+and pre-1.3 footage are labeled and do not certify current app behavior.
+
 ### September 25 large-screen and upstream update
 
 On September 27 the maintainer reported that the delivered debug build seemed

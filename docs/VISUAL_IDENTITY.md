@@ -68,6 +68,20 @@ Avoid:
 
 ## README/Site Rules
 
+The website uses a compact editorial layout with charcoal surfaces, a soft cyan
+accent, self-hosted Outfit typography, and the existing violet/cyan gem artwork.
+The hero introduces the app; four selectable feature previews replace a long
+stack of feature sections. Floating device/sticker motion, a bounded desktop
+hover tilt, and feature transitions use transform/opacity. A pause control and
+system reduced-motion preference disable decoration. Dark is the initial theme;
+the retained light theme and saved preference remain available.
+
+Reuse public device screenshots and native layout previews unchanged. Label
+pre-1.3 footage and sample-data previews, and keep links to full-size control
+images. Keep the existing GitHub Pages static architecture and make download,
+project resources, and feature content usable without JavaScript. Typeface
+licensing lives in `docs/fonts/OFL-Outfit.txt`.
+
 - Screenshots should support the narrative.
 - Do not duplicate the same navigation concepts in multiple places.
 - Docs and Contribute should serve different purposes.

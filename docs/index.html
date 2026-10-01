@@ -1,202 +1,166 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark" data-motion="running">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ThystTV - Twitch. Built Different.</title>
-    <meta name="description" content="ThystTV is a polished open-source Twitch client for Android focused on playback UX, floating chat, local stats, and large-screen behavior.">
-    <link rel="icon" type="image/svg+xml" href="app icon.svg">
+    <meta name="theme-color" content="#121416">
+    <title>ThystTV — Your stream. Your rules.</title>
+    <meta name="description" content="A free, open-source Twitch client for Android. Floating chat, thoughtful playback controls, local viewing stats. Make yourself comfortable.">
+    <link rel="icon" type="image/svg+xml" href="images/icons/launcher/store-icon.svg">
     <link rel="canonical" href="https://tzii.github.io/ThystTV/">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="ThystTV — Twitch client for Android">
-    <meta property="og:description" content="Open-source Android Twitch viewing with floating chat, local stats, and polished playback controls.">
+    <meta property="og:title" content="ThystTV — Your stream. Your rules.">
+    <meta property="og:description" content="Open-source Android Twitch viewing with floating chat, local stats, and thoughtful playback controls.">
     <meta property="og:url" content="https://tzii.github.io/ThystTV/">
-    <meta property="og:image" content="https://tzii.github.io/ThystTV/images/readme/website-preview.png">
+    <meta property="og:image" content="https://tzii.github.io/ThystTV/images/banners/minimal/readme-clean.png">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="ThystTV — Twitch client for Android">
-    <meta name="twitter:description" content="Open-source Android Twitch viewing with floating chat and polished playback controls.">
-    <meta name="twitter:image" content="https://tzii.github.io/ThystTV/images/readme/website-preview.png">
+    <meta name="twitter:title" content="ThystTV — Your stream. Your rules.">
+    <meta name="twitter:description" content="A free, open-source Twitch client for Android. Make yourself comfortable.">
+    <meta name="twitter:image" content="https://tzii.github.io/ThystTV/images/banners/minimal/readme-clean.png">
     <script>
       (() => {
-        try {
-          const requested = new URLSearchParams(location.search).get("theme");
-          const stored = localStorage.getItem("thysttv-theme");
-          const preferred = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-          document.documentElement.dataset.theme =
-            requested === "dark" || requested === "light" ? requested : stored || preferred;
-        } catch (_) {
-          document.documentElement.dataset.theme = "light";
-        }
+        const root = document.documentElement;
+        const requested = new URLSearchParams(location.search).get("theme");
+        let stored;
+        try { stored = localStorage.getItem("thysttv-theme"); } catch (_) {}
+        const theme = requested === "light" || requested === "dark" ? requested : stored;
+        root.dataset.theme = theme === "light" ? "light" : "dark";
+        let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        try { paused ||= localStorage.getItem("thysttv-motion") === "paused"; } catch (_) {}
+        root.dataset.motion = paused ? "paused" : "running";
       })();
     </script>
-    <link rel="stylesheet" href="styles.css?v=1.2.2">
+    <link rel="preload" href="fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="styles.css?v=2026-10-01">
+    <script src="script.js?v=2026-10-01" defer></script>
   </head>
   <body>
-    <aside class="side-rail" aria-label="Project sidebar">
-      <button class="rail-toggle" type="button" aria-label="Open project panel" aria-controls="rail-panel" aria-expanded="false">
-        <span></span>
-      </button>
-      <a href="https://github.com/tzii/ThystTV/tree/master/docs" class="rail-link">DOCS</a>
-      <a href="https://github.com/tzii/ThystTV/blob/master/CONTRIBUTING.md" class="rail-link">CONTRIBUTE</a>
-      <p class="rail-version">VERSION 1.2</p>
-    </aside>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7Z"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 4V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h6"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9m4 0h3M4 17h3m4 0h9M13 4v6M7 14v6"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h17M8 15v-4m5 4V6m5 9v-6"/></symbol>
+      <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 15.3A8.5 8.5 0 0 1 8.7 4a8.5 8.5 0 1 0 11.3 11.3Z"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+      <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    </svg>
 
-    <section class="rail-panel" id="rail-panel" aria-label="ThystTV project panel" aria-hidden="true">
-      <div class="rail-panel-head">
-        <p>Project notes</p>
-        <button class="rail-close" type="button" aria-label="Close project panel">X</button>
-      </div>
-      <div class="rail-panel-block">
-        <h2>ThystTV 1.2</h2>
-        <p>A polished fork of Xtra with player polish, floating chat, local viewing stats, and tablet-aware layout work.</p>
-      </div>
-      <div class="rail-panel-stats">
-        <div><strong>OPEN SOURCE</strong><span>AGPL-3.0</span></div>
-        <div><strong>LOCAL FIRST</strong><span>Stats stay on-device</span></div>
-        <div><strong>SIGNED RELEASES</strong><span>Checksummed APKs</span></div>
-      </div>
-      <div class="rail-panel-block">
-        <h3>Xtra credit</h3>
-        <p>ThystTV is based on Xtra, and a lot of credit goes to the Xtra project for the foundation this fork builds on.</p>
-      </div>
-      <div class="rail-panel-block">
-        <h3>Release focus</h3>
-        <ul>
-          <li>Speed control shows the active rate.</li>
-          <li>VoD scrubbing scales with duration.</li>
-          <li>Minimized player visuals are cleaned up.</li>
-          <li>README and site screenshot slots are prepared.</li>
-        </ul>
-      </div>
-    </section>
-    <button class="rail-scrim" type="button" aria-label="Close project panel" hidden></button>
-
-    <div class="site-shell">
+    <div class="site-shell" id="top">
       <header class="site-header">
         <a class="brand" href="#top" aria-label="ThystTV home">
-          <img src="app icon.svg" alt="" width="256" height="256" aria-hidden="true" class="brand-mark">
-          <span>THYSTTV</span>
+          <img src="images/icons/launcher/store-512.png" alt="" width="512" height="512" class="brand-mark">
+          <span>thyst<span class="brand-tv">tv</span></span>
         </a>
         <nav class="top-nav" aria-label="Primary navigation">
-          <a href="#features">FEATURES</a>
-          <a href="#stats">STATS</a>
-          <a href="https://github.com/tzii/ThystTV">GITHUB</a>
+          <a href="#features">The good stuff</a>
+          <a href="https://github.com/tzii/ThystTV" class="source-link"><svg class="icon" aria-hidden="true"><use href="#i-code"/></svg> Source code</a>
         </nav>
-        <button class="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
-          <span class="theme-icon" aria-hidden="true"></span>
-          <span class="theme-text">DARK</span>
-        </button>
+        <div class="header-controls">
+          <button class="icon-button motion-toggle" type="button" aria-label="Pause decorative motion" aria-pressed="false" hidden><svg class="icon motion-pause" aria-hidden="true"><use href="#i-pause"/></svg><svg class="icon motion-play" aria-hidden="true"><use href="#i-play"/></svg></button>
+          <button class="icon-button theme-toggle" type="button" aria-label="Switch to light mode" aria-pressed="true" hidden><svg class="icon theme-sun" aria-hidden="true"><use href="#i-sun"/></svg><svg class="icon theme-moon" aria-hidden="true"><use href="#i-moon"/></svg></button>
+          <a class="header-download" href="https://github.com/tzii/ThystTV/releases/latest">Get the app <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg></a>
+        </div>
       </header>
 
-      <main>
-        <section class="hero-grid" id="top">
+      <main id="main">
+        <section class="hero" aria-labelledby="hero-title">
           <div class="hero-copy">
-            <p class="eyebrow">THYSTTV 1.2.1</p>
-            <h1>A BETTER<br>TWITCH <span class="mobile-break"><br></span>CLIENT<br>FOR ANDROID.</h1>
-            <p>ThystTV is a polished fork of Xtra focused on better playback UX, floating chat, local stats and watch-history insights, and improved large-screen behavior. A lot of credit goes to the Xtra project for the foundation.</p>
-            <a class="github-cta" href="https://github.com/tzii/ThystTV/releases/latest">
-              <span class="github-dot" aria-hidden="true">
-                <svg viewBox="0 0 24 24" role="img"><path d="M12 .5a12 12 0 0 0-3.8 23.38c.6.1.82-.26.82-.58v-2.02c-3.34.72-4.04-1.42-4.04-1.42-.55-1.38-1.34-1.75-1.34-1.75-1.1-.75.08-.74.08-.74 1.2.08 1.84 1.24 1.84 1.24 1.08 1.83 2.82 1.3 3.5 1 .1-.78.43-1.3.78-1.6-2.66-.3-5.46-1.33-5.46-5.92 0-1.3.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1-.32 3.3 1.22a11.4 11.4 0 0 1 6 0c2.28-1.54 3.3-1.22 3.3-1.22.66 1.66.24 2.88.12 3.18.77.84 1.24 1.9 1.24 3.22 0 4.6-2.8 5.62-5.48 5.92.44.38.84 1.12.84 2.26v3.35c0 .32.22.7.84.58A12 12 0 0 0 12 .5Z"/></svg>
-              </span>
-              <span>DOWNLOAD ON GITHUB</span>
-              <span class="arrow">-></span>
-            </a>
-            <div class="proof-row" aria-label="Project facts">
-              <div class="proof-card">
-                <span class="proof-icon">#</span>
-                <strong>OPEN SOURCE</strong>
-                <small>AGPL-3.0</small>
-              </div>
-              <div class="proof-card">
-                <span class="proof-icon">[]</span>
-                <strong>LOCAL FIRST</strong>
-                <small>Stats stay on-device</small>
-              </div>
-              <div class="proof-card">
-                <span class="proof-icon">!</span>
-                <strong>SIGNED RELEASES</strong>
-                <small>Checksummed APKs</small>
-              </div>
+            <p class="eyebrow"><span class="tiny-gem" aria-hidden="true"></span> A TWITCH CLIENT WITH A TWIST</p>
+            <h1 id="hero-title">Your stream.<br>Your <span class="rules">rules.<svg class="rule-underline" viewBox="0 0 280 22" aria-hidden="true"><path d="M3 13Q112 1 275 9M34 20Q143 7 254 17"/></svg></span></h1>
+            <p class="hero-description">Your favorite streams, with room to enjoy them. A free, open-source Twitch client for Android that puts you in control.</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="https://github.com/tzii/ThystTV/releases/latest"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> Download for Android <span class="button-tail" aria-hidden="true"><svg class="icon"><use href="#i-chevron"/></svg></span></a>
+              <a class="demo-link" href="images/readme/floating-chat.mp4" data-demo><span class="play-circle"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></span> See it in action</a>
             </div>
+            <p class="download-note">Android 6.0+ <span>·</span> Free &amp; open source</p>
           </div>
 
-          <div class="phone-stage" aria-label="Application screenshots">
-            <figure class="phone-column discover-column">
-              <figcaption class="mini-label"><span></span>DISCOVER</figcaption>
-              <div class="phone-frame">
-                <picture>
-                  <source srcset="cropped/discover-phone.webp" type="image/webp">
-                  <img src="cropped/discover-phone.png" width="1069" height="2041" alt="Popular live channels in ThystTV's discovery screen">
-                </picture>
-              </div>
-            </figure>
-            <figure class="phone-column watch-column">
-              <figcaption class="mini-label"><span></span>WATCH</figcaption>
-              <div class="phone-frame">
+          <div class="hero-stage">
+            <div class="stage-grid" aria-hidden="true"></div>
+            <div class="orbit orbit-one" aria-hidden="true"></div>
+            <div class="orbit orbit-two" aria-hidden="true"></div>
+            <span class="stage-plus plus-one" aria-hidden="true">+</span>
+            <span class="stage-plus plus-two" aria-hidden="true">+</span>
+            <span class="stage-index" aria-hidden="true">LESS FRICTION. MORE WATCHING.</span>
+            <div class="stage-float">
+              <figure class="hero-device" data-tilt>
                 <picture>
                   <source srcset="cropped/watch-player.webp" type="image/webp">
-                  <img src="cropped/watch-player.png" width="2042" height="986" alt="Full-screen Twitch playback with ThystTV floating chat">
+                  <img src="cropped/watch-player.png" width="2042" height="986" fetchpriority="high" alt="Real ThystTV full-screen playback with floating chat over the stream">
                 </picture>
-              </div>
-            </figure>
-            <figure class="phone-column stats-column">
-              <figcaption class="mini-label"><span></span>STATS</figcaption>
-              <div class="phone-frame">
-                <img src="cropped/stats-phone.png" width="1018" height="2042" alt="Local stats dashboard with watched categories and viewing times">
-              </div>
-            </figure>
-          </div>
-        </section>
-
-        <section class="feature-bands" id="features">
-          <article class="control-showcase">
-            <div class="control-copy">
-              <p class="section-kicker">PLAYER REFINEMENT</p>
-              <h2>FAST CONTROLS.<br>NO VISUAL NOISE.</h2>
-              <p>Gesture-based playback controls cover horizontal seek, playback speed, brightness, volume, and clearer player feedback without pulling you out of the stream.</p>
-            </div>
-            <div class="popup-gallery" aria-label="Playback popup screenshots">
-              <figure class="popup-card popup-card-speed">
-                <figcaption>Playback speed</figcaption>
-                <img src="playback_speed_popup_menu.png" width="867" height="725" loading="lazy" alt="Playback speed popup showing 1.25x speed">
-              </figure>
-              <figure class="popup-card popup-card-quality">
-                <figcaption>Video quality</figcaption>
-                <img src="quality_popup_menu_cropped.png" width="867" height="639" loading="lazy" alt="Video quality popup with Auto, 1080p60, 720p60, and audio/chat only controls">
+                <figcaption class="device-caption"><span class="caption-line" aria-hidden="true"></span> YOUR FRONT-ROW SEAT</figcaption>
               </figure>
             </div>
-          </article>
-
-          <article class="community-panel" id="stats">
-            <div class="community-copy">
-              <h2>OPEN SOURCE.<br>BUILT FOR THE COMMUNITY.</h2>
-              <p>ThystTV is free and open source. It is based on Xtra, and a lot of credit goes to the Xtra project. The 1.2 release focuses on player polish, a visual refresh, repo maturity, and better project presentation.</p>
-              <a class="outline-link" href="https://github.com/tzii/ThystTV">VIEW ON GITHUB <span>-></span></a>
-            </div>
-            <div class="project-mark" aria-hidden="true">
-              <img src="app icon.svg" alt="" width="256" height="256">
-            </div>
-          </article>
-        </section>
-
-        <section class="install-trust" id="install">
-          <div class="install-copy">
-            <h2>Download and install</h2>
-            <p>Download the latest APK from <a href="https://github.com/tzii/ThystTV/releases/latest">GitHub Releases</a>. Every release ships with an APK checksum and signed build artifacts.</p>
-            <h2>Verify the APK</h2>
-            <p>Before installing or upgrading, verify the package, checksum, and official signing certificate with <a href="APK_VERIFICATION.md">APK_VERIFICATION.md</a>.</p>
+            <div class="chat-sticker"><svg class="icon" aria-hidden="true"><use href="#i-chat"/></svg><span>Bring the chat.<br><strong>Keep the view.</strong></span><svg class="sticker-spark icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1v22M1 12h22M4 4l16 16M4 20 20 4"/></svg></div>
+            <a class="speed-sticker" href="#features" data-select-feature="controls"><span class="speed-number">1.25<span>×</span></span><span>Your pace.<br>Your playback.</span><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg></a>
+            <p class="stage-footnote">Real app footage. Floating-chat demo recorded before 1.3.</p>
           </div>
         </section>
 
-        <section class="independence" id="open-source">
-          <div class="independence-copy">
-            <h2>Open source and independent</h2>
-            <p>ThystTV is free software under the <a href="https://github.com/tzii/ThystTV/blob/master/LICENSE">GNU Affero General Public License v3.0</a>. It is based on <a href="https://github.com/crackededed/Xtra">Xtra</a>, and a lot of credit goes to the Xtra project. ThystTV is not affiliated with Twitch or Amazon. Report problems through <a href="https://github.com/tzii/ThystTV/issues">GitHub Issues</a>, and browse the latest <a href="https://github.com/tzii/ThystTV/releases/latest">releases</a>.</p>
+        <div class="principles" aria-label="Project principles">
+          <span><svg class="icon" aria-hidden="true"><use href="#i-code"/></svg> Open source. Open possibilities.</span>
+          <span><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg> Your stats stay on your device.</span>
+          <span><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Built on Xtra. Made for you.</span>
+        </div>
+
+        <section class="feature-section" id="features" aria-labelledby="features-title">
+          <div class="feature-heading"><p class="eyebrow">SMALL DETAILS. BIG DIFFERENCE.</p><h2 id="features-title">Make yourself <span>comfortable.</span></h2><p>Pick a feature. Take a closer look.</p></div>
+          <div class="feature-playground">
+            <div class="feature-tabs" role="tablist" aria-label="Explore ThystTV features" aria-orientation="vertical" hidden>
+              <button class="feature-tab" id="tab-chat" type="button" role="tab" aria-selected="true" aria-controls="panel-chat" tabindex="0" data-feature="chat"><span class="tab-number">01</span><svg class="icon" aria-hidden="true"><use href="#i-chat"/></svg><span>Floating chat<small>Good company. Full screen.</small></span><svg class="icon tab-chevron" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+              <button class="feature-tab" id="tab-controls" type="button" role="tab" aria-selected="false" aria-controls="panel-controls" tabindex="-1" data-feature="controls"><span class="tab-number">02</span><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Player controls<small>Find your perfect playback.</small></span><svg class="icon tab-chevron" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+              <button class="feature-tab" id="tab-stats" type="button" role="tab" aria-selected="false" aria-controls="panel-stats" tabindex="-1" data-feature="stats"><span class="tab-number">03</span><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg><span>Local stats<small>A little self-discovery.</small></span><svg class="icon tab-chevron" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+              <button class="feature-tab" id="tab-space" type="button" role="tab" aria-selected="false" aria-controls="panel-space" tabindex="-1" data-feature="space"><span class="tab-number">04</span><svg class="icon" aria-hidden="true"><use href="#i-screen"/></svg><span>Room to watch<small>Small screen. Big screen. Yours.</small></span><svg class="icon tab-chevron" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+            </div>
+
+            <div class="feature-display">
+              <section class="feature-panel panel-chat" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" tabindex="0">
+                <div class="panel-chat-art"><img src="cropped/watch-player.webp" width="2042" height="986" loading="lazy" alt="Floating chat stays visible over full-screen video"><a href="images/readme/floating-chat.mp4" class="mini-demo" data-demo><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Watch the demo</a></div>
+                <div class="panel-copy"><span class="panel-label">FLOATING CHAT</span><h3>The conversation comes with you.</h3><p>Keep chat over the stream, move it where you want, and give the video the space it deserves.</p><p class="media-provenance">Device screenshot and demo recorded before 1.3.</p></div>
+              </section>
+
+              <section class="feature-panel panel-controls" id="panel-controls" role="tabpanel" aria-labelledby="tab-controls" tabindex="0" hidden>
+                <div class="control-art"><figure><a class="preview-image" href="images/review-1.3/speed-large-text.png" target="_blank" rel="noopener" aria-label="Open full-size playback speed preview in a new tab"><img src="images/review-1.3/speed-large-text.png" width="288" height="344" loading="lazy" alt="ThystTV 1.3 Playback speed overlay with a slider and speed presets at enlarged text size"></a><figcaption>Playback speed</figcaption></figure><figure><a class="preview-image" href="images/review-1.3/quality-font-1.0.png" target="_blank" rel="noopener" aria-label="Open full-size video quality preview in a new tab"><img src="images/review-1.3/quality-font-1.0.png" width="288" height="362" loading="lazy" alt="ThystTV 1.3 Video quality overlay with codec labels, Auto, audio-only and chat-only actions"></a><figcaption>Video quality</figcaption></figure></div>
+                <div class="panel-copy"><span class="panel-label">PLAYER CONTROLS</span><h3>That sweet spot? Find it.</h3><p>Quick VoD scrubbing. Speed, quality, audio-only and chat-only modes. Swipe for brightness and volume; pinch between Fit and Fill in landscape.</p><p class="media-provenance">Native 1.3 previews. Speed uses enlarged text. Tap an image for a closer look.</p></div>
+              </section>
+
+              <section class="feature-panel panel-stats" id="panel-stats" role="tabpanel" aria-labelledby="tab-stats" tabindex="0" hidden>
+                <div class="stats-art"><a class="preview-image" href="images/review-1.3/stats-font-1.0.png" target="_blank" rel="noopener" aria-label="Open full-size local stats preview in a new tab"><img src="images/review-1.3/stats-font-1.0.png" width="320" height="800" loading="lazy" alt="Native ThystTV 1.3 Stats preview with sample weekly watch time, daily bars and viewing streaks"></a><span class="private-label"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Stays on your device</span></div>
+                <div class="panel-copy"><span class="panel-label">LOCAL STATS</span><h3>Your watching, in perspective.</h3><p>Local stats and watch-history insights: viewing time, favorite channels, categories, and streaks. Your habits stay yours.</p><p class="media-provenance">Native 1.3 layout preview with sample data. Tap the image for a closer look.</p></div>
+              </section>
+
+              <section class="feature-panel panel-space" id="panel-space" role="tabpanel" aria-labelledby="tab-space" tabindex="0" hidden>
+                <div class="space-art"><picture><source srcset="cropped/discover-phone.webp" type="image/webp"><img src="cropped/discover-phone.png" width="1069" height="2041" loading="lazy" alt="ThystTV discovery screen showing popular live channels"></picture><div class="space-notes"><span class="space-icon"><svg class="icon" aria-hidden="true"><use href="#i-screen"/></svg></span><strong>Find a stream.<br>Settle in.</strong><span>Phones &amp; tablets<br>Wide &amp; resized windows</span></div></div>
+                <div class="panel-copy"><span class="panel-label">ROOM TO WATCH</span><h3>A comfy fit for your screen.</h3><p>Browse live channels, then settle into playback. Layouts adapt to phones, tablets, and wider windows, with controls that stay within reach.</p><p class="media-provenance">Discovery device screenshot recorded before 1.3.</p></div>
+              </section>
+            </div>
           </div>
+        </section>
+
+        <section class="get-app" id="install" aria-labelledby="install-title">
+          <div><p class="eyebrow">YOUR NEXT STREAM IS CALLING.</p><h2 id="install-title">Come on in.</h2><p>A polished fork of Xtra, with in-app updates<br>and release notes to keep you in the loop.</p></div>
+          <div class="install-actions"><a class="button button-primary" href="https://github.com/tzii/ThystTV/releases/latest"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> Get ThystTV <span class="button-tail" aria-hidden="true"><svg class="icon"><use href="#i-chevron"/></svg></span></a><p>Download and install from GitHub Releases.<br><a href="https://github.com/tzii/ThystTV/blob/master/docs/APK_VERIFICATION.md">Verify the APK</a> with its checksum and signing certificate.</p></div>
         </section>
       </main>
+
+      <footer class="site-footer">
+        <div class="footer-top"><a class="brand footer-brand" href="#top" aria-label="Back to ThystTV home"><img src="images/icons/launcher/store-512.png" alt="" width="512" height="512" class="brand-mark"><span>thyst<span class="brand-tv">tv</span></span></a><nav aria-label="Project resources"><a href="https://github.com/tzii/ThystTV/tree/master/docs">Docs</a><a href="https://github.com/tzii/ThystTV/blob/master/CONTRIBUTING.md">Contribute</a><a href="https://github.com/tzii/ThystTV/issues">Report a bug</a><a href="https://github.com/tzii/ThystTV/blob/master/LICENSE" aria-label="GNU Affero General Public License v3.0">AGPL-3.0</a></nav></div>
+        <p>Built on <a href="https://github.com/crackededed/Xtra">Xtra</a>; a lot of credit goes to the Xtra project. ThystTV is not affiliated with Twitch or Amazon.</p>
+      </footer>
     </div>
 
-    <script src="script.js"></script>
+    <dialog class="demo-dialog" aria-labelledby="demo-title" aria-describedby="demo-description">
+      <div class="dialog-header"><div><span class="panel-label">REAL APP. REAL FOOTAGE.</span><h2 id="demo-title">Chat, without the squeeze.</h2></div><button class="icon-button demo-close" type="button" aria-label="Close demo"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+      <video controls playsinline preload="none" poster="cropped/watch-player.webp" aria-label="ThystTV floating chat demonstration"><source src="images/readme/floating-chat.mp4" type="video/mp4"><a href="images/readme/floating-chat.mp4">Download the floating chat demo video</a></video>
+      <p id="demo-description">Floating-chat device demo recorded before 1.3. Chat appears over full-screen playback and can be moved while the stream keeps its space.</p>
+      <a class="video-fallback" href="images/readme/floating-chat.mp4">Download the demo video</a>
+    </dialog>
   </body>
 </html>
