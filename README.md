@@ -35,22 +35,9 @@ The **1.4.0** release adds live rewind, free pinch zoom, Channel Points rewards,
 
 > ThystTV is a fork of Xtra. A lot of credit goes to the Xtra project for the foundation this app builds on.
 
-## Project status
-
-| Area | Current detail |
-|---|---|
-| Repository | [`tzii/ThystTV`](https://github.com/tzii/ThystTV) |
-| Active branch | [`master`](https://github.com/tzii/ThystTV/tree/master) |
-| Published release | [Latest available APK](https://github.com/tzii/ThystTV/releases/latest) |
-| Version in this branch | [`1.4.0`](docs/release-notes/1.4.0.md), published October 13, 2026 |
-| License | [GNU AGPL-3.0](LICENSE) |
-| Primary language | Kotlin, with Java components |
-
 ## Screenshots
 
-**1.3 UI previews.** These are native renders of the Android layouts with sample
-data, including example update details. The Speed preview uses enlarged text.
-See [preview sources](docs/images/review-1.3/README.md) for their provenance.
+Version 1.3 layouts, rendered with sample data ([how they were made](docs/images/review-1.3/README.md)).
 
 <table>
   <tr>
@@ -80,10 +67,7 @@ See [preview sources](docs/images/review-1.3/README.md) for their provenance.
 
 ## Floating chat
 
-Floating chat is one of ThystTV's headline viewing upgrades. It keeps chat available during full-screen playback without forcing the player into a cramped split layout.
-
-The device demo below was recorded before 1.3. The gallery above shows native
-1.3 layout previews; the 1.4 updater and Settings changes are described in the release notes.
+Floating chat keeps chat on screen during full-screen playback, so the video doesn't have to shrink into a split layout. The demo below is from a version before 1.3.
 
 <p align="center">
   <img src="docs/images/readme/floating-chat.png" alt="Full-screen playback with floating chat overlay" width="760">
