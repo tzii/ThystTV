@@ -4,7 +4,7 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-10-12
+## [1.4.0] - 2026-10-13
 
 ### Added
 - Recording-backed live rewind from More or a full-screen ⏪ button, with replay chat, Go live and a 1x reset when faster playback catches up.

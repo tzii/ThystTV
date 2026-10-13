@@ -8,7 +8,7 @@ This map reflects the current expected structure. If a listed path has moved, se
 
 ThystTV is viewer-first. Protect stable playback, fast VoD controls, floating chat, local stats, large-screen layouts, and polished open-source presentation.
 
-## Current Release Target
+## Current Release
 
 Read:
 
@@ -16,10 +16,10 @@ Read:
 - `docs/release-notes/1.4.0.md`
 - `CHANGELOG.md`
 
-The published baseline is 1.3.1. Candidate 1.4.0 adds the October Xtra feature
+The published release is 1.4.0. It adds the October Xtra feature
 ports (notifications, rewards, quality, live rewind), free pinch zoom,
 spoiler-free VoDs and a half-folded layout for foldables. Keep player lifecycle and experimental Twitch sync work
-separate. Publication is pending the release gates in `RELEASE_PROCESS.md`.
+separate. Follow `RELEASE_PROCESS.md` when preparing the next release.
 
 ## Contribution And Style Conventions
 

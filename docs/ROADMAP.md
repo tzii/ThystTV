@@ -1,6 +1,6 @@
 # Roadmap
 
-## Current release target: 1.4.0
+## Current release: 1.4.0 (published October 13, 2026)
 
 - Selective Xtra feature ports: live notification reliability, Channel Points
   rewards, exact quality variants with a metered Wi-Fi preset, and
@@ -12,9 +12,8 @@
 - A half-folded layout for foldables (#43) and spoiler-free VoDs hiding the
   length in the games and download dialogs too (#42).
 
-Version 1.4.0/code 14 is being prepared from this update. Publication remains
-pending branch checks, signed-candidate verification, device QA and release review.
-See `release-notes/1.4.0.md` for the candidate scope.
+Version 1.4.0/code 14 is published. See `release-notes/1.4.0.md` for its scope,
+upgrade guidance and limitations, and `RELEASE_PROCESS.md` for the release flow.
 
 ## Previous target: 1.3.1 (published September 30, 2026)
 

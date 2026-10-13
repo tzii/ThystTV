@@ -31,7 +31,7 @@
 
 **ThystTV** is a third-party Twitch client for Android. It is based on [Xtra](https://github.com/crackededed/Xtra), with ThystTV-specific work aimed at making the viewing experience cleaner, faster, and more comfortable on phones, tablets, and large displays.
 
-The upcoming **1.4.0** release adds live rewind, free pinch zoom, Channel Points rewards, a half-folded layout for foldables, exact quality selection, and an optional spoiler-free mode for VoDs. It also refreshes Settings and the updater. See the [1.4.0 release notes](docs/release-notes/1.4.0.md) for changes and upgrade guidance. The signed candidate is undergoing final validation; 1.3.1 remains the published release.
+The **1.4.0** release adds live rewind, free pinch zoom, Channel Points rewards, a half-folded layout for foldables, exact quality selection, and an optional spoiler-free mode for VoDs. It also refreshes Settings and the updater. See the [1.4.0 release notes](docs/release-notes/1.4.0.md) for changes and upgrade guidance, or [download the official signed APK](https://github.com/tzii/ThystTV/releases/tag/v1.4.0).
 
 > ThystTV is a fork of Xtra. A lot of credit goes to the Xtra project for the foundation this app builds on.
 
@@ -42,7 +42,7 @@ The upcoming **1.4.0** release adds live rewind, free pinch zoom, Channel Points
 | Repository | [`tzii/ThystTV`](https://github.com/tzii/ThystTV) |
 | Active branch | [`master`](https://github.com/tzii/ThystTV/tree/master) |
 | Published release | [Latest available APK](https://github.com/tzii/ThystTV/releases/latest) |
-| Version in this branch | [`1.4.0` candidate](docs/release-notes/1.4.0.md), pending publication |
+| Version in this branch | [`1.4.0`](docs/release-notes/1.4.0.md), published October 13, 2026 |
 | License | [GNU AGPL-3.0](LICENSE) |
 | Primary language | Kotlin, with Java components |
 
@@ -176,7 +176,7 @@ ThystTV is distributed independently. It is not affiliated with, endorsed by, or
 - [Player notes](docs/PLAYER.md)
 - [Gesture system](docs/GESTURE_SYSTEM.md)
 - [Release process](docs/RELEASE_PROCESS.md)
-- [1.4.0 candidate release notes](docs/release-notes/1.4.0.md)
+- [1.4.0 release notes](docs/release-notes/1.4.0.md)
 - [1.3.1 release notes](docs/release-notes/1.3.1.md)
 - [Distribution policy](docs/DISTRIBUTION.md)
 - [APK verification guide](docs/APK_VERIFICATION.md)
