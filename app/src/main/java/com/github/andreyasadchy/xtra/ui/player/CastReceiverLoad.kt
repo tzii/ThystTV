@@ -15,7 +15,7 @@ internal class CastReceiverLoad(
     private val client: () -> RemoteMediaClient?,
     private val handler: Handler = Handler(Looper.getMainLooper()),
 ) {
-    fun start(player: Player, item: MediaItem, play: Boolean, ready: () -> Unit, failed: () -> Unit): () -> Unit {
+    fun start(player: Player, item: MediaItem, play: () -> Boolean, ready: () -> Unit, failed: () -> Unit): () -> Unit {
         val remote = client()
         val receiver = item.localConfiguration?.tag as? CastReceiverUri
         if (remote == null || receiver == null) {
@@ -33,7 +33,7 @@ internal class CastReceiverLoad(
             timeout?.let(handler::removeCallbacks)
             remote.unregisterCallback(callback)
             when (result) {
-                true -> runCatching { player.playWhenReady = play }.fold({ ready() }, { failed() })
+                true -> runCatching { player.playWhenReady = play() }.fold({ ready() }, { failed() })
                 false -> failed()
                 null -> Unit // Caller invalidated this source/route; do not fall back or play.
             }
@@ -49,7 +49,11 @@ internal class CastReceiverLoad(
         }
         remote.registerCallback(callback)
         timeout = Runnable { finish(false) }.also { handler.postDelayed(it, 15_000L) }
-        runCatching { player.setMediaItem(replacement) }.onFailure { finish(false) }
+        runCatching {
+            // Stage the LOAD paused (autoplay follows playWhenReady); PLAY waits for the ack.
+            if (player.playWhenReady) player.playWhenReady = false
+            player.setMediaItem(replacement)
+        }.onFailure { finish(false) }
         return { finish(null) }
     }
 }

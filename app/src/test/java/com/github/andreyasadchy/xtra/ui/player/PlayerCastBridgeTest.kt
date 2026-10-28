@@ -68,6 +68,37 @@ class PlayerCastBridgeTest {
         }
     }
 
+    @Test fun `user pause during a receiver lookup loads the receiver paused`() {
+        lateinit var local: ExoPlayer
+        val bridge = PlayerCastBridge(context, true,
+            createLocal = { ExoPlayer.Builder(context).build().also { local = it } },
+            endCurrentSession = {}, createCast = { player, _ -> ForwardingPlayer(player) })
+        val queued = mutableListOf<Runnable>()
+        val handoff = CastPlaybackHandoff(local, main = Executor { it.run() }, background = { queued += it })
+        ReflectionHelpers.setField(bridge, "handoff", handoff)
+        try {
+            val item = MediaItem.Builder().setUri("https://example.com/live.m3u8")
+                .setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(2000).build()).build()
+            val factory = HlsMediaSource.Factory(DefaultDataSource.Factory(context))
+            assertTrue(handoff.setSource(bridge.player, factory, item) {
+                HlsPlaylistParser().parse(Uri.parse("https://example.com/live.m3u8"),
+                    "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS=\"avc1.4d401f\"\nhttps://example.com/variant.m3u8\n".byteInputStream())
+            })
+            local.playWhenReady = true
+            val remote = mock<Player>()
+            handoff.transfer(local, remote) { fail("Live transfer should resolve") }
+            // Internal handoff commands use bridge.player and must not count as user intent.
+            bridge.player.pause()
+            bridge.player.play()
+            val sessionPlayer = bridge.guardCommands(object : ForwardingSimpleBasePlayer(bridge.player) {}, userIntent = true)
+            sessionPlayer.pause()
+            queued.single().run()
+            verify(remote).setMediaItem(any())
+            verify(remote).setPlayWhenReady(false)
+            verify(remote, never()).setPlayWhenReady(true)
+        } finally { bridge.dispose(); bridge.player.release() }
+    }
+
     @Test fun `queued fallback cannot disconnect a newer source on the same Cast route`() {
         var ended = 0
         lateinit var local: ExoPlayer

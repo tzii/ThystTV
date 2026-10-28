@@ -324,4 +324,20 @@ class CastCloseSessionTest {
             org.junit.Assert.assertEquals("https://example.com/resolved-vod.m3u8", sent.firstValue.customExtras.getString(PlaybackService.URI))
         }
     }
+
+    @Test fun `recreated accepted screen does not replay its original start`() {
+        val (original, _) = currentFragment(mock())
+        ReflectionHelpers.setField(original, "lastSourceCommand", SessionCommand(PlaybackService.START_VIDEO, Bundle().apply {
+            putString(PlaybackService.URI, "https://example.com/resolved-vod.m3u8")
+            putLong(PlaybackService.PLAYBACK_POSITION, 637_000L)
+        }))
+        ReflectionHelpers.setField(original, "sourceRequest", "accepted-source")
+        ReflectionHelpers.setField(original, "acceptedStart", true)
+        val saved = Bundle()
+        invoke(original, "saveSourceState", Bundle::class.java, saved)
+        val (recreated, _) = currentFragment(mock())
+        invoke(recreated, "restoreSourceState", Bundle::class.java, saved)
+        org.junit.Assert.assertNull(ReflectionHelpers.getField<SessionCommand?>(recreated, "lastSourceCommand"))
+        org.junit.Assert.assertEquals("accepted-source", ReflectionHelpers.getField<String?>(recreated, "sourceRequest"))
+    }
 }

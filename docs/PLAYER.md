@@ -430,6 +430,8 @@ receiver media, so Cancel keeps the session connected but idle. The rejected
 command and its state are saved with the fragment, so activity recreation replays
 the same resolved start; a start whose result was lost while stopped asks the
 service for its accepted request on return and replays if it was not accepted.
+An accepted start is not saved: after process death the recreated screen starts
+normally and resumes from the saved position, not the original open position.
 While receiver media exists, downloads are still blocked in `MainActivity` with a
 toast before any screen opens. With a connected but idle route, a download
 reaches the service and gets the same offer.
@@ -451,8 +453,12 @@ message and the stream continues on the phone. VoD HLS is local-only. Clips are
 progressive MP4 and are sent unchanged. Quality is fixed while casting.
 A live stream resolved while casting is loaded paused and played only after the
 receiver's status reports that exact LOAD (`CastReceiverLoad` tags it in the
-media's custom data); an empty receiver ignores an earlier PLAY. Without that
-status within 15 s the session ends and the stream continues on the phone.
+media's custom data); an empty receiver ignores an earlier PLAY. The LOAD is
+staged paused even when it replaces playing receiver media. A play or pause sent
+through the media session while the lookup or LOAD is pending replaces the play
+state used on acknowledgement and on the phone fallback; internal handoff
+commands do not. Without that status within 15 s the session ends and the stream
+continues on the phone.
 Receiver codec/network compatibility still needs physical Cast QA.
 
 ## Optional chat in system PiP

@@ -101,7 +101,7 @@ class Media3Fragment : PlayerFragment() {
 
     private fun saveSourceState(outState: Bundle) {
         outState.putString(PlaybackService.SOURCE_REQUEST, sourceRequest)
-        lastSourceCommand?.let { outState.putBundle(STATE_SOURCE_COMMAND, it.toBundle()) }
+        lastSourceCommand?.takeUnless { acceptedStart }?.let { outState.putBundle(STATE_SOURCE_COMMAND, it.toBundle()) }
         outState.putBoolean(STATE_REJECTED_START, rejectedStart)
     }
 

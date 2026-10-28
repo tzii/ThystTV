@@ -58,7 +58,23 @@ internal class PlayerCastBridge(
 
     // SimpleBasePlayer can skip its handleStop/remove hooks for an idle/empty player.
     // Intercept the explicit commands before that optimization, while a lookup has no item.
-    fun guardCommands(player: Player): Player = object : ForwardingPlayer(player) {
+    // [userIntent] marks the session-facing guard: its play/pause updates a pending receiver load.
+    fun guardCommands(player: Player, userIntent: Boolean = false): Player = object : ForwardingPlayer(player) {
+        override fun setPlayWhenReady(playWhenReady: Boolean) {
+            if (userIntent) handoff.playIntent(playWhenReady)
+            super.setPlayWhenReady(playWhenReady)
+        }
+
+        override fun play() {
+            if (userIntent) handoff.playIntent(true)
+            super.play()
+        }
+
+        override fun pause() {
+            if (userIntent) handoff.playIntent(false)
+            super.pause()
+        }
+
         override fun stop() {
             handoff.cancelPending()
             super.stop()

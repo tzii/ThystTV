@@ -245,7 +245,7 @@ class PlaybackService : MediaSessionService() {
                         else -> super.handleSeek(mediaItemIndex, positionMs, seekCommand)
                     }
                 }
-            })
+            }, userIntent = true)
         ).apply {
             setSessionActivity(
                 PendingIntent.getActivity(

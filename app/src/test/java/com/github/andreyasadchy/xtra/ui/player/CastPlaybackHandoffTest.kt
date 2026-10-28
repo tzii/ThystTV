@@ -371,6 +371,33 @@ class CastPlaybackHandoffTest {
         assertFalse(handoff.hasPendingSource)
     }
 
+    @Test fun `pause during a receiver LOAD carries into the acknowledgement and the timeout fallback`() {
+        val source = liveSource()
+        val factory = mock<MediaSource.Factory>()
+        whenever(factory.createMediaSource(source.mediaItem)).thenReturn(source)
+        var play: () -> Boolean = { fail("LOAD not started"); true }
+        var failed: () -> Unit = {}
+        val handoff = CastPlaybackHandoff(local, main = direct, background = direct,
+            loadReceiver = { _, _, intent, _, failure ->
+                play = intent
+                failed = failure
+                val cancel: () -> Unit = {}
+                cancel
+            })
+        assertTrue(handoff.setSource(remote, factory, source.mediaItem) { multivariant() })
+        assertTrue(play())
+        handoff.playIntent(false)
+        assertFalse(play())
+        failed()
+        handoff.transfer(remote, local) { fail("Return must not reject") }
+        verify(local).setMediaSource(source, C.TIME_UNSET)
+        verify(local).setPlayWhenReady(false)
+        verify(local, never()).setPlayWhenReady(true)
+        // Without a pending load there is no snapshot for a later intent to change.
+        handoff.playIntent(true)
+        assertFalse(handoff.hasPendingSource)
+    }
+
     @Test fun `failed receiver lookup returns the live stream to the phone at the live edge`() {
         val source = liveSource()
         val factory = mock<MediaSource.Factory>()

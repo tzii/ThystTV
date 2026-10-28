@@ -69,7 +69,7 @@ class CastReceiverLoadTest {
     @Test fun `empty receiver starts only after the matching LOAD has a media status`() {
         val remote = remote()
         var ready = 0
-        val cancel = helper.start(remote, item, true, { ready++ }, { fail("Receiver should acknowledge") })
+        val cancel = helper.start(remote, item, { true }, { ready++ }, { fail("Receiver should acknowledge") })
         try {
             val request = argumentCaptor<MediaLoadRequestData>()
             verify(client).load(request.capture())
@@ -83,9 +83,29 @@ class CastReceiverLoadTest {
         } finally { cancel(); remote.release() }
     }
 
+    @Test fun `playing target is staged paused and a pause before acknowledgement wins`() {
+        val remote = remote()
+        remote.playWhenReady = true
+        var play = true
+        var ready = 0
+        val cancel = helper.start(remote, item, { play }, { ready++ }, { fail("Receiver should acknowledge") })
+        try {
+            val request = argumentCaptor<MediaLoadRequestData>()
+            verify(client).load(request.capture())
+            assertEquals(false, request.firstValue.autoplay)
+            play = false
+            val callback = argumentCaptor<RemoteMediaClient.Callback>()
+            verify(client).registerCallback(callback.capture())
+            acknowledge(request.firstValue.queueData!!.items!!.single().media!!, callback.firstValue)
+            verify(client, never()).play()
+            assertFalse(remote.playWhenReady)
+            assertEquals(1, ready)
+        } finally { cancel(); remote.release() }
+    }
+
     @Test fun `old paused receiver and cancelled acknowledgement never receive a stale PLAY`() {
         val remote = remote()
-        val cancel = helper.start(remote, item, true, { fail("Cancelled source must not become ready") }, { fail("Cancellation is not failure") })
+        val cancel = helper.start(remote, item, { true }, { fail("Cancelled source must not become ready") }, { fail("Cancellation is not failure") })
         try {
             val request = argumentCaptor<MediaLoadRequestData>()
             verify(client).load(request.capture())
@@ -108,7 +128,7 @@ class CastReceiverLoadTest {
     @Test fun `missing receiver acknowledgement fails once and cleans its callback`() {
         val remote = remote()
         var failed = 0
-        val cancel = helper.start(remote, item, true, { fail("No status was delivered") }, { failed++ })
+        val cancel = helper.start(remote, item, { true }, { fail("No status was delivered") }, { failed++ })
         try {
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(15))
             assertEquals(1, failed)

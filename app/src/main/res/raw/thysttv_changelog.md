@@ -23,8 +23,8 @@ position, and adds a way to stop casting from a VoD.
 - Quality can't be changed while casting.
 
 Live casting, clips, live switching and disconnecting were checked on a
-Chromecast with Google TV. "Stop casting and play here" has not yet been checked
-on a receiver.
+Chromecast with Google TV using development builds. The final receiver start
+fixes and "Stop casting and play here" have not yet been checked on a receiver.
 
 ## Upgrading
 

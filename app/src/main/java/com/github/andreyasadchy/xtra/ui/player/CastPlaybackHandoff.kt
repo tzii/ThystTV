@@ -30,9 +30,9 @@ internal class CastPlaybackHandoff(
     private val receiverUnavailable: () -> Unit = {},
     private val main: Executor = MAIN,
     private val background: Executor = PLAYLISTS,
-    private val loadReceiver: (Player, MediaItem, Boolean, () -> Unit, () -> Unit) -> (() -> Unit) = { player, item, play, ready, _ ->
+    private val loadReceiver: (Player, MediaItem, () -> Boolean, () -> Unit, () -> Unit) -> (() -> Unit) = { player, item, play, ready, _ ->
         player.setMediaItem(item)
-        player.playWhenReady = play
+        player.playWhenReady = play()
         val cancel: () -> Unit = {}
         ready()
         cancel
@@ -204,8 +204,9 @@ internal class CastPlaybackHandoff(
             main.execute {
                 if (token != request) return@execute
                 if (variant != null) load(item.withReceiverUri(variant)) else {
+                    val current = pending ?: fallback
                     pending = null
-                    unavailable(fallback)
+                    unavailable(current)
                 }
             }
         }
@@ -214,18 +215,24 @@ internal class CastPlaybackHandoff(
     private fun load(player: Player, item: MediaItem, fallback: LocalSnapshot) {
         val token = request
         var completed = false
-        val cancel = loadReceiver(player, item, fallback.play, {
+        val cancel = loadReceiver(player, item, { pending?.play ?: fallback.play }, {
             completed = true
             if (token == request) { pending = null; cancelReceiverLoad = null }
         }, {
             completed = true
             if (token == request) {
+                val current = pending ?: fallback
                 pending = null
                 cancelReceiverLoad = null
-                unavailable(fallback)
+                unavailable(current)
             }
         })
         cancelReceiverLoad = if (completed) null else cancel
+    }
+
+    /** A user play/pause while a receiver lookup or LOAD is pending replaces the snapshot's intent. */
+    fun playIntent(play: Boolean) {
+        pending = pending?.copy(play = play)
     }
 
     /** Session end returns to local playback through [rejected]. */
