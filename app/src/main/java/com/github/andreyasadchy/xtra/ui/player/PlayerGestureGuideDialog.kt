@@ -36,7 +36,11 @@ class PlayerGestureGuideDialog : DialogFragment() {
         val contextName = requireArguments().getString(CONTEXT)
         val guideContext = PlayerGestureGuideContext.entries.find { it.name == contextName }
             ?: PlayerGestureGuideContext.SEEKABLE
-        val rows = PlayerGestureGuideContent.rowsFor(guideContext)
+        val prefs = requireContext().prefs()
+        val rows = PlayerGestureGuideContent.rowsFor(
+            guideContext,
+            swipeChat = prefs.getBoolean(C.PLAYER_GESTURES_SWIPE_CHAT, true) && !prefs.getBoolean(C.CHAT_DISABLE, false),
+        )
         val padding = (16 * resources.displayMetrics.density).toInt()
         val rowsContainer = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
@@ -70,6 +74,11 @@ class PlayerGestureGuideDialog : DialogFragment() {
                 PlayerGestureGuideRow.PLAYBACK_SPEED -> R.string.gesture_row_playback_speed
                 PlayerGestureGuideRow.PINCH -> R.string.gesture_row_pinch
                 PlayerGestureGuideRow.DOUBLE_TAP_CHAT -> R.string.gesture_row_double_tap
+                PlayerGestureGuideRow.SWIPE_CHAT -> if (context == PlayerGestureGuideContext.LIVE) {
+                    R.string.gesture_row_swipe_chat
+                } else {
+                    R.string.gesture_row_swipe_chat_edge
+                }
             }
         )
         val actionLabel = getString(
@@ -88,6 +97,11 @@ class PlayerGestureGuideDialog : DialogFragment() {
                 }
                 PlayerGestureGuideRow.PINCH -> R.string.gesture_action_pinch
                 PlayerGestureGuideRow.DOUBLE_TAP_CHAT -> R.string.gesture_action_toggle_chat
+                PlayerGestureGuideRow.SWIPE_CHAT -> if (context == PlayerGestureGuideContext.SETTINGS) {
+                    R.string.gesture_action_swipe_chat_settings
+                } else {
+                    R.string.gesture_action_swipe_chat
+                }
             }
         )
         val rowLayout = LinearLayout(requireContext()).apply {

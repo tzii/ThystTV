@@ -868,7 +868,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
             // Edge zone detection for system gesture areas
             val defaultEdgeThreshold = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 30f, resources.displayMetrics
+                TypedValue.COMPLEX_UNIT_DIP, EDGE_ZONE_FALLBACK_DP, resources.displayMetrics
             ).toInt()
             
             fun isInEdgeZone(x: Float, y: Float): Boolean {
@@ -4027,6 +4027,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         private const val REQUEST_CODE_PLAY_PAUSE = 3
 
         private const val PINCH_SCALE_CLAIM_DEADZONE = 0.02f
+        /** Edge exclusion where the system reports no gesture inset (three-button navigation). */
+        private const val EDGE_ZONE_FALLBACK_DP = 30f
         private const val PINCH_FEEDBACK_LINGER_MS = 400L
         private const val PINCH_SETTLE_MS = 240L
         private const val PINCH_SETTLE_EPSILON = 0.001f
@@ -4223,14 +4225,18 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
         } else {
             // Floating -> Hide chat completely
-            isFloatingChatEnabled = false
-            binding.floatingChatRoot.visibility = View.GONE
-            // Move chat view back to sidebar container (reparent, don't recreate)
-            reparentChatView(toFloating = false)
-            isChatOpen = false
-            hideChatLayout()
-            prefs.edit { putBoolean(C.KEY_CHAT_OPENED, false) }
+            hideFloatingChat()
         }
+    }
+
+    private fun hideFloatingChat() {
+        isFloatingChatEnabled = false
+        binding.floatingChatRoot.visibility = View.GONE
+        // Move chat view back to sidebar container (reparent, don't recreate)
+        reparentChatView(toFloating = false)
+        isChatOpen = false
+        hideChatLayout()
+        prefs.edit { putBoolean(C.KEY_CHAT_OPENED, false) }
     }
 
     private fun restoreDoubleTapChat() {
@@ -4418,6 +4424,41 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     override fun claimSingleFingerGesture(owner: PlayerGestureArbiter.Owner): Boolean {
         return gestureArbiter.tryClaimSingleFinger(owner)
+    }
+
+    override fun startsChatSwipe(startX: Float): Boolean {
+        if (!prefs.getBoolean(C.PLAYER_GESTURES_SWIPE_CHAT, true) || prefs.getBoolean(C.CHAT_DISABLE, false)) return false
+        val layout = binding.playerLayout
+        val rtl = layout.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        val density = resources.displayMetrics.density
+        // Matches isInEdgeZone on the chat side, so the strip starts where the
+        // ignored edge zone ends.
+        val exclusion = gestureInsets?.let { if (rtl) it.left else it.right }?.takeIf { it > 0 }?.toFloat()
+            ?: (EDGE_ZONE_FALLBACK_DP * density)
+        return PlayerChatSwipePolicy.startsChatSwipe(
+            isLive = videoType == STREAM,
+            startX = startX,
+            surfaceWidthPx = layout.width.toFloat(),
+            chatSideExclusionPx = exclusion,
+            stripWidthPx = PlayerChatSwipePolicy.SEEKABLE_STRIP_DP * density,
+            isRtl = rtl,
+        )
+    }
+
+    override fun swipeChat(dx: Float): Boolean {
+        val action = PlayerChatSwipePolicy.action(
+            dxPx = dx,
+            isRtl = binding.playerLayout.layoutDirection == View.LAYOUT_DIRECTION_RTL,
+            chatVisible = isChatOpen || isFloatingChatEnabled,
+        ) ?: return false
+        // The viewer picked a chat mode, so unfolding should not restore floating chat.
+        foldDockedFloatingChat = false
+        when (action) {
+            PlayerChatSwipeAction.SHOW -> showChat()
+            PlayerChatSwipeAction.HIDE -> if (isFloatingChatEnabled) hideFloatingChat() else hideChat()
+        }
+        updateChatButtonIcon()
+        return true
     }
 
     override fun claimDoubleTapChat(): Boolean {

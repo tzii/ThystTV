@@ -851,6 +851,8 @@
     <string name="player_gestures_haptic_summary" tools:ignore="MissingTranslation">Vibrate when changing volume or brightness</string>
     <string name="player_gestures_sensitivity" tools:ignore="MissingTranslation">Sensitivity</string>
     <string name="player_gestures_zone_split" tools:ignore="MissingTranslation">Zone split</string>
+    <string name="player_gestures_swipe_chat" tools:ignore="MissingTranslation">Swipe to show or hide chat</string>
+    <string name="player_gestures_swipe_chat_summary" tools:ignore="MissingTranslation">In full screen, swipe sideways to show or hide chat. On VODs and clips, start at the edge of the video on the chat side</string>
     <string name="gesture_feedback_brightness" tools:ignore="MissingTranslation">Brightness</string>
     <string name="gesture_feedback_device_volume" tools:ignore="MissingTranslation">Device volume</string>
     <string name="gesture_feedback_seek" tools:ignore="MissingTranslation">Seek</string>
@@ -886,6 +888,10 @@
     <string name="gesture_action_playback_speed_settings" tools:ignore="MissingTranslation">Playback speed on supported non-live media</string>
     <string name="gesture_action_pinch" tools:ignore="MissingTranslation">Fit / Fill</string>
     <string name="gesture_action_toggle_chat" tools:ignore="MissingTranslation">Toggle chat</string>
+    <string name="gesture_row_swipe_chat" tools:ignore="MissingTranslation">Horizontal</string>
+    <string name="gesture_row_swipe_chat_edge" tools:ignore="MissingTranslation">Horizontal from the chat side</string>
+    <string name="gesture_action_swipe_chat" tools:ignore="MissingTranslation">Show / hide chat</string>
+    <string name="gesture_action_swipe_chat_settings" tools:ignore="MissingTranslation">Show / hide chat (live: anywhere)</string>
     <string name="pinch_hint" tools:ignore="MissingTranslation">Pinch to fit or fill video</string>
     <string name="less_rounded_corners">Less rounded</string>
     <string name="reduced_padding">Reduced padding</string>

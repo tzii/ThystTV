@@ -105,6 +105,16 @@ class PlayerGestureArbiterTest {
     }
 
     @Test
+    fun `an owned chat swipe keeps the sequence from pinch and double tap`() {
+        startSequence()
+        assertTrue(arbiter.tryClaimSingleFinger(Owner.CHAT_SWIPE))
+        assertFalse(arbiter.onPointerAdded(2))
+        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.1f))
+        assertFalse(arbiter.onDoubleTapClaimed())
+        assertEquals(Owner.CHAT_SWIPE, arbiter.owner)
+    }
+
+    @Test
     fun `second owner claim denied while an owner holds the sequence`() {
         startSequence()
         assertTrue(arbiter.tryClaimSingleFinger(Owner.BRIGHTNESS))
