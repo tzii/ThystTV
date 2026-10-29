@@ -285,6 +285,29 @@ behavior remain unverified; emulator results are recorded separately in
 - [ ] Live, VoD and clips on all three backends; a double tap followed by a pinch
   still restores chat.
 
+### Extended zoom
+
+Turn on Player settings → Gestures → Extended zoom.
+
+- [ ] Landscape phone and foldable inner screen: pinch out to Fill, keep pushing
+  through the resistance and confirm magnifying continues smoothly from the
+  resisted size, without a jump. The pill reads "Zoom N%". Magnifying stops at
+  about 4× Fit with a short resistance.
+- [ ] Magnify on a corner detail (a minimap or scoreboard): it stays under your
+  fingers, and the picture never shows black past its edges. Content that Fill
+  crops can be brought into view.
+- [ ] Release just past Fill: it settles back to Fill. Release further out: the
+  magnification and position stay. Pinch in again: it resumes from there, and
+  reaching Fill gives a tick and the white outline and settles centered.
+- [ ] While magnified: open/close side chat, fold/unfold and change stream quality.
+  The same detail stays centered. Minimize, rotate to portrait, enter PiP or
+  choose a mode in More → Display mode: playback returns to plain, centered Fill.
+- [ ] More → Display mode lists the magnification as "Zoom N%". Double tap still
+  toggles chat. Brightness, volume, seek, speed and the chat swipe still work.
+- [ ] With the setting off, pinching past Fill only resists and settles back,
+  as before. A 16:10 tablet with the setting on: Fit and Fill still snap, and
+  magnifying past Fill works.
+
 ### Half-folded layout
 
 - [ ] Foldable inner screen, landscape, side chat open: half-fold like a laptop.

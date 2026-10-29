@@ -166,6 +166,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     protected var displayMode = PlayerDisplayMode.FIT
     /** Fit-relative pinch zoom kept with Fit; 1 is plain Fit. See [PinchZoomController]. */
     private var displayZoom = 1f
+    /**
+     * Extended zoom's magnification relative to Fill, kept with Fill only while
+     * full-screen landscape playback lasts; 1 is plain Fill. The pan places the
+     * magnified picture as shares of its size (see [PlayerMagnifyGeometry]).
+     */
+    private var magnification = 1f
+    private var magnifyPanX = 0f
+    private var magnifyPanY = 0f
     private lateinit var displayModeStore: PlayerDisplayModeStore
     protected var videoAspectRatio = 0f
     private var chatWidthLandscape = 0
@@ -218,6 +226,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pinchZooming = false
     /** Fit-relative zoom the pinch's renderer shows at unit scale: 1 for Fit, the Fill ratio for Fill. */
     private var pinchZoomBase = 1f
+    /** Last drawn pinch zoom (Fit-relative), focus (relative to the player's center) and pan. */
+    private var pinchDrawnZoom = 1f
+    private var pinchFocusX = 0f
+    private var pinchFocusY = 0f
+    private var pinchTranslationX = 0f
+    private var pinchTranslationY = 0f
+    /** The pinch has magnified past Fill, so the picture follows the fingers until it drops below Fill. */
+    private var pinchAnchoring = false
     private var pinchInProgress = false
     private var pinchPointerId1 = -1
     private var pinchPointerId2 = -1
@@ -627,8 +643,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     private fun applyMinimizedPlayerVisualState() {
         cancelPinchSettle()
-        binding.aspectRatioFrameLayout.scaleX = 1f
-        binding.aspectRatioFrameLayout.scaleY = 1f
+        clearMagnification()
+        setSurfaceScale(binding.aspectRatioFrameLayout, 1f)
         binding.aspectRatioFrameLayout.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         binding.playerLayout.setBackgroundColor(
             MaterialColors.getColor(binding.playerLayout, com.google.android.material.R.attr.colorSurface)
@@ -642,7 +658,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         } else {
             displayMode.resizeMode
         }
-        setSurfaceScale(binding.aspectRatioFrameLayout, canonicalSurfaceScale())
+        applyCanonicalSurface(binding.aspectRatioFrameLayout)
         binding.playerLayout.setBackgroundColor(Color.BLACK)
     }
 
@@ -654,6 +670,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun selectDisplayMode(mode: PlayerDisplayMode) {
         displayMode = mode
         displayZoom = 1f
+        clearMagnification()
         displayModeStore.saveDisplayMode(mode)
         finalizePinchSurface()
     }
@@ -667,6 +684,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private fun commitPinchDisplayMode(mode: PlayerDisplayMode) {
         displayMode = mode
         displayZoom = 1f
+        clearMagnification()
         displayModeStore.saveDisplayMode(mode)
         finalizePinchSurface()
     }
@@ -676,15 +694,38 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     /** Kept pinch zoom relative to Fit; only meaningful with Fit. */
     fun getDisplayZoom(): Float = displayZoom
 
+    /** Fit-relative zoom of a magnified Fill as drawn now; 1 when Fill is not magnified. */
+    fun getMagnifiedZoom(): Float {
+        return if (displayMode == PlayerDisplayMode.FILL && canonicalSurfaceScale() > 1f) canonicalZoom() else 1f
+    }
+
     open fun updateVideoAspectRatio(aspectRatio: Float) {
         videoAspectRatio = aspectRatio
         binding.aspectRatioFrameLayout.setAspectRatio(aspectRatio)
         refreshDisplayZoom()
     }
 
-    private fun setSurfaceScale(frame: View, scale: Float) {
+    private fun setSurfaceScale(frame: View, scale: Float, translationX: Float = 0f, translationY: Float = 0f) {
         frame.scaleX = scale
         frame.scaleY = scale
+        frame.translationX = translationX
+        frame.translationY = translationY
+    }
+
+    private fun applyCanonicalSurface(frame: View) {
+        val (x, y) = canonicalTranslation()
+        setSurfaceScale(frame, canonicalSurfaceScale(), x, y)
+    }
+
+    /** Extended zoom is enabled and the device can scale the surface (API 24+). */
+    private fun extendedZoomEnabled(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && prefs.getBoolean(C.PLAYER_EXTENDED_ZOOM, false)
+    }
+
+    private fun clearMagnification() {
+        magnification = 1f
+        magnifyPanX = 0f
+        magnifyPanY = 0f
     }
 
     private fun currentFillRatio(): Float {
@@ -695,32 +736,55 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     /**
      * Scale of the committed renderer. A kept zoom draws the Fit renderer
      * scaled about its center, clamped to this screen's Fill, so the same
-     * value crops the same share of the picture on any screen shape. Other
-     * modes, PiP, pre-N devices and screens too close to the video's shape
-     * (see [PinchZoomController.supports]) draw at unit scale.
+     * value crops the same share of the picture on any screen shape. A
+     * magnification draws the Fill renderer scaled by it, clamped to the
+     * magnify cap, while extended zoom stays enabled. Other modes, PiP,
+     * pre-N devices and screens too close to the video's shape (see
+     * [PinchZoomController.supports]) draw a kept zoom at unit scale.
      */
     private fun canonicalSurfaceScale(): Float {
-        if (isPortrait || !isMaximized || displayMode != PlayerDisplayMode.FIT || displayZoom <= 1f) return 1f
+        if (isPortrait || !isMaximized) return 1f
+        val kept = when (displayMode) {
+            PlayerDisplayMode.FIT -> displayZoom
+            PlayerDisplayMode.FILL -> magnification
+            PlayerDisplayMode.STRETCH -> 1f
+        }
+        if (kept <= 1f) return 1f
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || activity?.isInPictureInPictureMode == true) return 1f
         val ratio = currentFillRatio()
-        return if (PinchZoomController.supports(ratio)) displayZoom.coerceAtMost(ratio) else 1f
+        return if (displayMode == PlayerDisplayMode.FILL) {
+            if (extendedZoomEnabled()) kept.coerceAtMost(PinchZoomController.magnifyCap(ratio) / ratio) else 1f
+        } else {
+            if (PinchZoomController.supports(ratio)) kept.coerceAtMost(ratio) else 1f
+        }
     }
 
     /** Fit-relative zoom the committed state draws. */
     private fun canonicalZoom(): Float {
-        return if (displayMode == PlayerDisplayMode.FILL) currentFillRatio() else canonicalSurfaceScale()
+        return if (displayMode == PlayerDisplayMode.FILL) currentFillRatio() * canonicalSurfaceScale() else canonicalSurfaceScale()
+    }
+
+    /** Pan of a magnified Fill in pixels, kept inside the picture; zero otherwise. */
+    private fun canonicalTranslation(): Pair<Float, Float> {
+        val layout = _binding?.playerLayout ?: return 0f to 0f
+        if (displayMode != PlayerDisplayMode.FILL || canonicalSurfaceScale() <= 1f) return 0f to 0f
+        val zoom = canonicalZoom()
+        val (fitWidth, fitHeight) = PlayerMagnifyGeometry.fitSize(videoAspectRatio, layout.width, layout.height)
+        return PlayerMagnifyGeometry.translation(magnifyPanX, fitWidth, layout.width.toFloat(), zoom) to
+            PlayerMagnifyGeometry.translation(magnifyPanY, fitHeight, layout.height.toFloat(), zoom)
     }
 
     /**
-     * Re-applies a kept zoom when the player area or video shape changes
-     * (rotation, folding, side chat, PiP), since its Fill clamp depends on
-     * both. A running pinch or settle owns the scale until it finalizes.
+     * Re-applies a kept zoom or magnification when the player area or video
+     * shape changes (rotation, folding, side chat, PiP), since its clamps
+     * depend on both. A running pinch or settle owns the surface until it
+     * finalizes.
      */
     private fun refreshDisplayZoom() {
         val frame = _binding?.aspectRatioFrameLayout ?: return
         if (pinchInProgress || pinchSettleAnimator != null || isPortrait || !isMaximized) return
         if (frame.resizeMode != displayMode.resizeMode) return
-        setSurfaceScale(frame, canonicalSurfaceScale())
+        applyCanonicalSurface(frame)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -3444,6 +3508,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             // Restore brightness when switching to portrait
             if (isPortrait && !wasPortrait) {
                 restoreBrightness()
+                clearMagnification()
             }
             hidePlayerPopup(restoreFocus = false, animate = false)
             if (isMaximized) {
@@ -3476,6 +3541,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 liveRewindDialog?.dismiss()
                 restoreBrightness()
                 hidePlayerPopup(restoreFocus = false, animate = false)
+                // PiP draws plain Fill and leaving full screen recenters.
+                clearMagnification()
+                refreshDisplayZoom()
                 if (!isMaximized) {
                     isMaximized = true
                     requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback)
@@ -4485,6 +4553,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         return sqrt(dx * dx + dy * dy)
     }
 
+    /** Midpoint of the pinch's two pointers relative to the player's center. */
+    private fun pinchFocus(event: MotionEvent): Pair<Float, Float>? {
+        val index1 = event.findPointerIndex(pinchPointerId1)
+        val index2 = event.findPointerIndex(pinchPointerId2)
+        if (index1 == -1 || index2 == -1) return null
+        val layout = binding.playerLayout
+        return (event.getX(index1) + event.getX(index2)) / 2f - layout.width / 2f to
+            (event.getY(index1) + event.getY(index2)) / 2f - layout.height / 2f
+    }
+
     private fun resetPinchTracking() {
         doubleTapChatSnapshot = null
         pinchPointerId1 = -1
@@ -4509,14 +4587,34 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         finalizePinchSurface()
         pinchInProgress = true
         val ratio = currentFillRatio()
+        val extended = extendedZoomEnabled()
         // Free zoom scales the surface, which is unreliable before API 24; Stretch
-        // and near-matching shapes keep the Fit/Fill toggle.
+        // and near-matching shapes keep the Fit/Fill toggle unless extended zoom
+        // needs the zoom controller to magnify past Fill.
         pinchZooming = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
             displayMode != PlayerDisplayMode.STRETCH &&
-            PinchZoomController.supports(ratio)
+            (PinchZoomController.supports(ratio) || extended)
         if (pinchZooming) {
             pinchZoomBase = if (displayMode == PlayerDisplayMode.FILL) ratio else 1f
-            pinchZoomController.begin(displayMode, displayZoom, ratio)
+            val startMagnification = if (displayMode == PlayerDisplayMode.FILL) canonicalSurfaceScale() else 1f
+            pinchZoomController.begin(
+                mode = displayMode,
+                zoom = displayZoom,
+                maxZoom = ratio,
+                magnifyCap = if (extended) PinchZoomController.magnifyCap(ratio) else ratio,
+                magnification = startMagnification,
+            )
+            // finalizePinchSurface drew the canonical state this pinch starts from.
+            pinchDrawnZoom = canonicalZoom()
+            canonicalTranslation().let { (x, y) ->
+                pinchTranslationX = x
+                pinchTranslationY = y
+            }
+            pinchAnchoring = startMagnification > 1f
+            pinchFocus(event)?.let { (x, y) ->
+                pinchFocusX = x
+                pinchFocusY = y
+            }
         } else {
             pinchController.begin(effectivePinchDisplayMode())
         }
@@ -4541,7 +4639,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             return
         }
         if (pinchZooming) {
-            applyPinchZoom(pinchZoomController.update(span / pinchAnchorSpan))
+            val (focusX, focusY) = pinchFocus(event) ?: (pinchFocusX to pinchFocusY)
+            applyPinchZoom(pinchZoomController.update(span / pinchAnchorSpan), focusX, focusY)
         } else {
             pinchController.update(span / pinchAnchorSpan).forEach(::applyPinchEvent)
         }
@@ -4603,9 +4702,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     /**
      * Free zoom: the pinch's renderer stays in place and its view scale follows
      * the fingers about the center, so no resize-mode layout runs while fingers
-     * are down.
+     * are down. Once magnified past Fill, the picture point under the fingers
+     * stays under them, within the picture's edges, until the pinch drops
+     * below Fill.
      */
-    private fun applyPinchZoom(step: PinchZoomController.Frame) {
+    private fun applyPinchZoom(step: PinchZoomController.Frame, focusX: Float, focusY: Float) {
         showPinchZoomFeedback(step.target, step.zoom, step.fraction, step.reachedEnd)
         if (step.reachedEnd) {
             performPinchHaptic()
@@ -4613,33 +4714,84 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 flashPinchFillEdge()
             }
         }
+        val fromZoom = pinchDrawnZoom
+        val fromFocusX = pinchFocusX
+        val fromFocusY = pinchFocusY
+        pinchDrawnZoom = step.displayZoom
+        pinchFocusX = focusX
+        pinchFocusY = focusY
+        when (step.target) {
+            PinchZoomController.Target.MAGNIFIED -> pinchAnchoring = true
+            PinchZoomController.Target.FILL -> Unit
+            else -> pinchAnchoring = false
+        }
         if (isPortrait || !isMaximized) {
             return
         }
+        if (pinchAnchoring) {
+            val layout = binding.playerLayout
+            val (fitWidth, fitHeight) = PlayerMagnifyGeometry.fitSize(videoAspectRatio, layout.width, layout.height)
+            val limitX = PlayerMagnifyGeometry.panLimit(fitWidth, layout.width.toFloat(), step.displayZoom)
+            val limitY = PlayerMagnifyGeometry.panLimit(fitHeight, layout.height.toFloat(), step.displayZoom)
+            pinchTranslationX = PlayerMagnifyGeometry.anchoredTranslation(
+                pinchTranslationX, fromFocusX, focusX, fromZoom, step.displayZoom,
+            ).coerceIn(-limitX, limitX)
+            pinchTranslationY = PlayerMagnifyGeometry.anchoredTranslation(
+                pinchTranslationY, fromFocusY, focusY, fromZoom, step.displayZoom,
+            ).coerceIn(-limitY, limitY)
+        } else {
+            pinchTranslationX = 0f
+            pinchTranslationY = 0f
+        }
         cancelPinchSettle()
         binding.aspectRatioFrameLayout.resizeMode = displayMode.resizeMode
-        setSurfaceScale(binding.aspectRatioFrameLayout, step.displayZoom / pinchZoomBase)
+        setSurfaceScale(
+            binding.aspectRatioFrameLayout,
+            step.displayZoom / pinchZoomBase,
+            pinchTranslationX,
+            pinchTranslationY,
+        )
     }
 
     /**
      * Keeps the released zoom: the surface settles to it in the pinch's
      * renderer, then [finalizePinchSurface] swaps to the kept mode's renderer
-     * behind an equivalent scale if Fit and Fill traded places.
+     * behind an equivalent scale if Fit and Fill traded places. A magnified
+     * release keeps the picture point at the player's center while it
+     * settles; every other release recenters.
      */
     private fun finishPinchZoom(cancelled: Boolean) {
         val result = if (cancelled) pinchZoomController.cancel() else pinchZoomController.release()
         displayMode = result.mode
         displayZoom = result.zoom
+        if (result.magnification > 1f && !isPortrait && isMaximized) {
+            if (!cancelled) {
+                val layout = binding.playerLayout
+                val (fitWidth, fitHeight) = PlayerMagnifyGeometry.fitSize(videoAspectRatio, layout.width, layout.height)
+                magnifyPanX = PlayerMagnifyGeometry.panFraction(pinchTranslationX, fitWidth, pinchDrawnZoom)
+                magnifyPanY = PlayerMagnifyGeometry.panFraction(pinchTranslationY, fitHeight, pinchDrawnZoom)
+            }
+            magnification = result.magnification
+        } else {
+            clearMagnification()
+        }
+        pinchAnchoring = false
         if (result.changed) {
             displayModeStore.saveDisplayMode(result.mode, result.zoom)
             onSuccessfulPinch()
-            showPinchZoomFeedback(result.target, result.zoom, result.fraction)
+            val zoom = if (result.target == PinchZoomController.Target.MAGNIFIED) {
+                pinchZoomController.maxZoom * result.magnification
+            } else {
+                result.zoom
+            }
+            showPinchZoomFeedback(result.target, zoom, result.fraction)
         }
         hidePinchFeedback()
         if (isPortrait || !isMaximized) {
             finalizePinchSurface()
         } else {
-            animatePinchSurface(canonicalZoom() / pinchZoomBase)
+            val (x, y) = canonicalTranslation()
+            animatePinchSurface(canonicalZoom() / pinchZoomBase, x, y)
         }
     }
 
@@ -4693,8 +4845,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     /**
      * Single owner of canonical surface geometry: cancels any running settle
-     * and applies the committed display mode's canonical resize mode and
-     * scale (unit, or a kept zoom with Fit). Every path that interrupts pinch
+     * and applies the committed display mode's canonical resize mode, scale
+     * and pan (unit and centered, a kept zoom with Fit, or a magnified Fill
+     * with its pan). Every path that interrupts pinch
      * state (new pinch, mode selection, minimize/restore, orientation or PiP
      * mode changes, view destruction) must run through here so a partially transformed surface
      * can never survive; a cancelled settle finalizes through the animator's
@@ -4709,16 +4862,17 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             return
         }
         if (frame.resizeMode == displayMode.resizeMode) {
-            setSurfaceScale(frame, canonicalSurfaceScale())
+            applyCanonicalSurface(frame)
             return
         }
         // The current scale already shows the target geometry in the old
         // renderer (an armed commit or a settled zoom); keep it until the new
-        // renderer has laid out, then normalize before draw.
+        // renderer has laid out, then normalize before draw. A pan is the same
+        // in either renderer.
         frame.resizeMode = displayMode.resizeMode
         frame.doOnLayout {
             if (_binding?.aspectRatioFrameLayout === frame && pinchCommitGeneration == generation) {
-                setSurfaceScale(frame, canonicalSurfaceScale())
+                applyCanonicalSurface(frame)
             }
         }
     }
@@ -4744,10 +4898,15 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         animatePinchSurface(1f)
     }
 
-    /** Animates the surface to [targetScale] in its current renderer, then finalizes. */
-    private fun animatePinchSurface(targetScale: Float) {
+    /** Animates the surface to [targetScale] and pan in its current renderer, then finalizes. */
+    private fun animatePinchSurface(targetScale: Float, targetTranslationX: Float = 0f, targetTranslationY: Float = 0f) {
         val frame = _binding?.aspectRatioFrameLayout ?: return
-        if (frame.scaleX <= 0f || abs(frame.scaleX - targetScale) < PINCH_SETTLE_EPSILON) {
+        if (frame.scaleX <= 0f || (
+                abs(frame.scaleX - targetScale) < PINCH_SETTLE_EPSILON &&
+                    abs(frame.translationX - targetTranslationX) < 1f &&
+                    abs(frame.translationY - targetTranslationY) < 1f
+                )
+        ) {
             finalizePinchSurface()
             return
         }
@@ -4755,6 +4914,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         pinchSettleAnimator = frame.animate()
             .scaleX(targetScale)
             .scaleY(targetScale)
+            .translationX(targetTranslationX)
+            .translationY(targetTranslationY)
             .setDuration(PINCH_SETTLE_MS)
             .setInterpolator(DecelerateInterpolator(1.6f))
             .withEndAction {
@@ -4786,7 +4947,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         val label = when (target) {
             PinchZoomController.Target.FIT -> getString(R.string.display_mode_fit)
             PinchZoomController.Target.FILL -> getString(R.string.display_mode_fill)
-            PinchZoomController.Target.ZOOM -> getString(R.string.display_mode_zoom, PlayerGestureFeedbackState.zoomPercent(zoom))
+            PinchZoomController.Target.ZOOM, PinchZoomController.Target.MAGNIFIED ->
+                getString(R.string.display_mode_zoom, PlayerGestureFeedbackState.zoomPercent(zoom))
         }
         val level = (fraction.coerceIn(0f, 1f) * 100).roundToInt()
         val shouldWrite = reachedEnd || PlayerGestureFeedbackState.shouldUpdatePinchFeedback(

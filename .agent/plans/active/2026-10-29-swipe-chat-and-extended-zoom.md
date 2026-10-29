@@ -101,6 +101,11 @@ Human QA completed:
 ## Progress log
 
 - 2026-10-29: Created plan; started PR 1 on `feat/72-swipe-chat`.
+- 2026-10-29: PR 1 committed (0e25aa1f9). `assembleDebug test lintDebug` passed
+  in a clean worktree at that commit (BUILD SUCCESSFUL, exit 0).
+- 2026-10-29: PR 2 on `feat/73-extended-zoom`: magnified range in
+  `PinchZoomController`, `PlayerMagnifyGeometry`, fragment magnification and pan,
+  setting, guide copy, More menu label, tests, docs. Focused tests pass.
 
 ## Decisions
 
@@ -120,6 +125,16 @@ Human QA completed:
   stays centered, and returning to Fill recenters.
   Reason: the use case is corner details (minimap); centered magnification
   would push them off-screen.
+- Decision: the magnified pan may reach the parts of the video Fill crops.
+  Reason: on wide phones Fill crops the top and bottom, where minimaps and
+  scoreboards often sit.
+- Decision: magnification starts from Fill's saturated resistance (no jump),
+  releases within 10% of Fill return to Fill, and the cap is max(4x Fit, 2x Fill).
+  Reason: a continuous wall feels like today's Fill, and the detent keeps an
+  accidental breakthrough from leaving a 5% magnification behind.
+- Decision: magnification is session-only and clears when leaving full-screen
+  landscape (minimize, portrait, PiP) or choosing a display mode.
+  Reason: a saved off-center magnification would surprise the next stream.
 
 ## Final PR summary draft
 
