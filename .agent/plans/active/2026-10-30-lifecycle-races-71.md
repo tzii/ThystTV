@@ -243,6 +243,54 @@ Human QA completed:
     by the emulator re-run, not unit tests.
   - Docs: `docs/PLAYER.md` core invariants and the Cast restore paragraph;
     `docs/MANUAL_QA.md` issue #71 section.
+- 2026-10-30: Independent review, OpenCode lane (`zai-coding-plan/glm-5.3`,
+  variant `max`, agent `plan`; identity from the exported session, all 26
+  assistant messages). The bun-installed OpenCode that crew resolves is broken
+  (missing module), so the lane ran on the npm OpenCode 1.19.4 with the same
+  model and setting. Raw output kept outside the repo. Verdict: nothing blocks.
+  Findings and dispositions:
+  - Minor: a restored screen whose fresh start fails silently keeps
+    `freshStartPending` and `started`, so a later recreation whose service lost
+    the source no longer restarts. Confirmed, narrow; master retried there only
+    through the restart that caused the double load. Accepted risk (the user
+    reopens the video); no failure signal reaches the fragment today.
+  - Minor: the connect listener guard and deferred delivery have no unit test.
+    Covered by the emulator re-run below.
+  - Nit: a rejection did not drop `pendingSourceStart` as documented. Fixed.
+  - Nit: a deferred live start may carry an old playlist URL. Accepted; it
+    replaces a black player, and the service's live recovery handles errors.
+  - Nit: a rejection after a held tap leaves the PiP window up with the toast.
+    Accepted; the window shows the failure and closes normally.
+  - Nit: `docs/PLAYER.md` omitted that the tap is held only for a started screen.
+    Fixed with the change below.
+- 2026-10-30: Emulator re-run on d3dc8d25e with the same temporary diagnostics:
+  - Item 2 fixed: launch, open the VoD, Home, kill, reopen, night mode at 0.7,
+    1.8 and 3.0 s. One usher load and one START each time. At 0.7/1.8 s the
+    stopping screen's cancelled connect started nothing; at 3.0 s the restored
+    screen's fresh start was pending (`fresh=true`) when the recreated screen
+    got a null answer, and it did not restart.
+  - Item 3 fixed (Don't keep activities, background audio off): the offline
+    return owns the retained source; after play, leaving offline pauses
+    (position steady), where master kept playing. Online return resumed at the
+    saved position with one load; the next exit paused.
+  - Race 5 fixed: leave while loading, return after it resolved: the start was
+    kept, sent on connect, one load, playing.
+  - Item 1 found a defect in d3dc8d25e: the held tap applied at acceptance,
+    about a second before the service had the playlist, so audio only found no
+    audio-only quality, the video track stayed on and releasing the surface
+    failed the decoder ("The surface has been released", ERROR state). Master
+    has the same gap for a manual tap in that second.
+  - Out of scope, pre-existing: `MainActivity.onCreate` handles its launching
+    intent on every recreation, so an activity started from a VoD link reopens
+    that VoD on a night-mode or font change. Not changed here.
+- 2026-10-30: Follow-up fix: the tap is held until the start is accepted and its
+  qualities are known (`applyPendingAudioOnly()` from acceptance and from the
+  quality result), which also covers a tap between acceptance and the playlist.
+  A rejection drops a kept start. Tests: three audio-only timing cases (51 runs
+  pass); making the condition ignore qualities fails two of them. Emulator: the
+  held tap applied when 8 qualities arrived, the task moved back and audio kept
+  playing without errors; an ordinary tap after load still applies at once;
+  race 5 re-checked; VoD to live switching left one player and one START.
 
 ## Decisions
 
@@ -268,12 +316,18 @@ Human QA completed:
   before.
   Reason: `started` stays true after a failed load (offline), so acceptance may
   never come; the user must still be able to leave PiP from the action.
+- Decision: apply a held tap only once the qualities are known, not at acceptance.
+  Reason: `startAudioOnly()` picks the audio-only rendition from the qualities;
+  without it the video track stays on and fails once the surface is released.
+  Any non-empty list counts, so a source without an audio-only rendition
+  behaves like a tap after load, as before.
 
 ## Final PR summary draft
 
 Summary: Fix the issue #71 player lifecycle races. A screen restored after
 process death or Don't keep activities owns its retained source and starts once.
-A PiP Audio only tap during a pending start is applied when the start is accepted.
+A PiP Audio only tap during a pending start is applied once the start is accepted
+and its qualities have loaded.
 Tests: new ownership and audio-only cases in `CastCloseSessionTest`; full gates.
 Human QA: the #71 matrix above.
 Risks: player lifecycle; reviewed independently.

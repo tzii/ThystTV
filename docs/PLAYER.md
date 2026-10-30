@@ -91,9 +91,11 @@ and uses the normal default factory. This also covers local playback with Cast o
   exit pauses or switches to audio only as configured, online or offline.
 - A start resolved while the screen was stopped is sent once the new controller
   connects. Releasing a controller that is still connecting never starts anything.
-- A PiP Audio only tap made before this screen's start is accepted keeps the PiP
-  window and applies once the start is accepted. Leaving PiP, stopping or a
-  rejection drops it; a second tap leaves without audio only, as before.
+- A PiP Audio only tap made while this screen's started source is still on its
+  way (not yet accepted, or accepted before its qualities loaded) keeps the PiP
+  window and applies once both have happened; audio only needs the audio-only
+  rendition. Leaving PiP, stopping or a rejection drops it; a second tap leaves
+  as before.
 - Quality, Speed, Stream volume, and More share one player-owned popup host; only one
   can be attached at a time, and teardown/minimize/PiP must remove it with the player view.
 

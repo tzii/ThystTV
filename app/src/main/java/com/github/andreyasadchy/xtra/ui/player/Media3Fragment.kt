@@ -83,7 +83,7 @@ class Media3Fragment : PlayerFragment() {
     private var freshStartPending = false
     /** A start resolved before the controller connected; the connect listener sends it. */
     private var pendingSourceStart: (() -> Unit)? = null
-    /** A PiP Audio only tap waiting for this screen's start to be accepted. */
+    /** A PiP Audio only tap waiting for this screen's start to be accepted and its qualities loaded. */
     private var audioOnlyPending = false
     private var castUi: PlayerCastUi? = null
     private var castUiRequest = 0
@@ -292,6 +292,7 @@ class Media3Fragment : PlayerFragment() {
                                     if (list != null || reason == Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE) {
                                         viewModel.updateQualities = false
                                     }
+                                    applyPendingAudioOnly()
                                 }
                             }, MoreExecutors.directExecutor())
                         }
@@ -673,13 +674,19 @@ class Media3Fragment : PlayerFragment() {
 
     private fun acceptSourceStart() {
         acceptedStart = true
-        if (audioOnlyPending) {
-            audioOnlyPending = false
-            // The tap waited in PiP for this; leaving PiP or stopping cleared it.
-            if (isInPipMode()) {
-                startAudioOnly()
-                activity?.moveTaskToBack(false)
-            }
+        applyPendingAudioOnly()
+    }
+
+    /** Audio only needs this screen's accepted start and its qualities to find the audio-only rendition. */
+    private fun canStartAudioOnly() = acceptedStart && !viewModel.qualities.isNullOrEmpty()
+
+    private fun applyPendingAudioOnly() {
+        if (!audioOnlyPending || !canStartAudioOnly()) return
+        audioOnlyPending = false
+        // The tap waited in PiP for this; leaving PiP or stopping cleared it.
+        if (isInPipMode()) {
+            startAudioOnly()
+            activity?.moveTaskToBack(false)
         }
     }
 
@@ -688,6 +695,7 @@ class Media3Fragment : PlayerFragment() {
         viewModel.started = false
         rejectedStart = true
         acceptedStart = false
+        pendingSourceStart = null
         audioOnlyPending = false
         val message = when {
             resultCode != androidx.media3.session.SessionError.ERROR_NOT_SUPPORTED -> R.string.player_error_stopped
@@ -1110,11 +1118,12 @@ class Media3Fragment : PlayerFragment() {
     }
 
     override fun startAudioOnly(): Boolean {
-        if (!acceptedStart) {
-            // While this screen's own start is on its way, the first tap waits in PiP for the
-            // service to accept it; a second tap leaves without it, as before.
+        if (!canStartAudioOnly()) {
+            // While this screen's own start is on its way or still loading its qualities, the
+            // first tap waits in PiP for them; a second tap leaves as before.
             audioOnlyPending = !audioOnlyPending && viewModel.started && !rejectedStart && isInPipMode()
-            return !audioOnlyPending
+            if (audioOnlyPending) return false
+            if (!acceptedStart) return true
         }
         player?.let { player ->
             if (player.isConnected) {

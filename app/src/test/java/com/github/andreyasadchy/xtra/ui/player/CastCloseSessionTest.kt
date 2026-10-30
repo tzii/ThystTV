@@ -33,6 +33,7 @@ import org.robolectric.shadows.ShadowToast
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.Shadows.shadowOf
 import com.github.andreyasadchy.xtra.R
+import com.github.andreyasadchy.xtra.model.VideoQuality
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 
 @RunWith(RobolectricTestRunner::class)
@@ -491,24 +492,57 @@ class CastCloseSessionTest {
         return Triple(fragment, model, activity)
     }
 
+    private val audioOnlyQualities = listOf(VideoQuality("source"), VideoQuality("audio_only"))
+
     @Config(sdk = [28])
-    @Test fun `audio only tapped during a pending start applies once when the start is accepted`() {
+    @Test fun `audio only tapped during a pending start applies once the start is accepted and loaded`() {
         val controller = mock<MediaController>()
-        val (fragment, _, activity) = pipFragment(controller, started = true)
+        val (fragment, model, activity) = pipFragment(controller, started = true)
         assertFalse(fragment.startAudioOnly())
         verify(controller, never()).release()
         call(fragment, "acceptSourceStart")
         assertTrue(ReflectionHelpers.getField<Boolean>(fragment, "acceptedStart"))
+        // Accepted before its playlist loaded: audio only cannot find its rendition yet.
+        verify(controller, never()).release()
+        verify(activity, never()).moveTaskToBack(any())
+        whenever(model.qualities).thenReturn(audioOnlyQualities)
+        call(fragment, "applyPendingAudioOnly")
         verify(controller).release()
         verify(activity).moveTaskToBack(false)
+        call(fragment, "applyPendingAudioOnly")
         call(fragment, "acceptSourceStart")
         verify(activity, times(1)).moveTaskToBack(false)
     }
 
     @Config(sdk = [28])
+    @Test fun `audio only tapped after acceptance waits for the qualities`() {
+        val controller = mock<MediaController>()
+        val (fragment, model, activity) = pipFragment(controller, started = true)
+        ReflectionHelpers.setField(fragment, "acceptedStart", true)
+        assertFalse(fragment.startAudioOnly())
+        verify(controller, never()).release()
+        whenever(model.qualities).thenReturn(audioOnlyQualities)
+        call(fragment, "applyPendingAudioOnly")
+        verify(controller).release()
+        verify(activity).moveTaskToBack(false)
+    }
+
+    @Config(sdk = [28])
+    @Test fun `audio only tapped with known qualities applies on acceptance`() {
+        val controller = mock<MediaController>()
+        val (fragment, model, activity) = pipFragment(controller, started = true)
+        whenever(model.qualities).thenReturn(audioOnlyQualities)
+        assertFalse(fragment.startAudioOnly())
+        call(fragment, "acceptSourceStart")
+        verify(controller).release()
+        verify(activity).moveTaskToBack(false)
+    }
+
+    @Config(sdk = [28])
     @Test fun `pending audio only never fires after leaving PiP, rejection or a second tap`() {
         val left = mock<MediaController>()
-        val (leftPip, _, leftActivity) = pipFragment(left, started = true)
+        val (leftPip, leftModel, leftActivity) = pipFragment(left, started = true)
+        whenever(leftModel.qualities).thenReturn(audioOnlyQualities)
         assertFalse(leftPip.startAudioOnly())
         whenever(leftActivity.isInPictureInPictureMode).thenReturn(false)
         call(leftPip, "acceptSourceStart")
@@ -518,13 +552,16 @@ class CastCloseSessionTest {
         val rejected = mock<MediaController>()
         val (rejectedPip, _, _) = pipFragment(rejected, started = true)
         assertFalse(rejectedPip.startAudioOnly())
+        ReflectionHelpers.setField(rejectedPip, "pendingSourceStart", {})
         Media3Fragment::class.java.getDeclaredMethod("rejectSourceStart", String::class.java, Integer.TYPE).apply {
             isAccessible = true
         }.invoke(rejectedPip, PlaybackService.START_VIDEO, androidx.media3.session.SessionError.ERROR_UNKNOWN)
         assertFalse(ReflectionHelpers.getField<Boolean>(rejectedPip, "audioOnlyPending"))
+        org.junit.Assert.assertNull(ReflectionHelpers.getField<(() -> Unit)?>(rejectedPip, "pendingSourceStart"))
 
         val twice = mock<MediaController>()
-        val (twicePip, _, twiceActivity) = pipFragment(twice, started = true)
+        val (twicePip, twiceModel, twiceActivity) = pipFragment(twice, started = true)
+        whenever(twiceModel.qualities).thenReturn(audioOnlyQualities)
         assertFalse(twicePip.startAudioOnly())
         assertTrue(twicePip.startAudioOnly())
         call(twicePip, "acceptSourceStart")
