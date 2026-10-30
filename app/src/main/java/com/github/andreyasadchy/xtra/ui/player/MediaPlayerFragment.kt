@@ -702,7 +702,7 @@ class MediaPlayerFragment : PlayerFragment() {
         }
     }
 
-    override fun startAudioOnly() {
+    override fun startAudioOnly(): Boolean {
         player?.let { player ->
             if (playbackService != null) {
                 savePosition()
@@ -746,6 +746,7 @@ class MediaPlayerFragment : PlayerFragment() {
         serviceConnection?.let { requireContext().unbindService(it) }
         serviceConnection = null
         playbackService = null
+        return true
     }
 
     override fun downloadVideo() {
