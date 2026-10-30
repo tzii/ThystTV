@@ -114,6 +114,20 @@ Human QA completed:
 - 2026-10-30: PR 3 committed (dd0e7ffd0). `assembleDebug test lintDebug` passed
   in a clean worktree at that commit: 1,220 tests, 0 failures; lint 0 errors.
   Branches pushed and stacked PRs opened (1 → master, 2 → PR 1, 3 → PR 2).
+- 2026-10-30: Review by GPT-6.1 Terra, xhigh (user-requested lane, Codex via T3
+  delegate_task; snapshot f55a6b064). Verdict blocking, three findings:
+  - R1 major, confirmed: a VoD strip swipe toward the chat-side edge could not
+    travel the live trigger, so floating chat could not be hidden on wide
+    players. Fixed in PR 1 (18179eb5d): strip swipes act after 24dp, capped at
+    80% of the room to the edge; new policy and fragment tests.
+  - R2 major, confirmed: a pinch cancelled after PiP entry restored its starting
+    magnification, which reappeared after PiP. Fixed in PR 2 (08be165b3):
+    `finishPinchZoom` treats PiP like portrait/minimized; the new test fails
+    without the fix.
+  - R3 minor, confirmed but pre-existing on master: during an owned pinch, a
+    third finger plus lifting a tracked finger freezes the pinch until another
+    lift. Deferred to a follow-up; not introduced by this stack.
+  Fixes merged up the stack (no force-push).
 
 ## Decisions
 
