@@ -315,6 +315,28 @@ class PlayerPinchZoomTest {
         assertSurface(scale, x = -120f, y = 40f)
     }
 
+    @Test fun `a pinch cancelled after entering picture-in-picture keeps the magnification cleared`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        beginPinch(100f, center = 800f to 700f)
+        updatePinch(120f, center = 800f to 700f)
+        // Entering PiP clears the magnification while the pinch still owns the surface.
+        val pip = Mockito.mock(AppCompatActivity::class.java)
+        Mockito.doReturn(true).`when`(pip).isInPictureInPictureMode
+        Mockito.doReturn(pip).`when`(fragment).activity
+        call("clearMagnification")
+        call("refreshDisplayZoom")
+        finishPinch(cancelled = true)
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        // Back in full screen, plain Fill stays.
+        Mockito.doReturn(false).`when`(pip).isInPictureInPictureMode
+        call("refreshDisplayZoom")
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
+    }
+
     private fun enableExtendedZoom() {
         prefs.edit { putBoolean(C.PLAYER_EXTENDED_ZOOM, true) }
     }
@@ -337,18 +359,30 @@ class PlayerPinchZoomTest {
         around: Pair<Float, Float>? = null,
         to: Pair<Float, Float>? = around,
     ) {
+        beginPinch(100f, around)
+        updatePinch(100f * scale, to)
+        finishPinch(cancelled)
+    }
+
+    private fun beginPinch(span: Float, center: Pair<Float, Float>?) {
         ReflectionHelpers.setField(fragment, "pinchPointerId1", 0)
         ReflectionHelpers.setField(fragment, "pinchPointerId2", 1)
-        ReflectionHelpers.setField(fragment, "pinchAnchorSpan", 100f)
-        twoFingers(100f, around) { event ->
+        ReflectionHelpers.setField(fragment, "pinchAnchorSpan", span)
+        twoFingers(span, center) { event ->
             PlayerFragment::class.java.getDeclaredMethod(
                 "beginPinch", Boolean::class.javaPrimitiveType, MotionEvent::class.java,
             ).apply { isAccessible = true }.invoke(fragment, false, event)
         }
-        twoFingers(100f * scale, to) { event ->
+    }
+
+    private fun updatePinch(span: Float, center: Pair<Float, Float>?) {
+        twoFingers(span, center) { event ->
             PlayerFragment::class.java.getDeclaredMethod("updatePinch", MotionEvent::class.java)
                 .apply { isAccessible = true }.invoke(fragment, event)
         }
+    }
+
+    private fun finishPinch(cancelled: Boolean) {
         PlayerFragment::class.java.getDeclaredMethod("finishPinch", Boolean::class.javaPrimitiveType)
             .apply { isAccessible = true }.invoke(fragment, cancelled)
         idle()

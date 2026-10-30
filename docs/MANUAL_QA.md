@@ -257,7 +257,9 @@ behavior remain unverified; emulator results are recorded separately in
   (not in the Back zone) opens chat; with chat open, the same strip next to the
   chat closes it. Repeat with three-button navigation.
 - [ ] Floating chat showing: swipe toward the chat side hides it; swipe the other
-  way does nothing. Double tap still cycles hidden, side and floating.
+  way does nothing. On a VoD, start in the strip just inside the right edge and
+  swipe right: it hides, also on a tablet. Double tap still cycles hidden, side
+  and floating.
 - [ ] Settings → Player settings → Gestures → Swipe to show or hide chat off, or
   chat disabled: horizontal live swipes do nothing and the gesture guide drops
   the row. With gestures off entirely, nothing changes either.

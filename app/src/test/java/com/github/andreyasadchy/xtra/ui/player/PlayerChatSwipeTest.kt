@@ -131,6 +131,20 @@ class PlayerChatSwipeTest {
         assertFalse(ReflectionHelpers.getField<Boolean>(fragment, "isFloatingChatEnabled"))
     }
 
+    @Test fun `vod swipe from the strip toward the chat side hides floating chat`() {
+        setVideoType(PlayerFragment.VIDEO)
+        fragment.showChat()
+        fragment.cycleChatMode()
+        idle()
+        assertSame(binding.floatingChatContainer, chatView.parent)
+
+        // 35px from the edge leaves only 35px to travel; the live trigger is 80px.
+        swipe(fromX = 965f, toX = 999f, y = 400f)
+        assertEquals(PlayerGestureArbiter.Owner.CHAT_SWIPE, arbiter.owner)
+        assertHidden()
+        assertEquals(View.GONE, binding.floatingChatRoot.visibility)
+    }
+
     @Test fun `showing chat by swipe ends a fold-docked floating restore`() {
         ReflectionHelpers.setField(fragment, "foldDockedFloatingChat", true)
         swipe(fromX = 600f, toX = 400f)

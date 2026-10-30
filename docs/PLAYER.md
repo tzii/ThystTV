@@ -110,7 +110,9 @@ exclusion (the system gesture inset, or 30dp with three-button navigation).
 The chat side is the end edge, so RTL mirrors the strip and the directions.
 
 The swipe claims `Owner.CHAT_SWIPE` like any single-finger gesture and acts once,
-after max(48dp, 8% of the width) of mostly sideways travel. Moving away from the
+after mostly sideways travel: max(48dp, 8% of the width) on live, 24dp from the
+seekable strip. A strip swipe that hides chat moves toward the nearby edge, so
+its travel is also capped at 80% of the room left to that edge. Moving away from the
 chat side shows the sidebar; moving toward it hides sidebar or floating chat. It
 never cycles modes, and does nothing when chat is already in that state or chat
 is disabled. `PlayerChatSwipeTest` drives the real listener, arbiter and chat
