@@ -80,7 +80,7 @@ behavior proposed in chat. Release packaging for 1.5.2 is a separate step.
    zone, cap), session magnification on top of Fill, finger-anchored scale with
    translation, reset on minimize/PiP/portrait/display-mode choice, setting
    (default off), tests, docs.
-3. PR 3: `Owner.PAN`, listener pan path, pinch takeover from pan, normalized pan
+3. PR 3: `Owner.MAGNIFIED_PAN`, listener pan path, pinch takeover from pan, normalized pan
    offset re-clamped on resize, tests, docs.
 
 ## Verification
@@ -106,6 +106,11 @@ Human QA completed:
 - 2026-10-29: PR 2 on `feat/73-extended-zoom`: magnified range in
   `PinchZoomController`, `PlayerMagnifyGeometry`, fragment magnification and pan,
   setting, guide copy, More menu label, tests, docs. Focused tests pass.
+- 2026-10-29: PR 2 committed (4f4902bae). `assembleDebug test lintDebug` passed
+  in a clean worktree at that commit (BUILD SUCCESSFUL, exit 0).
+- 2026-10-30: PR 3 on `feat/73-zoom-pan`: `Owner.MAGNIFIED_PAN`, listener pan
+  path that re-anchors on finger-count changes, pinch takeover from the pan,
+  `PlayerMagnifyGeometry.pan`, guide row, tests, docs. Focused tests pass.
 
 ## Decisions
 
@@ -135,6 +140,12 @@ Human QA completed:
 - Decision: magnification is session-only and clears when leaving full-screen
   landscape (minimize, portrait, PiP) or choosing a display mode.
   Reason: a saved off-center magnification would surprise the next stream.
+- Decision: while magnified, every one-finger drag (controls hidden, outside
+  the edge zone) pans; no feedback pill, haptic or fling. Double tap and taps
+  keep their actions, and a second finger can take the pan into a pinch.
+  Reason: a magnified picture needs free movement, and brightness, volume,
+  seek or speed mid-pan would be surprising. Pinching back to Fill restores
+  them.
 
 ## Final PR summary draft
 

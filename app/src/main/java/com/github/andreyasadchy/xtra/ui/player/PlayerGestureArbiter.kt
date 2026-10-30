@@ -15,7 +15,9 @@ import kotlin.math.abs
  *    fingers' initial distance.
  *  - If a single-finger swipe (seek, playback speed, brightness, device
  *    volume, chat swipe) already owns the sequence, a second finger cannot
- *    convert it.
+ *    convert it. Panning a magnified picture is the exception: a second
+ *    finger may turn it into a pinch, and lifting that finger before the
+ *    pinch claims returns to the pan.
  *  - Once pinch owns the sequence, lifting one finger suppresses remaining
  *    single-finger events until the final release or cancellation.
  *  - A third finger cannot start another player action.
@@ -34,6 +36,7 @@ class PlayerGestureArbiter(
         BRIGHTNESS,
         DEVICE_VOLUME,
         CHAT_SWIPE,
+        MAGNIFIED_PAN,
         DOUBLE_TAP_CHAT,
         PINCH_DISPLAY_MODE,
     }
@@ -62,7 +65,7 @@ class PlayerGestureArbiter(
      */
     fun onPointerAdded(activePointerCount: Int): Boolean {
         if (activePointerCount != 2) return false
-        if (owner != Owner.IDLE && owner != Owner.DOUBLE_TAP_CHAT) return false
+        if (owner != Owner.IDLE && owner != Owner.DOUBLE_TAP_CHAT && owner != Owner.MAGNIFIED_PAN) return false
         isPinchCandidate = true
         return true
     }
@@ -77,7 +80,7 @@ class PlayerGestureArbiter(
     fun onPointerRemoved(remainingPointerCount: Int): Boolean {
         val pinchEnded = owner == Owner.PINCH_DISPLAY_MODE && remainingPointerCount < 2
         if (remainingPointerCount < 2) {
-            if (isPinchCandidate && owner == Owner.IDLE) {
+            if (isPinchCandidate && (owner == Owner.IDLE || owner == Owner.MAGNIFIED_PAN)) {
                 isPinchCandidate = false
             }
             if (owner == Owner.PINCH_DISPLAY_MODE) {
@@ -132,6 +135,8 @@ class PlayerGestureArbiter(
     }
 
     companion object {
-        val SINGLE_FINGER_OWNERS = setOf(Owner.SEEK, Owner.PLAYBACK_SPEED, Owner.BRIGHTNESS, Owner.DEVICE_VOLUME, Owner.CHAT_SWIPE)
+        val SINGLE_FINGER_OWNERS = setOf(
+            Owner.SEEK, Owner.PLAYBACK_SPEED, Owner.BRIGHTNESS, Owner.DEVICE_VOLUME, Owner.CHAT_SWIPE, Owner.MAGNIFIED_PAN,
+        )
     }
 }

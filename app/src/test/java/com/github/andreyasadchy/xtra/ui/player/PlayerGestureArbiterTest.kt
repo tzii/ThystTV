@@ -115,6 +115,28 @@ class PlayerGestureArbiterTest {
     }
 
     @Test
+    fun `a magnified pan can become a pinch`() {
+        startSequence()
+        assertTrue(arbiter.tryClaimSingleFinger(Owner.MAGNIFIED_PAN))
+        assertTrue(arbiter.onPointerAdded(2))
+        assertFalse(arbiter.onDoubleTapClaimed())
+        assertTrue(arbiter.onScaleUpdate(cumulativeScale = 1.1f))
+        assertEquals(Owner.PINCH_DISPLAY_MODE, arbiter.owner)
+    }
+
+    @Test
+    fun `lifting the second finger before a pinch claims returns to the pan`() {
+        startSequence()
+        assertTrue(arbiter.tryClaimSingleFinger(Owner.MAGNIFIED_PAN))
+        assertTrue(arbiter.onPointerAdded(2))
+        assertFalse(arbiter.onPointerRemoved(1))
+        assertFalse(arbiter.isPinchCandidate)
+        assertFalse(arbiter.isSingleFingerSuppressed)
+        assertEquals(Owner.MAGNIFIED_PAN, arbiter.owner)
+        assertFalse(arbiter.onScaleUpdate(cumulativeScale = 1.1f))
+    }
+
+    @Test
     fun `second owner claim denied while an owner holds the sequence`() {
         startSequence()
         assertTrue(arbiter.tryClaimSingleFinger(Owner.BRIGHTNESS))

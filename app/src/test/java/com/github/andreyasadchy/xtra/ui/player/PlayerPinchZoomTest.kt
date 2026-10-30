@@ -16,6 +16,7 @@ import com.github.andreyasadchy.xtra.util.prefs
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,6 +39,8 @@ class PlayerPinchZoomTest {
     private lateinit var activity: ActivityController<AppCompatActivity>
     private lateinit var binding: FragmentPlayerBinding
     private lateinit var fragment: PlayerFragment
+    private lateinit var listener: PlayerGestureListener
+    private val arbiter = PlayerGestureArbiter(0.02f)
     private val frame get() = binding.aspectRatioFrameLayout
     private val prefs get() = fragment.requireContext().prefs()
     private val ratio = PlayerDisplayModePreviewer.fillToFitRatio(16f / 9f, 1083, 1000)
@@ -61,6 +64,8 @@ class PlayerPinchZoomTest {
         ReflectionHelpers.setField(fragment, "displayModeStore",
             PlayerDisplayModeStore(SharedPreferencesDisplayModeStorage(context.prefs())))
         ReflectionHelpers.setField(fragment, "videoAspectRatio", 16f / 9f)
+        ReflectionHelpers.setField(fragment, "gestureArbiter", arbiter)
+        listener = PlayerGestureListener(context, fragment, doubleTapEnabled = true)
         call("finalizePinchSurface")
         idle()
     }
@@ -248,6 +253,68 @@ class PlayerPinchZoomTest {
         assertSurface(scale = 2f * magnifyScale, x = x, y = y)
     }
 
+    @Test fun `only a magnified picture takes one-finger drags`() {
+        enableExtendedZoom()
+        pinch(1.3f)
+        assertFalse(fragment.canPanMagnified())
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        assertFalse(fragment.canPanMagnified())
+        pinch(2f, around = 541.5f to 500f)
+        assertTrue(fragment.canPanMagnified())
+        ReflectionHelpers.setField(fragment, "pinchInProgress", true)
+        assertFalse(fragment.canPanMagnified())
+    }
+
+    @Test fun `a one-finger drag pans a magnified picture up to its edges`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 541.5f to 500f)
+        val scale = frame.scaleX
+        drag(listOf(300f to 300f), listOf(240f to 320f), listOf(180f to 340f))
+        assertEquals(PlayerGestureArbiter.Owner.MAGNIFIED_PAN, arbiter.owner)
+        assertSurface(scale, x = -120f, y = 40f)
+
+        drag(listOf(300f to 300f), listOf(-4000f to 4000f))
+        val zoom = fragment.getMagnifiedZoom()
+        val (fitWidth, fitHeight) = PlayerMagnifyGeometry.fitSize(16f / 9f, 1083, 1000)
+        assertSurface(
+            scale,
+            x = -PlayerMagnifyGeometry.panLimit(fitWidth, 1083f, zoom),
+            y = PlayerMagnifyGeometry.panLimit(fitHeight, 1000f, zoom),
+        )
+    }
+
+    @Test fun `a second finger landing or lifting does not jump the pan`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 541.5f to 500f)
+        val scale = frame.scaleX
+        drag(
+            listOf(300f to 300f),
+            listOf(250f to 300f),
+            listOf(250f to 300f, 450f to 300f),
+            listOf(250f to 320f, 450f to 320f),
+            listOf(250f to 320f),
+            listOf(230f to 320f),
+        )
+        assertEquals(PlayerGestureArbiter.Owner.MAGNIFIED_PAN, arbiter.owner)
+        assertSurface(scale, x = -70f, y = 20f)
+    }
+
+    @Test fun `the next pinch starts from the panned picture`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 541.5f to 500f)
+        drag(listOf(300f to 300f), listOf(180f to 340f))
+        val scale = frame.scaleX
+        pinch(1f, around = 541.5f to 500f)
+        assertSurface(scale, x = -120f, y = 40f)
+    }
+
     private fun enableExtendedZoom() {
         prefs.edit { putBoolean(C.PLAYER_EXTENDED_ZOOM, true) }
     }
@@ -301,6 +368,46 @@ class PlayerPinchZoomTest {
         } finally {
             event.recycle()
         }
+    }
+
+    /**
+     * One sequence through the detector callbacks the touch listener feeds.
+     * Each step lists the fingers down. Like the real detector, which never
+     * sees a finger land or lift, the scroll distance follows the fingers'
+     * midpoint from the previous step.
+     */
+    private fun drag(vararg steps: List<Pair<Float, Float>>) {
+        arbiter.onSequenceStarted()
+        val (startX, startY) = steps.first().first()
+        val down = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, startX, startY, 0)
+        try {
+            listener.onDown(down)
+            var lastX = startX
+            var lastY = startY
+            var lastCount = 1
+            steps.forEachIndexed { index, fingers ->
+                if (fingers.size > lastCount) arbiter.onPointerAdded(fingers.size)
+                if (fingers.size < lastCount) arbiter.onPointerRemoved(fingers.size)
+                lastCount = fingers.size
+                val focusX = fingers.map { it.first }.average().toFloat()
+                val focusY = fingers.map { it.second }.average().toFloat()
+                val properties = Array(fingers.size) { id -> MotionEvent.PointerProperties().apply { this.id = id } }
+                val coords = Array(fingers.size) { i ->
+                    MotionEvent.PointerCoords().apply { x = fingers[i].first; y = fingers[i].second }
+                }
+                val move = MotionEvent.obtain(0, (index + 1) * 16L, MotionEvent.ACTION_MOVE, fingers.size, properties, coords, 0, 0, 1f, 1f, 0, 0, 0, 0)
+                try {
+                    listener.onScroll(down, move, lastX - focusX, lastY - focusY)
+                } finally {
+                    move.recycle()
+                }
+                lastX = focusX
+                lastY = focusY
+            }
+        } finally {
+            down.recycle()
+        }
+        idle()
     }
 
     private fun call(name: String) {

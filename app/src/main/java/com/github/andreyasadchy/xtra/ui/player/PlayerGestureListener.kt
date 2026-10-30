@@ -51,6 +51,12 @@ interface PlayerGestureCallback {
     fun startsChatSwipe(startX: Float): Boolean
     /** Shows or hides chat for a swipe of [dx] pixels; returns true when chat changed. */
     fun swipeChat(dx: Float): Boolean
+
+    // One-finger pan of a picture magnified past Fill (extended zoom)
+    /** Whether drags move the magnified picture instead of the usual gestures. */
+    fun canPanMagnified(): Boolean
+    /** Moves the magnified picture by [dx], [dy] pixels without passing its edges. */
+    fun panMagnified(dx: Float, dy: Float)
 }
 
 class PlayerGestureListener(
@@ -72,6 +78,10 @@ class PlayerGestureListener(
     private var isSpeed = false
     private var isChatSwipe = false
     private var chatSwipeDone = false
+    private var isPan = false
+    private var panFocusX = 0f
+    private var panFocusY = 0f
+    private var panPointers = 0
 
     // Flag to ensure we only notify the callback once per gesture
     private var hasNotifiedGestureStart = false
@@ -102,6 +112,8 @@ class PlayerGestureListener(
         isSpeed = false
         isChatSwipe = false
         chatSwipeDone = false
+        isPan = false
+        panPointers = 0
         isScrolling = false
 
         // Capture start coordinates
@@ -124,8 +136,11 @@ class PlayerGestureListener(
         val height = callback.playerHeight.toFloat()
         
         // If we haven't locked onto a specific gesture type yet, determine it now
-        if (!isVolume && !isBrightness && !isSeek && !isSpeed && !isChatSwipe) {
-             if (abs(distanceY) > abs(distanceX)) {
+        if (!isVolume && !isBrightness && !isSeek && !isSpeed && !isChatSwipe && !isPan) {
+             if (callback.canPanMagnified()) {
+                 // A magnified picture moves with the finger in every direction.
+                 isPan = true
+             } else if (abs(distanceY) > abs(distanceX)) {
                  // Vertical Swipes (Volume / Brightness)
                  // Split left/right halves
                  if (e1.x < width / 2) {
@@ -160,8 +175,9 @@ class PlayerGestureListener(
              }
              
              // Notify that we've claimed this gesture (prevents minimize gesture from triggering)
-             if (isVolume || isBrightness || isSeek || isSpeed || isChatSwipe) {
+             if (isVolume || isBrightness || isSeek || isSpeed || isChatSwipe || isPan) {
                 val owner = when {
+                    isPan -> PlayerGestureArbiter.Owner.MAGNIFIED_PAN
                     isBrightness -> PlayerGestureArbiter.Owner.BRIGHTNESS
                     isVolume -> PlayerGestureArbiter.Owner.DEVICE_VOLUME
                     isSeek -> PlayerGestureArbiter.Owner.SEEK
@@ -175,16 +191,41 @@ class PlayerGestureListener(
                     isSeek = false
                     isSpeed = false
                     isChatSwipe = false
+                    isPan = false
                     return false
                 }
                 isScrolling = true  // Mark that we're in a scroll gesture
                 if (!hasNotifiedGestureStart) {
                     callback.onSwipeGestureStarted()
-                    // A chat swipe gives its feedback when it acts.
-                    if (!isChatSwipe) performHapticFeedback() // Feedback on gesture start
+                    // A chat swipe gives its feedback when it acts; a pan needs none.
+                    if (!isChatSwipe && !isPan) performHapticFeedback() // Feedback on gesture start
                     hasNotifiedGestureStart = true
                 }
             }
+        }
+
+        if (isPan) {
+            // The picture follows the fingers' midpoint. The detector never
+            // sees a second finger land or lift, so its distances would jump
+            // then; re-anchor whenever the finger count changes instead.
+            val pointers = e2.pointerCount
+            var focusX = 0f
+            var focusY = 0f
+            for (i in 0 until pointers) {
+                focusX += e2.getX(i)
+                focusY += e2.getY(i)
+            }
+            focusX /= pointers
+            focusY /= pointers
+            when (panPointers) {
+                // Scroll distances run opposite to the finger.
+                0 -> callback.panMagnified(-distanceX, -distanceY)
+                pointers -> callback.panMagnified(focusX - panFocusX, focusY - panFocusY)
+            }
+            panFocusX = focusX
+            panFocusY = focusY
+            panPointers = pointers
+            return true
         }
 
         if (isChatSwipe) {

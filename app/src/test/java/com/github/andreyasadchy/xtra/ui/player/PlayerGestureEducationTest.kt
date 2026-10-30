@@ -36,6 +36,17 @@ class PlayerGestureEducationTest {
     }
 
     @Test
+    fun `magnified pan row follows extended zoom in every context`() {
+        for (context in PlayerGestureGuideContext.entries) {
+            assertTrue(PlayerGestureGuideRow.MAGNIFIED_PAN in PlayerGestureGuideContent.rowsFor(context, magnifiedPan = true))
+            val rows = PlayerGestureGuideContent.rowsFor(context, swipeChat = false, magnifiedPan = false)
+            assertFalse(PlayerGestureGuideRow.MAGNIFIED_PAN in rows)
+            assertFalse(PlayerGestureGuideRow.SWIPE_CHAT in rows)
+            assertTrue(PlayerGestureGuideRow.PINCH in rows)
+        }
+    }
+
+    @Test
     fun `settings context keeps horizontal rows with qualified copy`() {
         assertEquals(
             PlayerGestureGuideRow.entries,
