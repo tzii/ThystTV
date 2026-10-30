@@ -19,6 +19,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.common.Tracks
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.SettableFuture
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -441,6 +442,26 @@ class CastCloseSessionTest {
         inOrder(model) { verify(model).started = false; verify(model).started = true }
         verify(model, times(1)).started = true
         assertTrue(ReflectionHelpers.getField<Boolean>(recreated, "freshStartPending"))
+    }
+
+    @Test fun `a retained screen whose restart is still loading does not restart again on its next connection`() {
+        val controller = mock<MediaController>()
+        val (fragment, model) = currentFragment(controller)
+        whenever(model.loaded).thenReturn(MutableStateFlow(true))
+        fun lost() = invoke(fragment, "lostRetainedSource", MediaController::class.java, controller) as Boolean
+        // The service lost the media this loaded screen played.
+        assertTrue(lost())
+        // A load alone, without a fresh start of its own pending, does not hold the restart back.
+        whenever(model.sourceLoading).thenReturn(true)
+        assertTrue(lost())
+        // Its own restart is still resolving its playlist: the next connection leaves it alone.
+        ReflectionHelpers.setField(fragment, "freshStartPending", true)
+        assertFalse(lost())
+        // That load failed without a start: the next connection retries it as before.
+        whenever(model.sourceLoading).thenReturn(false)
+        assertTrue(lost())
+        whenever(controller.currentMediaItem).thenReturn(MediaItem.fromUri("https://example.com/live.m3u8"))
+        assertFalse(lost())
     }
 
     @Test fun `restored screen owns the source the service kept for it until its next command`() {

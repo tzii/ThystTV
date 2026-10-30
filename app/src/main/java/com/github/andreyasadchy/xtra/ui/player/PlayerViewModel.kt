@@ -94,6 +94,7 @@ class PlayerViewModel @Inject constructor(
     val integrity = MutableStateFlow<String?>(null)
 
     val streamResult = MutableStateFlow<String?>(null)
+    private var streamResultJob: Job? = null
     val stream = MutableStateFlow<Stream?>(null)
     private var streamJob: Job? = null
     var useCustomProxy = false
@@ -102,6 +103,7 @@ class PlayerViewModel @Inject constructor(
     var stopProxy = false
 
     val videoResult = MutableStateFlow<String?>(null)
+    private var videoResultJob: Job? = null
     var backupQualities: List<String>? = null
     var playbackPosition: Long? = null
     val savedPosition = MutableStateFlow<Long?>(null)
@@ -117,6 +119,11 @@ class PlayerViewModel @Inject constructor(
     internal var liveRewindDropped = false
 
     val clipUrls = MutableStateFlow<List<VideoQuality>?>(null)
+    private var clipUrlsJob: Job? = null
+
+    /** A playlist or clip this screen started resolving is still on its way. */
+    val sourceLoading: Boolean
+        get() = streamResultJob?.isActive == true || videoResultJob?.isActive == true || clipUrlsJob?.isActive == true
 
     val savedOfflineVideoPosition = MutableStateFlow<Long?>(null)
 
@@ -393,7 +400,7 @@ class PlayerViewModel @Inject constructor(
 
     fun loadStreamResult(networkLibrary: String?, gqlHeaders: Map<String, String>, channelLogin: String, randomDeviceId: Boolean?, xDeviceId: String?, playerType: String?, supportedCodecs: String?, proxyPlaybackAccessToken: Boolean, proxyHost: String?, proxyPort: Int?, proxyUser: String?, proxyPassword: String?, enableIntegrity: Boolean) {
         if (streamResult.value == null) {
-            viewModelScope.launch {
+            streamResultJob = viewModelScope.launch {
                 try {
                     streamResult.value = playerRepository.loadStreamPlaylistUrl(networkLibrary, gqlHeaders, channelLogin, randomDeviceId, xDeviceId, playerType, supportedCodecs, proxyPlaybackAccessToken, proxyHost, proxyPort, proxyUser, proxyPassword, enableIntegrity)
                 } catch (e: Exception) {
@@ -505,7 +512,7 @@ class PlayerViewModel @Inject constructor(
 
     fun loadVideo(networkLibrary: String?, gqlHeaders: Map<String, String>, videoId: String?, playerType: String?, supportedCodecs: String?, enableIntegrity: Boolean) {
         if (videoResult.value == null) {
-            viewModelScope.launch {
+            videoResultJob = viewModelScope.launch {
                 try {
                     val result = playerRepository.loadVideoPlaylistUrl(networkLibrary, gqlHeaders, videoId, playerType, supportedCodecs, enableIntegrity)
                     videoResult.value = result.first
@@ -798,7 +805,7 @@ class PlayerViewModel @Inject constructor(
 
     fun loadClip(networkLibrary: String?, gqlHeaders: Map<String, String>, id: String?, supportedCodecs: String?, enableIntegrity: Boolean) {
         if (clipUrls.value == null) {
-            viewModelScope.launch {
+            clipUrlsJob = viewModelScope.launch {
                 try {
                     clipUrls.value = playerRepository.loadClipQualities(networkLibrary, gqlHeaders, id, supportedCodecs, enableIntegrity) ?: emptyList()
                 } catch (e: Exception) {

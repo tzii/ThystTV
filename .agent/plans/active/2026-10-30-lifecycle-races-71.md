@@ -291,6 +291,40 @@ Human QA completed:
   held tap applied when 8 qualities arrived, the task moved back and audio kept
   playing without errors; an ordinary tap after load still applies at once;
   race 5 re-checked; VoD to live switching left one player and one START.
+- 2026-10-30: Independent review, primary lane (T3 delegated Codex task, model
+  `gpt-6.1-sol`, `reasoningEffort=high`, confirmed from the task status) on
+  d3dc8d25e. Raw output kept outside the repo. Verdict: hold for finding 1.
+  - Major: the connect listener's lost-media reset ignored `freshStartPending`,
+    so a loaded screen whose service lost its media, connected twice while its
+    restart was still loading, started a second load. Confirmed on the emulator
+    (`am stopservice` while in the background, return, Home and return 0.3 s
+    after the connect): two usher loads and two STARTs. Fixed: the reset skips
+    only while this screen's fresh start is pending and the view model's
+    playlist or clip job is still active (`PlayerViewModel.sourceLoading`). A load
+    that failed silently still retries on the next connect, as on master, which
+    keeps the GLM finding above from widening. Loader-level dedupe was rejected
+    (it would change the legacy backends' network-restore restarts), and so was
+    cancel-and-restart (the loaders swallow cancellation and `loadClip` turns any
+    exception into an empty list).
+  - Minor: a start kept for the controller loses an explicit VoD timestamp if
+    the screen is destroyed before the controller connects; the replacement
+    resolves again from the saved position because `startPlayer()` already
+    cleared the explicit-position arguments. Confirmed by reading the code.
+    Accepted: a start is kept only between `onStart` and the in-process
+    controller connecting, and master leaves that screen black with no start.
+    Keeping the timestamp would mean saving the kept start or moving the
+    argument clearing out of `PlayerFragment`, which the legacy backends share.
+  - Minor: a held Audio only tap applied at acceptance finds no audio-only
+    quality. Same defect the emulator found in item 1; already fixed by holding
+    the tap until the qualities are known.
+- 2026-10-30: GPT finding 1 fix. Test: a lost-media connect resets except while
+  the screen's own fresh start is still loading; a load alone or a failed load
+  still resets (53 runs pass). Dropping the new condition fails it. Emulator with
+  the temporary diagnostics: the repro above gave one usher load and one START
+  (the second connect saw `fresh=true loading=true`); item 2 at 3.0 s and race 5
+  re-checked with one load and one START each. Gates on the clean tree:
+  `assembleDebug test lintDebug assembleRelease` BUILD SUCCESSFUL, 1189 tests,
+  0 failures, no lint issues on changed lines.
 
 ## Decisions
 
@@ -321,13 +355,25 @@ Human QA completed:
   without it the video track stays on and fails once the surface is released.
   Any non-empty list counts, so a source without an audio-only rendition
   behaves like a tap after load, as before.
+- Decision: skip the lost-media restart only while this screen's fresh start is
+  pending and its playlist or clip load is still running.
+  Reason: that is the window in which a second start would race the first;
+  outside it (a failed load, or a load the screen did not start itself) the
+  restart behaves as on master. The saved-position lookups before a VoD or
+  download start are not tracked; they read the database in milliseconds,
+  against seconds for a playlist.
+  Alternatives considered: skip whenever `freshStartPending` is set (a load that
+  failed would never retry, widening the accepted GLM finding); dedupe or
+  cancel in the loaders (changes the legacy backends and the loaders' error
+  handling).
 
 ## Final PR summary draft
 
 Summary: Fix the issue #71 player lifecycle races. A screen restored after
 process death or Don't keep activities owns its retained source and starts once.
-A PiP Audio only tap during a pending start is applied once the start is accepted
-and its qualities have loaded.
+A screen whose service lost its media restarts once, even if it reconnects while
+that restart loads. A PiP Audio only tap during a pending start is applied once
+the start is accepted and its qualities have loaded.
 Tests: new ownership and audio-only cases in `CastCloseSessionTest`; full gates.
 Human QA: the #71 matrix above.
 Risks: player lifecycle; reviewed independently.

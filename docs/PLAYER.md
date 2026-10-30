@@ -86,9 +86,12 @@ and uses the normal default factory. This also covers local playback with Cast o
 - A screen's own fresh start (including a saved-position resume) is marked
   pending, and the mark is saved with the screen, until its command is sent. The
   ownership query never starts it a second time, so a recreation or
-  process-death restore loads once. A restored screen whose earlier source the
-  service still holds (Don't keep activities) owns that source, so its first
-  exit pauses or switches to audio only as configured, online or offline.
+  process-death restore loads once. A loaded screen whose service lost its media
+  restarts on connect, but not again while that restart is still loading its
+  playlist; a load that failed is retried on the next connect. A restored screen
+  whose earlier source the service still holds (Don't keep activities) owns that
+  source, so its first exit pauses or switches to audio only as configured,
+  online or offline.
 - A start resolved while the screen was stopped is sent once the new controller
   connects. Releasing a controller that is still connecting never starts anything.
 - A PiP Audio only tap made while this screen's started source is still on its

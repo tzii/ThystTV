@@ -27,6 +27,10 @@ Required on a physical phone with the default Media3 backend:
   audio on), also offline; after reconnecting, returning resumes normally.
 - [ ] Leave a VoD and a live stream while they are still loading and return
   after they would have loaded: playback starts, never a black player.
+- [ ] Background a VoD, stop the player service (`adb shell am stopservice
+  <package>/com.github.andreyasadchy.xtra.ui.player.PlaybackService`), return,
+  then press Home and return again at once while it reloads: one reload,
+  playback resumes.
 - [ ] PiP Audio only right after opening a VoD or live stream (before video
   shows): one tap switches to audio only in the background once playback
   starts. Expanding PiP before then stays in the app. A second tap leaves PiP.

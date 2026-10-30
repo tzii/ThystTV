@@ -484,7 +484,7 @@ class Media3Fragment : PlayerFragment() {
             player?.let { player ->
                 updatePlaybackRouteUi()
                 binding.castStatus.isVisible = isRemotePlayback()
-                if (resolvedStart == null && viewModel.loaded.value && player.currentMediaItem == null) {
+                if (resolvedStart == null && lostRetainedSource(player)) {
                     viewModel.started = false
                 }
                 if (viewModel.started && player.currentMediaItem != null) {
@@ -533,6 +533,10 @@ class Media3Fragment : PlayerFragment() {
             startPlayer()
         }
     }
+
+    /** The service lost the media this loaded screen played, and no restart of its own is loading yet. */
+    private fun lostRetainedSource(controller: MediaController) =
+        viewModel.loaded.value && controller.currentMediaItem == null && !(freshStartPending && viewModel.sourceLoading)
 
     /** A start resolved while this screen was stopped arrives before its new controller connects. */
     private fun deferSourceStart(start: () -> Unit) {
