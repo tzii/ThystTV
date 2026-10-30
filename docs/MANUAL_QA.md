@@ -263,6 +263,8 @@ behavior remain unverified; emulator results are recorded separately in
 - [ ] Settings → Player settings → Gestures → Swipe to show or hide chat off, or
   chat disabled: horizontal live swipes do nothing and the gesture guide drops
   the row. With gestures off entirely, nothing changes either.
+- [ ] Phone in landscape on a VoD: open Player gestures from the player menu.
+  Every row, down to the swipe row, can be scrolled into view above Got it.
 - [ ] Vertical swipes on the right half still change volume. A swipe with the
   controls showing still minimizes. Pinch and double tap work as before.
 - [ ] Foldable inner screen, book and tabletop postures, and an RTL language

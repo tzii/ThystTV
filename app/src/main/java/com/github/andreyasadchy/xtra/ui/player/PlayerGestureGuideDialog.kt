@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.content.edit
 import androidx.fragment.app.DialogFragment
@@ -49,9 +50,13 @@ class PlayerGestureGuideDialog : DialogFragment() {
         rows.forEach { row ->
             rowsContainer.addView(guideRow(row, guideContext))
         }
+        // A phone in landscape is too short for every row, so let them scroll.
+        val rowsScroll = ScrollView(requireContext()).apply {
+            addView(rowsContainer)
+        }
         return MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.player_gesture_guide_title))
-            .setView(rowsContainer)
+            .setView(rowsScroll)
             .setPositiveButton(getString(R.string.player_gesture_guide_got_it)) { _, _ ->
                 requireContext().prefs().edit {
                     putInt(C.PLAYER_GESTURE_GUIDE_VERSION, PlayerGestureEducationState.GUIDE_VERSION)
