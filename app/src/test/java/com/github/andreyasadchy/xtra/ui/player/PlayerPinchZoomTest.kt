@@ -39,6 +39,10 @@ class PlayerPinchZoomTest {
     private lateinit var binding: FragmentPlayerBinding
     private lateinit var fragment: PlayerFragment
     private val frame get() = binding.aspectRatioFrameLayout
+    private val prefs get() = fragment.requireContext().prefs()
+    private val ratio = PlayerDisplayModePreviewer.fillToFitRatio(16f / 9f, 1083, 1000)
+    /** Raw-to-drawn factor past Fill's saturated resistance. */
+    private val magnifyScale = (1f + PlayerDisplayModePreviewer.ELASTIC_MAX_SCALE_DELTA) / 1.12f
 
     @Before fun setup() {
         activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply {
@@ -135,29 +139,195 @@ class PlayerPinchZoomTest {
         assertEquals(1.3f, fragment.getDisplayZoom(), 0.001f)
     }
 
-    private fun pinch(scale: Float, cancelled: Boolean = false) {
+    @Test fun `without extended zoom pinching past fill stays at fill`() {
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        assertEquals(PlayerDisplayMode.FILL, fragment.getCurrentDisplayMode())
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
+    }
+
+    @Test fun `extended zoom magnifies fill around the fingers`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        val magnification = 2f * magnifyScale
+        assertEquals(PlayerDisplayMode.FILL, fragment.getCurrentDisplayMode())
+        assertEquals(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, frame.resizeMode)
+        // The picture point under the fingers stays there: t = focus * (1 - magnification).
+        assertSurface(
+            scale = magnification,
+            x = (800f - 541.5f) * (1f - magnification),
+            y = (700f - 500f) * (1f - magnification),
+        )
+        assertEquals(ratio * magnification, fragment.getMagnifiedZoom(), 0.001f)
+        // The magnification is not saved; the next session starts at plain Fill.
+        assertEquals("fill", prefs.getString(C.PLAYER_DISPLAY_MODE_LANDSCAPE, null))
+        assertFalse(prefs.contains(C.PLAYER_DISPLAY_ZOOM_LANDSCAPE))
+    }
+
+    @Test fun `pinching from fit through fill ends magnified in the fill renderer`() {
+        enableExtendedZoom()
+        pinch(4f, around = 541.5f to 500f)
+        assertEquals(PlayerDisplayMode.FILL, fragment.getCurrentDisplayMode())
+        assertEquals(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, frame.resizeMode)
+        assertSurface(scale = 4f * magnifyScale / ratio, x = 0f, y = 0f)
+    }
+
+    @Test fun `a magnified pan stops at the edge of the picture`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        // The fingers spread around the center, then drift toward the lower right.
+        pinch(2f, around = 541.5f to 500f, to = 1041.5f to 980f)
+        val zoom = fragment.getMagnifiedZoom()
+        val fitHeight = PlayerMagnifyGeometry.fitSize(16f / 9f, 1083, 1000).second
+        assertEquals(500f, frame.translationX, 0.5f)
+        assertEquals(PlayerMagnifyGeometry.panLimit(fitHeight, 1000f, zoom), frame.translationY, 0.5f)
+    }
+
+    @Test fun `pinching back to fill recenters and leaving full screen clears the magnification`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        pinch(0.5f, around = 800f to 700f)
+        assertEquals(PlayerDisplayMode.FILL, fragment.getCurrentDisplayMode())
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
+
+        pinch(2f, around = 800f to 700f)
+        call("applyMinimizedPlayerVisualState")
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        call("applyMaximizedPlayerVisualState")
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
+    }
+
+    @Test fun `choosing fill or turning extended zoom off draws plain fill`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
+
+        pinch(2f, around = 800f to 700f)
+        prefs.edit { putBoolean(C.PLAYER_EXTENDED_ZOOM, false) }
+        call("refreshDisplayZoom")
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
+    }
+
+    @Test fun `a cancelled pinch returns to the magnified pan`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        val scale = frame.scaleX
+        val x = frame.translationX
+        val y = frame.translationY
+        pinch(1.5f, around = 300f to 300f, cancelled = true)
+        assertSurface(scale, x, y)
+    }
+
+    @Test fun `a magnification follows the player area while chat changes it`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        val x = frame.translationX
+        val y = frame.translationY
+        // Side chat narrows the player. Fill keeps its height, so the same picture point stays centered.
+        resizePlayer(800, 1000)
+        call("refreshDisplayZoom")
+        assertSurface(scale = 2f * magnifyScale, x = x, y = y)
+    }
+
+    @Test fun `a pinch cancelled after entering picture-in-picture keeps the magnification cleared`() {
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        beginPinch(100f, center = 800f to 700f)
+        updatePinch(120f, center = 800f to 700f)
+        // Entering PiP clears the magnification while the pinch still owns the surface.
+        val pip = Mockito.mock(AppCompatActivity::class.java)
+        Mockito.doReturn(true).`when`(pip).isInPictureInPictureMode
+        Mockito.doReturn(pip).`when`(fragment).activity
+        call("clearMagnification")
+        call("refreshDisplayZoom")
+        finishPinch(cancelled = true)
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        // Back in full screen, plain Fill stays.
+        Mockito.doReturn(false).`when`(pip).isInPictureInPictureMode
+        call("refreshDisplayZoom")
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
+    }
+
+    private fun enableExtendedZoom() {
+        prefs.edit { putBoolean(C.PLAYER_EXTENDED_ZOOM, true) }
+    }
+
+    private fun assertSurface(scale: Float, x: Float, y: Float) {
+        assertEquals(scale, frame.scaleX, 0.001f)
+        assertEquals(scale, frame.scaleY, 0.001f)
+        assertEquals(x, frame.translationX, 0.5f)
+        assertEquals(y, frame.translationY, 0.5f)
+    }
+
+    /**
+     * One pinch from a 100px span to [scale] times it. Without [around] the
+     * first finger stays at (500, 500); otherwise the fingers are centered on
+     * [around] and then on [to].
+     */
+    private fun pinch(
+        scale: Float,
+        cancelled: Boolean = false,
+        around: Pair<Float, Float>? = null,
+        to: Pair<Float, Float>? = around,
+    ) {
+        beginPinch(100f, around)
+        updatePinch(100f * scale, to)
+        finishPinch(cancelled)
+    }
+
+    private fun beginPinch(span: Float, center: Pair<Float, Float>?) {
         ReflectionHelpers.setField(fragment, "pinchPointerId1", 0)
         ReflectionHelpers.setField(fragment, "pinchPointerId2", 1)
-        ReflectionHelpers.setField(fragment, "pinchAnchorSpan", 100f)
-        twoFingers(100f) { event ->
+        ReflectionHelpers.setField(fragment, "pinchAnchorSpan", span)
+        twoFingers(span, center) { event ->
             PlayerFragment::class.java.getDeclaredMethod(
                 "beginPinch", Boolean::class.javaPrimitiveType, MotionEvent::class.java,
             ).apply { isAccessible = true }.invoke(fragment, false, event)
         }
-        twoFingers(100f * scale) { event ->
+    }
+
+    private fun updatePinch(span: Float, center: Pair<Float, Float>?) {
+        twoFingers(span, center) { event ->
             PlayerFragment::class.java.getDeclaredMethod("updatePinch", MotionEvent::class.java)
                 .apply { isAccessible = true }.invoke(fragment, event)
         }
+    }
+
+    private fun finishPinch(cancelled: Boolean) {
         PlayerFragment::class.java.getDeclaredMethod("finishPinch", Boolean::class.javaPrimitiveType)
             .apply { isAccessible = true }.invoke(fragment, cancelled)
         idle()
     }
 
-    private fun twoFingers(span: Float, block: (MotionEvent) -> Unit) {
+    private fun twoFingers(span: Float, center: Pair<Float, Float>?, block: (MotionEvent) -> Unit) {
         val properties = Array(2) { id -> MotionEvent.PointerProperties().apply { this.id = id } }
+        val left = center?.first?.minus(span / 2f) ?: 500f
+        val top = center?.second ?: 500f
         val coords = arrayOf(
-            MotionEvent.PointerCoords().apply { x = 500f; y = 500f },
-            MotionEvent.PointerCoords().apply { x = 500f + span; y = 500f },
+            MotionEvent.PointerCoords().apply { x = left; y = top },
+            MotionEvent.PointerCoords().apply { x = left + span; y = top },
         )
         val event = MotionEvent.obtain(0, 10, MotionEvent.ACTION_MOVE, 2, properties, coords, 0, 0, 1f, 1f, 0, 0, 0, 0)
         try {

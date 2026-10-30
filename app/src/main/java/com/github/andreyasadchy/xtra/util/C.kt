@@ -199,6 +199,7 @@ object C {
     const val PLAYER_GESTURES_SENSITIVITY = "player_gestures_sensitivity"
     const val PLAYER_GESTURES_ZONE_SPLIT = "player_gestures_zone_split"
     const val PLAYER_GESTURES_SWIPE_CHAT = "player_gestures_swipe_chat"
+    const val PLAYER_EXTENDED_ZOOM = "player_extended_zoom"
     const val PLAYER_GESTURE_GUIDE_VERSION = "player_gesture_guide_version"
     const val PLAYER_PINCH_HINT_SHOWN = "player_pinch_hint_shown"
     const val PLAYER_PINCH_USED = "player_pinch_used"

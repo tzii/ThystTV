@@ -15,6 +15,15 @@ class PinchZoomControllerTest {
     private fun controller(mode: PlayerDisplayMode = PlayerDisplayMode.FIT, zoom: Float = 1f, max: Float = foldable) =
         PinchZoomController().apply { begin(mode, zoom, max) }
 
+    /** Extended zoom: magnifying past Fill up to the usual cap. */
+    private fun extended(mode: PlayerDisplayMode = PlayerDisplayMode.FIT, max: Float = foldable, magnification: Float = 1f) =
+        PinchZoomController().apply {
+            begin(mode, zoom = 1f, maxZoom = max, magnifyCap = PinchZoomController.magnifyCap(max), magnification = magnification)
+        }
+
+    /** Raw-to-drawn factor past Fill's saturated resistance. */
+    private val magnifyScale = (1f + PlayerDisplayModePreviewer.ELASTIC_MAX_SCALE_DELTA) / 1.12f
+
     @Test
     fun `free zoom needs a band between the two detents`() {
         assertFalse(PinchZoomController.supports(1f))
@@ -148,6 +157,153 @@ class PinchZoomControllerTest {
             assertTrue("$scale: $displayed < $previous", displayed >= previous)
             previous = displayed
             scale += 0.01f
+        }
+    }
+
+    @Test
+    fun `magnify cap is four times Fit or twice a larger Fill`() {
+        assertEquals(4f, PinchZoomController.magnifyCap(foldable), 0f)
+        assertEquals(5f, PinchZoomController.magnifyCap(2.5f), 0f)
+    }
+
+    @Test
+    fun `extended zoom breaks through Fill's resistance and keeps the magnification`() {
+        val pinch = extended()
+        val resisted = pinch.update(foldable * 1.12f)
+        assertEquals(Target.FILL, resisted.target)
+        assertEquals(foldable * (1f + PlayerDisplayModePreviewer.ELASTIC_MAX_SCALE_DELTA), resisted.displayZoom, 0.0001f)
+
+        val magnified = pinch.update(foldable * 1.3f)
+        assertEquals(Target.MAGNIFIED, magnified.target)
+        assertTrue(magnified.reachedEnd)
+        assertEquals(foldable * 1.3f * magnifyScale, magnified.zoom, 0.0001f)
+        assertEquals(magnified.zoom, magnified.displayZoom, 0f)
+        assertEquals(1f, magnified.fraction, 0f)
+
+        val result = pinch.release()
+        assertEquals(PlayerDisplayMode.FILL, result.mode)
+        assertEquals(1f, result.zoom, 0f)
+        assertEquals(Target.MAGNIFIED, result.target)
+        assertEquals(1.3f * magnifyScale, result.magnification, 0.0001f)
+        assertTrue(result.changed)
+    }
+
+    @Test
+    fun `releasing just past Fill's resistance returns to plain Fill`() {
+        val pinch = extended()
+        val frame = pinch.update(foldable * 1.15f)
+        assertEquals(Target.FILL, frame.target)
+        assertEquals(foldable * 1.15f * magnifyScale, frame.displayZoom, 0.0001f)
+        val result = pinch.release()
+        assertEquals(PlayerDisplayMode.FILL, result.mode)
+        assertEquals(1f, result.magnification, 0f)
+    }
+
+    @Test
+    fun `the magnify cap resists like the other ends and is kept`() {
+        val cap = PinchZoomController.magnifyCap(foldable)
+        val pinch = extended()
+        val frame = pinch.update(20f)
+        assertEquals(Target.MAGNIFIED, frame.target)
+        assertEquals(cap, frame.zoom, 0f)
+        assertEquals(cap * (1f + PlayerDisplayModePreviewer.ELASTIC_MAX_SCALE_DELTA), frame.displayZoom, 0.0001f)
+        assertEquals(cap / foldable, pinch.release().magnification, 0.0001f)
+    }
+
+    @Test
+    fun `a magnified Fill resumes and pinching back to Fill recenters with a tick`() {
+        val pinch = extended(mode = PlayerDisplayMode.FILL, magnification = 2f)
+        val resumed = pinch.update(1f)
+        assertEquals(Target.MAGNIFIED, resumed.target)
+        assertEquals(foldable * 2f, resumed.displayZoom, 0.0001f)
+        assertFalse(resumed.reachedEnd)
+        assertFalse(pinch.release().changed)
+
+        val back = pinch.update(0.5f)
+        assertEquals(Target.FILL, back.target)
+        assertTrue(back.reachedEnd)
+        val result = pinch.release()
+        assertEquals(PlayerDisplayMode.FILL, result.mode)
+        assertEquals(1f, result.magnification, 0f)
+        assertTrue(result.changed)
+    }
+
+    @Test
+    fun `a magnified pinch can still reach a Fit zoom`() {
+        val pinch = extended(mode = PlayerDisplayMode.FILL, magnification = 2f)
+        val frame = pinch.update(0.35f)
+        assertEquals(Target.ZOOM, frame.target)
+        val result = pinch.release()
+        assertEquals(PlayerDisplayMode.FIT, result.mode)
+        assertEquals(1f, result.magnification, 0f)
+    }
+
+    @Test
+    fun `cancel restores the starting magnification`() {
+        val pinch = extended(mode = PlayerDisplayMode.FILL, magnification = 2f)
+        pinch.update(0.5f)
+        val result = pinch.cancel()
+        assertEquals(PlayerDisplayMode.FILL, result.mode)
+        assertEquals(Target.MAGNIFIED, result.target)
+        assertEquals(2f, result.magnification, 0f)
+        assertFalse(result.changed)
+    }
+
+    @Test
+    fun `without extended zoom a stored magnification is ignored`() {
+        val pinch = PinchZoomController().apply { begin(PlayerDisplayMode.FILL, 1f, foldable, magnification = 2f) }
+        val frame = pinch.update(1.5f)
+        assertEquals(Target.FILL, frame.target)
+        assertEquals(1f, pinch.release().magnification, 0f)
+    }
+
+    @Test
+    fun `extended zoom on a shape without a band keeps Fit and Fill as neighbouring detents`() {
+        val tablet = PlayerDisplayModePreviewer.fillToFitRatio(16f / 9f, 2560, 1600)
+        for (max in listOf(tablet, 1f)) {
+            val fromFit = extended(max = max)
+            var scale = 0.5f
+            while (scale <= 6f) {
+                assertTrue("$max at $scale", fromFit.update(scale).target != Target.ZOOM)
+                scale += 0.01f
+            }
+            assertEquals(Target.FIT, extended(max = max).update(1.04f).target)
+            assertEquals(Target.FILL, extended(max = max).update(1.08f).target)
+            assertEquals(Target.MAGNIFIED, extended(max = max).update(2f).target)
+
+            val fromFill = extended(mode = PlayerDisplayMode.FILL, max = max)
+            assertEquals(Target.FILL, fromFill.update(1f).target)
+            assertFalse(fromFill.release().changed)
+            assertEquals(Target.FIT, fromFill.update(0.9f).target)
+        }
+    }
+
+    @Test
+    fun `a kept Fit zoom survives a pinch where the shape has no band`() {
+        val tablet = PlayerDisplayModePreviewer.fillToFitRatio(16f / 9f, 2560, 1600)
+        val pinch = PinchZoomController().apply {
+            begin(PlayerDisplayMode.FIT, 1.3f, tablet, magnifyCap = PinchZoomController.magnifyCap(tablet))
+        }
+        assertEquals(Target.FIT, pinch.update(1.03f).target)
+        val result = pinch.release()
+        assertEquals(PlayerDisplayMode.FIT, result.mode)
+        assertEquals(1.3f, result.zoom, 0f)
+        assertFalse(result.changed)
+    }
+
+    @Test
+    fun `magnifying never jumps or moves against the fingers`() {
+        val pinch = extended()
+        var previous = 0f
+        var scale = 0.5f
+        while (scale <= 8f) {
+            val displayed = pinch.update(scale).displayZoom
+            assertTrue("$scale: $displayed < $previous", displayed >= previous)
+            if (scale > foldable) {
+                assertTrue("$scale: $displayed jumps from $previous", displayed / previous < 1.01f)
+            }
+            previous = displayed
+            scale += 0.005f
         }
     }
 }
