@@ -4540,6 +4540,21 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         return true
     }
 
+    override fun canPanMagnified(): Boolean = !pinchInProgress && getMagnifiedZoom() > 1f
+
+    override fun panMagnified(dx: Float, dy: Float) {
+        val layout = _binding?.playerLayout ?: return
+        if (!canPanMagnified()) return
+        // Land a running settle first so the drag moves the final framing.
+        if (pinchSettleAnimator != null) finalizePinchSurface()
+        val zoom = canonicalZoom()
+        val (fitWidth, fitHeight) = PlayerMagnifyGeometry.fitSize(videoAspectRatio, layout.width, layout.height)
+        magnifyPanX = PlayerMagnifyGeometry.pan(magnifyPanX, dx, fitWidth, layout.width.toFloat(), zoom)
+        magnifyPanY = PlayerMagnifyGeometry.pan(magnifyPanY, dy, fitHeight, layout.height.toFloat(), zoom)
+        // A renderer swap still laying out applies the new pan when it lands.
+        refreshDisplayZoom()
+    }
+
     override fun claimDoubleTapChat(): Boolean {
         if (!gestureArbiter.onDoubleTapClaimed()) return false
         // The listener cycles chat immediately after this claim. Keep its exact

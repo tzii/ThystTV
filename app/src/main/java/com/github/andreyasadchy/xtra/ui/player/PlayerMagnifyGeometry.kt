@@ -49,4 +49,15 @@ object PlayerMagnifyGeometry {
         val limit = panLimit(fitExtent, viewportExtent, zoom)
         return (panFraction * fitExtent * zoom).coerceIn(-limit, limit)
     }
+
+    /**
+     * [panFraction] after a drag of [delta] pixels, stopping where an edge of
+     * the picture would enter the player. It moves from the drawn position, so
+     * a pan stored past this player's limit starts moving at once.
+     */
+    fun pan(panFraction: Float, delta: Float, fitExtent: Float, viewportExtent: Float, zoom: Float): Float {
+        val limit = panLimit(fitExtent, viewportExtent, zoom)
+        val moved = (translation(panFraction, fitExtent, viewportExtent, zoom) + delta).coerceIn(-limit, limit)
+        return panFraction(moved, fitExtent, zoom)
+    }
 }

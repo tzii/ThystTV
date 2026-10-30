@@ -42,6 +42,7 @@ class PlayerGestureGuideDialog : DialogFragment() {
         val rows = PlayerGestureGuideContent.rowsFor(
             guideContext,
             swipeChat = prefs.getBoolean(C.PLAYER_GESTURES_SWIPE_CHAT, true) && !prefs.getBoolean(C.CHAT_DISABLE, false),
+            magnifiedPan = extendedZoomEnabled(),
         )
         val padding = (16 * resources.displayMetrics.density).toInt()
         val rowsContainer = LinearLayout(requireContext()).apply {
@@ -79,6 +80,7 @@ class PlayerGestureGuideDialog : DialogFragment() {
                 PlayerGestureGuideRow.SEEK -> R.string.gesture_row_seek
                 PlayerGestureGuideRow.PLAYBACK_SPEED -> R.string.gesture_row_playback_speed
                 PlayerGestureGuideRow.PINCH -> R.string.gesture_row_pinch
+                PlayerGestureGuideRow.MAGNIFIED_PAN -> R.string.gesture_row_magnified_pan
                 PlayerGestureGuideRow.DOUBLE_TAP_CHAT -> R.string.gesture_row_double_tap
                 PlayerGestureGuideRow.SWIPE_CHAT -> if (context == PlayerGestureGuideContext.LIVE) {
                     R.string.gesture_row_swipe_chat
@@ -101,14 +103,12 @@ class PlayerGestureGuideDialog : DialogFragment() {
                 } else {
                     R.string.gesture_feedback_playback_speed
                 }
-                PlayerGestureGuideRow.PINCH -> if (
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
-                    requireContext().prefs().getBoolean(C.PLAYER_EXTENDED_ZOOM, false)
-                ) {
+                PlayerGestureGuideRow.PINCH -> if (extendedZoomEnabled()) {
                     R.string.gesture_action_pinch_extended
                 } else {
                     R.string.gesture_action_pinch
                 }
+                PlayerGestureGuideRow.MAGNIFIED_PAN -> R.string.gesture_action_magnified_pan
                 PlayerGestureGuideRow.DOUBLE_TAP_CHAT -> R.string.gesture_action_toggle_chat
                 PlayerGestureGuideRow.SWIPE_CHAT -> if (context == PlayerGestureGuideContext.SETTINGS) {
                     R.string.gesture_action_swipe_chat_settings
@@ -138,5 +138,9 @@ class PlayerGestureGuideDialog : DialogFragment() {
             }
         )
         return rowLayout
+    }
+
+    private fun extendedZoomEnabled(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && requireContext().prefs().getBoolean(C.PLAYER_EXTENDED_ZOOM, false)
     }
 }

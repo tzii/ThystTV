@@ -46,4 +46,22 @@ class PlayerMagnifyGeometryTest {
         assertEquals(-250f, PlayerMagnifyGeometry.translation(fraction, fitExtent = 1000f, viewportExtent = 1500f, zoom = 2f), 0.001f)
         assertEquals(0f, PlayerMagnifyGeometry.panFraction(translation = 10f, fitExtent = 0f, zoom = 2f), 0f)
     }
+
+    @Test
+    fun `a drag moves the picture until an edge would enter the player`() {
+        // A 2000 px picture in a 1000 px player can move 500 px either way.
+        val moved = PlayerMagnifyGeometry.pan(panFraction = 0f, delta = 120f, fitExtent = 1000f, viewportExtent = 1000f, zoom = 2f)
+        assertEquals(0.06f, moved, 0.0001f)
+        assertEquals(0.25f, PlayerMagnifyGeometry.pan(moved, delta = 900f, fitExtent = 1000f, viewportExtent = 1000f, zoom = 2f), 0.0001f)
+        assertEquals(-0.25f, PlayerMagnifyGeometry.pan(0f, delta = -900f, fitExtent = 1000f, viewportExtent = 1000f, zoom = 2f), 0.0001f)
+        // A picture that does not cover the player on this axis stays centered.
+        assertEquals(0f, PlayerMagnifyGeometry.pan(0f, delta = 50f, fitExtent = 400f, viewportExtent = 1000f, zoom = 2f), 0f)
+    }
+
+    @Test
+    fun `a drag moves from the drawn position when the stored pan is past the limit`() {
+        // Stored at 0.25 of a 2000 px picture, but a 1500 px player only allows 250 px.
+        val moved = PlayerMagnifyGeometry.pan(panFraction = 0.25f, delta = -50f, fitExtent = 1000f, viewportExtent = 1500f, zoom = 2f)
+        assertEquals(0.1f, moved, 0.0001f)
+    }
 }

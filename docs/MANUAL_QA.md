@@ -306,8 +306,17 @@ Turn on Player settings → Gestures → Extended zoom.
 - [ ] While magnified: open/close side chat, fold/unfold and change stream quality.
   The same detail stays centered. Minimize, rotate to portrait, enter PiP or
   choose a mode in More → Display mode: playback returns to plain, centered Fill.
+- [ ] While magnified, with the controls hidden, drag with one finger on live and
+  on a VOD: the picture follows the finger in every direction and stops at the
+  video's edges. Brightness, volume, seek, speed and the chat swipe do not
+  trigger, and there is no pill or haptic. Taps still show the controls.
+- [ ] Mid-drag, put a second finger down and pinch: zooming continues from the
+  dragged position without a jump. Put a second finger down and lift it
+  without pinching: the drag continues without a jump.
 - [ ] More → Display mode lists the magnification as "Zoom N%". Double tap still
-  toggles chat. Brightness, volume, seek, speed and the chat swipe still work.
+  toggles chat. At plain Fill, brightness, volume, seek, speed and the chat
+  swipe work as before. The gesture guide lists "Drag while magnified" only
+  with the setting on.
 - [ ] With the setting off, pinching past Fill only resists and settles back,
   as before. A 16:10 tablet with the setting on: Fit and Fill still snap, and
   magnifying past Fill works.

@@ -138,11 +138,21 @@ same picture point centered. Canonical surface geometry therefore includes a
 translation; `setSurfaceScale`, `applyCanonicalSurface` and
 `animatePinchSurface` set or animate it with the scale.
 
+While magnified, a one-finger drag that starts with the controls hidden pans
+the picture instead of brightness, volume, seek, speed or the chat swipe
+(`canPanMagnified`, owner `MAGNIFIED_PAN`). It moves from the drawn position
+up to the same edges (`PlayerMagnifyGeometry.pan`), with no feedback pill,
+haptic or fling. A second finger can turn the pan into a pinch, which starts
+from the panned picture; lifting it before the pinch claims returns to the
+pan. The detector never sees a finger land or lift, so the listener follows
+the fingers' midpoint and re-anchors whenever their count changes.
+
 The magnification is session-only and never saved. Choosing a display mode,
 minimizing, rotating to portrait, entering PiP or turning the setting off
 draws plain Fill. More → Display mode lists it as "Zoom N%". Double tap stays
 the chat action. `PinchZoomControllerTest`, `PlayerMagnifyGeometryTest` and
-`PlayerPinchZoomTest` cover the controller, geometry and fragment surface.
+`PlayerPinchZoomTest` cover the controller, geometry, fragment surface and
+magnified pan; `PlayerGestureArbiterTest` covers the pan-to-pinch handoff.
 
 ## Half-folded layout
 
