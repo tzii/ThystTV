@@ -128,6 +128,22 @@ Human QA completed:
     third finger plus lifting a tracked finger freezes the pinch until another
     lift. Deferred to a follow-up; not introduced by this stack.
   Fixes merged up the stack (no force-push).
+- 2026-10-30: Emulator QA by the agent, not human QA (Medium Phone API 36.1,
+  landscape, build d484536e9). Touches went through the emulator console; zoom
+  and pan were read from the SurfaceFlinger source crop. Passed: live swipe
+  hides and shows side chat; pinch past Fill magnifies at the fingers; drag
+  pans 1:1 and clamps at the edges without opening chat; a second finger landing
+  and lifting mid-drag does not jump; pan hands over to a pinch; a pinch near
+  Fill snaps back; pinching back recenters; minimize, portrait, PiP and PiP
+  mid-pinch all clear the magnification; VoD upper and lower swipes change speed
+  and seek; strip swipes show and hide side chat and hide floating chat; a
+  magnified drag in the seek zone pans without seeking.
+  - Found: the gesture guide did not scroll, so a phone in landscape cut off
+    rows past the sixth (the VoD swipe row from PR 1, and double tap too once
+    PR 3 adds the pan row). Fixed in PR 1 (c85941d46): the rows scroll. Checked
+    on build 78040f7a1 in the eight-row Settings guide.
+  - One black PiP window after entering PiP mid-pinch did not reproduce over
+    four timed captures; left for human QA.
 
 ## Decisions
 
