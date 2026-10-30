@@ -4775,7 +4775,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         val result = if (cancelled) pinchZoomController.cancel() else pinchZoomController.release()
         displayMode = result.mode
         displayZoom = result.zoom
-        if (result.magnification > 1f && !isPortrait && isMaximized) {
+        // PiP may start mid-pinch; like leaving full screen, it ends the magnification.
+        if (result.magnification > 1f && !isPortrait && isMaximized && !isInPipMode()) {
             if (!cancelled) {
                 val layout = binding.playerLayout
                 val (fitWidth, fitHeight) = PlayerMagnifyGeometry.fitSize(videoAspectRatio, layout.width, layout.height)
