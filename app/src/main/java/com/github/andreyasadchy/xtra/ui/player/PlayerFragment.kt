@@ -303,7 +303,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     open fun showPlaylistTags(mediaPlaylist: Boolean) {}
     open fun changeQuality(selectedQuality: VideoQuality?) {}
     open fun isRemotePlayback(): Boolean = false
-    open fun startAudioOnly() {}
+    /** Returns false while the tap waits in PiP for this screen's start, so the task stays visible. */
+    open fun startAudioOnly(): Boolean = true
     open fun downloadVideo() {}
     open fun close() {}
     open fun closeSession() { close() }
@@ -2701,7 +2702,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         layoutParams = params
     }
 
-    private fun isInPipMode(): Boolean {
+    protected fun isInPipMode(): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity?.isInPictureInPictureMode == true
     }
 

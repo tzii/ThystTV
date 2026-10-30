@@ -83,6 +83,23 @@ and uses the normal default factory. This also covers local playback with Cast o
   screen recreation; a returning controller can recover acceptance from the
   service after its earlier result was cancelled. Remote live autoplay waits
   until the resolved item is installed so an older paused item stays paused.
+- A screen's own fresh start (including a saved-position resume) is marked
+  pending, and the mark is saved with the screen, until its command is sent. The
+  ownership query never starts it a second time, so a recreation or
+  process-death restore loads once. A loaded screen whose service lost its media
+  restarts on connect, but not again while that restart is still resolving (its
+  saved position, playlist or clip, until the start takes the result); a load
+  that failed is retried on the next connect. A restored screen
+  whose earlier source the service still holds (Don't keep activities) owns that
+  source, so its first exit pauses or switches to audio only as configured,
+  online or offline.
+- A start resolved while the screen was stopped is sent once the new controller
+  connects. Releasing a controller that is still connecting never starts anything.
+- A PiP Audio only tap made while this screen's started source is still on its
+  way (not yet accepted, or accepted before its qualities loaded) keeps the PiP
+  window and applies once both have happened; audio only needs the audio-only
+  rendition. Leaving PiP, stopping or a rejection drops it; a second tap leaves
+  as before.
 - Quality, Speed, Stream volume, and More share one player-owned popup host; only one
   can be attached at a time, and teardown/minimize/PiP must remove it with the player view.
 
@@ -431,9 +448,9 @@ command and its state are saved with the fragment, so activity recreation replay
 the same resolved start; a start whose result was lost while stopped asks the
 service for its accepted request on return and replays if it was not accepted.
 An accepted start is not saved: after process death the recreated screen starts
-normally and resumes from the saved position, not the original open position. It
-skips the ownership query, which would otherwise race that start into a second
-one. A start still unanswered when the screen stops is saved as unknown; if the
+normally and resumes from the saved position, not the original open position. Its
+ownership query cannot start it a second time (see Core Invariants). A start
+still unanswered when the screen stops is saved as unknown; if the
 process then dies, it replays at its original position (a narrow known gap).
 While receiver media exists, downloads are still blocked in `MainActivity` with a
 toast before any screen opens. With a connected but idle route, a download
