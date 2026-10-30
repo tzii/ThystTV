@@ -49,6 +49,8 @@ interface PlayerGestureCallback {
 
     // Sideways swipe that shows or hides chat (see PlayerChatSwipePolicy)
     fun startsChatSwipe(startX: Float): Boolean
+    /** Travel in pixels after which a chat swipe that started at [startX] acts. */
+    fun chatSwipeTriggerPx(startX: Float): Float
     /** Shows or hides chat for a swipe of [dx] pixels; returns true when chat changed. */
     fun swipeChat(dx: Float): Boolean
 }
@@ -192,7 +194,7 @@ class PlayerGestureListener(
             if (!chatSwipeDone) {
                 val dx = e2.x - gestureStartX
                 val dy = e2.y - gestureStartY
-                val trigger = PlayerChatSwipePolicy.triggerDistancePx(callback.playerWidth.toFloat(), context.resources.displayMetrics.density)
+                val trigger = callback.chatSwipeTriggerPx(gestureStartX)
                 if (PlayerChatSwipePolicy.reachedTrigger(dx, dy, trigger)) {
                     chatSwipeDone = true
                     if (callback.swipeChat(dx)) {
