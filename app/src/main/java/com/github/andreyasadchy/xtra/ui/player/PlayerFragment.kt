@@ -4513,6 +4513,17 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         )
     }
 
+    override fun chatSwipeTriggerPx(startX: Float): Float {
+        val layout = binding.playerLayout
+        return PlayerChatSwipePolicy.triggerDistancePx(
+            isLive = videoType == STREAM,
+            startX = startX,
+            surfaceWidthPx = layout.width.toFloat(),
+            density = resources.displayMetrics.density,
+            isRtl = layout.layoutDirection == View.LAYOUT_DIRECTION_RTL,
+        )
+    }
+
     override fun swipeChat(dx: Float): Boolean {
         val action = PlayerChatSwipePolicy.action(
             dxPx = dx,

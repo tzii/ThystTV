@@ -71,9 +71,23 @@ class PlayerChatSwipePolicyTest {
     }
 
     @Test
-    fun `trigger distance is a minimum length or a share of wide surfaces`() {
-        assertEquals(132f, PlayerChatSwipePolicy.triggerDistancePx(surfaceWidthPx = 1000f, density = 2.75f), 0.001f)
-        assertEquals(192f, PlayerChatSwipePolicy.triggerDistancePx(surfaceWidthPx = 2400f, density = 2.75f), 0.001f)
+    fun `live trigger distance is a minimum length or a share of wide surfaces`() {
+        assertEquals(132f, trigger(isLive = true, startX = 500f, width = 1000f), 0.001f)
+        assertEquals(192f, trigger(isLive = true, startX = 500f, width = 2400f), 0.001f)
+    }
+
+    @Test
+    fun `a strip swipe can always travel far enough toward the chat side edge`() {
+        // 24dp, even on a 1200dp tablet where the live trigger is 96dp.
+        assertEquals(66f, trigger(isLive = false, startX = 3100f, width = 3300f), 0.001f)
+        // Near the edge exclusion, 80% of the room left to the edge.
+        assertEquals(66f, trigger(isLive = false, startX = 900f, width = 1000f), 0.001f)
+        assertEquals(64f, trigger(isLive = false, startX = 920f, width = 1000f), 0.001f)
+        assertEquals(64f, trigger(isLive = false, startX = 80f, width = 1000f, isRtl = true), 0.001f)
+    }
+
+    private fun trigger(isLive: Boolean, startX: Float, width: Float, isRtl: Boolean = false): Float {
+        return PlayerChatSwipePolicy.triggerDistancePx(isLive, startX, width, density = 2.75f, isRtl = isRtl)
     }
 
     @Test

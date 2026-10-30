@@ -21,9 +21,17 @@ object PlayerChatSwipePolicy {
     /** Width of the seekable-media start strip on the chat side. */
     const val SEEKABLE_STRIP_DP = 56f
 
-    /** The swipe acts once it travels this far, or [TRIGGER_FRACTION] of the width if larger. */
+    /** A live swipe acts once it travels this far, or [TRIGGER_FRACTION] of the width if larger. */
     const val MIN_TRIGGER_DP = 48f
     const val TRIGGER_FRACTION = 0.08f
+
+    /**
+     * A swipe from the seekable strip acts after this much travel, or
+     * [STRIP_REACH_FRACTION] of its start's distance from the chat-side edge
+     * if shorter, so a hide swipe toward that edge can always reach it.
+     */
+    const val STRIP_TRIGGER_DP = 24f
+    const val STRIP_REACH_FRACTION = 0.8f
 
     fun startsChatSwipe(
         isLive: Boolean,
@@ -39,8 +47,15 @@ object PlayerChatSwipePolicy {
         return fromChatEdge > chatSideExclusionPx && fromChatEdge <= chatSideExclusionPx + stripWidthPx
     }
 
-    fun triggerDistancePx(surfaceWidthPx: Float, density: Float): Float {
-        return maxOf(MIN_TRIGGER_DP * density, surfaceWidthPx * TRIGGER_FRACTION)
+    /**
+     * Travel after which the swipe acts. Live swipes may start anywhere, so
+     * they need a longer travel. A swipe from the seekable strip already
+     * started deliberately, and hiding moves toward the nearby chat-side edge.
+     */
+    fun triggerDistancePx(isLive: Boolean, startX: Float, surfaceWidthPx: Float, density: Float, isRtl: Boolean): Float {
+        if (isLive) return maxOf(MIN_TRIGGER_DP * density, surfaceWidthPx * TRIGGER_FRACTION)
+        val fromChatEdge = if (isRtl) startX else surfaceWidthPx - startX
+        return minOf(STRIP_TRIGGER_DP * density, fromChatEdge * STRIP_REACH_FRACTION)
     }
 
     /** The swipe has travelled far enough, and mostly sideways. */
