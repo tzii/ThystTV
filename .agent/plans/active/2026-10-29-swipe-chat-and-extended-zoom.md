@@ -91,8 +91,8 @@ Automated checks:
 - [ ] `./gradlew test`
 - [ ] `./gradlew lintDebug`
 
-Human QA required: see `docs/MANUAL_QA.md` sections "Swipe to show chat" and
-"Extended zoom".
+Human QA required: see `docs/MANUAL_QA.md` sections "Swipe to show or hide
+chat" and "Extended zoom".
 
 Human QA completed:
 
@@ -111,6 +111,9 @@ Human QA completed:
 - 2026-10-30: PR 3 on `feat/73-zoom-pan`: `Owner.MAGNIFIED_PAN`, listener pan
   path that re-anchors on finger-count changes, pinch takeover from the pan,
   `PlayerMagnifyGeometry.pan`, guide row, tests, docs. Focused tests pass.
+- 2026-10-30: PR 3 committed (dd0e7ffd0). `assembleDebug test lintDebug` passed
+  in a clean worktree at that commit: 1,220 tests, 0 failures; lint 0 errors.
+  Branches pushed and stacked PRs opened (1 → master, 2 → PR 1, 3 → PR 2).
 
 ## Decisions
 
