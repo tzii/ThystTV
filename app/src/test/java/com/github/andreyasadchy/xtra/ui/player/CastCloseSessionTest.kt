@@ -519,6 +519,7 @@ class CastCloseSessionTest {
     @Test fun `audio only tapped during a pending start applies once the start is accepted and loaded`() {
         val controller = mock<MediaController>()
         val (fragment, model, activity) = pipFragment(controller, started = true)
+        whenever(controller.isConnected).thenReturn(true)
         assertFalse(fragment.startAudioOnly())
         verify(controller, never()).release()
         call(fragment, "acceptSourceStart")
@@ -526,9 +527,13 @@ class CastCloseSessionTest {
         // Accepted before its playlist loaded: audio only cannot find its rendition yet.
         verify(controller, never()).release()
         verify(activity, never()).moveTaskToBack(any())
+        verify(model, never()).quality = any()
         whenever(model.qualities).thenReturn(audioOnlyQualities)
         call(fragment, "applyPendingAudioOnly")
-        verify(controller).release()
+        inOrder(model, controller) {
+            verify(model).quality = audioOnlyQualities[1]
+            verify(controller).release()
+        }
         verify(activity).moveTaskToBack(false)
         call(fragment, "applyPendingAudioOnly")
         call(fragment, "acceptSourceStart")

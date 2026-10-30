@@ -174,10 +174,10 @@ replaces a reviewed 1.5.1 guard.
 
 Automated checks:
 
-- [ ] `./gradlew assembleDebug`
-- [ ] `./gradlew test`
-- [ ] `./gradlew lintDebug`
-- [ ] `./gradlew assembleRelease`
+- [x] `./gradlew assembleDebug`
+- [x] `./gradlew test`
+- [x] `./gradlew lintDebug`
+- [x] `./gradlew assembleRelease`
 
 Human QA required (issue #71 matrix):
 
@@ -325,6 +325,57 @@ Human QA completed:
   re-checked with one load and one START each. Gates on the clean tree:
   `assembleDebug test lintDebug assembleRelease` BUILD SUCCESSFUL, 1189 tests,
   0 failures, no lint issues on changed lines.
+- 2026-10-30: Review round 2 on b74e15e2d (follow-ups b7b0a6a17 and b74e15e2d),
+  both lanes given the same brief with the round 1 findings and dispositions.
+  Raw output kept outside the repo.
+  - Primary lane (T3 delegated Codex task, `gpt-6.1-sol`, `reasoningEffort=high`,
+    from the task status). Verdict: hold for finding 1.
+    - Major: `sourceLoading` left out the saved-position lookups
+      (`getVideoPosition`, `getOfflineVideoPosition`), so a second connect
+      during the lookup still restarted; the plan's "milliseconds" is no
+      guarantee. Confirmed. Fixed: the lookup jobs count, and so does any result
+      not yet taken by its collector (all five are reset to null when taken), so
+      a failed load still retries.
+    - Minor: the audio-only tests call `applyPendingAudioOnly()` directly and
+      never reach the switch. Partly fixed: the first case now uses a connected
+      controller and checks the audio-only rendition is selected before the
+      controller is released. The GET_QUALITIES call sits in the controller
+      listener built in `onStart`; it stays covered by the emulator run (held
+      tap applied when 8 qualities arrived) and human QA.
+  - Independent lane (OpenCode 1.19.4 from npm, `zai-coding-plan/glm-5.3`,
+    variant `max`, agent `plan`; identity from the exported session, all 22
+    assistant messages). Verdict: nothing blocks; round 1 dispositions verified.
+    - Nit: the same untracked-lookup window. Fixed as above. The synchronous
+      starts it also named (custom proxy, preview URL) send at once on a
+      connected controller and clear `freshStartPending`, so they leave no
+      window.
+    - Nit: a forced second tap before the qualities load still releases the
+      controller with video on. Accepted as before: leaving PiP without the
+      switch would hit the same gap in `onStop`'s background-audio branch, which
+      also picks the rendition from the qualities. Any exit before the qualities
+      load has this on master; plausible, not reproduced, outside #71.
+    - Nit: a held tap on a lost-media restart uses the earlier playlist's
+      audio-only URL. Accepted; same class as the old live URL nit.
+- 2026-10-30: Round 2 fix. Tests: two `PlayerResumeLookupTest` cases (a
+  suspended lookup, an unconsumed result, a failed playlist and download lookup)
+  and the stronger audio-only case. Untracking the lookup jobs fails both new
+  cases; ignoring unconsumed results fails one. Emulator with temporary logs and
+  a 3 s delay in the resume lookup (PiP and background audio off): `am
+  stopservice`, return, Home and return 0.3 s after the connect: the second
+  connect saw `fresh=true loading=true`; one lookup, one usher load, one START.
+
+- 2026-10-30: Final clean-tree validation after the round 2 fixes:
+  `assembleDebug test lintDebug assembleRelease` BUILD SUCCESSFUL (gate71d.txt);
+  1,191 tests in 136 suites, no failures/errors/skips; lint 0 errors and 332
+  existing warnings, none on changed lines. `git diff --check` passes. The clean
+  debug APK contains none of the temporary diagnostic messages; installed with
+  data retained on Medium_Phone_API_36.1. Fresh VoD playback visibly decoded,
+  position advanced, and no AndroidRuntime/ExoPlayer error or T71 diagnostic was
+  logged. APK SHA-256:
+  `8938776b90e8b5dc369d220c7259517ab720550d4e471667da553f541817faf0`.
+  PiP and background audio are on; Don't keep activities and night mode are off.
+  Implementation and review corrections are complete; physical-device QA above
+  remains pending before merge/release. The gesture stack stays in #75/#76/#77.
 
 ## Decisions
 
@@ -356,12 +407,12 @@ Human QA completed:
   Any non-empty list counts, so a source without an audio-only rendition
   behaves like a tap after load, as before.
 - Decision: skip the lost-media restart only while this screen's fresh start is
-  pending and its playlist or clip load is still running.
+  pending and its saved position, playlist or clip is still resolving (a job
+  running or a result not yet taken).
   Reason: that is the window in which a second start would race the first;
   outside it (a failed load, or a load the screen did not start itself) the
-  restart behaves as on master. The saved-position lookups before a VoD or
-  download start are not tracked; they read the database in milliseconds,
-  against seconds for a playlist.
+  restart behaves as on master. Round 2 added the saved-position lookups and
+  untaken results after review; a database read has no timing guarantee.
   Alternatives considered: skip whenever `freshStartPending` is set (a load that
   failed would never retry, widening the accepted GLM finding); dedupe or
   cancel in the loaders (changes the legacy backends and the loaders' error
@@ -374,6 +425,7 @@ process death or Don't keep activities owns its retained source and starts once.
 A screen whose service lost its media restarts once, even if it reconnects while
 that restart loads. A PiP Audio only tap during a pending start is applied once
 the start is accepted and its qualities have loaded.
-Tests: new ownership and audio-only cases in `CastCloseSessionTest`; full gates.
+Tests: new ownership and audio-only cases in `CastCloseSessionTest`, source
+loading cases in `PlayerResumeLookupTest`; full gates.
 Human QA: the #71 matrix above.
 Risks: player lifecycle; reviewed independently.

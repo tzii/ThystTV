@@ -107,6 +107,7 @@ class PlayerViewModel @Inject constructor(
     var backupQualities: List<String>? = null
     var playbackPosition: Long? = null
     val savedPosition = MutableStateFlow<Long?>(null)
+    private var savedPositionJob: Job? = null
     val isBookmarked = MutableStateFlow<Boolean?>(null)
     val gamesList = MutableStateFlow<List<Game>?>(null)
     val videoStoryboard = MutableStateFlow<VideoStoryboard?>(null)
@@ -121,11 +122,13 @@ class PlayerViewModel @Inject constructor(
     val clipUrls = MutableStateFlow<List<VideoQuality>?>(null)
     private var clipUrlsJob: Job? = null
 
-    /** A playlist or clip this screen started resolving is still on its way. */
+    /** A saved position, playlist or clip this screen started resolving has not reached its start yet. */
     val sourceLoading: Boolean
-        get() = streamResultJob?.isActive == true || videoResultJob?.isActive == true || clipUrlsJob?.isActive == true
+        get() = listOf(savedPositionJob, savedOfflineVideoPositionJob, streamResultJob, videoResultJob, clipUrlsJob).any { it?.isActive == true } ||
+                listOf(savedPosition, savedOfflineVideoPosition, streamResult, videoResult, clipUrls).any { it.value != null }
 
     val savedOfflineVideoPosition = MutableStateFlow<Long?>(null)
+    private var savedOfflineVideoPositionJob: Job? = null
 
     var qualities: List<VideoQuality>? = null
     var quality: VideoQuality? = null
@@ -527,7 +530,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun getVideoPosition(id: Long, durationSeconds: Int, thumbnailUrl: String?, explicitPosition: Long? = null) {
-        viewModelScope.launch {
+        savedPositionJob = viewModelScope.launch {
             savedPosition.value = explicitPosition ?: networkVideoResumePosition(
                 playerRepository.getVideoPosition(id)?.position,
                 durationSeconds.toLong() * 1000L,
@@ -820,7 +823,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun getOfflineVideoPosition(id: Int) {
-        viewModelScope.launch {
+        savedOfflineVideoPositionJob = viewModelScope.launch {
             val video = offlineRepository.getVideoById(id)
             savedOfflineVideoPosition.value = videoResumePosition(video?.lastWatchPosition, video?.duration)
         }

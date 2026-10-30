@@ -5,18 +5,25 @@ import com.github.andreyasadchy.xtra.model.VideoPosition
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.repository.OfflineRepository
 import com.github.andreyasadchy.xtra.repository.PlayerRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.doSuspendableAnswer
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
@@ -94,6 +101,51 @@ class PlayerResumeLookupTest {
         vm.getVideoPosition(1L, 60, "https://example.com/final.jpg")
         advanceUntilIdle()
         assertEquals(0L, vm.savedPosition.value)
+    }
+
+    @Test fun `a resume lookup and its playlist count as loading until the start takes them`() = runTest {
+        val lookup = CompletableDeferred<VideoPosition?>()
+        whenever(playerRepository.getVideoPosition(1L)).doSuspendableAnswer { lookup.await() }
+        val playlist = CompletableDeferred<Pair<String, List<String>>>()
+        whenever(playerRepository.loadVideoPlaylistUrl(anyOrNull(), any(), anyOrNull(), anyOrNull(), anyOrNull(), any()))
+            .doSuspendableAnswer { playlist.await() }
+        val vm = viewModel()
+        assertFalse(vm.sourceLoading)
+        vm.getVideoPosition(1L, 0, "https://example.com/vod.jpg")
+        runCurrent()
+        assertTrue(vm.sourceLoading)
+        lookup.complete(VideoPosition(1L, 30_000L))
+        advanceUntilIdle()
+        // Resolved but not yet taken by the screen's collector.
+        assertTrue(vm.sourceLoading)
+        vm.savedPosition.value = null
+        vm.loadVideo(null, emptyMap(), "1", null, null, false)
+        runCurrent()
+        assertTrue(vm.sourceLoading)
+        playlist.complete("https://example.com/vod.m3u8" to emptyList())
+        advanceUntilIdle()
+        assertTrue(vm.sourceLoading)
+        vm.videoResult.value = null
+        assertFalse(vm.sourceLoading)
+    }
+
+    @Test fun `a failed playlist or download lookup stops counting as loading`() = runTest {
+        val lookup = CompletableDeferred<OfflineVideo?>()
+        whenever(offlineRepository.getVideoById(1)).doSuspendableAnswer { lookup.await() }
+        whenever(playerRepository.loadVideoPlaylistUrl(anyOrNull(), any(), anyOrNull(), anyOrNull(), anyOrNull(), any()))
+            .doSuspendableAnswer { throw java.io.IOException("offline") }
+        val vm = viewModel()
+        vm.getOfflineVideoPosition(1)
+        runCurrent()
+        assertTrue(vm.sourceLoading)
+        lookup.complete(null)
+        advanceUntilIdle()
+        vm.savedOfflineVideoPosition.value = null
+        assertFalse(vm.sourceLoading)
+        vm.loadVideo(null, emptyMap(), "1", null, null, false)
+        advanceUntilIdle()
+        // Nothing will start, so the next connection may restart it.
+        assertFalse(vm.sourceLoading)
     }
 
     @Test fun `missing download record starts from zero`() = runTest {

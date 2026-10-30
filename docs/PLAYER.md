@@ -87,8 +87,9 @@ and uses the normal default factory. This also covers local playback with Cast o
   pending, and the mark is saved with the screen, until its command is sent. The
   ownership query never starts it a second time, so a recreation or
   process-death restore loads once. A loaded screen whose service lost its media
-  restarts on connect, but not again while that restart is still loading its
-  playlist; a load that failed is retried on the next connect. A restored screen
+  restarts on connect, but not again while that restart is still resolving (its
+  saved position, playlist or clip, until the start takes the result); a load
+  that failed is retried on the next connect. A restored screen
   whose earlier source the service still holds (Don't keep activities) owns that
   source, so its first exit pauses or switches to audio only as configured,
   online or offline.
