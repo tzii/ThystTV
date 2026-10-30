@@ -4,6 +4,9 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Added
+- In full-screen landscape, swipe sideways to show or hide chat (#72). On live streams the swipe works anywhere on the video; on VoDs, clips and downloads start it at the edge of the video on the chat side, so seek and speed swipes keep the rest. Swiping away from the chat side opens the side chat, swiping toward it hides side or floating chat. Turn it off in Player settings → Gestures.
+
 ## [1.5.1] - 2026-10-27
 
 ### Added

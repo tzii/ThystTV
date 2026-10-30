@@ -99,6 +99,25 @@ transition. Clear the snapshot at pointer-sequence boundaries and view destructi
 Android containers and preferences with fragment attachment/network chat mocked.
 Device gesture timing and playback still need the manual matrix in `MANUAL_QA.md`.
 
+## Swipe to show or hide chat
+
+In full-screen landscape with the controls hidden, a sideways swipe shows or
+hides chat (`PlayerChatSwipePolicy`, setting `player_gestures_swipe_chat`, on by
+default). Live streams have no horizontal gesture, so the swipe may start
+anywhere. Seekable media (VoDs, clips, downloads, live rewind) keep seek and
+speed and accept it only from a 56dp strip just inside the chat-side edge
+exclusion (the system gesture inset, or 30dp with three-button navigation).
+The chat side is the end edge, so RTL mirrors the strip and the directions.
+
+The swipe claims `Owner.CHAT_SWIPE` like any single-finger gesture and acts once,
+after mostly sideways travel: max(48dp, 8% of the width) on live, 24dp from the
+seekable strip. A strip swipe that hides chat moves toward the nearby edge, so
+its travel is also capped at 80% of the room left to that edge. Moving away from the
+chat side shows the sidebar; moving toward it hides sidebar or floating chat. It
+never cycles modes, and does nothing when chat is already in that state or chat
+is disabled. `PlayerChatSwipeTest` drives the real listener, arbiter and chat
+transitions; edge-strip reachability next to the Back gesture needs devices.
+
 ## Half-folded layout
 
 Half-opening a foldable does not change the configuration, so `PlayerFragment`

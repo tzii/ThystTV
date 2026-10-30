@@ -14,7 +14,8 @@ import kotlin.math.abs
  *    deadzone is crossed; no fixed pixel gate makes sensitivity depend on the
  *    fingers' initial distance.
  *  - If a single-finger swipe (seek, playback speed, brightness, device
- *    volume) already owns the sequence, a second finger cannot convert it.
+ *    volume, chat swipe) already owns the sequence, a second finger cannot
+ *    convert it.
  *  - Once pinch owns the sequence, lifting one finger suppresses remaining
  *    single-finger events until the final release or cancellation.
  *  - A third finger cannot start another player action.
@@ -32,6 +33,7 @@ class PlayerGestureArbiter(
         PLAYBACK_SPEED,
         BRIGHTNESS,
         DEVICE_VOLUME,
+        CHAT_SWIPE,
         DOUBLE_TAP_CHAT,
         PINCH_DISPLAY_MODE,
     }
@@ -130,6 +132,6 @@ class PlayerGestureArbiter(
     }
 
     companion object {
-        val SINGLE_FINGER_OWNERS = setOf(Owner.SEEK, Owner.PLAYBACK_SPEED, Owner.BRIGHTNESS, Owner.DEVICE_VOLUME)
+        val SINGLE_FINGER_OWNERS = setOf(Owner.SEEK, Owner.PLAYBACK_SPEED, Owner.BRIGHTNESS, Owner.DEVICE_VOLUME, Owner.CHAT_SWIPE)
     }
 }

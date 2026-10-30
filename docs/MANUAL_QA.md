@@ -247,6 +247,29 @@ behavior remain unverified; emulator results are recorded separately in
   APK. The previous destroyed pager/RecyclerView retention groups must not recur.
   Keep heap dumps and private analysis out of public issues and commits.
 
+### Swipe to show or hide chat
+
+- [ ] Gesture navigation, landscape live stream, controls hidden: swipe right to
+  left across the middle; side chat opens once. Swipe left to right; it closes.
+  Neither swipe triggers Back or minimizes the player.
+- [ ] VoD and clip: a horizontal swipe in the middle still seeks (lower half) or
+  changes speed (upper half). A swipe that starts just inside the right edge
+  (not in the Back zone) opens chat; with chat open, the same strip next to the
+  chat closes it. Repeat with three-button navigation.
+- [ ] Floating chat showing: swipe toward the chat side hides it; swipe the other
+  way does nothing. On a VoD, start in the strip just inside the right edge and
+  swipe right: it hides, also on a tablet. Double tap still cycles hidden, side
+  and floating.
+- [ ] Settings → Player settings → Gestures → Swipe to show or hide chat off, or
+  chat disabled: horizontal live swipes do nothing and the gesture guide drops
+  the row. With gestures off entirely, nothing changes either.
+- [ ] Phone in landscape on a VoD: open Player gestures from the player menu.
+  Every row, down to the swipe row, can be scrolled into view above Got it.
+- [ ] Vertical swipes on the right half still change volume. A swipe with the
+  controls showing still minimizes. Pinch and double tap work as before.
+- [ ] Foldable inner screen, book and tabletop postures, and an RTL language
+  (chat on the left, directions mirrored).
+
 ### Pinch free zoom
 
 - [ ] Near-square foldable inner screen (or a tablet in landscape): pinch out

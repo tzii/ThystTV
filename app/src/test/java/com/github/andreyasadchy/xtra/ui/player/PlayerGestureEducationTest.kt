@@ -16,7 +16,7 @@ class PlayerGestureEducationTest {
     }
 
     @Test
-    fun `live context omits both horizontal rows`() {
+    fun `live context omits both horizontal seek rows`() {
         val rows = PlayerGestureGuideContent.rowsFor(PlayerGestureGuideContext.LIVE)
         assertFalse(PlayerGestureGuideRow.SEEK in rows)
         assertFalse(PlayerGestureGuideRow.PLAYBACK_SPEED in rows)
@@ -24,6 +24,15 @@ class PlayerGestureEducationTest {
         assertTrue(PlayerGestureGuideRow.DEVICE_VOLUME in rows)
         assertTrue(PlayerGestureGuideRow.PINCH in rows)
         assertTrue(PlayerGestureGuideRow.DOUBLE_TAP_CHAT in rows)
+        assertTrue(PlayerGestureGuideRow.SWIPE_CHAT in rows)
+    }
+
+    @Test
+    fun `chat swipe row follows its availability in every context`() {
+        for (context in PlayerGestureGuideContext.entries) {
+            assertTrue(PlayerGestureGuideRow.SWIPE_CHAT in PlayerGestureGuideContent.rowsFor(context, swipeChat = true))
+            assertFalse(PlayerGestureGuideRow.SWIPE_CHAT in PlayerGestureGuideContent.rowsFor(context, swipeChat = false))
+        }
     }
 
     @Test
