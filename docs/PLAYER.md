@@ -103,6 +103,22 @@ and uses the normal default factory. This also covers local playback with Cast o
 - Quality, Speed, Stream volume, and More share one player-owned popup host; only one
   can be attached at a time, and teardown/minimize/PiP must remove it with the player view.
 
+## Mini-player geometry
+
+The mini-player uses a 16:9 viewport in portrait and landscape, independently of
+the window's aspect ratio. Its base rectangle fits inside the sliding container
+before uniform scaling, so an extra-wide phone cannot clip the video before the
+mini-player transform. Placement uses the measured player bounds, including
+after rotation or resizing. Non-16:9 sources keep normal Fit letterboxing.
+
+`PlayerLayout.isMinimized` is synchronized by `updateFoldLayout`, including
+minimize, maximize, view initialization and PiP. It is separate from portrait
+measurement: fold splits and the maximized landscape player retain their own
+geometry. Never shrink a full landscape window as the mini-player viewport or
+use different X/Y scales; that preserves window-shaped empty bands and distorts
+the video. `PlayerMiniPlayerLayoutTest` checks native view measurements across
+phone, near-square and tablet windows and restoration of the full-player area.
+
 ## Pinch and double-tap chat ownership
 
 A pinch can supersede a double tap when its first finger is interpreted as the

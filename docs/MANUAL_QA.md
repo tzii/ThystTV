@@ -38,6 +38,20 @@ Required on a physical phone with the default Media3 backend:
   close/reopen, stream switching, speed/quality, gestures and floating chat.
 - [ ] Upgrade over the released 1.5.1 with a player open.
 
+### Mini-player aspect ratio
+
+- [ ] Live and 16:9 VoD on a near-square foldable, landscape tablet and landscape
+  phone: minimize. The visible mini-player is 16:9, with no window-shaped empty
+  bands around the picture, no stretching and no clipped bottom on wide phones.
+- [ ] While minimized, rotate, resize a split-screen window, fold/unfold and
+  repeat maximize/minimize. It stays above the bottom navigation; full-player
+  sidebar/floating chat and half-fold layouts restore correctly.
+- [ ] Try a non-16:9 video: Fit can keep legitimate source letterboxing. Change
+  quality, switch live/VoD, close/reopen, enter/leave PiP from maximized and
+  minimized states, and background/restore. Video stays visible with one source.
+- [ ] Speed/quality, brightness/volume/seek gestures and floating chat still work
+  after restoring. Retest on the reporting physical device and tablet.
+
 ### 1.5.1 release candidate
 
 On October 27 the maintainer reported that upgrade, offline cold start and player
