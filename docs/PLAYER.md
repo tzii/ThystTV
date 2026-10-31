@@ -132,6 +132,61 @@ transition. Clear the snapshot at pointer-sequence boundaries and view destructi
 Android containers and preferences with fragment attachment/network chat mocked.
 Device gesture timing and playback still need the manual matrix in `MANUAL_QA.md`.
 
+## Swipe to show or hide chat
+
+In full-screen landscape with the controls hidden, a sideways swipe shows or
+hides chat (`PlayerChatSwipePolicy`, setting `player_gestures_swipe_chat`, on by
+default). Live streams have no horizontal gesture, so the swipe may start
+anywhere. Seekable media (VoDs, clips, downloads, live rewind) keep seek and
+speed and accept it only from a 56dp strip just inside the chat-side edge
+exclusion (the system gesture inset, or 30dp with three-button navigation).
+The chat side is the end edge, so RTL mirrors the strip and the directions.
+
+The swipe claims `Owner.CHAT_SWIPE` like any single-finger gesture and acts once,
+after mostly sideways travel: max(48dp, 8% of the width) on live, 24dp from the
+seekable strip. A strip swipe that hides chat moves toward the nearby edge, so
+its travel is also capped at 80% of the room left to that edge. Moving away from the
+chat side shows the sidebar; moving toward it hides sidebar or floating chat. It
+never cycles modes, and does nothing when chat is already in that state or chat
+is disabled. `PlayerChatSwipeTest` drives the real listener, arbiter and chat
+transitions; edge-strip reachability next to the Back gesture needs devices.
+
+## Extended zoom
+
+Setting `player_extended_zoom` (off by default, hidden before API 24) lets a
+pinch magnify past Fill. Below Fill nothing changes: `PinchZoomController`
+keeps the centered Fit-to-Fill band and its detents. Fill's elastic resistance
+becomes a wall the fingers can push through: past its saturation the drawn zoom
+continues from the resisted size, up to `magnifyCap` (4x Fit, or twice Fill on
+very wide shapes), which resists in turn. A release within 10% of Fill
+(`MAGNIFY_DETENT`) returns to plain Fill. On shapes `supports` rejects, Fit and
+Fill become neighbouring detents so magnifying still works.
+
+While magnified, the pinch keeps the picture point under the fingers in place
+(`PlayerMagnifyGeometry.anchoredTranslation`) and clamps the pan so the
+picture's edges never enter the player. Below Fill the pan drops to zero.
+The fragment keeps `magnification` (relative to Fill) and a pan stored as a
+share of the picture, so side chat, folding and video shape changes keep the
+same picture point centered. Canonical surface geometry therefore includes a
+translation; `setSurfaceScale`, `applyCanonicalSurface` and
+`animatePinchSurface` set or animate it with the scale.
+
+While magnified, a one-finger drag that starts with the controls hidden pans
+the picture instead of brightness, volume, seek, speed or the chat swipe
+(`canPanMagnified`, owner `MAGNIFIED_PAN`). It moves from the drawn position
+up to the same edges (`PlayerMagnifyGeometry.pan`), with no feedback pill,
+haptic or fling. A second finger can turn the pan into a pinch, which starts
+from the panned picture; lifting it before the pinch claims returns to the
+pan. The detector never sees a finger land or lift, so the listener follows
+the fingers' midpoint and re-anchors whenever their count changes.
+
+The magnification is session-only and never saved. Choosing a display mode,
+minimizing, rotating to portrait, entering PiP or turning the setting off
+draws plain Fill. More → Display mode lists it as "Zoom N%". Double tap stays
+the chat action. `PinchZoomControllerTest`, `PlayerMagnifyGeometryTest` and
+`PlayerPinchZoomTest` cover the controller, geometry, fragment surface and
+magnified pan; `PlayerGestureArbiterTest` covers the pan-to-pinch handoff.
+
 ## Half-folded layout
 
 Half-opening a foldable does not change the configuration, so `PlayerFragment`

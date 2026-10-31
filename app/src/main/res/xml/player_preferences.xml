@@ -123,6 +123,22 @@
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
 
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="player_gestures_swipe_chat"
+            android:title="@string/player_gestures_swipe_chat"
+            android:summary="@string/player_gestures_swipe_chat_summary"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="player_extended_zoom"
+            android:title="@string/player_extended_zoom"
+            android:summary="@string/player_extended_zoom_summary"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
         <ListPreference
             android:defaultValue="1"
             android:entries="@array/playerGesturesSensitivityEntries"

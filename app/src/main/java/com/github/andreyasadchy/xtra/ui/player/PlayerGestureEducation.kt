@@ -15,21 +15,33 @@ enum class PlayerGestureGuideRow {
     SEEK,
     PLAYBACK_SPEED,
     PINCH,
+    MAGNIFIED_PAN,
     DOUBLE_TAP_CHAT,
+    SWIPE_CHAT,
 }
 
 object PlayerGestureGuideContent {
 
     /**
-     * Live playback supports neither horizontal gesture, so those rows are
-     * omitted entirely; the settings context keeps them with qualified copy.
+     * Live playback supports neither horizontal seek gesture, so those rows
+     * are omitted entirely; the settings context keeps them with qualified
+     * copy. The chat swipe row appears only while that swipe is available, and
+     * the magnified pan row only while extended zoom is on.
      */
-    fun rowsFor(context: PlayerGestureGuideContext): List<PlayerGestureGuideRow> {
-        return when (context) {
+    fun rowsFor(
+        context: PlayerGestureGuideContext,
+        swipeChat: Boolean = true,
+        magnifiedPan: Boolean = true,
+    ): List<PlayerGestureGuideRow> {
+        val rows = when (context) {
             PlayerGestureGuideContext.SEEKABLE, PlayerGestureGuideContext.SETTINGS -> PlayerGestureGuideRow.entries
             PlayerGestureGuideContext.LIVE -> PlayerGestureGuideRow.entries.filterNot {
                 it == PlayerGestureGuideRow.SEEK || it == PlayerGestureGuideRow.PLAYBACK_SPEED
             }
+        }
+        return rows.filter {
+            (swipeChat || it != PlayerGestureGuideRow.SWIPE_CHAT) &&
+                (magnifiedPan || it != PlayerGestureGuideRow.MAGNIFIED_PAN)
         }
     }
 }

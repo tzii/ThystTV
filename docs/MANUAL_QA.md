@@ -284,6 +284,29 @@ behavior remain unverified; emulator results are recorded separately in
   APK. The previous destroyed pager/RecyclerView retention groups must not recur.
   Keep heap dumps and private analysis out of public issues and commits.
 
+### Swipe to show or hide chat
+
+- [ ] Gesture navigation, landscape live stream, controls hidden: swipe right to
+  left across the middle; side chat opens once. Swipe left to right; it closes.
+  Neither swipe triggers Back or minimizes the player.
+- [ ] VoD and clip: a horizontal swipe in the middle still seeks (lower half) or
+  changes speed (upper half). A swipe that starts just inside the right edge
+  (not in the Back zone) opens chat; with chat open, the same strip next to the
+  chat closes it. Repeat with three-button navigation.
+- [ ] Floating chat showing: swipe toward the chat side hides it; swipe the other
+  way does nothing. On a VoD, start in the strip just inside the right edge and
+  swipe right: it hides, also on a tablet. Double tap still cycles hidden, side
+  and floating.
+- [ ] Settings → Player settings → Gestures → Swipe to show or hide chat off, or
+  chat disabled: horizontal live swipes do nothing and the gesture guide drops
+  the row. With gestures off entirely, nothing changes either.
+- [ ] Phone in landscape on a VoD: open Player gestures from the player menu.
+  Every row, down to the swipe row, can be scrolled into view above Got it.
+- [ ] Vertical swipes on the right half still change volume. A swipe with the
+  controls showing still minimizes. Pinch and double tap work as before.
+- [ ] Foldable inner screen, book and tabletop postures, and an RTL language
+  (chat on the left, directions mirrored).
+
 ### Pinch free zoom
 
 - [ ] Near-square foldable inner screen (or a tablet in landscape): pinch out
@@ -302,6 +325,38 @@ behavior remain unverified; emulator results are recorded separately in
   or Stretch clears it. Stretch and Android 6 keep the Fit/Fill toggle.
 - [ ] Live, VoD and clips on all three backends; a double tap followed by a pinch
   still restores chat.
+
+### Extended zoom
+
+Turn on Player settings → Gestures → Extended zoom.
+
+- [ ] Landscape phone and foldable inner screen: pinch out to Fill, keep pushing
+  through the resistance and confirm magnifying continues smoothly from the
+  resisted size, without a jump. The pill reads "Zoom N%". Magnifying stops at
+  about 4× Fit with a short resistance.
+- [ ] Magnify on a corner detail (a minimap or scoreboard): it stays under your
+  fingers, and the picture never shows black past its edges. Content that Fill
+  crops can be brought into view.
+- [ ] Release just past Fill: it settles back to Fill. Release further out: the
+  magnification and position stay. Pinch in again: it resumes from there, and
+  reaching Fill gives a tick and the white outline and settles centered.
+- [ ] While magnified: open/close side chat, fold/unfold and change stream quality.
+  The same detail stays centered. Minimize, rotate to portrait, enter PiP or
+  choose a mode in More → Display mode: playback returns to plain, centered Fill.
+- [ ] While magnified, with the controls hidden, drag with one finger on live and
+  on a VOD: the picture follows the finger in every direction and stops at the
+  video's edges. Brightness, volume, seek, speed and the chat swipe do not
+  trigger, and there is no pill or haptic. Taps still show the controls.
+- [ ] Mid-drag, put a second finger down and pinch: zooming continues from the
+  dragged position without a jump. Put a second finger down and lift it
+  without pinching: the drag continues without a jump.
+- [ ] More → Display mode lists the magnification as "Zoom N%". Double tap still
+  toggles chat. At plain Fill, brightness, volume, seek, speed and the chat
+  swipe work as before. The gesture guide lists "Drag while magnified" only
+  with the setting on.
+- [ ] With the setting off, pinching past Fill only resists and settles back,
+  as before. A 16:10 tablet with the setting on: Fit and Fill still snap, and
+  magnifying past Fill works.
 
 ### Half-folded layout
 

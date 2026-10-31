@@ -1037,6 +1037,10 @@ class SettingsActivity : AppCompatActivity() {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                 findPreference<SwitchPreferenceCompat>(C.PLAYER_ROUNDED_CORNER_PADDING)?.isVisible = false
             }
+            // Magnifying scales the video surface, which is unreliable before API 24.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+                findPreference<SwitchPreferenceCompat>(C.PLAYER_EXTENDED_ZOOM)?.isVisible = false
+            }
             findPreference<Preference>("delete_video_positions")?.setOnPreferenceClickListener {
                 requireActivity().getAlertDialogBuilder()
                     .setMessage(getString(R.string.delete_video_positions_message))
