@@ -1062,49 +1062,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             if (isTap && (event.eventTime - tapEventTime) < longPressTimeout) {
                                 maximize()
                             } else {
-                                if (moveFreely) {
-                                    val windowInsets = ViewCompat.getRootWindowInsets(requireView())
-                                    val insets = windowInsets?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-                                    val scaledXDiff = (slidingLayout.width * (1f - slidingLayout.scaleX)) / 2
-                                    val scaledYDiff = (slidingLayout.height * (1f - slidingLayout.scaleY)) / 2
-                                    val minX = 0f - scaledXDiff - ((insets?.left ?: 0) * slidingLayout.scaleX) + (insets?.left ?: 0)
-                                    val minY = 0f - scaledYDiff - ((insets?.top ?: 0) * slidingLayout.scaleY) + (insets?.top ?: 0)
-                                    val maxX = 0f - scaledXDiff - ((insets?.left ?: 0) * slidingLayout.scaleX) + slidingLayout.width - (playerLayout.width * slidingLayout.scaleX) - (insets?.right ?: 0)
-                                    val maxY = 0f - scaledYDiff - ((insets?.top ?: 0) * slidingLayout.scaleY) + slidingLayout.height - (playerLayout.height * slidingLayout.scaleY) - (insets?.bottom ?: 0)
-                                    val newX = when {
-                                        slidingLayout.translationX < minX -> minX
-                                        slidingLayout.translationX > maxX -> maxX
-                                        else -> null
-                                    }
-                                    val newY = when {
-                                        slidingLayout.translationY < minY -> minY
-                                        slidingLayout.translationY > maxY -> maxY
-                                        else -> null
-                                    }
-                                    if (newX != null || newY != null) {
-                                        moveAnimation = slidingLayout.animate().apply {
-                                            newX?.let { translationX(it) }
-                                            newY?.let { translationY(it) }
-                                            setDuration(250L)
-                                            start()
-                                        }
-                                    }
-                                } else {
-                                    val windowInsets = ViewCompat.getRootWindowInsets(requireView())
-                                    val insets = windowInsets?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-                                    val keyboardInsets = windowInsets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom?.let { if (it > 0) it - (insets?.bottom ?: 0) else it } ?: 0
-                                    val scaledXDiff = (slidingLayout.width * (1f - slidingLayout.scaleX)) / 2
-                                    val scaledYDiff = (slidingLayout.height * (1f - slidingLayout.scaleY)) / 2
-                                    val navBarHeight = requireView().rootView.findViewById<LinearLayout>(R.id.navBarContainer)?.height?.takeIf { it > 0 }?.let { it - keyboardInsets } ?: (insets?.bottom ?: 0)
-                                    val newX = slidingLayout.width - (insets?.right ?: 0) - (playerLayout.width * slidingLayout.scaleX) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20F, resources.displayMetrics) * slidingLayout.scaleX)
-                                    val newY = slidingLayout.height - navBarHeight - (playerLayout.height * slidingLayout.scaleY) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 30F, resources.displayMetrics) * slidingLayout.scaleY)
-                                    moveAnimation = slidingLayout.animate().apply {
-                                        translationX(0f - scaledXDiff - ((insets?.left ?: 0) * slidingLayout.scaleX) + newX)
-                                        translationY(0f - scaledYDiff - ((insets?.top ?: 0) * slidingLayout.scaleY) + newY)
-                                        setDuration(250L)
-                                        start()
-                                    }
-                                }
+                                settleMinimizedPlayerPosition(moveFreely)
                             }
                         }
                     }
@@ -1864,8 +1822,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         val navBarHeight = requireView().rootView.findViewById<LinearLayout>(R.id.navBarContainer)?.height?.takeIf { it > 0 }?.let { it - keyboardInsets } ?: (insets?.bottom ?: 0)
                         val newX = slidingLayout.width - (insets?.right ?: 0) - (playerLayout.width * minimizedScaleX) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20F, resources.displayMetrics) * minimizedScaleX)
                         val newY = slidingLayout.height - navBarHeight - (playerHeight * minimizedScaleY) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 30F, resources.displayMetrics) * minimizedScaleY)
-                        slidingLayout.translationX = 0f - scaledXDiff - ((insets?.left ?: 0) * minimizedScaleX) + newX
-                        slidingLayout.translationY = 0f - scaledYDiff - ((insets?.top ?: 0) * minimizedScaleY) + newY
+                        slidingLayout.translationX = 0f - scaledXDiff - (playerLayout.left * minimizedScaleX) + newX
+                        slidingLayout.translationY = 0f - scaledYDiff - (playerLayout.top * minimizedScaleY) + newY
                     }
                 }
                 if (isMaximized) {
@@ -1945,8 +1903,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         val navBarHeight = requireView().rootView.findViewById<LinearLayout>(R.id.navBarContainer)?.height?.takeIf { it > 0 }?.let { it - keyboardInsets } ?: (insets?.bottom ?: 0)
                         val newX = slidingLayout.width - (insets?.right ?: 0) - (playerWidth * minimizedScaleX) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20F, resources.displayMetrics) * minimizedScaleX)
                         val newY = slidingLayout.height - navBarHeight - (playerLayout.height * minimizedScaleY) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 30F, resources.displayMetrics) * minimizedScaleY)
-                        slidingLayout.translationX = 0f - scaledXDiff - ((insets?.left ?: 0) * minimizedScaleX) + newX
-                        slidingLayout.translationY = 0f - scaledYDiff - ((insets?.top ?: 0) * minimizedScaleY) + newY
+                        slidingLayout.translationX = 0f - scaledXDiff - (playerLayout.left * minimizedScaleX) + newX
+                        slidingLayout.translationY = 0f - scaledYDiff - (playerLayout.top * minimizedScaleY) + newY
                     }
                 }
                 if (isMaximized) {
@@ -3173,6 +3131,54 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         } else 0
     }
 
+    private fun settleMinimizedPlayerPosition(moveFreely: Boolean) {
+        with(binding) {
+            if (moveFreely) {
+                val windowInsets = ViewCompat.getRootWindowInsets(requireView())
+                val insets = windowInsets?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+                val scaledXDiff = (slidingLayout.width * (1f - slidingLayout.scaleX)) / 2
+                val scaledYDiff = (slidingLayout.height * (1f - slidingLayout.scaleY)) / 2
+                val minX = 0f - scaledXDiff - (playerLayout.left * slidingLayout.scaleX) + (insets?.left ?: 0)
+                val minY = 0f - scaledYDiff - (playerLayout.top * slidingLayout.scaleY) + (insets?.top ?: 0)
+                val maxX = 0f - scaledXDiff - (playerLayout.left * slidingLayout.scaleX) + slidingLayout.width - (playerLayout.width * slidingLayout.scaleX) - (insets?.right ?: 0)
+                val maxY = 0f - scaledYDiff - (playerLayout.top * slidingLayout.scaleY) + slidingLayout.height - (playerLayout.height * slidingLayout.scaleY) - (insets?.bottom ?: 0)
+                val newX = when {
+                    slidingLayout.translationX < minX -> minX
+                    slidingLayout.translationX > maxX -> maxX
+                    else -> null
+                }
+                val newY = when {
+                    slidingLayout.translationY < minY -> minY
+                    slidingLayout.translationY > maxY -> maxY
+                    else -> null
+                }
+                if (newX != null || newY != null) {
+                    moveAnimation = slidingLayout.animate().apply {
+                        newX?.let { translationX(it) }
+                        newY?.let { translationY(it) }
+                        setDuration(250L)
+                        start()
+                    }
+                }
+            } else {
+                val windowInsets = ViewCompat.getRootWindowInsets(requireView())
+                val insets = windowInsets?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+                val keyboardInsets = windowInsets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom?.let { if (it > 0) it - (insets?.bottom ?: 0) else it } ?: 0
+                val scaledXDiff = (slidingLayout.width * (1f - slidingLayout.scaleX)) / 2
+                val scaledYDiff = (slidingLayout.height * (1f - slidingLayout.scaleY)) / 2
+                val navBarHeight = requireView().rootView.findViewById<LinearLayout>(R.id.navBarContainer)?.height?.takeIf { it > 0 }?.let { it - keyboardInsets } ?: (insets?.bottom ?: 0)
+                val newX = slidingLayout.width - (insets?.right ?: 0) - (playerLayout.width * slidingLayout.scaleX) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20F, resources.displayMetrics) * slidingLayout.scaleX)
+                val newY = slidingLayout.height - navBarHeight - (playerLayout.height * slidingLayout.scaleY) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 30F, resources.displayMetrics) * slidingLayout.scaleY)
+                moveAnimation = slidingLayout.animate().apply {
+                    translationX(0f - scaledXDiff - (playerLayout.left * slidingLayout.scaleX) + newX)
+                    translationY(0f - scaledYDiff - (playerLayout.top * slidingLayout.scaleY) + newY)
+                    setDuration(250L)
+                    start()
+                }
+            }
+        }
+    }
+
     private fun getScaleValues(): Pair<Float, Float> {
         return if (isPortrait) {
             0.5f to 0.5f
@@ -3660,8 +3666,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 val newX = slidingLayout.width - (insets?.right ?: 0) - (playerWidth * minimizedScaleX) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20F, resources.displayMetrics) * minimizedScaleX)
                 val newY = slidingLayout.height - navBarHeight - (playerLayout.height * minimizedScaleY) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 30F, resources.displayMetrics) * minimizedScaleY)
                 slidingLayout.animate().apply {
-                    translationX(0f - scaledXDiff - ((insets?.left ?: 0) * minimizedScaleX) + newX)
-                    translationY(0f - scaledYDiff - ((insets?.top ?: 0) * minimizedScaleY) + newY)
+                    translationX(0f - scaledXDiff - (playerLayout.left * minimizedScaleX) + newX)
+                    translationY(0f - scaledYDiff - (playerLayout.top * minimizedScaleY) + newY)
                     scaleX(minimizedScaleX)
                     scaleY(minimizedScaleY)
                     setDuration(250L)

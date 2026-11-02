@@ -37,6 +37,9 @@ PR/RC evidence; adding evidence must not change the frozen source tree.
   including PiP mid-pinch, clear magnification. Default-off behavior stays normal.
 - [ ] Mini-player on phone/foldable and tablet, orientation/resizing/folding,
   maximize and PiP entry/return; no device-shaped bands, clipping or stale scale.
+  Repeat in RTL on an extra-wide landscape window: minimize, reinitialize and
+  drag/release with both corner snap and free movement; check every boundary,
+  cutout/navigation/keyboard insets and restore the original layout direction.
 - [ ] Floating chat drag/resize/readability; gesture-guide rows reachable on a
   landscape phone and at enlarged text. Full-player controls remain usable.
 - [ ] Updater discovery, install permission and installer handover. When a
