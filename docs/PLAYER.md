@@ -110,6 +110,10 @@ the window's aspect ratio. Its base rectangle fits inside the sliding container
 before uniform scaling, so an extra-wide phone cannot clip the video before the
 mini-player transform. Placement uses the measured player bounds, including
 after rotation or resizing. Non-16:9 sources keep normal Fit letterboxing.
+Placement and free-movement bounds subtract the measured player child origin,
+not assumed system insets: START gravity in RTL and parent padding can move that
+origin. Reapply placement after layout so extra-wide RTL windows remain inside
+the physical corner/bounds without changing the viewport, margin or scale.
 
 `PlayerLayout.isMinimized` is synchronized by `updateFoldLayout`, including
 minimize, maximize, view initialization and PiP. It is separate from portrait
@@ -118,6 +122,9 @@ geometry. Never shrink a full landscape window as the mini-player viewport or
 use different X/Y scales; that preserves window-shaped empty bands and distorts
 the video. `PlayerMiniPlayerLayoutTest` checks native view measurements across
 phone, near-square and tablet windows and restoration of the full-player area.
+`PlayerMiniPlayerPlacementTest` drives real fragment minimize/init and production
+drag-release placement, asserting transformed Android bounds for RTL/LTR,
+extra-wide windows, padding and both orientations.
 
 ## Pinch and double-tap chat ownership
 
