@@ -68,7 +68,7 @@ class PlayerPipRequestTest {
         val host = Robolectric.buildActivity(Activity::class.java).setup().visible().get()
         val container = FrameLayout(host).also(host::setContentView)
         container.addView(harness.binding.root)
-        ReflectionHelpers.callInstanceMethod<Unit>(harness.fragment, "watchPipPresentation",
+        ReflectionHelpers.callInstanceMethod<Unit>(harness.fragment, "watchPlayerPresentation",
             ReflectionHelpers.ClassParameter.from(View::class.java, harness.binding.root))
         container.viewTreeObserver.dispatchOnGlobalLayout()
         verify(harness.fragment, atLeastOnce()).isAdded

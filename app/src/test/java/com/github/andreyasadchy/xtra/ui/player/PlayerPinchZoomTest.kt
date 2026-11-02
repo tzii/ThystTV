@@ -1,10 +1,12 @@
 package com.github.andreyasadchy.xtra.ui.player
 
 import android.app.Application
+import android.content.SharedPreferences
 import android.os.Looper
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.View
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
@@ -59,6 +61,7 @@ class PlayerPinchZoomTest {
         fragment = Mockito.mock(PlayerFragment::class.java,
             Mockito.withSettings().useConstructor().defaultAnswer(Mockito.CALLS_REAL_METHODS))
         Mockito.doReturn(context).`when`(fragment).context
+        Mockito.doReturn(activity.get()).`when`(fragment).activity
         Mockito.doReturn(android.os.Bundle()).`when`(fragment).arguments
         ReflectionHelpers.setField(fragment, "_binding", binding)
         ReflectionHelpers.setField(fragment, "displayModeStore",
@@ -71,6 +74,8 @@ class PlayerPinchZoomTest {
     }
 
     @After fun teardown() {
+        ReflectionHelpers.getField<SharedPreferences.OnSharedPreferenceChangeListener?>(fragment, "presentationPreferenceListener")
+            ?.let(prefs::unregisterOnSharedPreferenceChangeListener)
         activity.pause().stop().destroy()
     }
 
@@ -211,7 +216,11 @@ class PlayerPinchZoomTest {
         assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
     }
 
-    @Test fun `choosing fill or turning extended zoom off draws plain fill`() {
+    @Test
+    @Config(sdk = [24, 28])
+    fun `choosing fill or turning extended zoom off draws plain fill`() {
+        ReflectionHelpers.callInstanceMethod<Unit>(fragment, "watchPlayerPresentation",
+            ReflectionHelpers.ClassParameter.from(View::class.java, binding.root))
         enableExtendedZoom()
         fragment.selectDisplayMode(PlayerDisplayMode.FILL)
         idle()
@@ -223,9 +232,50 @@ class PlayerPinchZoomTest {
 
         pinch(2f, around = 800f to 700f)
         prefs.edit { putBoolean(C.PLAYER_EXTENDED_ZOOM, false) }
-        call("refreshDisplayZoom")
+        idle()
         assertSurface(scale = 1f, x = 0f, y = 0f)
         assertEquals(1f, fragment.getMagnifiedZoom(), 0f)
+        assertFalse(fragment.canPanMagnified())
+
+        // Re-enabling must not revive the old magnification and pan.
+        enableExtendedZoom()
+        idle()
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertFalse(fragment.canPanMagnified())
+    }
+
+    @Test fun `disabling extended zoom during a pinch cannot restore the crop on release`() {
+        ReflectionHelpers.callInstanceMethod<Unit>(fragment, "watchPlayerPresentation",
+            ReflectionHelpers.ClassParameter.from(View::class.java, binding.root))
+        enableExtendedZoom()
+        fragment.selectDisplayMode(PlayerDisplayMode.FILL)
+        idle()
+        pinch(2f, around = 800f to 700f)
+        arbiter.onSequenceStarted()
+        arbiter.onPointerAdded(2)
+        assertTrue(arbiter.onScaleUpdate(1.2f))
+        beginPinch(100f, center = 800f to 700f)
+        updatePinch(120f, center = 800f to 700f)
+
+        prefs.edit { putBoolean(C.PLAYER_EXTENDED_ZOOM, false) }
+        idle()
+        assertEquals(PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE, arbiter.owner)
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        updatePinch(140f, center = 800f to 700f)
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        enableExtendedZoom()
+        idle()
+        updatePinch(160f, center = 800f to 700f)
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        finishPinch(cancelled = false)
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        assertFalse(fragment.canPanMagnified())
+        assertEquals(PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE, arbiter.owner)
+        arbiter.onSequenceFinished()
+
+        // Only the old sequence is invalidated: a fresh pinch works normally.
+        pinch(2f, around = 800f to 700f)
+        assertTrue(fragment.canPanMagnified())
     }
 
     @Test fun `a cancelled pinch returns to the magnified pan`() {
