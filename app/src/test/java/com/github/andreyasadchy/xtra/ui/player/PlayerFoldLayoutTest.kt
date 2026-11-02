@@ -220,12 +220,12 @@ class PlayerFoldLayoutTest {
         }
     }
 
-    @Test fun `minimizing returns to the normal layout`() {
+    @Test fun `minimizing leaves the fold split for a 16 by 9 viewport`() {
         val harness = Harness(chatOpen = true)
         harness.fold(tabletop)
         ReflectionHelpers.setField(harness.fragment, "isMaximized", false)
         harness.fold(tabletop)
-        assertEquals(2152, harness.binding.playerLayout.height)
+        assertEquals((2076 / (16f / 9f)).toInt(), harness.binding.playerLayout.height)
     }
 
     @Test fun `the setting turns the split off`() {

@@ -94,6 +94,7 @@ class PlayerViewModel @Inject constructor(
     val integrity = MutableStateFlow<String?>(null)
 
     val streamResult = MutableStateFlow<String?>(null)
+    private var streamResultJob: Job? = null
     val stream = MutableStateFlow<Stream?>(null)
     private var streamJob: Job? = null
     var useCustomProxy = false
@@ -102,9 +103,11 @@ class PlayerViewModel @Inject constructor(
     var stopProxy = false
 
     val videoResult = MutableStateFlow<String?>(null)
+    private var videoResultJob: Job? = null
     var backupQualities: List<String>? = null
     var playbackPosition: Long? = null
     val savedPosition = MutableStateFlow<Long?>(null)
+    private var savedPositionJob: Job? = null
     val isBookmarked = MutableStateFlow<Boolean?>(null)
     val gamesList = MutableStateFlow<List<Game>?>(null)
     val videoStoryboard = MutableStateFlow<VideoStoryboard?>(null)
@@ -117,8 +120,15 @@ class PlayerViewModel @Inject constructor(
     internal var liveRewindDropped = false
 
     val clipUrls = MutableStateFlow<List<VideoQuality>?>(null)
+    private var clipUrlsJob: Job? = null
+
+    /** A saved position, playlist or clip this screen started resolving has not reached its start yet. */
+    val sourceLoading: Boolean
+        get() = listOf(savedPositionJob, savedOfflineVideoPositionJob, streamResultJob, videoResultJob, clipUrlsJob).any { it?.isActive == true } ||
+                listOf(savedPosition, savedOfflineVideoPosition, streamResult, videoResult, clipUrls).any { it.value != null }
 
     val savedOfflineVideoPosition = MutableStateFlow<Long?>(null)
+    private var savedOfflineVideoPositionJob: Job? = null
 
     var qualities: List<VideoQuality>? = null
     var quality: VideoQuality? = null
@@ -393,7 +403,7 @@ class PlayerViewModel @Inject constructor(
 
     fun loadStreamResult(networkLibrary: String?, gqlHeaders: Map<String, String>, channelLogin: String, randomDeviceId: Boolean?, xDeviceId: String?, playerType: String?, supportedCodecs: String?, proxyPlaybackAccessToken: Boolean, proxyHost: String?, proxyPort: Int?, proxyUser: String?, proxyPassword: String?, enableIntegrity: Boolean) {
         if (streamResult.value == null) {
-            viewModelScope.launch {
+            streamResultJob = viewModelScope.launch {
                 try {
                     streamResult.value = playerRepository.loadStreamPlaylistUrl(networkLibrary, gqlHeaders, channelLogin, randomDeviceId, xDeviceId, playerType, supportedCodecs, proxyPlaybackAccessToken, proxyHost, proxyPort, proxyUser, proxyPassword, enableIntegrity)
                 } catch (e: Exception) {
@@ -505,7 +515,7 @@ class PlayerViewModel @Inject constructor(
 
     fun loadVideo(networkLibrary: String?, gqlHeaders: Map<String, String>, videoId: String?, playerType: String?, supportedCodecs: String?, enableIntegrity: Boolean) {
         if (videoResult.value == null) {
-            viewModelScope.launch {
+            videoResultJob = viewModelScope.launch {
                 try {
                     val result = playerRepository.loadVideoPlaylistUrl(networkLibrary, gqlHeaders, videoId, playerType, supportedCodecs, enableIntegrity)
                     videoResult.value = result.first
@@ -520,7 +530,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun getVideoPosition(id: Long, durationSeconds: Int, thumbnailUrl: String?, explicitPosition: Long? = null) {
-        viewModelScope.launch {
+        savedPositionJob = viewModelScope.launch {
             savedPosition.value = explicitPosition ?: networkVideoResumePosition(
                 playerRepository.getVideoPosition(id)?.position,
                 durationSeconds.toLong() * 1000L,
@@ -798,7 +808,7 @@ class PlayerViewModel @Inject constructor(
 
     fun loadClip(networkLibrary: String?, gqlHeaders: Map<String, String>, id: String?, supportedCodecs: String?, enableIntegrity: Boolean) {
         if (clipUrls.value == null) {
-            viewModelScope.launch {
+            clipUrlsJob = viewModelScope.launch {
                 try {
                     clipUrls.value = playerRepository.loadClipQualities(networkLibrary, gqlHeaders, id, supportedCodecs, enableIntegrity) ?: emptyList()
                 } catch (e: Exception) {
@@ -813,7 +823,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun getOfflineVideoPosition(id: Int) {
-        viewModelScope.launch {
+        savedOfflineVideoPositionJob = viewModelScope.launch {
             val video = offlineRepository.getVideoById(id)
             savedOfflineVideoPosition.value = videoResumePosition(video?.lastWatchPosition, video?.duration)
         }

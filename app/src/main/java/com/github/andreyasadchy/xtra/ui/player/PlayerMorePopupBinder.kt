@@ -238,11 +238,15 @@ internal class PlayerMorePopupBinder(
                     },
                 )
             }.toTypedArray()
-            // A pinch zoom between Fit and Fill is listed as the current choice;
-            // picking a mode clears it.
+            // A pinch zoom between Fit and Fill, or a magnified Fill, is listed
+            // as the current choice; picking a mode clears it.
             fun choices(): Pair<Array<String>, Int> {
-                val zoom = fragment.getDisplayZoom()
-                return if (fragment.getCurrentDisplayMode() == PlayerDisplayMode.FIT && zoom > 1f) {
+                val zoom = when (fragment.getCurrentDisplayMode()) {
+                    PlayerDisplayMode.FIT -> fragment.getDisplayZoom()
+                    PlayerDisplayMode.FILL -> fragment.getMagnifiedZoom()
+                    PlayerDisplayMode.STRETCH -> 1f
+                }
+                return if (zoom > 1f) {
                     labels + context.getString(R.string.display_mode_zoom, (zoom * 100).roundToInt()) to labels.size
                 } else {
                     labels to modes.indexOf(fragment.getCurrentDisplayMode())

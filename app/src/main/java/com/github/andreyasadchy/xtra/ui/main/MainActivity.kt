@@ -166,8 +166,7 @@ class MainActivity : AppCompatActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 INTENT_START_AUDIO_ONLY -> {
-                    playerFragment?.startAudioOnly()
-                    moveTaskToBack(false)
+                    if (playerFragment?.startAudioOnly() != false) moveTaskToBack(false)
                 }
                 INTENT_PLAY_PAUSE_PLAYER -> {
                     playerFragment?.playPause()
