@@ -183,7 +183,11 @@ the fingers' midpoint and re-anchors whenever their count changes.
 The magnification is session-only and never saved. Choosing a display mode,
 minimizing, rotating to portrait, entering PiP or turning the setting off
 draws plain Fill. More → Display mode lists it as "Zoom N%". Double tap stays
-the chat action. `PinchZoomControllerTest`, `PlayerMagnifyGeometryTest` and
+the chat action. The view-owned preference observer immediately clears the
+drawn scale and pan when Extended zoom is disabled, including on API 24 and
+devices without PiP; re-enabling cannot revive the previous crop. A pinch still
+in flight cannot recommit disabled magnification. `PinchZoomControllerTest`,
+`PlayerMagnifyGeometryTest` and
 `PlayerPinchZoomTest` cover the controller, geometry, fragment surface and
 magnified pan; `PlayerGestureArbiterTest` covers the pan-to-pinch handoff.
 
