@@ -3206,6 +3206,15 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private fun watchPlayerPresentation(view: View) {
         presentationPreferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if ((key == C.PLAYER_EXTENDED_ZOOM || key == null) && !extendedZoomEnabled()) {
+                if (pinchInProgress) {
+                    // Keep the arbiter's ownership until UP, but discard this
+                    // controller's cached extended cap and eventual commit.
+                    pinchInProgress = false
+                    pinchZooming = false
+                    isSwipeGestureInProgress = false
+                    resetPinchTracking()
+                    hidePinchFeedback()
+                }
                 clearMagnification()
                 finalizePinchSurface()
             }
@@ -5152,6 +5161,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun finishPinch(cancelled: Boolean) {
+        if (!pinchInProgress) return
         pinchInProgress = false
         if (pinchZooming) {
             pinchZooming = false

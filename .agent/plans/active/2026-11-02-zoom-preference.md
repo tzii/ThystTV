@@ -45,6 +45,8 @@ Exact signed-candidate approval is a separate release gate.
 2. Register the view-owned presentation preference observer independently of PiP
    support. Clear magnification and finalize the surface when zoom is disabled.
 3. Prevent an in-flight pinch from recommitting disabled magnification.
+   Invalidate its pointer tracking without releasing arbiter ownership, so
+   further MOVE events and release cannot revive the old crop after re-enable.
 4. Run focused tests, all required Gradle checks, and review the focused diff.
 5. Keep this player fix separate from the metadata PR, preserve attributed raw
    review/dispositions outside source, and require final signed-candidate review.
@@ -52,9 +54,9 @@ Exact signed-candidate approval is a separate release gate.
 ## Verification
 
 - [x] Failure reproduced through actual SharedPreferences notification
-- [ ] API 24 and 28 regression coverage; old magnification stays cleared
-- [ ] test, assembleDebug, lintDebug, assembleRelease (unsigned local)
-- [ ] Focused diff reviewed
+- [x] API 24 and 28 regression coverage; old magnification stays cleared
+- [x] test, assembleDebug, lintDebug, assembleRelease (unsigned local)
+- [x] Focused diff reviewed
 
 Human QA required: toggle off while magnified in multi-window, return and toggle
 on again; live/VoD, switching, minimize/restore, close/reopen, PiP/background,
@@ -72,6 +74,19 @@ No new physical-device QA is claimed.
   the presentation observer independently of PiP and cleared magnification
   before finalizing geometry. Added an in-flight pinch commit guard and a
   re-enable assertion. Full required Gradle verification is running.
+- 2026-11-02: All four Gradle gates passed on 1ab96ee8d in 10m56s. A focused
+  GPT-6.1-sol/high review then found that a subsequent MOVE still used the old
+  controller cap. Reproduced this with an additional MOVE after disabling.
+  Invalidated that pinch's pointer tracking while preserving arbiter ownership
+  until the sequence ends; ignore its stale finish. Regression now includes
+  re-enable before release, retained ownership, and a working fresh pinch.
+  Full verification must pass again on this correction before merge.
+- 2026-11-02: The corrected source passed all four required Gradle gates in
+  8m47s. Actual preference notification, further MOVE while disabled, re-enable
+  before release, retained arbiter ownership and a fresh pinch all pass. The
+  focused diff was reviewed against the Sol finding. Exact signed-candidate
+  reviews and physical-device QA remain release gates; this is not a claim of
+  a new independent clean review of the later source correction.
 
 ## Decisions
 

@@ -251,17 +251,31 @@ class PlayerPinchZoomTest {
         fragment.selectDisplayMode(PlayerDisplayMode.FILL)
         idle()
         pinch(2f, around = 800f to 700f)
+        arbiter.onSequenceStarted()
+        arbiter.onPointerAdded(2)
+        assertTrue(arbiter.onScaleUpdate(1.2f))
         beginPinch(100f, center = 800f to 700f)
         updatePinch(120f, center = 800f to 700f)
 
         prefs.edit { putBoolean(C.PLAYER_EXTENDED_ZOOM, false) }
         idle()
+        assertEquals(PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE, arbiter.owner)
         assertSurface(scale = 1f, x = 0f, y = 0f)
-        finishPinch(cancelled = false)
+        updatePinch(140f, center = 800f to 700f)
+        assertSurface(scale = 1f, x = 0f, y = 0f)
         enableExtendedZoom()
         idle()
+        updatePinch(160f, center = 800f to 700f)
+        assertSurface(scale = 1f, x = 0f, y = 0f)
+        finishPinch(cancelled = false)
         assertSurface(scale = 1f, x = 0f, y = 0f)
         assertFalse(fragment.canPanMagnified())
+        assertEquals(PlayerGestureArbiter.Owner.PINCH_DISPLAY_MODE, arbiter.owner)
+        arbiter.onSequenceFinished()
+
+        // Only the old sequence is invalidated: a fresh pinch works normally.
+        pinch(2f, around = 800f to 700f)
+        assertTrue(fragment.canPanMagnified())
     }
 
     @Test fun `a cancelled pinch returns to the magnified pan`() {
