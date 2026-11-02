@@ -160,7 +160,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pipChatRequested = false
     private var pipPresentation: PlayerPipPolicy.Presentation? = null
     private var pipSupported = false
-    private var pipPreferenceListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+    private var presentationPreferenceListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     private val pipLayoutListener = ViewTreeObserver.OnGlobalLayoutListener { refreshPipPresentation() }
     private var isKeyboardShown = false
     protected var displayMode = PlayerDisplayMode.FIT
@@ -810,7 +810,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     @SuppressLint("ClickableViewAccessibility")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        watchPipPresentation(view)
+        watchPlayerPresentation(view)
         watchLiveRewindCatchUp()
         watchFoldPosture()
         with(binding) {
@@ -3203,15 +3203,20 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         return quality?.name != AUDIO_ONLY_QUALITY && quality?.name != CHAT_ONLY_QUALITY
     }
 
-    private fun watchPipPresentation(view: View) {
-        pipSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            requireActivity().packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
-        if (!pipSupported) return
-        pipPreferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+    private fun watchPlayerPresentation(view: View) {
+        presentationPreferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if ((key == C.PLAYER_EXTENDED_ZOOM || key == null) && !extendedZoomEnabled()) {
+                clearMagnification()
+                finalizePinchSurface()
+            }
             if (key == C.PLAYER_PIP_CHAT || key == C.PLAYER_PICTURE_IN_PICTURE || key == C.CHAT_DISABLE) {
                 refreshPipPresentation()
             }
         }.also { prefs.registerOnSharedPreferenceChangeListener(it) }
+        // Zoom is available from API 24 and must also update on devices without PiP.
+        pipSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            requireActivity().packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        if (!pipSupported) return
         view.addWindowGlobalLayoutListener(pipLayoutListener)
     }
 
@@ -4041,8 +4046,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun onDestroyView() {
-        pipPreferenceListener?.let { context?.prefs()?.unregisterOnSharedPreferenceChangeListener(it) }
-        pipPreferenceListener = null
+        presentationPreferenceListener?.let { context?.prefs()?.unregisterOnSharedPreferenceChangeListener(it) }
+        presentationPreferenceListener = null
         // The attached-window listener removes itself before Fragment destroys the view.
         pipSupported = false
         chatFragment?.setPipMode(false)
@@ -4789,7 +4794,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         displayMode = result.mode
         displayZoom = result.zoom
         // PiP may start mid-pinch; like leaving full screen, it ends the magnification.
-        if (result.magnification > 1f && !isPortrait && isMaximized && !isInPipMode()) {
+        if (result.magnification > 1f && extendedZoomEnabled() && !isPortrait && isMaximized && !isInPipMode()) {
             if (!cancelled) {
                 val layout = binding.playerLayout
                 val (fitWidth, fitHeight) = PlayerMagnifyGeometry.fitSize(videoAspectRatio, layout.width, layout.height)
