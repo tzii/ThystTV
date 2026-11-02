@@ -4,9 +4,20 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-10-31
+
 ### Added
-- In full-screen landscape, swipe sideways to show or hide chat (#72). On live streams the swipe works anywhere on the video; on VoDs, clips and downloads start it at the edge of the video on the chat side, so seek and speed swipes keep the rest. Swiping away from the chat side opens the side chat, swiping toward it hides side or floating chat. Turn it off in Player settings → Gestures.
-- Extended zoom (#73), off by default in Player settings → Gestures. In full-screen landscape, keep pinching past Fill's resistance to magnify up to 4× Fit, for example to read a minimap. The picture under your fingers stays under them, without moving past the edges of the video. While magnified, drag with one finger to look around. Pinch back to Fill to recenter. Zoom below Fill is unchanged and stays centered. The magnification lasts until you leave full-screen landscape or choose a display mode.
+- In full-screen landscape, swipe away from the chat side to show sidebar chat or toward it to hide side/floating chat (#72). Live accepts the swipe anywhere; seekable media uses a strip just inside the chat-side edge, preserving seek/speed swipes and system Back. Disable it in Player settings > Gestures if desired.
+- Optional Extended zoom (#73), off by default in Player settings > Gestures on Android 7+. Pinch beyond Fill to magnify a detail under your fingers and drag with one finger while magnified; pinch back to Fill to recenter. Double tap still toggles chat, and zoom below Fill is unchanged. Magnification clears on leaving full-screen landscape or choosing a display mode.
+
+### Fixed
+- Restored players avoid duplicate/lost starts and recognize retained service media, including offline background pause/audio-only behavior (#71).
+- A PiP Audio only tap during startup waits for a usable source and applies once; expanding PiP before it applies cancels the pending action (#71).
+- The mini-player uses a 16:9 viewport and uniform scale on landscape phones, foldables and tablets, preserving normal Fit bars for other source ratios (#81).
+- The gesture guide scrolls so every row remains reachable on short landscape screens.
+
+### Release metadata
+- Version 1.5.2 uses version code 17 and retains database version 36. Scope, residual limitations and upgrade guidance: `docs/release-notes/1.5.2.md`.
 
 ## [1.5.1] - 2026-10-27
 

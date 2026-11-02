@@ -1,3 +1,57 @@
+# ThystTV 1.5.2
+
+ThystTV 1.5.2 adds chat swipes and optional extended zoom with dragging, and fixes
+restored-player startup, PiP Audio only timing and mini-player sizing.
+
+## Gestures
+
+- In full-screen landscape with controls hidden, swipe away from the chat side
+  to open sidebar chat, or toward that side to hide sidebar or floating chat.
+  Live streams accept the swipe anywhere on the video. On VoDs, clips, downloads
+  and live rewind, start just inside the chat-side edge so seek and speed swipes
+  retain the rest of the picture. Android's Back-gesture area stays reserved.
+  Turn the feature off in Player settings > Gestures if desired.
+- Extended zoom is off by default in Player settings > Gestures and requires
+  Android 7 or newer. Push a pinch past Fill to magnify a detail under your
+  fingers, then drag with one finger to move around. Pinch back to Fill to
+  recenter. Double tap keeps its chat action; zoom below Fill is unchanged.
+  Magnification clears when leaving full-screen landscape or choosing a display
+  mode. While magnified, dragging moves the picture instead of seek, speed,
+  volume, brightness or chat swipes.
+- The gesture guide scrolls on short landscape screens so every row is reachable.
+
+## Player fixes
+
+- Restored players avoid duplicate loads and lost starts after process death,
+  activity recreation, or leaving while a source is still loading.
+- A restored player recognizes media retained by its service, so the first exit
+  honors pause/background-audio settings even when offline.
+- A PiP Audio only tap during startup waits until playback can switch to audio,
+  then applies once. Expanding PiP before the pending action applies cancels it.
+- The in-app mini-player keeps a 16:9 viewport and uniform scaling on landscape
+  phones, foldables and tablets, with no device-shaped empty bands or clipping
+  on wide phones. Other source ratios retain normal Fit letterboxing.
+
+## Scope and limitations
+
+Google Cast remains experimental and off by default; its live/clip and local-only
+VoD behavior is unchanged. New gesture text falls back to English where not yet
+translated. Rare pre-existing edges remain: a third finger during a pinch can
+freeze it until another finger lifts; a failed fresh load may need closing and
+reopening; recreating the player during a narrow startup window can fall back
+from an explicit VoD timestamp to the saved position. Physical Cast/TV and older
+Android behavior still need their device matrices.
+
+## Upgrading
+
+Version 1.5.2 uses version code 17 and database version 36, unchanged from 1.5.1.
+Install the official signed APK over official 1.5.1 to retain accounts, settings,
+Stats, bookmarks and downloads. Debug builds use a separate application ID.
+
+See the [APK verification guide](https://github.com/tzii/ThystTV/blob/master/docs/APK_VERIFICATION.md)
+for checksum and official signing-certificate verification.
+
+
 # ThystTV 1.5.1
 
 ThystTV 1.5.1 fixes live casting to Google TV and resuming VoDs at their saved

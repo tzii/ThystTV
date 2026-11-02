@@ -8,23 +8,25 @@ This map reflects the current expected structure. If a listed path has moved, se
 
 ThystTV is viewer-first. Protect stable playback, fast VoD controls, floating chat, local stats, large-screen layouts, and polished open-source presentation.
 
-## Current Release
+## Current Source And Release Baseline
 
 Read:
 
 - `docs/ROADMAP.md`
+- `docs/release-notes/1.5.2.md`
+- `docs/release-notes/1.5.1.md`
 - `docs/release-notes/1.5.0.md`
-- `docs/release-notes/1.4.0.md` (previous release and upgrade baseline)
 - `CHANGELOG.md`
 
-The published release is 1.5.0/code 15. It adds VoD seek previews,
-chat/performance work, bounded recovery, optional PiP chat, TV phone sign-in and
-experimental, default-off Cast. Release candidate 1.5.1/code 16 fixes live
-casting to Google TV (checked on a Chromecast with Google TV), keeps VoDs local
-with a stop-casting offer, and restores VoD resume. Authenticated TV sign-in
-remains unverified. Keep player
-lifecycle and experimental Twitch sync work separate. Follow
-`RELEASE_PROCESS.md` when preparing the next release.
+This source targets 1.5.2/code 17, based on published 1.5.1/code 16. It adds
+landscape chat swipes and optional extended zoom/pan, fixes restored starts and
+PiP Audio only timing, and keeps the mini-player 16:9 across window shapes.
+Database version remains 36. Version 1.5.1 is the upgrade baseline for the exact
+signed-candidate QA; debug acceptance does not certify a signed release APK.
+Cast stays experimental and off by default. Authenticated TV sign-in and physical
+Cast/TV coverage retain their documented limitations. Keep player lifecycle and
+experimental Twitch sync work separate. Follow `RELEASE_PROCESS.md` for candidate
+verification, reviews, exact-APK approval and publication.
 
 ## Contribution And Style Conventions
 

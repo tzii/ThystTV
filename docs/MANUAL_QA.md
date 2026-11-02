@@ -15,6 +15,36 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### 1.5.2 signed release candidate
+
+On October 31 the maintainer accepted the supplied lifecycle/mini-player debug
+builds (#80/#82). The reports did not identify every scenario/device, and those
+APKs excluded the gesture stack. They do not certify the combined signed APK.
+Record exact candidate SHA, run ID, APK hash, device and results in the release
+PR/RC evidence; adding evidence must not change the frozen source tree.
+
+- [ ] Upgrade official 1.5.1 with the exact signed 1.5.2/code17 APK; preserve
+  accounts, settings, Stats, bookmarks and downloads. Signed-in offline cold
+  start: Saved/Bookmarks/Downloads remain usable; restore networking and retry.
+- [ ] Live/VoD/download playback and resume, explicit VoD timestamps, stream
+  switching without old audio, close/reopen, speed/quality and audio-only labels.
+- [ ] The issue #71 startup/restore/offline/PiP Audio only matrix below, plus
+  minimize/restore and background/lock behavior with both audio settings.
+- [ ] Chat swipe: live anywhere; VoD edge strip preserves seek/speed, hides
+  floating chat and respects system Back. Repeat with the setting off and RTL.
+- [ ] Enable Extended zoom: pinch beyond Fill, drag, pinch back to recenter;
+  adding/lifting a second finger does not jump. Minimize, portrait and PiP,
+  including PiP mid-pinch, clear magnification. Default-off behavior stays normal.
+- [ ] Mini-player on phone/foldable and tablet, orientation/resizing/folding,
+  maximize and PiP entry/return; no device-shaped bands, clipping or stale scale.
+- [ ] Floating chat drag/resize/readability; gesture-guide rows reachable on a
+  landscape phone and at enlarged text. Full-player controls remain usable.
+- [ ] Updater discovery, install permission and installer handover. When a
+  receiver/TV is available, repeat the existing Cast/TV matrices; document gaps.
+
+Known residuals are listed in the release notes and task ExecPlans: rare
+three-finger pinch ownership, failed-load reopen and startup timestamp fallback.
+
 ### Player lifecycle races (issue #71)
 
 Required on a physical phone with the default Media3 backend:

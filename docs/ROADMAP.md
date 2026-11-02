@@ -1,18 +1,31 @@
 # Roadmap
 
-## Release candidate: 1.5.1 / code 16
+## 1.5.2 / code 17
+
+- Landscape swipe to show/hide chat, with a chat-side strip on seekable media.
+- Optional extended zoom past Fill and one-finger dragging while magnified.
+- Restored-player startup/ownership fixes and deferred PiP Audio only intent.
+- A 16:9 mini-player on landscape phones, foldables and tablets; scrollable
+  gesture-guide rows on short screens.
+
+The source is prepared for 1.5.2; database version remains 36. Publication requires
+the combined signed candidate, upgrade from official 1.5.1, exact-APK device
+approval and independent release reviews. See `release-notes/1.5.2.md`,
+`MANUAL_QA.md` and `RELEASE_PROCESS.md`; candidate evidence belongs in the release
+PR/workflow record so recording QA does not change the frozen source SHA.
+
+## Upgrade baseline: 1.5.1 / code 16 (published October 28, 2026)
 
 - Live casting fixed for Chromecast with Google TV (#62); VoDs stay on the phone.
 - "Stop casting and play here" when a VoD is opened while casting (#64).
 - VoDs and downloads resume at their saved position again (#63).
 
-Live casting, clips, live switching and disconnect were checked on a Chromecast
-with Google TV. The stop-casting offer has not been checked on a receiver. See
-`release-notes/1.5.1.md`; signed-candidate verification, independent reviews and
-exact-APK device approval are required before publication. Version 1.5.0 remains
-the published release below.
+See `release-notes/1.5.1.md` for the previous release's scope and hardware
+limitations. Live casting, clips, live switching and disconnect were checked on
+a Chromecast with Google TV during development; receiver/device limits stay
+explicit in the release QA handoff.
 
-## Current release: 1.5.0 / code 15 (published)
+## Previous release: 1.5.0 / code 15 (published)
 
 - VoD seek previews, portrait live rewind and chat/performance improvements.
 - Media3 1.11.1, bounded live recovery and background VoD/clip retries.
