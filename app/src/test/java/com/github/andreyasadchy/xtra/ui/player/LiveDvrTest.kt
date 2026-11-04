@@ -6,6 +6,7 @@ import androidx.media3.common.C
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
+import kotlin.concurrent.thread
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
@@ -24,6 +25,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.ConscryptMode
 import java.io.File
 import java.io.IOException
+import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
 @ConscryptMode(ConscryptMode.Mode.OFF)
@@ -264,6 +266,53 @@ class LiveDvrTest {
         assertEquals(0L, buffer.availableMs())
     }
 
+    @Test fun `init segments count toward the limit and go with the last video using them`() {
+        val buffer = buffer(maxBytes = 1_000)
+        (1L..12L).forEach { n ->
+            val segment = segment(n, initUrl = "https://edge.example/init$n.mp4")
+            buffer.onPlaylist(playlist(segment))
+            buffer.save(segment.initUrl!!)
+            buffer.save(segment.url)
+        }
+        val files = directory.listFiles().orEmpty().filter { it.isFile }
+        assertTrue("disk use is ${files.sumOf { it.length() }}", files.sumOf { it.length() } <= 1_000)
+        assertEquals("five pairs of video and init fit", 10, files.size)
+        assertEquals(10_000L, buffer.availableMs())
+        assertEquals(5, buffer.replayLines().count { it.startsWith("#EXT-X-MAP:") })
+    }
+
+    @Test fun `an init segment shared with newer video survives eviction of the old video`() {
+        val buffer = buffer(maxBytes = 500)
+        val init = "https://edge.example/init.mp4"
+        (1L..10L).forEach { n ->
+            val segment = segment(n, initUrl = init)
+            buffer.onPlaylist(playlist(segment))
+            if (n == 1L) buffer.save(init)
+            buffer.save(segment.url)
+        }
+        assertNull("already saved", buffer.openWriter(init))
+        val lines = buffer.replayLines()
+        assertEquals(1, lines.count { it.startsWith("#EXT-X-MAP:") })
+        assertEquals(4, lines.entries().size)
+    }
+
+    @Test fun `init segments count against a replay's hard limit`() {
+        val buffer = buffer(maxBytes = 500)
+        val first = segment(1, initUrl = "https://edge.example/init1.mp4")
+        buffer.onPlaylist(playlist(first))
+        buffer.save(first.initUrl!!)
+        buffer.save(first.url)
+        buffer.pin()
+        (2L..5L).forEach { n ->
+            val segment = segment(n, initUrl = "https://edge.example/init$n.mp4")
+            buffer.onPlaylist(playlist(segment))
+            assertTrue(buffer.canGrow())
+            buffer.save(segment.initUrl!!)
+            buffer.save(segment.url)
+        }
+        assertFalse("1,000 bytes of video and init reach twice the limit", buffer.canGrow())
+    }
+
     @Test fun `only a replay publishes a playlist`() {
         val buffer = buffer()
         buffer.saveAll(segment(1))
@@ -337,7 +386,11 @@ class LiveDvrTest {
 
     // Capture.
 
-    private class FakeSource(private val bodies: Map<String, ByteArray>, private val failing: Set<String> = emptySet()) : DataSource {
+    private class FakeSource(
+        private val bodies: Map<String, ByteArray>,
+        private val failing: Set<String> = emptySet(),
+        private val redirects: Map<String, String> = emptyMap(),
+    ) : DataSource {
         private var body: ByteArray? = null
         private var position = 0
         var closed = 0
@@ -347,7 +400,7 @@ class LiveDvrTest {
             val url = dataSpec.uri.toString()
             if (url in failing) throw IOException("offline")
             body = bodies[url] ?: throw IOException("missing $url")
-            opened = dataSpec.uri
+            opened = redirects[url]?.let(Uri::parse) ?: dataSpec.uri
             position = dataSpec.position.toInt()
             return C.LENGTH_UNSET.toLong()
         }
@@ -397,6 +450,24 @@ class LiveDvrTest {
         assertEquals(2_000L, buffer.availableMs())
     }
 
+    @Test fun `video that redirects is saved under the address its playlist lists`() {
+        val buffer = LiveDvrBuffer(directory, 100_000, minFreeBytes = 0) { Long.MAX_VALUE }
+        val listedPlaylist = "https://proxy.example/live/high.m3u8"
+        val finalPlaylist = "https://cdn.example/session/high.m3u8"
+        val listedSegment = "https://cdn.example/session/1.ts"
+        val body = "#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:1\n#EXTINF:2.000,live\n1.ts\n".toByteArray()
+        val factory = LiveDvrHlsDataSourceFactory({
+            FakeSource(
+                mapOf(listedPlaylist to body, listedSegment to ByteArray(10)),
+                redirects = mapOf(listedPlaylist to finalPlaylist, listedSegment to "https://other.example/x/1.ts"),
+            )
+        }, buffer)
+        factory.createDataSource(C.DATA_TYPE_MANIFEST).drain(listedPlaylist)
+        assertEquals("relative entries resolve from where the playlist landed", finalPlaylist, buffer.lastPlaylistUrl)
+        factory.createDataSource(C.DATA_TYPE_MEDIA).drain(listedSegment)
+        assertEquals(2_000L, buffer.availableMs())
+    }
+
     @Test fun `a load the player abandons or resumes is not saved`() {
         val buffer = buffer()
         val video = ByteArray(11) { it.toByte() }
@@ -435,6 +506,7 @@ class LiveDvrTest {
     private class Upstream(var playlistBody: String = "") : DataSource.Factory {
         val bodies = HashMap<String, ByteArray>()
         val failing = HashSet<String>()
+        val redirects = HashMap<String, String>()
         val requests = ArrayList<String>()
         var onOpen: (String) -> Unit = {}
         override fun createDataSource(): DataSource = object : DataSource {
@@ -444,7 +516,7 @@ class LiveDvrTest {
                 requests.add(dataSpec.uri.toString())
                 onOpen(dataSpec.uri.toString())
                 val all = bodies + ("https://edge.example/v1/playlist/high.m3u8" to playlistBody.toByteArray())
-                inner = FakeSource(all, failing)
+                inner = FakeSource(all, failing, redirects)
                 return inner!!.open(dataSpec)
             }
             override fun read(buffer: ByteArray, offset: Int, length: Int) = inner!!.read(buffer, offset, length)
@@ -490,6 +562,44 @@ class LiveDvrTest {
         LiveDvrRecorder(buffer, upstream, now = { currentTime }).run()
         assertTrue(buffer.replayFile.readLines().last() == "#EXT-X-ENDLIST")
         assertEquals(LiveDvrRecorder.NO_PROGRESS_LIMIT_MS, currentTime)
+    }
+
+    @Test fun `a response trickling in can't hold a replay open past the limit`() = runTest {
+        var clock = 0L
+        val buffer = LiveDvrBuffer(directory, 100_000, minFreeBytes = 0) { Long.MAX_VALUE }
+        buffer.onPlaylist(DvrPlaylistParser.parse(livePlaylist(1), base)!!)
+        buffer.save("https://edge.example/high/1.ts", 10)
+        buffer.pin()
+        buffer.publish(false)
+        val trickle = DataSource.Factory {
+            object : DataSource {
+                override fun addTransferListener(transferListener: TransferListener) {}
+                override fun open(dataSpec: DataSpec) = C.LENGTH_UNSET.toLong()
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    clock += 5_000
+                    return 1
+                }
+                override fun getUri(): Uri? = null
+                override fun close() {}
+            }
+        }
+        LiveDvrRecorder(buffer, trickle, now = { clock }).run()
+        assertEquals("#EXT-X-ENDLIST", buffer.replayFile.readLines().last())
+        assertEquals(LiveDvrRecorder.NO_PROGRESS_LIMIT_MS, clock)
+    }
+
+    @Test fun `a recorded playlist that redirects resolves its entries from where it landed`() = runTest {
+        val buffer = LiveDvrBuffer(directory, 100_000, minFreeBytes = 0) { Long.MAX_VALUE }
+        val moved = "https://moved.example/session/high.m3u8"
+        val upstream = Upstream("#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:2\n#EXTINF:2.000,live\n2.ts\n#EXT-X-ENDLIST\n")
+        upstream.redirects[base] = moved
+        upstream.bodies["https://moved.example/session/2.ts"] = ByteArray(10)
+        buffer.onPlaylist(DvrPlaylistParser.parse(livePlaylist(1), base)!!)
+        buffer.save("https://edge.example/high/1.ts", 10)
+        buffer.pin()
+        buffer.publish(false)
+        LiveDvrRecorder(buffer, upstream, now = { currentTime }).run()
+        assertEquals(2, buffer.replayFile.readLines().entries().size)
     }
 
     @Test fun `one stalled download doesn't end the replay`() = runTest {
@@ -640,6 +750,27 @@ class LiveDvrTest {
         elapse(31_000)
         assertEquals(0L, dvr.availableMs("a"))
         assertTrue("nothing left on disk", sessionDirectories().isEmpty())
+    }
+
+    @Test fun `a delete that loses the race to a new start leaves the reused capture alone`() {
+        val dvr = dvr()
+        dvr.watch("a", segment(1))
+        dvr.sourceClosed()
+        val lock = ReflectionHelpers.getField<Any>(dvr, "lock")
+        var cleanup: Thread? = null
+        synchronized(lock) {
+            // The grace period runs out on another thread, which then has to wait for this lock.
+            cleanup = thread { elapse(30_000) }
+            val deadline = System.currentTimeMillis() + 10_000
+            while (cleanup!!.state != Thread.State.BLOCKED) {
+                assertTrue("the delete never reached the lock", System.currentTimeMillis() < deadline)
+                Thread.sleep(1)
+            }
+            dvr.beginLive("a", true, megabytes, Upstream())
+        }
+        cleanup!!.join(10_000)
+        settle()
+        assertEquals(2_000L, dvr.availableMs("a"))
     }
 
     @Test fun `playing something else deletes the capture at once`() {

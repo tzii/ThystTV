@@ -10,12 +10,14 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
@@ -42,7 +44,7 @@ internal class LiveDvrRecorder(
     private val pollMs: Long = POLL_MS,
     private val noProgressLimitMs: Long = NO_PROGRESS_LIMIT_MS,
 ) {
-    private var lastProgress = 0L
+    @Volatile private var lastProgress = 0L
 
     suspend fun run() {
         lastProgress = now()
@@ -57,7 +59,7 @@ internal class LiveDvrRecorder(
                 // A failed poll is ordinary while the network recovers; the limit below handles the rest.
             }
             publishProgress()
-            if (finished || now() - lastProgress >= noProgressLimitMs) break
+            if (finished || stalled()) break
         }
         buffer.publish(true)
     }
@@ -65,8 +67,9 @@ internal class LiveDvrRecorder(
     /** True when there is nothing further to capture. */
     private suspend fun recordOnce(): Boolean {
         val url = buffer.lastPlaylistUrl ?: return true
-        val body = runInterruptible { ByteArrayOutputStream().also { read(url, MAX_PLAYLIST_BYTES, it::write) }.toString(Charsets.UTF_8.name()) }
-        val playlist = DvrPlaylistParser.parse(body, url) ?: return false
+        val body = ByteArrayOutputStream()
+        val finalUrl = runInterruptible { read(url, MAX_PLAYLIST_BYTES, body::write) }
+        val playlist = DvrPlaylistParser.parse(body.toString(Charsets.UTF_8.name()), finalUrl) ?: return false
         buffer.onPlaylist(playlist)
         for (segment in buffer.missing(playlist)) {
             if (!buffer.canGrow()) return true
@@ -77,6 +80,8 @@ internal class LiveDvrRecorder(
         }
         return playlist.ended
     }
+
+    private fun stalled() = now() - lastProgress >= noProgressLimitMs
 
     private fun publishProgress() {
         if (buffer.publish(false)) lastProgress = now()
@@ -94,15 +99,19 @@ internal class LiveDvrRecorder(
         }
     }
 
-    private fun read(url: String, limit: Long, sink: (ByteArray, Int, Int) -> Unit) {
+    /** Returns where the response really came from, which relative playlist entries resolve against. */
+    private fun read(url: String, limit: Long, sink: (ByteArray, Int, Int) -> Unit): String {
         val source = upstream.createDataSource()
         try {
             source.open(DataSpec(url.toUri()))
+            val finalUrl = source.uri?.toString() ?: url
             val chunk = ByteArray(READ_BUFFER_BYTES)
             var total = 0L
             while (true) {
+                // A response trickling in satisfies the read timeout without being any progress.
+                if (stalled()) throw IOException("No progress")
                 val read = source.read(chunk, 0, chunk.size)
-                if (read == C.RESULT_END_OF_INPUT) return
+                if (read == C.RESULT_END_OF_INPUT) return finalUrl
                 total += read
                 check(total <= limit) { "Response too large" }
                 sink(chunk, 0, read)
@@ -247,7 +256,8 @@ class LiveDvr internal constructor(cacheDir: File, private val scope: CoroutineS
         current.closing = scope.launch {
             delay(CLOSE_GRACE_MS)
             synchronized(lock) {
-                if (session === current) clearLocked()
+                // Cancelled while waiting for the lock means a new start has claimed this session.
+                if (isActive && session === current) clearLocked()
             }
         }
     }

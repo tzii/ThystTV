@@ -117,7 +117,8 @@ private class SegmentCapture(upstream: DataSource, private val buffer: LiveDvrBu
 
     override fun onOpen(dataSpec: DataSpec) {
         // A resumed or partial load holds only part of the segment, so it can't be stored.
-        writer = if (dataSpec.position == 0L && dataSpec.length == C.LENGTH_UNSET.toLong()) buffer.openWriter(url) else null
+        // Named as the playlist lists it, wherever a redirect sent the request.
+        writer = if (dataSpec.position == 0L && dataSpec.length == C.LENGTH_UNSET.toLong()) buffer.openWriter(dataSpec.uri.toString()) else null
     }
 
     override fun onData(data: ByteArray, offset: Int, length: Int) {

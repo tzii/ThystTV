@@ -448,18 +448,24 @@ default Media3 backend. On the others the buffer stays empty and only recordings
 
 - `LiveDvrHlsDataSourceFactory` tees the player's own playlist and segment loads into
   `LiveDvrBuffer`. It adds no requests while live, and capture failures never reach the
-  player. Only a segment read from its start through to its end is stored.
+  player. Only a segment read from its start through to its end is stored, under the URL
+  its playlist lists rather than wherever a redirect sent it.
 - `LiveDvrBuffer` joins bytes with playlist metadata, keeps one copy of each moment
-  across variants, and evicts the oldest video to stay under the size setting.
+  across variants, and evicts the oldest video to stay under the size setting. Init
+  segments count toward that limit and go with the last video that used them.
 - A rewind uses the buffer when it covers the request, otherwise a recording, then the
   buffer as a shorter fallback with a toast. "Watch from beginning" always tries the
-  recording first. It reuses the single-player VoD handoff through `LiveRewind.LOCAL`.
+  recording first. It reuses the single-player VoD handoff through `LiveRewind.LOCAL`, and
+  needs no connection to start. A replay prepared just as the viewer minimizes or leaves is
+  cancelled, so the buffer goes back to evicting.
 - Pinning (`pin`) stops eviction and makes the playlist append-only, because a player
   holding an EVENT playlist needs the listed segments to stay in place.
 - `LiveDvrRecorder` keeps a replay's playlist growing, since nothing else fetches new
   video then. Each saved segment is published at once. If the stream ends, nothing new
   arrives for 60 seconds, or the buffer reaches twice its size, it closes the playlist with
-  ENDLIST and playback returns to live at the end. A viewer who reaches the end of the saved
+  ENDLIST and playback returns to live at the end. The 60 seconds also bounds a response
+  that trickles in without finishing. A replay that ended during background audio returns to
+  live once its screen is resumed and maximized. A viewer who reaches the end of the saved
   video during a shorter drop gets Exo's stuck-playlist error (3.5 target durations, 21s),
   which also returns to live. Losing the network doesn't stop a replay the way it stops a
   VoD, since the video is on disk.
@@ -479,7 +485,9 @@ Known limits: ads are saved as they played; replay chat stays live; pausing or c
 leaves a gap; the rewind distance is measured from the newest saved segment, a few seconds
 ahead of the viewer's position; a process death ends the replay and returns to live; a
 replay that falls back to live while offline starts a new buffer if the player stays blank
-past the 30-second grace period, since nothing starts until the network returns.
+past the 30-second grace period, since nothing starts until the network returns; changing
+the player backend during a session makes the next rewind fail back to live, since only the
+default backend plays a local replay.
 
 ## VoD seek previews
 

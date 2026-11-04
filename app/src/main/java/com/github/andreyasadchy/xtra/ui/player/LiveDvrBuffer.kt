@@ -151,6 +151,7 @@ internal class LiveDvrBuffer(
 ) {
     private class Stored(val segment: DvrSegment, val playlistUrl: String, val file: File, val bytes: Long)
     private class Unjoined(val file: File, val bytes: Long)
+    private class StoredInit(val file: File, val bytes: Long)
 
     private val lock = Any()
     private val entries = ArrayList<Stored>()
@@ -158,7 +159,7 @@ internal class LiveDvrBuffer(
     private val awaitingBytes = LinkedHashMap<String, Pair<DvrSegment, String>>()
     private val awaitingPlaylist = LinkedHashMap<String, Unjoined>()
     private val initUrls = HashSet<String>()
-    private val inits = HashMap<String, File>()
+    private val inits = HashMap<String, StoredInit>()
     private var nextFile = 0L
     private var totalBytes = 0L
     private var totalMs = 0L
@@ -209,8 +210,11 @@ internal class LiveDvrBuffer(
                 awaitingBytes[segment.url] = segment to playlist.url
             }
         }
-        while (awaitingBytes.size > MAX_AWAITING_BYTES) {
-            awaitingBytes.remove(awaitingBytes.keys.first())
+        if (awaitingBytes.size > MAX_AWAITING_BYTES) {
+            while (awaitingBytes.size > MAX_AWAITING_BYTES) {
+                awaitingBytes.remove(awaitingBytes.keys.first())
+            }
+            dropUnusedInits()
         }
     }
 
@@ -233,7 +237,13 @@ internal class LiveDvrBuffer(
             return@synchronized
         }
         if (url in initUrls) {
-            if (inits.containsKey(url)) target.delete() else inits[url] = target
+            if (inits.containsKey(url)) {
+                target.delete()
+            } else {
+                inits[url] = StoredInit(target, bytes)
+                totalBytes += bytes
+                evict()
+            }
             return@synchronized
         }
         val described = awaitingBytes.remove(url)
@@ -274,9 +284,25 @@ internal class LiveDvrBuffer(
 
     private fun evict() {
         if (pinned) return
+        val before = entries.size
         while (entries.size > 1 && (totalBytes > maxBytes || freeBytes() < minFreeBytes)) {
             forget(entries.removeAt(0))
         }
+        if (entries.size != before) dropUnusedInits()
+    }
+
+    /** An init segment stays only while saved video, or video on its way, plays with it. */
+    private fun dropUnusedInits() {
+        val used = HashSet<String>()
+        entries.mapNotNullTo(used) { it.segment.initUrl }
+        awaitingBytes.values.mapNotNullTo(used) { it.first.initUrl }
+        inits.keys.filter { it !in used }.forEach { url ->
+            inits.remove(url)?.let {
+                it.file.delete()
+                totalBytes -= it.bytes
+            }
+        }
+        initUrls.retainAll(used)
     }
 
     private fun forget(entry: Stored) {
@@ -308,7 +334,11 @@ internal class LiveDvrBuffer(
         recoverIfCleared()
         pinned = true
         // Clearing a cache can also remove just some of its files.
-        inits.values.removeAll { !it.exists() }
+        inits.values.removeAll { init ->
+            val gone = !init.file.exists()
+            if (gone) totalBytes -= init.bytes
+            gone
+        }
         entries.removeAll { entry ->
             val unplayable = !entry.file.exists() || entry.segment.initUrl.let { it != null && it !in inits }
             if (unplayable) forget(entry)
@@ -358,7 +388,7 @@ internal class LiveDvrBuffer(
             val segment = entry.segment
             if (previous != null && startsNewTimeline(previous, entry)) text.append("#EXT-X-DISCONTINUITY\n")
             if (segment.initUrl != previous?.segment?.initUrl) {
-                segment.initUrl?.let { text.append("#EXT-X-MAP:URI=\"").append(inits.getValue(it).name).append("\"\n") }
+                segment.initUrl?.let { text.append("#EXT-X-MAP:URI=\"").append(inits.getValue(it).file.name).append("\"\n") }
             }
             text.append("#EXTINF:").append(String.format(Locale.ROOT, "%.3f", segment.durationMs / 1000.0)).append(",\n")
                 .append(entry.file.name).append('\n')
@@ -414,7 +444,7 @@ internal class LiveDvrBuffer(
 
         /**
          * Android starts clearing every app's cache when free space falls below 150% of its
-         * low-storage threshold, which is 750 MB at most. This buffer must never cause that.
+         * low-storage threshold, which comes to 750 MB at most. This buffer must never cause that.
          */
         const val DEFAULT_MIN_FREE_BYTES = 1024L * 1024 * 1024
         const val PINNED_CEILING_FACTOR = 2L

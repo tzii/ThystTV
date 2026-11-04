@@ -503,6 +503,8 @@ live and replay on the default player at both a high and low quality.
   with no stuck-playlist error. Airplane mode for about 20 seconds at least a minute behind
   live: the replay keeps playing and carries on saving afterwards. End of stream, or
   airplane mode for over a minute: it plays what's saved, then returns to live with a message.
+  Airplane mode first, then Rewind > Watch last minute: the replay starts from disk and is
+  still playing after 30 seconds.
 - [ ] Quality: change it during live, then rewind across the change. Pictures continue
   with no error. The replay's quality menu shows a sensible label or stays hidden.
 - [ ] Replay controls: Download and Bookmark are hidden, Create clip isn't offered, the
@@ -510,7 +512,8 @@ live and replay on the default player at both a high and low quality.
 - [ ] Rewind then Go live repeatedly: it keeps the buffer. Stream switching replaces it.
   Close the player: `cache/live-dvr` empties within about 30 seconds. VoD or clip: at once.
 - [ ] Minimize, restore, PiP, background and rotate during replay and at its end. A replay
-  that ended while minimized returns to live on restore, never in the background.
+  that ended while minimized returns to live on restore, never in the background. Let one
+  end during background audio, then reopen the app: it returns to live.
 - [ ] Kill the app during replay and reopen: no crash, and the leftover folder is removed
   by the next stream. Clear the app's cache from Android settings during live, then rewind
   after a minute: only the new video is offered. During replay: it returns to live.
@@ -518,7 +521,8 @@ live and replay on the default player at both a high and low quality.
   playback stays unaffected, and the device's cache isn't cleared.
 - [ ] Each buffer size holds roughly the stated time at 1080p. Disk use settles near the
   setting while live, and at most doubles during a long replay.
-- [ ] ExoPlayer and MediaPlayer backends: no capture, and recordings still work.
+- [ ] ExoPlayer and MediaPlayer backends: no capture, and recordings still work. Switch to
+  MediaPlayer with video already saved, then rewind: it returns to live with a message.
 
 ### VoD seek previews (performance stack)
 
