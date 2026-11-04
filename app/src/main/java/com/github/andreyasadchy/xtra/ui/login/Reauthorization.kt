@@ -214,8 +214,7 @@ internal object ClipAuthorization {
             throw cancelled
         } catch (failure: Exception) {
             if (load(prefs) != credentials) throw ClipGrantChanged()
-            // The request may have outlasted the token, and using it then would lose the grant.
-            if (now() < credentials.expiresAt) return credentials
+            // Even with time left: if the token expired mid-request, the 401 would lose a grant whose refresh token still works.
             throw failure
         }
         val renewed = fromGrant(credentials.clientId, response, now(), credentials.refreshToken)

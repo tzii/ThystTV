@@ -301,12 +301,13 @@ class ReauthorizationTest {
         assertNull(ClipAuthorization.load(prefs))
     }
 
-    @Test fun `a network failure keeps the grant and uses the token if it still works`() = runTest {
+    @Test fun `a network failure keeps the grant and is reported, even with time left on the token`() = runTest {
         ClipAuthorization.save(prefs, credentials)
-        assertEquals(credentials, ClipAuthorization.current(prefs, { 950_000L }) { throw IOException("offline") })
-        val failure = runCatching { ClipAuthorization.current(prefs, { 2_000_000L }) { throw IOException("offline") } }.exceptionOrNull()
-        assertTrue(failure is IOException)
-        assertEquals("kept for the next attempt", credentials, ClipAuthorization.load(prefs))
+        for (time in listOf(950_000L, 2_000_000L)) {
+            val failure = runCatching { ClipAuthorization.current(prefs, { time }) { throw IOException("offline") } }.exceptionOrNull()
+            assertTrue(failure is IOException)
+            assertEquals("kept for the next attempt", credentials, ClipAuthorization.load(prefs))
+        }
     }
 
     @Test fun `cancelling a refresh is not treated as a network failure`() {
