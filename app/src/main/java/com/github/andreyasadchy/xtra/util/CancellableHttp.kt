@@ -56,6 +56,8 @@ internal class CancellableHttp(
                     }.build()
                     continuation.invokeOnCancellation { request.cancel() }
                     request.start()
+                    // A cancel that came before the start might not have counted.
+                    if (continuation.isCancelled) request.cancel()
                 }
                 HttpResult(response.first.httpStatusCode, String(response.second))
             }
@@ -68,6 +70,7 @@ internal class CancellableHttp(
                     }.build()
                     continuation.invokeOnCancellation { request.cancel() }
                     request.start()
+                    if (continuation.isCancelled) request.cancel()
                 }
                 HttpResult(response.first.httpStatusCode, String(response.second))
             }

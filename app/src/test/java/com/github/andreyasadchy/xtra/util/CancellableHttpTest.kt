@@ -1,11 +1,16 @@
 package com.github.andreyasadchy.xtra.util
 
+import dagger.Lazy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
+import org.chromium.net.CronetEngine
+import org.chromium.net.UrlRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,6 +24,11 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.system.measureTimeMillis
+import org.mockito.kotlin.any
+import org.mockito.kotlin.inOrder
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 
 class CancellableHttpTest {
     private val executor = Executors.newSingleThreadExecutor()
@@ -29,6 +39,26 @@ class CancellableHttpTest {
     @After fun tearDown() {
         server.close()
         executor.shutdownNow()
+    }
+
+    @Test fun `a native request cancelled while it is built is cancelled again once started`() = runBlocking {
+        val request = mock<UrlRequest>()
+        val builder = mock<UrlRequest.Builder>()
+        val engine = mock<CronetEngine>()
+        whenever(engine.newUrlRequestBuilder(any(), any(), any())).thenReturn(builder)
+        whenever(builder.build()).thenReturn(request)
+        lateinit var job: Job
+        whenever(builder.setHttpMethod(any())).thenAnswer {
+            job.cancel()
+            builder
+        }
+        val native = CancellableHttp(null, Lazy { engine }, executor, OkHttpClient())
+        job = launch { native.execute("Cronet", url) }
+        job.join()
+        inOrder(request) {
+            verify(request).start()
+            verify(request).cancel()
+        }
     }
 
     /** Accept one request, leave it unanswered, and report when the client hangs up. */
