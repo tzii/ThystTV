@@ -348,6 +348,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         BundleCompat.getParcelable(it, LiveRewind.ORIGIN, Stream::class.java)
     }
 
+    /** Twitch needs the broadcaster's id, and a stream opened by login alone may not have one. */
+    internal fun canCreateClip(): Boolean =
+        videoType == STREAM && !requireArguments().getString(KEY_CHANNEL_ID).isNullOrBlank()
+
     internal fun createClip() {
         val context = requireContext()
         val channelId = requireArguments().getString(KEY_CHANNEL_ID)
@@ -417,7 +421,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             grant = {
                 ClipAuthorization.current(
                     tokenPrefs,
-                    System.currentTimeMillis(),
+                    System::currentTimeMillis,
                     discard = { auth.revokeInBackground(networkLibrary, RevokeTarget(it.clientId, it.token).body) },
                 ) {
                     auth.refreshToken(networkLibrary, it.clientId, it.refreshToken.orEmpty())
@@ -679,7 +683,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         val show = !isRemotePlayback() && LiveRewind.shouldShowFullscreenLiveRewind(videoType, liveRewindOrigin() != null, isMaximized)
         binding.playerControls.bindLiveRewindButton(show, isPortrait) { showLiveRewindOptions() }
         // Shares the rewind row, which is what keeps it clear of the uptime and viewer counts.
-        binding.playerControls.createClipButton.isVisible = show && requireContext().prefs().getBoolean(C.PLAYER_CLIP_BUTTON, false)
+        binding.playerControls.createClipButton.isVisible = show && canCreateClip() && requireContext().prefs().getBoolean(C.PLAYER_CLIP_BUTTON, false)
         binding.playerControls.createClipButton.setOnClickListener { createClip() }
     }
 

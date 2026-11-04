@@ -170,6 +170,15 @@ class ClipResultDialogTest {
         assertEquals(12f, dialog()!!.findViewById<Slider>(R.id.clipDuration)!!.value)
     }
 
+    @Test fun `a stream with no channel id offers no clip`() {
+        doReturn(Bundle().apply { putString("channelLogin", "caster") }).whenever(fragment).requireArguments()
+        assertFalse(fragment.canCreateClip())
+        doReturn(Bundle().apply { putString("channelId", "channel") }).whenever(fragment).requireArguments()
+        assertTrue(fragment.canCreateClip())
+        ReflectionHelpers.setField(fragment, "videoType", PlayerFragment.VIDEO)
+        assertFalse(fragment.canCreateClip())
+    }
+
     private fun resumePending(pending: PendingClip): PendingClip? {
         val model = model
         var stored: PendingClip? = pending

@@ -55,7 +55,7 @@ internal class PlayerMorePopupBinder(
             if (videoType == PlayerFragment.STREAM) {
                 menuLiveRewind.visibility = View.VISIBLE
                 menuLiveRewind.setOnClickListener { dismissThen(fragment::showLiveRewindOptions) }
-                if (prefs.getBoolean(C.PLAYER_MENU_CLIP, true)) {
+                if (fragment.canCreateClip() && prefs.getBoolean(C.PLAYER_MENU_CLIP, true)) {
                     menuCreateClip.visibility = View.VISIBLE
                     menuCreateClip.setOnClickListener { dismissThen(fragment::createClip) }
                 }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.SerializationException
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -326,7 +327,7 @@ class ReauthorizationTest {
         assertNull(ReflectionHelpers.getField<ClipCredentials?>(other, "clipCredentials"))
     }
 
-    @Test fun `a lost connection while validating keeps the clip approval, a refusal does not`() = runTest {
+    @Test fun `only a clear answer rejects a clip approval, not a lost connection or an error page`() = runTest {
         val repository = mock<AuthRepository>()
         val activity = LoginActivity().apply { authRepository = repository }
         whenever(repository.getToken(anyOrNull(), any())).thenReturn(TokenResponse("device-access", refreshToken = "device-refresh", expiresInSeconds = 14_000L))
@@ -336,6 +337,15 @@ class ReauthorizationTest {
             activity.checkClipDeviceApproval("OkHttp", "client", "private-code"),
         )
         assertEquals("device-refresh", ReflectionHelpers.getField<ClipCredentials?>(activity, "clipCredentials")?.refreshToken)
+
+        val unreadable = LoginActivity().apply { authRepository = repository }
+        reset(repository)
+        whenever(repository.getToken(anyOrNull(), any())).thenReturn(TokenResponse("device-access", refreshToken = "device-refresh", expiresInSeconds = 14_000L))
+        whenever(repository.validate(anyOrNull(), any())).thenThrow(SerializationException("a 503 page"))
+        assertEquals(
+            DeviceCodeLoginController.Approval.Token("device-access"),
+            unreadable.checkClipDeviceApproval("OkHttp", "client", "private-code"),
+        )
 
         val refused = LoginActivity().apply { authRepository = repository }
         reset(repository)

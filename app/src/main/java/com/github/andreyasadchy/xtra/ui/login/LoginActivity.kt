@@ -45,7 +45,6 @@ import com.google.android.material.slider.Slider
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import dagger.hilt.android.AndroidEntryPoint
-import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -681,17 +680,16 @@ class LoginActivity : AppCompatActivity() {
     }
 
     /**
-     * Twitch just issued this token and its code works only once, so a lost connection must not
-     * cost the viewer their approval. A token that turns out to be bad is refused when used.
+     * Twitch just issued this token and its code works only once, so only a clear answer rejects
+     * it: a refusal, or a token for another app. Anything inconclusive, such as a lost connection
+     * or a 503, must not cost the viewer their approval. A bad token is refused when used.
      */
     private suspend fun clipGrantUsable(networkLibrary: String?, clientId: String, token: String): Boolean = try {
         authRepository.validate(networkLibrary, TwitchApiHelper.addTokenPrefixHelix(token)).clientId == clientId
-    } catch (_: IOException) {
-        true
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (_: Exception) {
-        false
+    } catch (failure: Exception) {
+        !(failure is IllegalStateException && failure.message == "401")
     }
 
     private fun deviceApprovalStatus(message: String?): DeviceCodeLoginController.Approval = when (message) {
