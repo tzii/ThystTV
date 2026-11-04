@@ -71,6 +71,13 @@ class LoginActivity : AppCompatActivity() {
     private var checkUrl = false
     private var deviceCodeController: DeviceCodeLoginController? = null
     private var renderedDeviceCode: String? = null
+    private var clipCredentials: ClipCredentials? = null
+
+    private val reauthorize get() = intent?.getBooleanExtra(EXTRA_REAUTHORIZE, false) == true
+    private val clipDeviceAuth get() = intent?.getBooleanExtra(EXTRA_CLIP_DEVICE_AUTH, false) == true
+
+    /** These modes add permissions, so the sign-in stays in place unless they finish successfully. */
+    private val preservesSignIn get() = reauthorize || clipDeviceAuth
 
     private lateinit var binding: ActivityLoginBinding
 
@@ -98,40 +105,32 @@ class LoginActivity : AppCompatActivity() {
             val gqlHeaders = TwitchApiHelper.getGQLHeaders(this@LoginActivity, true)
             val oldGQLToken = gqlHeaders[C.HEADER_TOKEN]?.removePrefix("OAuth ")
             val oldGQLWebToken = tokenPrefs().getString(C.GQL_TOKEN_WEB, null)
-            if (!oldGQLToken.isNullOrBlank() || !oldHelixToken.isNullOrBlank()) {
-                TwitchApiHelper.checkedValidation = false
-                tokenPrefs().edit {
-                    putString(C.TOKEN, null)
-                    putString(C.GQL_HEADERS, null)
-                    putLong(C.INTEGRITY_EXPIRATION, 0)
-                    putString(C.GQL_TOKEN2, null)
-                    putString(C.GQL_TOKEN_WEB, null)
-                    putString(C.USER_ID, null)
-                    putString(C.USERNAME, null)
+            if (!preservesSignIn) {
+                ClipAuthorization.load(tokenPrefs())?.let { clip ->
+                    ClipAuthorization.clear(tokenPrefs())
+                    authRepository.revokeInBackground(networkLibrary, RevokeTarget(clip.clientId, clip.token).body)
                 }
-                lifecycleScope.launch {
+                if (!oldGQLToken.isNullOrBlank() || !oldHelixToken.isNullOrBlank()) {
+                    TwitchApiHelper.checkedValidation = false
+                    tokenPrefs().edit {
+                        putString(C.TOKEN, null)
+                        putString(C.GQL_HEADERS, null)
+                        putLong(C.INTEGRITY_EXPIRATION, 0)
+                        putString(C.GQL_TOKEN2, null)
+                        putString(C.GQL_TOKEN_WEB, null)
+                        putString(C.USER_ID, null)
+                        putString(C.USERNAME, null)
+                    }
                     if (!helixClientId.isNullOrBlank() && !oldHelixToken.isNullOrBlank()) {
-                        try {
-                            authRepository.revoke(networkLibrary, "client_id=${helixClientId}&token=${oldHelixToken}")
-                        } catch (e: Exception) {
-
-                        }
+                        authRepository.revokeInBackground(networkLibrary, RevokeTarget(helixClientId, oldHelixToken).body)
                     }
                     val gqlClientId = gqlHeaders[C.HEADER_CLIENT_ID]
                     if (!gqlClientId.isNullOrBlank() && !oldGQLToken.isNullOrBlank() && oldGQLToken != oldGQLWebToken) {
-                        try {
-                            authRepository.revoke(networkLibrary, "client_id=${gqlClientId}&token=${oldGQLToken}")
-                        } catch (e: Exception) {
-
-                        }
+                        authRepository.revokeInBackground(networkLibrary, RevokeTarget(gqlClientId, oldGQLToken).body)
                     }
                     val gqlWebClientId = prefs().getString(C.GQL_CLIENT_ID_WEB, "kimne78kx3ncx6brgo4mv6wki5h1ko")
                     if (!gqlWebClientId.isNullOrBlank() && !oldGQLWebToken.isNullOrBlank()) {
-                        try {
-                            authRepository.revoke(networkLibrary, "client_id=${gqlWebClientId}&token=${oldGQLWebToken}")
-                        } catch (e: Exception) {
-
-                        }
+                        authRepository.revokeInBackground(networkLibrary, RevokeTarget(gqlWebClientId, oldGQLWebToken).body)
                     }
                 }
             }
@@ -141,7 +140,7 @@ class LoginActivity : AppCompatActivity() {
                     putString(C.GQL_REDIRECT2, "https://www.twitch.tv/settings/connections")
                 }
             }
-            val apiSetting = prefs().getString(C.API_LOGIN, "0")?.toInt() ?: 0
+            val apiSetting = if (reauthorize) API_HELIX_ONLY else prefs().getString(C.API_LOGIN, "0")?.toInt() ?: 0
             val helixRedirect = prefs().getString(C.HELIX_REDIRECT, "https://localhost")
             val helixScopes = listOf(
                 "channel:edit:commercial", // channels/commercial
@@ -175,7 +174,7 @@ class LoginActivity : AppCompatActivity() {
             textZoom.visibility = View.VISIBLE
             havingTrouble.visibility = View.VISIBLE
             setupButtons(networkLibrary, helixClientId, helixAuthUrl)
-            if (isTelevision()) {
+            if (isTelevision() && !preservesSignIn) {
                 deviceCodeLogin.visibility = View.VISIBLE
                 deviceCodeLogin.setOnClickListener {
                     getAlertDialogBuilder()
@@ -190,7 +189,9 @@ class LoginActivity : AppCompatActivity() {
                 havingTrouble.isClickable = true
                 deviceCodeLogin.requestFocus()
             }
-            CookieManager.getInstance().removeAllCookies(null)
+            if (!preservesSignIn) {
+                CookieManager.getInstance().removeAllCookies(null)
+            }
             val isLightTheme = obtainStyledAttributes(intArrayOf(androidx.appcompat.R.attr.isLightTheme)).use {
                 it.getBoolean(0, false)
             }
@@ -336,12 +337,16 @@ class LoginActivity : AppCompatActivity() {
                     }
                 }
             }
-            if (apiSetting == 1) {
-                readHeaders = true
-                webView.loadUrl("https://www.twitch.tv/login")
-            } else {
-                checkUrl = true
-                webView.loadUrl(helixAuthUrl)
+            when {
+                clipDeviceAuth -> setupExternalCodeLogin(networkLibrary, helixClientId, helixAuthUrl)
+                apiSetting == 1 -> {
+                    readHeaders = true
+                    webView.loadUrl("https://www.twitch.tv/login")
+                }
+                else -> {
+                    checkUrl = true
+                    webView.loadUrl(helixAuthUrl)
+                }
             }
         }
     }
@@ -391,7 +396,10 @@ class LoginActivity : AppCompatActivity() {
                                 if (!token.isNullOrBlank()) {
                                     lifecycleScope.launch {
                                         val valid = validateHelixToken(networkLibrary, helixClientId, token)
-                                        if (valid) {
+                                        if (valid && reauthorize) {
+                                            helixToken = token
+                                            done()
+                                        } else if (valid) {
                                             helixToken = token
                                             var getTvToken = false
                                             this@LoginActivity.getAlertDialogBuilder()
@@ -585,8 +593,12 @@ class LoginActivity : AppCompatActivity() {
         readHeaders = false
         readHeaders2 = false
         checkUrl = false
-        val clientId = prefs().getString(C.GQL_CLIENT_ID2, "ue6666qo983tsx6so1t0vnawi233wa")
+        val clientId = if (clipDeviceAuth) helixClientId else prefs().getString(C.GQL_CLIENT_ID2, "ue6666qo983tsx6so1t0vnawi233wa")
         val panel = binding.deviceCodePane
+        if (clipDeviceAuth) {
+            panel.browserSignIn.isVisible = false
+            panel.codeInstructions.setText(R.string.clip_device_instructions)
+        }
         panel.codeText.isFocusable = !isTelevision()
         panel.copyCode.isVisible = !isTelevision()
         panel.browserSignIn.setOnClickListener {
@@ -611,11 +623,17 @@ class LoginActivity : AppCompatActivity() {
         }
         val controller = DeviceCodeLoginController(lifecycleScope, SystemClock::elapsedRealtime,
             request = {
-                authRepository.getDeviceCode(networkLibrary,
-                    "client_id=${URLEncoder.encode(clientId, "UTF-8")}&scopes=channel_read+chat%3Aread+user_blocks_edit+user_blocks_read+user_follows_edit+user_read")
+                val scopes = if (clipDeviceAuth) URLEncoder.encode(ClipAuthorization.SCOPES, "UTF-8") else "channel_read+chat%3Aread+user_blocks_edit+user_blocks_read+user_follows_edit+user_read"
+                authRepository.getDeviceCode(networkLibrary, "client_id=${URLEncoder.encode(clientId, "UTF-8")}&scopes=$scopes")
             },
-            check = { code -> checkDeviceApproval(networkLibrary, clientId, code) },
+            check = { code ->
+                if (clipDeviceAuth) checkClipDeviceApproval(networkLibrary, clientId, code) else checkDeviceApproval(networkLibrary, clientId, code)
+            },
             authorized = { token ->
+                if (clipDeviceAuth) {
+                    finishClipAuthorization()
+                    return@DeviceCodeLoginController
+                }
                 if (token != null) {
                     gqlClientId = clientId
                     gqlToken = token
@@ -640,13 +658,38 @@ class LoginActivity : AppCompatActivity() {
             if (!helixToken.isNullOrBlank()) return DeviceCodeLoginController.Approval.ExistingAccount
             throw DeviceCodeLoginController.Rejected(DeviceCodeLoginController.Failure.VALIDATION_FAILED)
         }
-        return when (response.message) {
-            "authorization_pending" -> DeviceCodeLoginController.Approval.Pending
-            "access_denied" -> throw DeviceCodeLoginController.Rejected(DeviceCodeLoginController.Failure.DENIED)
-            "expired_token" -> throw DeviceCodeLoginController.CodeExpired()
-            "invalid device code", "invalid_device_code" -> throw DeviceCodeLoginController.Rejected(DeviceCodeLoginController.Failure.INVALID_CODE)
-            else -> throw java.io.IOException("Device approval failed")
+        return deviceApprovalStatus(response.message)
+    }
+
+    /** Approves the separate clip grant without replacing any stored sign-in. */
+    internal suspend fun checkClipDeviceApproval(networkLibrary: String?, clientId: String?, code: String): DeviceCodeLoginController.Approval {
+        val response = authRepository.getToken(networkLibrary,
+            "client_id=${URLEncoder.encode(clientId, "UTF-8")}&scopes=${URLEncoder.encode(ClipAuthorization.SCOPES, "UTF-8")}&device_code=${URLEncoder.encode(code, "UTF-8")}&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code")
+        val token = response.token
+        if (!token.isNullOrBlank()) {
+            if (clientId.isNullOrBlank() || !validateHelixToken(networkLibrary, clientId, token)) {
+                throw DeviceCodeLoginController.Rejected(DeviceCodeLoginController.Failure.VALIDATION_FAILED)
+            }
+            clipCredentials = ClipAuthorization.fromGrant(clientId, response, System.currentTimeMillis())
+            return DeviceCodeLoginController.Approval.Token(token)
         }
+        return deviceApprovalStatus(response.message)
+    }
+
+    private fun deviceApprovalStatus(message: String?): DeviceCodeLoginController.Approval = when (message) {
+        "authorization_pending" -> DeviceCodeLoginController.Approval.Pending
+        "access_denied" -> throw DeviceCodeLoginController.Rejected(DeviceCodeLoginController.Failure.DENIED)
+        "expired_token" -> throw DeviceCodeLoginController.CodeExpired()
+        "invalid device code", "invalid_device_code" -> throw DeviceCodeLoginController.Rejected(DeviceCodeLoginController.Failure.INVALID_CODE)
+        else -> throw java.io.IOException("Device approval failed")
+    }
+
+    private fun finishClipAuthorization() {
+        clipCredentials?.let {
+            ClipAuthorization.save(tokenPrefs(), it)
+            setResult(RESULT_OK)
+        }
+        finish()
     }
 
     private fun renderDeviceCode(state: DeviceCodeLoginController.State) {
@@ -754,7 +797,42 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
+    private fun finishReauthorization() {
+        val newToken = helixToken
+        if (newToken.isNullOrBlank()) {
+            finish()
+            return
+        }
+        val networkLibrary = prefs().getString(C.NETWORK_LIBRARY, "OkHttp")
+        val helixHeaders = TwitchApiHelper.getHelixHeaders(this)
+        val gqlHeaders = TwitchApiHelper.getGQLHeaders(this, true)
+        val plan = Reauthorization.plan(
+            CurrentSignIn(
+                helixClientId = helixHeaders[C.HEADER_CLIENT_ID],
+                helixToken = helixHeaders[C.HEADER_TOKEN]?.removePrefix("Bearer "),
+                gqlClientId = gqlHeaders[C.HEADER_CLIENT_ID],
+                gqlToken = gqlHeaders[C.HEADER_TOKEN]?.removePrefix("OAuth "),
+                gqlWebClientId = prefs().getString(C.GQL_CLIENT_ID_WEB, "kimne78kx3ncx6brgo4mv6wki5h1ko"),
+                gqlWebToken = tokenPrefs().getString(C.GQL_TOKEN_WEB, null),
+                userId = tokenPrefs().getString(C.USER_ID, null),
+                login = tokenPrefs().getString(C.USERNAME, null),
+            ),
+            newToken,
+            userId,
+            userLogin,
+        )
+        TwitchApiHelper.checkedValidation = true
+        Reauthorization.commit(tokenPrefs(), plan, newToken, userId, userLogin)
+        plan.revoke.forEach { authRepository.revokeInBackground(networkLibrary, it.body) }
+        setResult(RESULT_OK, Intent().putExtra(EXTRA_ACCOUNT_CHANGED, plan.accountChanged))
+        finish()
+    }
+
     private fun done() {
+        if (reauthorize) {
+            finishReauthorization()
+            return
+        }
         if (!gqlToken.isNullOrBlank() || !helixToken.isNullOrBlank()) {
             TwitchApiHelper.checkedValidation = true
             prefs().edit {
@@ -781,6 +859,19 @@ class LoginActivity : AppCompatActivity() {
         }
         setResult(RESULT_OK)
         finish()
+    }
+
+    companion object {
+        /** Ask for the current Helix permissions, keeping the sign-in until a new token is validated. */
+        const val EXTRA_REAUTHORIZE = "reauthorize"
+
+        /** Approve a device-code clip grant, stored apart from the sign-in. */
+        const val EXTRA_CLIP_DEVICE_AUTH = "clipDeviceAuth"
+
+        /** Result of [EXTRA_REAUTHORIZE]: a different account signed in, so the app must restart. */
+        const val EXTRA_ACCOUNT_CHANGED = "accountChanged"
+
+        private const val API_HELIX_ONLY = 2
     }
 
     override fun onDestroy() {

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- New feature copy intentionally falls back to English until translations are vetted. -->
+    <string name="clip_device_instructions" tools:ignore="MissingTranslation">To create clips on this TV, scan this code with another device, or open twitch.tv/activate in a browser and enter the code. Authorize the device, then choose Check sign-in. Your TV sign-in doesn’t change.</string>
+</resources>
