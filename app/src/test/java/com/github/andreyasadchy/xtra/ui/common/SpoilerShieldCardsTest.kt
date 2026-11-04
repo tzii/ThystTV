@@ -142,8 +142,8 @@ class SpoilerShieldCardsTest {
             assertEquals(context.getString(R.string.spoiler_shield_title_hidden), root.findViewById<TextView>(R.id.title).text)
             assertEquals(View.VISIBLE, root.findViewById<View>(R.id.spoilerReveal).visibility)
             assertTrue(root.findViewById<android.widget.ImageView>(R.id.thumbnail).drawable is android.graphics.drawable.ColorDrawable)
+            assertEquals("a protected card does not reveal its length", View.GONE, root.findViewById<View>(R.id.duration).visibility)
         }
-        assertEquals("a protected VoD does not reveal its length", View.GONE, cards[0].findViewById<View>(R.id.duration).visibility)
     }
 
     @Test fun `an unprotected vod card shows everything and no eye`() {

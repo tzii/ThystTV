@@ -116,7 +116,7 @@ class ClipsAdapter(
                     } else {
                         views.visibility = View.GONE
                     }
-                    if (item.durationSeconds != null) {
+                    if (item.durationSeconds != null && !spoilers.hidesAnything) {
                         duration.visibility = View.VISIBLE
                         duration.text = DateUtils.formatElapsedTime(item.durationSeconds.toLong())
                     } else {
