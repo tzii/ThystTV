@@ -190,7 +190,7 @@ class ReauthorizationTest {
         val held = CompletableDeferred<TokenResponse>()
         val discarded = ArrayList<ClipCredentials>()
         val attempt = async {
-            runCatching { ClipAuthorization.current(prefs, 950_000L, discard = { discarded.add(it) }) { held.await() } }
+            runCatching { ClipAuthorization.current(prefs, { 950_000L }, discard = { discarded.add(it) }) { held.await() } }
         }
         runCurrent()
         ClipAuthorization.clear(prefs)
@@ -205,7 +205,7 @@ class ReauthorizationTest {
         val newer = ClipCredentials("client", "approved", "refresh-approved", 99_000_000L)
         val rejected = async {
             runCatching {
-                ClipAuthorization.current(prefs, 950_000L) {
+                ClipAuthorization.current(prefs, { 950_000L }) {
                     ClipAuthorization.save(prefs, newer)
                     TokenResponse(message = "Invalid refresh token")
                 }
@@ -218,7 +218,7 @@ class ReauthorizationTest {
     @Test fun `a refresh failing after logout doesn't bring back the old token`() = runTest {
         ClipAuthorization.save(prefs, credentials)
         val failure = runCatching {
-            ClipAuthorization.current(prefs, 950_000L) {
+            ClipAuthorization.current(prefs, { 950_000L }) {
                 ClipAuthorization.clear(prefs)
                 throw IOException("offline")
             }
@@ -235,15 +235,28 @@ class ReauthorizationTest {
         assertNull(ClipAuthorization.load(prefs))
     }
 
+    @Test fun `a token that expires while its refresh stalls is not used, and the grant stays`() = runTest {
+        ClipAuthorization.save(prefs, credentials)
+        var now = 990_000L
+        val failure = runCatching {
+            ClipAuthorization.current(prefs, { now }) {
+                now = 1_010_000L
+                throw IOException("stalled")
+            }
+        }.exceptionOrNull()
+        assertEquals("stalled", failure?.message)
+        assertEquals("the refresh token can still work", credentials, ClipAuthorization.load(prefs))
+    }
+
     @Test fun `a valid clip token is used without refreshing`() = runTest {
         ClipAuthorization.save(prefs, credentials)
-        val used = ClipAuthorization.current(prefs, 100_000L) { error("should not refresh") }
+        val used = ClipAuthorization.current(prefs, { 100_000L }) { error("should not refresh") }
         assertEquals(credentials, used)
     }
 
     @Test fun `an expiring clip token refreshes and stores the rotated tokens`() = runTest {
         ClipAuthorization.save(prefs, credentials)
-        val renewed = ClipAuthorization.current(prefs, 950_000L) { old ->
+        val renewed = ClipAuthorization.current(prefs, { 950_000L }) { old ->
             assertEquals("refresh", old.refreshToken)
             TokenResponse(token = "access2", refreshToken = "refresh2", expiresInSeconds = 14_000L)
         }
@@ -254,14 +267,14 @@ class ReauthorizationTest {
 
     @Test fun `a refresh Twitch rejects clears the grant and asks for approval`() = runTest {
         ClipAuthorization.save(prefs, credentials)
-        assertNull(ClipAuthorization.current(prefs, 2_000_000L) { TokenResponse(message = "Invalid refresh token") })
+        assertNull(ClipAuthorization.current(prefs, { 2_000_000L }) { TokenResponse(message = "Invalid refresh token") })
         assertNull(ClipAuthorization.load(prefs))
     }
 
     @Test fun `a network failure keeps the grant and uses the token if it still works`() = runTest {
         ClipAuthorization.save(prefs, credentials)
-        assertEquals(credentials, ClipAuthorization.current(prefs, 950_000L) { throw IOException("offline") })
-        val failure = runCatching { ClipAuthorization.current(prefs, 2_000_000L) { throw IOException("offline") } }.exceptionOrNull()
+        assertEquals(credentials, ClipAuthorization.current(prefs, { 950_000L }) { throw IOException("offline") })
+        val failure = runCatching { ClipAuthorization.current(prefs, { 2_000_000L }) { throw IOException("offline") } }.exceptionOrNull()
         assertTrue(failure is IOException)
         assertEquals("kept for the next attempt", credentials, ClipAuthorization.load(prefs))
     }
@@ -269,15 +282,15 @@ class ReauthorizationTest {
     @Test fun `cancelling a refresh is not treated as a network failure`() {
         ClipAuthorization.save(prefs, credentials)
         val failure = runCatching {
-            runBlocking { ClipAuthorization.current(prefs, 950_000L) { throw CancellationException("left") } }
+            runBlocking { ClipAuthorization.current(prefs, { 950_000L }) { throw CancellationException("left") } }
         }.exceptionOrNull()
         assertTrue(failure is CancellationException)
     }
 
     @Test fun `an expired grant without a refresh token asks for approval`() = runTest {
         ClipAuthorization.save(prefs, credentials.copy(refreshToken = null))
-        assertEquals("still usable", credentials.copy(refreshToken = null), ClipAuthorization.current(prefs, 950_000L) { error("no refresh") })
-        assertNull(ClipAuthorization.current(prefs, 2_000_000L) { error("no refresh") })
+        assertEquals("still usable", credentials.copy(refreshToken = null), ClipAuthorization.current(prefs, { 950_000L }) { error("no refresh") })
+        assertNull(ClipAuthorization.current(prefs, { 2_000_000L }) { error("no refresh") })
         assertNull(ClipAuthorization.load(prefs))
     }
 

@@ -180,14 +180,15 @@ internal object ClipAuthorization {
      */
     suspend fun current(
         prefs: SharedPreferences,
-        now: Long,
+        now: () -> Long,
         discard: (ClipCredentials) -> Unit = {},
         refresh: suspend (ClipCredentials) -> TokenResponse,
     ): ClipCredentials? {
         val credentials = load(prefs) ?: return null
-        if (now < credentials.expiresAt - REFRESH_MARGIN_MS) return credentials
+        val startedAt = now()
+        if (startedAt < credentials.expiresAt - REFRESH_MARGIN_MS) return credentials
         if (credentials.refreshToken.isNullOrBlank()) {
-            if (now < credentials.expiresAt) return credentials
+            if (startedAt < credentials.expiresAt) return credentials
             clear(prefs)
             return null
         }
@@ -197,10 +198,11 @@ internal object ClipAuthorization {
             throw cancelled
         } catch (failure: Exception) {
             if (load(prefs) != credentials) throw ClipGrantChanged()
-            if (now < credentials.expiresAt) return credentials
+            // The request may have outlasted the token, and using it then would lose the grant.
+            if (now() < credentials.expiresAt) return credentials
             throw failure
         }
-        val renewed = fromGrant(credentials.clientId, response, now, credentials.refreshToken)
+        val renewed = fromGrant(credentials.clientId, response, now(), credentials.refreshToken)
         if (load(prefs) != credentials) {
             renewed?.let(discard)
             throw ClipGrantChanged()
