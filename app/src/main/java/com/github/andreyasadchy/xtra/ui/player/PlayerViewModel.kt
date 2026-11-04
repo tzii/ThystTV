@@ -164,7 +164,7 @@ class PlayerViewModel @Inject constructor(
         channelId: String,
         request: ClipRequest,
         grant: suspend () -> ClipCredentials?,
-        grantRejected: () -> Unit,
+        grantRejected: (ClipCredentials) -> Unit,
     ) {
         if (isCreatingClip) return
         lastClipRequest = request
@@ -180,7 +180,7 @@ class PlayerViewModel @Inject constructor(
                     val (status, body) = helixRepository.createClip(networkLibrary, headers, channelId, request.title, request.durationSeconds)
                     val created = ClipCreation.parseResponse(status, body)
                     if (created == ClipCreationResult.SignInRequired && granted != null) {
-                        grantRejected()
+                        grantRejected(granted)
                     }
                     if (created is ClipCreationResult.Created && !ClipCreation.awaitConfirmation {
                         helixRepository.clipExists(networkLibrary, headers, created.id)

@@ -160,6 +160,16 @@ class ClipResultDialogTest {
         assertEquals(12f, dialog()!!.findViewById<Slider>(R.id.clipDuration)!!.value)
     }
 
+    @Test fun `opening the options after a failed attempt keeps the viewer's choices`() {
+        whenever(model.lastClipRequest).thenReturn(ClipRequest("Big play", 12f))
+        result.value = null
+        activity.get().tokenPrefs().edit().putString(C.TOKEN, "token").commit()
+        doReturn(Bundle().apply { putString("channelId", "channel") }).whenever(fragment).requireArguments()
+        fragment.createClip()
+        assertEquals("Big play", dialog()!!.findViewById<EditText>(R.id.clipTitle)!!.text.toString())
+        assertEquals(12f, dialog()!!.findViewById<Slider>(R.id.clipDuration)!!.value)
+    }
+
     private fun resumePending(pending: PendingClip): PendingClip? {
         val model = model
         var stored: PendingClip? = pending

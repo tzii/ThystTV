@@ -459,6 +459,9 @@ TV device-code sign-in has no Helix token, so the TV approves a separate grant f
 another device (`EXTRA_CLIP_DEVICE_AUTH`), kept apart from `C.TOKEN` in
 `ClipAuthorization` and renewed with its refresh token. That grant can belong to a
 different account from the TV's sign-in until login is entered again.
+A replaced token stays valid for what is already on screen, and is revoked at the next
+app start or on logout. A grant refresh that finishes after the grant changed is
+discarded and revoked, and a refusal only clears the grant that request used.
 
 ## VoD seek previews
 

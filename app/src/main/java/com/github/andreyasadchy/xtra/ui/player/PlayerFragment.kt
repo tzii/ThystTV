@@ -100,6 +100,7 @@ import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.login.ClipAuthorization
 import com.github.andreyasadchy.xtra.ui.login.LoginActivity
+import com.github.andreyasadchy.xtra.ui.login.RevokeTarget
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
@@ -363,7 +364,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             showClipSignIn(clipSignInMessage(context), null)
             return
         }
-        showClipOptions(channelId, null)
+        showClipOptions(channelId, viewModel.lastClipRequest)
     }
 
     /** The token a clip would use: a TV's separate grant first, then the sign-in's. */
@@ -414,11 +415,15 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             channelId,
             request,
             grant = {
-                ClipAuthorization.current(tokenPrefs, System.currentTimeMillis()) {
+                ClipAuthorization.current(
+                    tokenPrefs,
+                    System.currentTimeMillis(),
+                    discard = { auth.revokeInBackground(networkLibrary, RevokeTarget(it.clientId, it.token).body) },
+                ) {
                     auth.refreshToken(networkLibrary, it.clientId, it.refreshToken.orEmpty())
                 }
             },
-            grantRejected = { ClipAuthorization.clear(tokenPrefs) },
+            grantRejected = { ClipAuthorization.clearIfCurrent(tokenPrefs, it) },
         )
     }
 
@@ -429,7 +434,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         val context = requireContext()
         if (!isMaximized || videoType != STREAM || requireArguments().getString(KEY_CHANNEL_ID) != pending.channelId) return
         if (clipAccessToken(context) == pending.tokenAtLaunch || clipAccessToken(context).isNullOrBlank()) return
-        pending.request?.let { startClip(pending.channelId, it) } ?: showClipOptions(pending.channelId, null)
+        pending.request?.let { startClip(pending.channelId, it) } ?: showClipOptions(pending.channelId, viewModel.lastClipRequest)
     }
 
     private fun watchClipCreation() {
