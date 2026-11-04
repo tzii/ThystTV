@@ -35,7 +35,7 @@ class LiveRewindHandoffTest {
         whenever(manager.isStateSaved).thenReturn(saved)
         whenever(manager.findFragmentById(R.id.playerContainer)).thenReturn(current)
         ReflectionHelpers.setField(activity, "playerFragment", pending)
-        doNothing().whenever(activity).startStream(any())
+        doReturn(true).whenever(activity).startStream(any())
     }
 
     @Test fun `owned recording returns through existing single player entrypoint`() {
@@ -60,6 +60,12 @@ class LiveRewindHandoffTest {
         setup(pending = mock())
         assertFalse(activity.returnFromLiveRewind(source, origin))
         verify(activity, never()).startStream(any())
+    }
+
+    @Test fun `a return to live that was refused doesn't claim to be returning`() {
+        setup()
+        doReturn(false).whenever(activity).startStream(any())
+        assertFalse(activity.returnFromLiveRewind(source, origin))
     }
 
     @Test fun `a replay refused while another session holds media reports failure`() {

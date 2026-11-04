@@ -786,7 +786,8 @@ class MainActivity : AppCompatActivity() {
 
 //Navigation listeners
 
-    fun startStream(stream: Stream) {
+    /** False when it was refused and the current player carries on. */
+    fun startStream(stream: Stream): Boolean {
         val fragment = when (prefs.getString(C.PLAYER, "ExoPlayer")) {
             "MediaPlayer" -> MediaPlayerFragment.newInstance(stream)
             else -> {
@@ -797,7 +798,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        startPlayer(fragment)
+        return startPlayer(fragment)
     }
 
     fun startVideo(video: Video, offset: Long?, ignoreSavedPosition: Boolean = false) {
@@ -832,11 +833,10 @@ class MainActivity : AppCompatActivity() {
         if (!canReplacePlayer(source)) return false
         // The broadcaster may have restarted while the recording was playing.
         // Keep channel identity, but force fresh live-session metadata lookup.
-        startStream(Stream(
+        return startStream(Stream(
             channelId = origin.channelId, channelLogin = origin.channelLogin,
             channelName = origin.channelName, channelImageURL = origin.channelImageURL,
         ))
-        return true
     }
 
     /** Reject late discovery/error callbacks after navigation, close or state save. */

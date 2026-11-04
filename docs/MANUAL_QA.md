@@ -523,9 +523,12 @@ live and replay on the default player at both a high and low quality.
   setting while live, and at most doubles during a long replay.
 - [ ] ExoPlayer and MediaPlayer backends: no capture, and recordings still work. Switch to
   MediaPlayer with video already saved, then rewind: live carries on with a message, and
-  disk use stays near the setting.
+  disk use stays near the setting. Switch during a replay, then Go live: a message says the
+  session is in use, with no claim of returning, and closing the player clears it.
 - [ ] During a local replay, pick Audio only and leave the app so audio keeps playing. Clear
   the app's cache, wait for audio to stop, then return: it goes back to live with a message.
+  Repeat, returning within about 10 seconds of the error: it still goes back to live, because
+  a local replay has nothing to reload from.
 
 ### VoD seek previews (performance stack)
 
