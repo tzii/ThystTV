@@ -163,6 +163,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pipPresentation: PlayerPipPolicy.Presentation? = null
     private var pipSupported = false
     private var presentationPreferenceListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+
+    /** What the player last bound, so a Spoiler Shield rule change can re-evaluate it. */
+    private var boundTitle: String? = null
+    private var boundGameId: String? = null
+    private var boundGameName: String? = null
     private val pipLayoutListener = ViewTreeObserver.OnGlobalLayoutListener { refreshPipPresentation() }
     private var isKeyboardShown = false
     protected var displayMode = PlayerDisplayMode.FIT
@@ -2803,6 +2808,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private fun protectPlayerTitle(gameId: String?, gameName: String?) {
         val view = binding.playerControls.title
         val visibleTitle = view.text?.toString()
+        boundTitle = visibleTitle
+        boundGameId = gameId
+        boundGameName = gameName
         if (!view.isVisible || visibleTitle.isNullOrBlank() || viewModel.spoilerTitleRevealed) return
         if (!SpoilerShield.hidesTitle(requireContext().prefs(), playerSpoilerSubject(gameId, gameName))) return
         view.text = getString(R.string.spoiler_shield_title_hidden)
@@ -2811,6 +2819,17 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             view.text = visibleTitle
             view.setOnClickListener { Toast.makeText(requireContext(), visibleTitle, Toast.LENGTH_SHORT).show() }
         }
+    }
+
+    /** A rule can change while this player stays open, such as from a list while it is minimized. */
+    internal fun refreshPlayerTitleProtection() {
+        if (_binding == null) return
+        val title = boundTitle?.takeIf { it.isNotBlank() } ?: return
+        val view = binding.playerControls.title
+        viewModel.spoilerTitleRevealed = false
+        view.text = title
+        view.setOnClickListener { Toast.makeText(requireContext(), title, Toast.LENGTH_SHORT).show() }
+        protectPlayerTitle(boundGameId, boundGameName)
     }
 
     private fun playerSpoilerSubject(gameId: String?, gameName: String?) = SpoilerSubject(
@@ -2823,13 +2842,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     )
 
     /** The media notification and Cast receiver have no reveal control, so they stay hidden. */
-    protected fun playbackTitle(): String? {
-        val hidden = SpoilerShield.hidesTitle(
-            requireContext().prefs(),
-            playerSpoilerSubject(requireArguments().getString(KEY_GAME_ID), requireArguments().getString(KEY_GAME_NAME)),
-        )
-        return if (hidden) getString(R.string.spoiler_shield_title_hidden) else requireArguments().getString(KEY_TITLE)
-    }
+    protected fun playbackTitle(): String? = SpoilerShield.titleOrHiddenLabel(
+        requireContext(),
+        playerSpoilerSubject(
+            boundGameId ?: requireArguments().getString(KEY_GAME_ID),
+            boundGameName ?: requireArguments().getString(KEY_GAME_NAME),
+        ),
+        requireArguments().getString(KEY_TITLE),
+    )
 
     fun updateStreamInfo(title: String?, gameId: String?, gameSlug: String?, gameName: String?) {
         binding.playerControls.title.apply {
@@ -3265,6 +3285,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             if (key == C.PLAYER_PIP_CHAT || key == C.PLAYER_PICTURE_IN_PICTURE || key == C.CHAT_DISABLE) {
                 refreshPipPresentation()
+            }
+            if (key == C.SPOILER_SHIELD_RULES || key == C.SPOILER_SHIELD_HIDE_TITLES || key == null) {
+                refreshPlayerTitleProtection()
             }
         }.also { prefs.registerOnSharedPreferenceChangeListener(it) }
         // Zoom is available from API 24 and must also update on devices without PiP.

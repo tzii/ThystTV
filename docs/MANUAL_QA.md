@@ -519,7 +519,9 @@ Turn on Player settings → Gestures → Extended zoom.
 - [ ] Player: open a protected live stream, VoD and clip. The title shows Title hidden,
   and tapping it reveals the title for that player only. The media notification and
   lock screen also say Title hidden. With Hide titles off, the title shows normally.
-  Repeat on a live title change, and with each backend (default, ExoPlayer).
+  Repeat on a live title change, and with each backend (default, ExoPlayer, MediaPlayer).
+  Protect a channel from a list while its player is minimized: restoring shows Title
+  hidden. The notification keeps the title it started with until the stream next starts.
 
 ### VoD seek previews (performance stack)
 

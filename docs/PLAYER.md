@@ -481,8 +481,11 @@ For release-risk player work, also verify:
 `protectPlayerTitle` replaces the visible title when `SpoilerShield.hidesTitle` matches
 the channel or category, including after a live title or category update. A tap
 reveals it for that player through `PlayerViewModel.spoilerTitleRevealed`.
-`playbackTitle()` supplies the media-session title, so the notification and lock screen
-follow the same rule. Share intents still carry the real title.
+`playbackTitle()` supplies the media-session title on every backend, so the notification
+and lock screen follow the same rule. A rule changed while the player stays open updates
+the visible title at once. The media session keeps its title until a source next starts:
+nothing updates it during playback, so it never shows anything newer than what was already
+there. Share intents still carry the real title.
 
 ## Optional Google Cast (default Media3 backend)
 
