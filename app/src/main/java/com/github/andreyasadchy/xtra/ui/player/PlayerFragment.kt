@@ -91,6 +91,8 @@ import com.github.andreyasadchy.xtra.ui.chat.ChatFragment
 import com.github.andreyasadchy.xtra.ui.common.BaseNetworkFragment
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.ui.common.RadioButtonDialogFragment
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShield
+import com.github.andreyasadchy.xtra.ui.common.SpoilerSubject
 import com.github.andreyasadchy.xtra.ui.download.DownloadDialog
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
@@ -1344,6 +1346,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     title.visibility = View.VISIBLE
                     title.text = if (liveRewindOrigin() != null) getString(R.string.live_rewind_recording_title, titleText) else titleText
                 }
+                protectPlayerTitle(requireArguments().getString(KEY_GAME_ID), requireArguments().getString(KEY_GAME_NAME))
                 val gameName = requireArguments().getString(KEY_GAME_NAME)
                 if (!gameName.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_CATEGORY, true)) {
                     category.visibility = View.VISIBLE
@@ -2793,6 +2796,41 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
+    /**
+     * Replace a Spoiler Shield protected title with a tap-to-reveal label. It runs after the
+     * title is bound, so callers keep deciding what the title says and whether it shows.
+     */
+    private fun protectPlayerTitle(gameId: String?, gameName: String?) {
+        val view = binding.playerControls.title
+        val visibleTitle = view.text?.toString()
+        if (!view.isVisible || visibleTitle.isNullOrBlank() || viewModel.spoilerTitleRevealed) return
+        if (!SpoilerShield.hidesTitle(requireContext().prefs(), playerSpoilerSubject(gameId, gameName))) return
+        view.text = getString(R.string.spoiler_shield_title_hidden)
+        view.setOnClickListener {
+            viewModel.spoilerTitleRevealed = true
+            view.text = visibleTitle
+            view.setOnClickListener { Toast.makeText(requireContext(), visibleTitle, Toast.LENGTH_SHORT).show() }
+        }
+    }
+
+    private fun playerSpoilerSubject(gameId: String?, gameName: String?) = SpoilerSubject(
+        key = "player",
+        channelId = requireArguments().getString(KEY_CHANNEL_ID),
+        channelLogin = requireArguments().getString(KEY_CHANNEL_LOGIN),
+        channelName = requireArguments().getString(KEY_CHANNEL_NAME),
+        gameId = gameId,
+        gameName = gameName,
+    )
+
+    /** The media notification and Cast receiver have no reveal control, so they stay hidden. */
+    protected fun playbackTitle(): String? {
+        val hidden = SpoilerShield.hidesTitle(
+            requireContext().prefs(),
+            playerSpoilerSubject(requireArguments().getString(KEY_GAME_ID), requireArguments().getString(KEY_GAME_NAME)),
+        )
+        return if (hidden) getString(R.string.spoiler_shield_title_hidden) else requireArguments().getString(KEY_TITLE)
+    }
+
     fun updateStreamInfo(title: String?, gameId: String?, gameSlug: String?, gameName: String?) {
         binding.playerControls.title.apply {
             if (!title.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_TITLE, true)) {
@@ -2806,6 +2844,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 visibility = View.GONE
             }
         }
+        protectPlayerTitle(gameId, gameName)
         binding.playerControls.category.apply {
             if (!gameName.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_CATEGORY, true)) {
                 text = gameName

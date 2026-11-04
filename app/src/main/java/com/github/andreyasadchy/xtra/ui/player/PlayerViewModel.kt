@@ -115,6 +115,7 @@ class PlayerViewModel @Inject constructor(
     var shouldRetry = true
     /** True only while the initial recording handoff is starting; not restored after process death. */
     internal var liveRewindPending = false
+    internal var spoilerTitleRevealed = false
     internal var liveRewindFailed = false
     /** A rewind result arrived while minimized or backgrounded and was not applied. */
     internal var liveRewindDropped = false

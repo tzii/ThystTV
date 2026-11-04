@@ -555,7 +555,7 @@ class Media3Fragment : PlayerFragment() {
                     PlaybackService.START_STREAM, bundleOf(
                         PlaybackService.CUSTOM_PROXY to viewModel.useCustomProxy,
                         PlaybackService.URI to url,
-                        PlaybackService.TITLE to requireArguments().getString(KEY_TITLE),
+                        PlaybackService.TITLE to playbackTitle(),
                         PlaybackService.CHANNEL_ID to requireArguments().getString(KEY_CHANNEL_ID),
                         PlaybackService.CHANNEL_NAME to requireArguments().getString(KEY_CHANNEL_NAME),
                     PlaybackService.CHANNEL_LOGIN to requireArguments().getString(KEY_CHANNEL_LOGIN),
@@ -582,7 +582,7 @@ class Media3Fragment : PlayerFragment() {
                         PlaybackService.URI to url,
                         PlaybackService.PLAYBACK_POSITION to playbackPosition,
                         PlaybackService.VIDEO_ID to requireArguments().getString(KEY_VIDEO_ID)?.toLongOrNull(),
-                        PlaybackService.TITLE to requireArguments().getString(KEY_TITLE),
+                        PlaybackService.TITLE to playbackTitle(),
                         PlaybackService.CHANNEL_ID to requireArguments().getString(KEY_CHANNEL_ID),
                         PlaybackService.CHANNEL_NAME to requireArguments().getString(KEY_CHANNEL_NAME),
                         PlaybackService.CHANNEL_LOGIN to requireArguments().getString(KEY_CHANNEL_LOGIN),
@@ -613,7 +613,7 @@ class Media3Fragment : PlayerFragment() {
                 SessionCommand(
                     PlaybackService.START_CLIP, bundleOf(
                         PlaybackService.URI to url,
-                        PlaybackService.TITLE to requireArguments().getString(KEY_TITLE),
+                        PlaybackService.TITLE to playbackTitle(),
                         PlaybackService.CHANNEL_ID to requireArguments().getString(KEY_CHANNEL_ID),
                         PlaybackService.CHANNEL_NAME to requireArguments().getString(KEY_CHANNEL_NAME),
                         PlaybackService.CHANNEL_LOGIN to requireArguments().getString(KEY_CHANNEL_LOGIN),
@@ -646,7 +646,7 @@ class Media3Fragment : PlayerFragment() {
                         PlaybackService.URI to url,
                         PlaybackService.VIDEO_ID to requireArguments().getInt(KEY_OFFLINE_VIDEO_ID),
                         PlaybackService.PLAYBACK_POSITION to position,
-                        PlaybackService.TITLE to requireArguments().getString(KEY_TITLE),
+                        PlaybackService.TITLE to playbackTitle(),
                         PlaybackService.CHANNEL_ID to requireArguments().getString(KEY_CHANNEL_ID),
                         PlaybackService.CHANNEL_NAME to requireArguments().getString(KEY_CHANNEL_NAME),
                         PlaybackService.CHANNEL_LOGIN to requireArguments().getString(KEY_CHANNEL_LOGIN),

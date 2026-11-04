@@ -516,6 +516,10 @@ Turn on Player settings → Gestures → Extended zoom.
 - [ ] Settings > UI > Protected channels and categories: Add a channel and Add a
   category search Twitch; pick a match or use the name exactly as typed. Cancel while
   a search is running closes immediately. Offline, the typed name is still offered.
+- [ ] Player: open a protected live stream, VoD and clip. The title shows Title hidden,
+  and tapping it reveals the title for that player only. The media notification and
+  lock screen also say Title hidden. With Hide titles off, the title shows normally.
+  Repeat on a live title change, and with each backend (default, ExoPlayer).
 
 ### VoD seek previews (performance stack)
 
