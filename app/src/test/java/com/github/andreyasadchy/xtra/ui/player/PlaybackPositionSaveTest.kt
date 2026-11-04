@@ -53,6 +53,7 @@ class PlaybackPositionSaveTest {
             val session = mock<MediaSession>()
             whenever(session.player).thenReturn(player)
             val service = mock<PlaybackService>(defaultAnswer = Mockito.CALLS_REAL_METHODS)
+            service.liveDvr = mock()
             doReturn(context.packageName).whenever(service).packageName
             doReturn(context.prefs()).whenever(service).getSharedPreferences(any(), any())
             val onlineRepository = mock<PlayerRepository>()

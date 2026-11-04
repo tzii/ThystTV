@@ -6,6 +6,7 @@ All notable changes to ThystTV should be documented here.
 
 ### Added
 - Live rewind offers "Watch last 3 minutes" (#79). Like the other presets, it plays the broadcast's recording.
+- Local rewind buffer, off by default in Player settings > Videos. It saves the live video you're watching (250 MB to 2 GB) so a rewind works even when the broadcast has no recording. It uses the default player, needs 1 GB of free storage, and is deleted shortly after you leave the stream.
 
 ## [1.5.2] - 2026-10-31
 

@@ -152,6 +152,7 @@ class Media3Fragment : PlayerFragment() {
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY) markLiveRewindReady()
+                    if (playbackState == Player.STATE_ENDED) handleLocalReplayEnded()
                     binding.bufferingIndicator.isVisible = playbackState == Player.STATE_BUFFERING
                     val showPlayButton = Util.shouldShowPlayButton(player)
                     if (showPlayButton) {
@@ -1354,7 +1355,8 @@ class Media3Fragment : PlayerFragment() {
 
     override fun onNetworkLost() {
         if (isRemotePlayback()) return
-        if (videoType != STREAM && isResumed) {
+        // A local replay reads its video from disk, so it can carry on.
+        if (videoType != STREAM && isResumed && !isLocalReplay()) {
             player?.stop()
         }
     }

@@ -823,6 +823,7 @@ class MainActivity : AppCompatActivity() {
             putParcelable(LiveRewind.ORIGIN, prepared.origin)
             putString(LiveRewind.PLAYLIST, prepared.playlistUrl)
             putLong(LiveRewind.POSITION, prepared.positionMs)
+            putBoolean(LiveRewind.LOCAL, prepared.local)
         }
         startPlayer(fragment)
         return true

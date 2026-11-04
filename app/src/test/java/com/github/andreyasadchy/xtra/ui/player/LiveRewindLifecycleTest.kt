@@ -7,6 +7,8 @@ import android.view.LayoutInflater
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import com.github.andreyasadchy.xtra.util.C
+import com.github.andreyasadchy.xtra.util.prefs
 import org.robolectric.RuntimeEnvironment
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.FragmentPlayerBinding
@@ -211,7 +213,11 @@ class LiveRewindLifecycleTest {
         f.fragment.finishLiveRewindDiscovery(prepared)
         verify(f.activity).startLiveRewind(f.fragment, prepared)
         f.fragment.finishLiveRewindDiscovery(null)
-        assertEquals(RuntimeEnvironment.getApplication().getString(R.string.live_rewind_unavailable), ShadowToast.getTextOfLatestToast())
+        val application = RuntimeEnvironment.getApplication()
+        assertEquals("with the buffer off, the message points to it", application.getString(R.string.live_dvr_turn_on_hint), ShadowToast.getTextOfLatestToast())
+        application.prefs().edit().putBoolean(C.PLAYER_LIVE_DVR, true).commit()
+        f.fragment.finishLiveRewindDiscovery(null)
+        assertEquals(application.getString(R.string.live_rewind_unavailable), ShadowToast.getTextOfLatestToast())
         assertFalse(f.vm.liveRewindDropped)
         f.owner.lifecycle.currentState = Lifecycle.State.DESTROYED
     }
