@@ -4,6 +4,9 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Added
+- Live rewind offers "Watch last 3 minutes" (#79). Like the other presets, it plays the broadcast's recording.
+
 ## [1.5.2] - 2026-10-31
 
 ### Added

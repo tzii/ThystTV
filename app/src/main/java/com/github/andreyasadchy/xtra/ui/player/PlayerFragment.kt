@@ -343,8 +343,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             .setTitle(R.string.live_rewind)
             .setItems(arrayOf(
                 getString(R.string.live_rewind_30_seconds), getString(R.string.live_rewind_1_minute),
-                getString(R.string.live_rewind_5_minutes), getString(R.string.live_rewind_beginning),
-            )) { _, which -> requestLiveRewind(listOf(30_000L, 60_000L, 300_000L, null)[which]) }
+                getString(R.string.live_rewind_3_minutes), getString(R.string.live_rewind_5_minutes),
+                getString(R.string.live_rewind_beginning),
+            )) { _, which -> requestLiveRewind(listOf(30_000L, 60_000L, 180_000L, 300_000L, null)[which]) }
             .setNegativeButton(android.R.string.cancel, null)
             .create().also { dialog ->
                 dialog.setOnDismissListener { liveRewindDialog = null }
