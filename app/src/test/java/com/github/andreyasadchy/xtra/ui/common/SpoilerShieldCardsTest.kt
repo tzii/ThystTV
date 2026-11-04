@@ -23,6 +23,7 @@ import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.databinding.FragmentChannelBinding
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragment
 import com.github.andreyasadchy.xtra.ui.team.TeamMembersAdapter
+import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
 import org.junit.Assert.*
 import org.junit.Before
@@ -52,6 +53,15 @@ class SpoilerShieldCardsTest {
     @Before fun setup() {
         context.prefs().edit { clear() }
         SpoilerShield.saveRules(context.prefs(), SpoilerShieldRules(channels = listOf(ProtectedChannel(id = "c1"))))
+    }
+
+    @Test fun `a place with no reveal control gets the hidden label for a protected title`() {
+        val protected = SpoilerSubject(key = "d1", channelId = "c1")
+        val other = SpoilerSubject(key = "d2", channelId = "c2")
+        assertEquals(context.getString(R.string.spoiler_shield_title_hidden), SpoilerShield.titleOrHiddenLabel(context, protected, "Secret"))
+        assertEquals("Open", SpoilerShield.titleOrHiddenLabel(context, other, "Open"))
+        context.prefs().edit { putBoolean(C.SPOILER_SHIELD_HIDE_TITLES, false) }
+        assertEquals("Secret", SpoilerShield.titleOrHiddenLabel(context, protected, "Secret"))
     }
 
     private fun cards(context: Context): List<View> {

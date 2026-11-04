@@ -17,6 +17,7 @@ import com.github.andreyasadchy.xtra.ui.common.SpoilerShield
 import com.github.andreyasadchy.xtra.ui.common.SpoilerShieldRules
 import com.github.andreyasadchy.xtra.util.getAlertDialogBuilder
 import com.github.andreyasadchy.xtra.util.prefs
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /** The Settings > UI list of protected channels and categories. */
@@ -104,7 +105,7 @@ private fun Fragment.showSpoilerShieldAdd(viewModel: SettingsViewModel, changed:
 }
 
 /** Search online, but never require it: a failed search still offers the typed text. */
-private fun <T> Fragment.showSpoilerShieldSearch(
+internal fun <T> Fragment.showSpoilerShieldSearch(
     hint: Int,
     search: suspend (String) -> List<T>,
     label: (T) -> String,
@@ -126,6 +127,8 @@ private fun <T> Fragment.showSpoilerShieldSearch(
         binding.progress.isVisible = true
         searching = viewLifecycleOwner.lifecycleScope.launch {
             val results = search(query)
+            // Twitch's search sources catch every exception, so a cancelled search returns normally.
+            ensureActive()
             dialog.setOnDismissListener(null)
             dialog.dismiss()
             showSpoilerShieldResults(query, results, label, typed, chosen)

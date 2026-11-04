@@ -214,6 +214,10 @@ internal object SpoilerShield {
     fun hidesTitle(prefs: SharedPreferences, subject: SpoilerSubject): Boolean =
         prefs.getBoolean(C.SPOILER_SHIELD_HIDE_TITLES, true) && rules(prefs).protects(subject)
 
+    /** The text for a place with no reveal control, such as a notification. */
+    fun titleOrHiddenLabel(context: Context, subject: SpoilerSubject, title: String?): String? =
+        if (hidesTitle(context.prefs(), subject)) context.getString(R.string.spoiler_shield_title_hidden) else title
+
     /** Ask how long a new rule lasts, then report when it expires (null means never). */
     fun chooseDuration(context: Context, now: () -> Long = System::currentTimeMillis, onChosen: (Long?) -> Unit) {
         val labels = arrayOf(
