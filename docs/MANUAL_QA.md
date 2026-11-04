@@ -523,6 +523,8 @@ Turn on Player settings → Gestures → Extended zoom.
   Repeat on a live title change, and with each backend (default, ExoPlayer, MediaPlayer).
   Protect a channel from a list while its player is minimized: restoring shows Title
   hidden. The notification keeps the title it started with until the stream next starts.
+  Protect a category, then let the streamer change title and category to an unprotected
+  one and press Restart: the notification shows the new title, never the old one.
 
 ### VoD seek previews (performance stack)
 

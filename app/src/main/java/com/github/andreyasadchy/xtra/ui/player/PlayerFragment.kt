@@ -168,6 +168,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var boundTitle: String? = null
     private var boundGameId: String? = null
     private var boundGameName: String? = null
+
+    /** The latest live title, kept apart from the view, which may hide titles or show a label. */
+    private var reportedTitle: String? = null
+    private var streamInfoReported = false
     private val pipLayoutListener = ViewTreeObserver.OnGlobalLayoutListener { refreshPipPresentation() }
     private var isKeyboardShown = false
     protected var displayMode = PlayerDisplayMode.FIT
@@ -2841,17 +2845,22 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         gameName = gameName,
     )
 
-    /** The media notification and Cast receiver have no reveal control, so they stay hidden. */
+    /**
+     * The media notification and Cast receiver have no reveal control, so they stay hidden. A title
+     * is judged with the category it came with, so an old title can't get out under a newer category.
+     */
     protected fun playbackTitle(): String? = SpoilerShield.titleOrHiddenLabel(
         requireContext(),
         playerSpoilerSubject(
             boundGameId ?: requireArguments().getString(KEY_GAME_ID),
             boundGameName ?: requireArguments().getString(KEY_GAME_NAME),
         ),
-        requireArguments().getString(KEY_TITLE),
+        if (streamInfoReported) reportedTitle else requireArguments().getString(KEY_TITLE),
     )
 
     fun updateStreamInfo(title: String?, gameId: String?, gameSlug: String?, gameName: String?) {
+        reportedTitle = title?.trim()
+        streamInfoReported = true
         binding.playerControls.title.apply {
             if (!title.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_TITLE, true)) {
                 text = title.trim()

@@ -11,9 +11,11 @@ import com.github.andreyasadchy.xtra.ui.common.ProtectedCategory
 import com.github.andreyasadchy.xtra.ui.common.ProtectedChannel
 import com.github.andreyasadchy.xtra.ui.common.SpoilerShield
 import com.github.andreyasadchy.xtra.ui.common.SpoilerShieldRules
+import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -99,4 +101,23 @@ class PlayerTitleProtectionTest {
         fragment.updateStreamInfo("Secret", "g2", "go", "Go")
         assertEquals(hiddenLabel, playbackTitle())
     }
+
+    @Test fun `leaving a protected category doesn't let the old title reach the media session`() {
+        protectCategory()
+        assertEquals(hiddenLabel, playbackTitle())
+        fragment.updateStreamInfo("Taking a break", "g2", "go", "Go")
+        assertEquals("Taking a break", playbackTitle())
+        fragment.updateStreamInfo(null, "g2", "go", "Go")
+        assertNull(playbackTitle())
+    }
+
+    @Test fun `the media title is the live one even when the player shows no title`() {
+        protectCategory()
+        context.prefs().edit { putBoolean(C.PLAYER_TITLE, false) }
+        fragment.updateStreamInfo("Taking a break", "g2", "go", "Go")
+        assertEquals("Taking a break", playbackTitle())
+    }
+
+    private fun protectCategory() =
+        SpoilerShield.saveRules(context.prefs(), SpoilerShieldRules(categories = listOf(ProtectedCategory(id = "g1"))))
 }

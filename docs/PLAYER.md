@@ -486,7 +486,9 @@ and a new live title stays hidden until revealed too.
 and lock screen follow the same rule. A rule changed while the player stays open updates
 the visible title at once. The media session keeps its title until a source next starts:
 nothing updates it during playback, so it never shows anything newer than what was already
-there. Share intents still carry the real title.
+there. A start uses the latest live title with the category it came with, so an old protected
+title can't return after the stream moves to an unprotected category. Share intents still
+carry the real title.
 
 ## Optional Google Cast (default Media3 backend)
 
