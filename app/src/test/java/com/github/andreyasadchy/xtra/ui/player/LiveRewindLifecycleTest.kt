@@ -196,6 +196,32 @@ class LiveRewindLifecycleTest {
         f.owner.lifecycle.currentState = Lifecycle.State.DESTROYED
     }
 
+    @Test fun `a local replay prepared as the viewer minimizes goes back to evicting`() = runTest {
+        val f = Fixture()
+        val dvr = mock<LiveDvr>()
+        f.fragment.liveDvr = dvr
+        ReflectionHelpers.setField(f.fragment, "isMaximized", false)
+        f.fragment.finishLiveRewindDiscovery(prepared.copy(local = true))
+        verify(dvr).cancelReplay()
+        verify(f.activity, never()).startLiveRewind(any(), any())
+        f.owner.lifecycle.currentState = Lifecycle.State.DESTROYED
+    }
+
+    @Test fun `a replay shorter than the request says how much is saved, a full one says nothing`() = runTest {
+        val f = Fixture()
+        val dvr = mock<LiveDvr>()
+        f.fragment.liveDvr = dvr
+        whenever(dvr.prepareReplay("channel", 180_000L)).thenReturn(LocalReplay("file:///replay.m3u8", 0L, 40_000L))
+        assertNotNull(f.fragment.prepareLocalReplay("channel", 180_000L))
+        val application = RuntimeEnvironment.getApplication()
+        assertEquals(application.getString(R.string.live_dvr_partial, "00:40"), ShadowToast.getTextOfLatestToast())
+        ShadowToast.reset()
+        whenever(dvr.prepareReplay("channel", 30_000L)).thenReturn(LocalReplay("file:///replay.m3u8", 10_000L, 40_000L))
+        assertNotNull(f.fragment.prepareLocalReplay("channel", 30_000L))
+        assertNull(ShadowToast.getLatestToast())
+        f.owner.lifecycle.currentState = Lifecycle.State.DESTROYED
+    }
+
     @Test fun `rewind result while backgrounded waits for resume`() = runTest {
         val f = Fixture()
         doReturn(false).whenever(f.fragment).isResumed

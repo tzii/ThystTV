@@ -492,6 +492,7 @@ class Media3Fragment : PlayerFragment() {
                     markLiveRewindReady()
                     chatFragment?.startReplayChatLoad()
                 }
+                finishEndedReplay(player)
                 updateKeepScreenOn()
                 updateProgress()
                 if (Util.shouldShowPlayButton(player)) {
@@ -1343,6 +1344,16 @@ class Media3Fragment : PlayerFragment() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
         if (isInPictureInPictureMode) castUi?.dismissDialog() else audioOnlyPending = false
         super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+    }
+
+    /**
+     * Background audio plays on without this screen, so a replay may have finished while it
+     * was away. Until this screen starts its source, the session's state is the previous one's.
+     */
+    internal fun finishEndedReplay(player: Player) {
+        if (viewModel.started && player.currentMediaItem != null && player.playbackState == Player.STATE_ENDED) {
+            handleLocalReplayEnded()
+        }
     }
 
     override fun onNetworkRestored() {
