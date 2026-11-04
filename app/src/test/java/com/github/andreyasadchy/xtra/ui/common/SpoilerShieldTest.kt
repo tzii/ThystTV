@@ -130,6 +130,17 @@ class SpoilerShieldTest {
         assertTrue(rules.protects(subject))
     }
 
+    @Test fun `a typed display name protects, though it isn't the channel's login`() {
+        val rules = SpoilerShieldRules().withChannel(ProtectedChannel(login = "some name", name = "Some Name"))
+        assertTrue(rules.protects(SpoilerSubject(key = "a", channelLogin = "somename", channelName = "Some Name")))
+        assertFalse(rules.protects(SpoilerSubject(key = "b", channelLogin = "other", channelName = "Other")))
+    }
+
+    @Test fun `a rule from a search goes by its id, not a matching name`() {
+        val rules = SpoilerShieldRules().withChannel(ProtectedChannel(id = "c1", login = "caster", name = "Same Name"))
+        assertFalse(rules.protects(SpoilerSubject(key = "a", channelId = "c2", channelLogin = "other", channelName = "Same Name")))
+    }
+
     @Test fun `rules saved before time limits still load`() {
         val rules = SpoilerShield.decode("""{"channels":[{"id":"c1","login":"caster","name":"Caster"}],"categories":[{"id":"g1","name":"Chess"}]}""")
         assertEquals(listOf(ProtectedChannel("c1", "caster", "Caster")), rules.channels)
