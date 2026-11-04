@@ -9,6 +9,7 @@ import com.github.andreyasadchy.xtra.model.id.ValidationResponse
 import com.github.andreyasadchy.xtra.repository.AuthRepository
 import com.github.andreyasadchy.xtra.ui.main.MainViewModel
 import com.github.andreyasadchy.xtra.util.C
+import com.github.andreyasadchy.xtra.util.HttpTimeoutException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -323,6 +324,25 @@ class ReauthorizationTest {
             (failure as DeviceCodeLoginController.Rejected).reason,
         )
         assertNull(ReflectionHelpers.getField<ClipCredentials?>(other, "clipCredentials"))
+    }
+
+    @Test fun `a lost connection while validating keeps the clip approval, a refusal does not`() = runTest {
+        val repository = mock<AuthRepository>()
+        val activity = LoginActivity().apply { authRepository = repository }
+        whenever(repository.getToken(anyOrNull(), any())).thenReturn(TokenResponse("device-access", refreshToken = "device-refresh", expiresInSeconds = 14_000L))
+        whenever(repository.validate(anyOrNull(), any())).thenAnswer { throw HttpTimeoutException(20_000L) }
+        assertEquals(
+            DeviceCodeLoginController.Approval.Token("device-access"),
+            activity.checkClipDeviceApproval("OkHttp", "client", "private-code"),
+        )
+        assertEquals("device-refresh", ReflectionHelpers.getField<ClipCredentials?>(activity, "clipCredentials")?.refreshToken)
+
+        val refused = LoginActivity().apply { authRepository = repository }
+        reset(repository)
+        whenever(repository.getToken(anyOrNull(), any())).thenReturn(TokenResponse("device-access", refreshToken = "device-refresh", expiresInSeconds = 14_000L))
+        whenever(repository.validate(anyOrNull(), any())).thenThrow(IllegalStateException("401"))
+        val failure = runCatching { refused.checkClipDeviceApproval("OkHttp", "client", "private-code") }.exceptionOrNull()
+        assertEquals(DeviceCodeLoginController.Failure.VALIDATION_FAILED, (failure as DeviceCodeLoginController.Rejected).reason)
     }
 
     @Test fun `a pending clip device approval reports the same states as sign-in`() = runTest {

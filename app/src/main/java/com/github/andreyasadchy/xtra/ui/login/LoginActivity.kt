@@ -45,6 +45,8 @@ import com.google.android.material.slider.Slider
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import dagger.hilt.android.AndroidEntryPoint
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.util.regex.Pattern
@@ -669,13 +671,27 @@ class LoginActivity : AppCompatActivity() {
             "client_id=${URLEncoder.encode(clientId, "UTF-8")}&scopes=${URLEncoder.encode(ClipAuthorization.SCOPES, "UTF-8")}&device_code=${URLEncoder.encode(code, "UTF-8")}&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code")
         val token = response.token
         if (!token.isNullOrBlank()) {
-            if (clientId.isNullOrBlank() || !validateHelixToken(networkLibrary, clientId, token)) {
+            if (clientId.isNullOrBlank() || !clipGrantUsable(networkLibrary, clientId, token)) {
                 throw DeviceCodeLoginController.Rejected(DeviceCodeLoginController.Failure.VALIDATION_FAILED)
             }
             clipCredentials = ClipAuthorization.fromGrant(clientId, response, System.currentTimeMillis())
             return DeviceCodeLoginController.Approval.Token(token)
         }
         return deviceApprovalStatus(response.message)
+    }
+
+    /**
+     * Twitch just issued this token and its code works only once, so a lost connection must not
+     * cost the viewer their approval. A token that turns out to be bad is refused when used.
+     */
+    private suspend fun clipGrantUsable(networkLibrary: String?, clientId: String, token: String): Boolean = try {
+        authRepository.validate(networkLibrary, TwitchApiHelper.addTokenPrefixHelix(token)).clientId == clientId
+    } catch (_: IOException) {
+        true
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
     }
 
     private fun deviceApprovalStatus(message: String?): DeviceCodeLoginController.Approval = when (message) {

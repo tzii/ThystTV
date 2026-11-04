@@ -515,7 +515,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 activity.reauthorizeResultLauncher?.launch(Intent(activity, LoginActivity::class.java).putExtra(mode, true))
             }
             .create().also { dialog ->
-                dialog.setOnDismissListener { clipDialog = null }
+                dialog.setOnDismissListener { if (clipDialog === dialog) clipDialog = null }
                 dialog.show()
             }
     }
