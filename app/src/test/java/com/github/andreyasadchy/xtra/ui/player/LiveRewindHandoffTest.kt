@@ -1,16 +1,22 @@
 package com.github.andreyasadchy.xtra.ui.player
 
 import android.app.Application
+import android.content.SharedPreferences
 import androidx.fragment.app.FragmentManager
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.model.ui.Stream
+import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
+import com.github.andreyasadchy.xtra.util.C
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito
 import org.mockito.kotlin.*
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.ConscryptMode
 import org.robolectric.util.ReflectionHelpers
@@ -54,6 +60,25 @@ class LiveRewindHandoffTest {
         setup(pending = mock())
         assertFalse(activity.returnFromLiveRewind(source, origin))
         verify(activity, never()).startStream(any())
+    }
+
+    @Test fun `a replay refused while another session holds media reports failure`() {
+        setup()
+        ReflectionHelpers.setField(activity, "mBase", RuntimeEnvironment.getApplication())
+        val prefs: SharedPreferences = mock()
+        whenever(prefs.getString(C.PLAYER, "ExoPlayer")).thenReturn("MediaPlayer")
+        ReflectionHelpers.setField(activity, "prefs", prefs)
+        val session: Player = mock()
+        whenever(session.currentMediaItem).thenReturn(MediaItem.EMPTY)
+        PlaybackSessionOwner.register(session)
+        try {
+            val prepared = PreparedLiveRewind(origin, Video(), "playlist", 0L, local = true)
+            assertFalse("so the caller releases the buffer it pinned", activity.startLiveRewind(source, prepared))
+            verify(manager, never()).beginTransaction()
+            verify(source, never()).close()
+        } finally {
+            PlaybackSessionOwner.unregister(session)
+        }
     }
 
     @Test fun `saved activity and closed player reject source handoff`() {

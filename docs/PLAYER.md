@@ -486,8 +486,9 @@ leaves a gap; the rewind distance is measured from the newest saved segment, a f
 ahead of the viewer's position; a process death ends the replay and returns to live; a
 replay that falls back to live while offline starts a new buffer if the player stays blank
 past the 30-second grace period, since nothing starts until the network returns; changing
-the player backend during a session makes the next rewind fail back to live, since only the
-default backend plays a local replay.
+the player backend during a session means the next rewind can't play locally, since only the
+default backend plays a local replay: live carries on with a message while the default player
+still holds the stream, and otherwise it falls back to live.
 
 ## VoD seek previews
 

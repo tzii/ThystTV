@@ -825,8 +825,7 @@ class MainActivity : AppCompatActivity() {
             putLong(LiveRewind.POSITION, prepared.positionMs)
             putBoolean(LiveRewind.LOCAL, prepared.local)
         }
-        startPlayer(fragment)
-        return true
+        return startPlayer(fragment)
     }
 
     internal fun returnFromLiveRewind(source: PlayerFragment, origin: Stream): Boolean {
@@ -879,13 +878,14 @@ class MainActivity : AppCompatActivity() {
 
 //Player methods
 
-    private fun startPlayer(fragment: PlayerFragment) {
+    /** False when it was refused and the current player carries on. */
+    private fun startPlayer(fragment: PlayerFragment): Boolean {
         val previous = supportFragmentManager.findFragmentById(R.id.playerContainer) as? PlayerFragment
         // Closing a visible Media3 fragment sends asynchronous service commands.
         // Do not start another backend until the service has actually released its media.
         if (fragment !is Media3Fragment && PlaybackSessionOwner.hasMedia()) {
             Toast.makeText(this, R.string.player_session_in_use, Toast.LENGTH_LONG).show()
-            return
+            return false
         }
         previous?.close()
         playerFragment = fragment
@@ -898,6 +898,7 @@ class MainActivity : AppCompatActivity() {
         ) {
             setPictureInPictureParams(PictureInPictureParams.Builder().setAutoEnterEnabled(true).build())
         }
+        return true
     }
 
     fun closePlayer(sourceFragment: PlayerFragment? = null) {
