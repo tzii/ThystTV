@@ -496,6 +496,37 @@ Turn on Player settings → Gestures → Extended zoom.
   an error within about 20 seconds, on OkHttp, Cronet and HttpEngine. Leaving the
   screen cancels at once, and a later sign-in works normally.
 
+### Create clip
+
+- [ ] Signed in after this version: More > Create clip on a live channel opens options
+  while video and audio keep playing. Create shows Clip created. Share sends a working
+  link; Edit opens Twitch's editor; the clip contains the moment just watched.
+- [ ] Title and length: a title up to 100 characters and lengths of 5, 30 and 60
+  seconds appear on the published clip. A blank title uses Twitch's default. Reopening
+  the dialog remembers the last choice. A title Twitch rejects reopens the dialog with
+  the rejection message, keeping what was typed.
+- [ ] Player button: off by default. Turn on Create clip in Player buttons settings and
+  it appears in the live player only, in portrait and landscape, and matches the More
+  action. Check 360dp width and 200% text with the other optional buttons on.
+- [ ] Signed in from an earlier version: Create clip offers sign-in; cancelling it, or
+  leaving the login screen, keeps the sign-in and playback. Finishing with the same
+  account retries the clip automatically with no restart. A different account restarts
+  the app on that account. Check background audio.
+- [ ] Android TV: Create clip shows a code to approve on another device. The TV's sign-in
+  doesn't change, and the clip then works. A later clip reuses the grant; after about
+  4 hours it refreshes without a new code. Check D-pad through the dialog and slider.
+- [ ] Refusals: subscriber/follower-only clips and clips disabled show a readable
+  message and playback continues; 503 says temporarily unavailable. Repeated
+  Create clip taps while processing show feedback without duplicate requests.
+- [ ] Tap, then minimize or enter PiP: nothing opens until the player is maximized.
+  Rotate during the wait: one result only. Close the player: no late dialog.
+- [ ] After Clip created is already visible, minimize, enter PiP or background
+  the app. Returning to the full player restores its links. Close/Back/outside,
+  Edit and Share acknowledge it, so it does not reopen after a later return.
+- [ ] Recording replay, local replay, VoDs, clips and downloads do not show Create clip;
+  hiding it in Player menu settings works. Check OkHttp, Cronet and HttpEngine network
+  libraries, and that a stalled connection gives up instead of waiting indefinitely.
+
 ### VoD seek previews (performance stack)
 
 - [ ] Finished online VoD: drag slowly, quickly and across sprite-sheet boundaries;

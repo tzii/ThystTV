@@ -306,6 +306,17 @@
             tools:visibility="visible" />
 
         <ImageButton
+            android:id="@+id/createClipButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/clip_create"
+            android:src="@drawable/baseline_content_cut_24"
+            android:visibility="gone"
+            app:tint="@android:color/white"
+            tools:visibility="visible" />
+
+        <ImageButton
             android:id="@+id/volume"
             android:layout_width="40dp"
             android:layout_height="40dp"

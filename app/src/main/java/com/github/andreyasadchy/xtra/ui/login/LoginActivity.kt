@@ -152,6 +152,7 @@ class LoginActivity : AppCompatActivity() {
                 "channel:moderate",
                 "chat:edit", // irc
                 "chat:read", // irc
+                "clips:edit", // clips
                 "moderator:manage:announcements", // chat/announcements
                 "moderator:manage:banned_users", // moderation/bans
                 "moderator:manage:chat_messages", // moderation/chat

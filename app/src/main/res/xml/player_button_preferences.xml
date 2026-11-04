@@ -17,6 +17,13 @@
 
     <SwitchPreferenceCompat
         android:defaultValue="false"
+        android:key="player_clip_button"
+        android:title="@string/clip_create"
+        android:icon="@drawable/baseline_content_cut_24"
+        app:singleLineTitle="false" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
         android:key="player_follow"
         android:title="@string/follow"
         android:icon="@drawable/baseline_favorite_border_black_24"
