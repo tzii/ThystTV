@@ -70,7 +70,9 @@ internal data class ProtectedChannel(
 ) {
     fun matches(subject: SpoilerSubject): Boolean =
         if (!id.isNullOrBlank() && !subject.channelId.isNullOrBlank()) id == subject.channelId
-        else !login.isNullOrBlank() && login.equals(subject.channelLogin, true)
+        else (!login.isNullOrBlank() && login.equals(subject.channelLogin, true)) ||
+            // A name typed in Settings may be a display name, which isn't the channel's login.
+            (id.isNullOrBlank() && !name.isNullOrBlank() && name.equals(subject.channelName, true))
 
     fun sameChannel(other: ProtectedChannel): Boolean =
         if (!id.isNullOrBlank() && !other.id.isNullOrBlank()) id == other.id

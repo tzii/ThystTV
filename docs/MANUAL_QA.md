@@ -515,7 +515,8 @@ Turn on Player settings → Gestures → Extended zoom.
   again at its next bind, and the rule is gone from Settings.
 - [ ] Settings > UI > Protected channels and categories: Add a channel and Add a
   category search Twitch; pick a match or use the name exactly as typed. Cancel while
-  a search is running closes immediately. Offline, the typed name is still offered.
+  a search is running closes immediately. Offline, the typed name is still offered,
+  and a channel typed by its display name is protected too.
 - [ ] Player: open a protected live stream, VoD and clip. The title shows Title hidden,
   and tapping it reveals the title for that player only. The media notification and
   lock screen also say Title hidden. With Hide titles off, the title shows normally.
