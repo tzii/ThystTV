@@ -106,7 +106,7 @@ class LoginActivity : AppCompatActivity() {
             val oldGQLToken = gqlHeaders[C.HEADER_TOKEN]?.removePrefix("OAuth ")
             val oldGQLWebToken = tokenPrefs().getString(C.GQL_TOKEN_WEB, null)
             if (!preservesSignIn) {
-                Reauthorization.takePendingRevocations(tokenPrefs()).forEach { authRepository.revokeInBackground(networkLibrary, it) }
+                Reauthorization.revokePending(tokenPrefs()) { body, answered -> authRepository.revokeInBackground(networkLibrary, body, answered) }
                 ClipAuthorization.load(tokenPrefs())?.let { clip ->
                     ClipAuthorization.clear(tokenPrefs())
                     authRepository.revokeInBackground(networkLibrary, RevokeTarget(clip.clientId, clip.token).body)
@@ -829,7 +829,7 @@ class LoginActivity : AppCompatActivity() {
         Reauthorization.commit(tokenPrefs(), plan, newToken, userId, userLogin)
         plan.revokeNow.forEach { authRepository.revokeInBackground(networkLibrary, it.body) }
         if (plan.accountChanged) {
-            Reauthorization.takePendingRevocations(tokenPrefs()).forEach { authRepository.revokeInBackground(networkLibrary, it) }
+            Reauthorization.revokePending(tokenPrefs()) { body, answered -> authRepository.revokeInBackground(networkLibrary, body, answered) }
         }
         setResult(RESULT_OK, Intent().putExtra(EXTRA_ACCOUNT_CHANGED, plan.accountChanged))
         finish()

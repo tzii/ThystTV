@@ -20,6 +20,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.*
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.times
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
@@ -69,8 +72,7 @@ class ReauthorizationTest {
         val plan = Reauthorization.plan(signIn, "new-helix", "1", "viewer")
         assertTrue("nothing is revoked while pages are still loading with it", plan.revokeNow.isEmpty())
         Reauthorization.commit(prefs, plan, "new-helix", "1", "viewer")
-        assertEquals(setOf("client_id=helix-client&token=old-helix"), Reauthorization.takePendingRevocations(prefs))
-        assertTrue("handed out once", Reauthorization.takePendingRevocations(prefs).isEmpty())
+        assertEquals(setOf("client_id=helix-client&token=old-helix"), Reauthorization.pendingRevocations(prefs))
     }
 
     @Test fun `tokens replaced in turn all wait, and one issued again is never revoked`() {
@@ -82,7 +84,7 @@ class ReauthorizationTest {
         Reauthorization.commit(prefs, Reauthorization.plan(third, "old-helix", "1", "viewer"), "old-helix", "1", "viewer")
         assertEquals(
             setOf("client_id=helix-client&token=second", "client_id=helix-client&token=third"),
-            Reauthorization.takePendingRevocations(prefs),
+            Reauthorization.pendingRevocations(prefs),
         )
     }
 
@@ -94,7 +96,7 @@ class ReauthorizationTest {
         assertTrue(RevokeTarget("client", "access") in plan.revokeNow)
         Reauthorization.commit(prefs, plan, "new-helix", "2", "other")
         assertNull(ClipAuthorization.load(prefs))
-        assertTrue(Reauthorization.takePendingRevocations(prefs).isEmpty())
+        assertTrue(Reauthorization.pendingRevocations(prefs).isEmpty())
     }
 
     @Test fun `the same account keeps its clip grant`() {
@@ -118,9 +120,37 @@ class ReauthorizationTest {
         storeSignIn()
         Reauthorization.commit(prefs, Reauthorization.plan(signIn, "new-helix", "1", "viewer"), "new-helix", "1", "viewer")
         running.revokePendingTokens("OkHttp", prefs)
-        verify(auth, never()).revokeInBackground(anyOrNull(), any())
+        verify(auth, never()).revokeInBackground(anyOrNull(), any(), any())
         mainViewModel(auth).revokePendingTokens("OkHttp", prefs)
-        verify(auth).revokeInBackground("OkHttp", "client_id=helix-client&token=old-helix")
+        verify(auth).revokeInBackground(eq("OkHttp"), eq("client_id=helix-client&token=old-helix"), any())
+    }
+
+    @Test fun `a replaced token stays listed until Twitch answers, and is tried again at the next start`() {
+        val auth = mock<AuthRepository>()
+        val body = "client_id=helix-client&token=old-helix"
+        storeSignIn()
+        Reauthorization.commit(prefs, Reauthorization.plan(signIn, "new-helix", "1", "viewer"), "new-helix", "1", "viewer")
+        mainViewModel(auth).revokePendingTokens("OkHttp", prefs)
+        val answered = argumentCaptor<() -> Unit>()
+        verify(auth).revokeInBackground(eq("OkHttp"), eq(body), answered.capture())
+        assertEquals("a lost connection must not lose it", setOf(body), Reauthorization.pendingRevocations(prefs))
+        mainViewModel(auth).revokePendingTokens("OkHttp", prefs)
+        verify(auth, times(2)).revokeInBackground(eq("OkHttp"), eq(body), any())
+        answered.firstValue.invoke()
+        assertTrue(Reauthorization.pendingRevocations(prefs).isEmpty())
+        mainViewModel(auth).revokePendingTokens("OkHttp", prefs)
+        verify(auth, times(2)).revokeInBackground(eq("OkHttp"), eq(body), any())
+    }
+
+    @Test fun `a listed token signed in with again leaves the list unrevoked`() {
+        prefs.edit()
+            .putStringSet(C.PENDING_TOKEN_REVOCATIONS, setOf("client_id=helix-client&token=in-use"))
+            .putString(C.TOKEN, "in-use")
+            .apply()
+        val revoked = mutableListOf<String>()
+        Reauthorization.revokePending(prefs) { body, _ -> revoked += body }
+        assertTrue(revoked.isEmpty())
+        assertTrue(Reauthorization.pendingRevocations(prefs).isEmpty())
     }
 
     @Test fun `a different account replaces everything and restarts`() {

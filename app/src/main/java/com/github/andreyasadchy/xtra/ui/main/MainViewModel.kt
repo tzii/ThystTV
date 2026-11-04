@@ -845,7 +845,7 @@ class MainViewModel @Inject constructor(
     fun revokePendingTokens(networkLibrary: String?, tokenPrefs: SharedPreferences) {
         if (checkedPendingRevocations) return
         checkedPendingRevocations = true
-        Reauthorization.takePendingRevocations(tokenPrefs).forEach { authRepository.revokeInBackground(networkLibrary, it) }
+        Reauthorization.revokePending(tokenPrefs) { body, answered -> authRepository.revokeInBackground(networkLibrary, body, answered) }
     }
 
     fun validate(networkLibrary: String?, gqlHeaders: Map<String, String>, gqlWebClientId: String?, gqlWebToken: String?, helixHeaders: Map<String, String>, accountId: String?, accountLogin: String?, activity: Activity) {
