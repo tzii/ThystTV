@@ -490,6 +490,7 @@ Turn on Player settings → Gestures → Extended zoom.
 - [ ] Complete it with the same account: no restart, the current sign-in continues
   and its features work. Scroll on through Following loaded before signing in: more
   channels still load. The old token is revoked the next time the app starts or on Log out.
+  If that request fails, the next app start tries again.
 - [ ] Complete it with a different account: the app restarts on the new account.
 - [ ] Log in and Log out from the menu behave as before, including restart.
 - [ ] Network cancellation: airplane mode or a stalled connection during sign-in shows

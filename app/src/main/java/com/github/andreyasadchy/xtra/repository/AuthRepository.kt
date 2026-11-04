@@ -6,6 +6,7 @@ import com.github.andreyasadchy.xtra.model.id.TokenResponse
 import com.github.andreyasadchy.xtra.model.id.ValidationResponse
 import com.github.andreyasadchy.xtra.util.CancellableHttp
 import dagger.Lazy
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,17 +41,23 @@ class AuthRepository @Inject constructor(
         json.decodeFromString<ValidationResponse>(response.body)
     }
 
-    suspend fun revoke(networkLibrary: String?, body: String) {
-        postForm(networkLibrary, "https://id.twitch.tv/oauth2/revoke", body)
+    /**
+     * Whether Twitch gave a final answer. A token it no longer knows gets a 400, which counts because
+     * nothing is left to revoke. A failed request, a 429 or a 5xx says nothing about the token.
+     */
+    suspend fun revoke(networkLibrary: String?, body: String): Boolean = try {
+        val status = post(networkLibrary, "https://id.twitch.tv/oauth2/revoke", body).status
+        status != 429 && status < 500
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
     }
 
-    /** Revoke a replaced token without delaying or depending on the caller; a failure is not actionable. */
-    fun revokeInBackground(networkLibrary: String?, body: String) {
+    /** Revoke a replaced token without delaying or depending on the caller. */
+    fun revokeInBackground(networkLibrary: String?, body: String, onAnswered: () -> Unit = {}) {
         backgroundScope.launch {
-            try {
-                revoke(networkLibrary, body)
-            } catch (_: Exception) {
-            }
+            if (revoke(networkLibrary, body)) onAnswered()
         }
     }
 
@@ -68,11 +75,14 @@ class AuthRepository @Inject constructor(
         "client_id=${URLEncoder.encode(clientId, "UTF-8")}&grant_type=refresh_token&refresh_token=${URLEncoder.encode(refreshToken, "UTF-8")}",
     )
 
-    private suspend fun postForm(networkLibrary: String?, url: String, body: String): String = http.execute(
+    private suspend fun postForm(networkLibrary: String?, url: String, body: String): String =
+        post(networkLibrary, url, body).body
+
+    private suspend fun post(networkLibrary: String?, url: String, body: String) = http.execute(
         networkLibrary,
         url,
         method = "POST",
         headers = mapOf("Content-Type" to "application/x-www-form-urlencoded"),
         body = body.toByteArray(),
-    ).body
+    )
 }

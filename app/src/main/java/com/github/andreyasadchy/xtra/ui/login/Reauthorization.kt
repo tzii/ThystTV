@@ -66,7 +66,9 @@ internal object Reauthorization {
         )
     }
 
-    fun commit(tokenPrefs: SharedPreferences, plan: Plan, newHelixToken: String, newUserId: String?, newLogin: String?) {
+    private val revocationLock = Any()
+
+    fun commit(tokenPrefs: SharedPreferences, plan: Plan, newHelixToken: String, newUserId: String?, newLogin: String?) = synchronized(revocationLock) {
         val pending = pendingRevocations(tokenPrefs) + plan.revoke.filter { !plan.accountChanged }.map { it.body }
         tokenPrefs.edit {
             putString(C.TOKEN, newHelixToken)
@@ -87,14 +89,28 @@ internal object Reauthorization {
         }
     }
 
-    /** Replaced tokens no screen can still be using. Each is handed out once. */
-    fun takePendingRevocations(tokenPrefs: SharedPreferences): Set<String> {
-        val pending = pendingRevocations(tokenPrefs)
-        if (pending.isNotEmpty()) tokenPrefs.edit { remove(C.PENDING_TOKEN_REVOCATIONS) }
-        return pending
+    /**
+     * Revoke replaced tokens no screen can still be using. Each stays listed until Twitch answers
+     * for it, so a lost connection only delays it to the next app start. A token signed in with
+     * again is back in use, so it leaves the list unrevoked.
+     */
+    fun revokePending(tokenPrefs: SharedPreferences, revoke: (body: String, onAnswered: () -> Unit) -> Unit) {
+        val current = tokenPrefs.getString(C.TOKEN, null)
+        pendingRevocations(tokenPrefs).forEach { body ->
+            if (!current.isNullOrEmpty() && body.endsWith("&token=$current")) {
+                forgetRevocation(tokenPrefs, body)
+            } else {
+                revoke(body) { forgetRevocation(tokenPrefs, body) }
+            }
+        }
     }
 
-    private fun pendingRevocations(tokenPrefs: SharedPreferences): Set<String> =
+    /** Answers arrive on a background thread, while [commit] adds to the same list. */
+    private fun forgetRevocation(tokenPrefs: SharedPreferences, body: String) = synchronized(revocationLock) {
+        tokenPrefs.edit { putStringSet(C.PENDING_TOKEN_REVOCATIONS, pendingRevocations(tokenPrefs) - body) }
+    }
+
+    fun pendingRevocations(tokenPrefs: SharedPreferences): Set<String> =
         tokenPrefs.getStringSet(C.PENDING_TOKEN_REVOCATIONS, null).orEmpty().toSet()
 
     private fun isSameAccount(current: CurrentSignIn, newUserId: String?, newLogin: String?): Boolean =
