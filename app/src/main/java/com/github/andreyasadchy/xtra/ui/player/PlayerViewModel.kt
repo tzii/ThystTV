@@ -115,7 +115,8 @@ class PlayerViewModel @Inject constructor(
     var shouldRetry = true
     /** True only while the initial recording handoff is starting; not restored after process death. */
     internal var liveRewindPending = false
-    internal var spoilerTitleRevealed = false
+    /** The protected title the viewer chose to see. A new live title stays hidden until revealed too. */
+    internal var spoilerRevealedTitle: String? = null
     internal var liveRewindFailed = false
     /** A rewind result arrived while minimized or backgrounded and was not applied. */
     internal var liveRewindDropped = false

@@ -77,8 +77,20 @@ class PlayerTitleProtectionTest {
         binding.playerControls.title.performClick()
         assertEquals("Secret", shownTitle)
         fragment.refreshPlayerTitleProtection()
-        assertFalse(model.spoilerTitleRevealed)
+        assertEquals(null, model.spoilerRevealedTitle)
         assertEquals(hiddenLabel, shownTitle)
+    }
+
+    @Test fun `a reveal covers only the title it showed, not the next live title`() {
+        protectChannel()
+        fragment.refreshPlayerTitleProtection()
+        binding.playerControls.title.performClick()
+        fragment.updateStreamInfo("Secret", "g1", "chess", "Chess")
+        assertEquals("the same title stays revealed", "Secret", shownTitle)
+        fragment.updateStreamInfo("Winner: someone", "g1", "chess", "Chess")
+        assertEquals(hiddenLabel, shownTitle)
+        binding.playerControls.title.performClick()
+        assertEquals("Winner: someone", shownTitle)
     }
 
     @Test fun `the media title follows a live category change`() {

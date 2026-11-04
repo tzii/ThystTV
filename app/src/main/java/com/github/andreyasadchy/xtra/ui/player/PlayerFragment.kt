@@ -2811,11 +2811,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         boundTitle = visibleTitle
         boundGameId = gameId
         boundGameName = gameName
-        if (!view.isVisible || visibleTitle.isNullOrBlank() || viewModel.spoilerTitleRevealed) return
+        if (!view.isVisible || visibleTitle.isNullOrBlank() || viewModel.spoilerRevealedTitle == visibleTitle) return
         if (!SpoilerShield.hidesTitle(requireContext().prefs(), playerSpoilerSubject(gameId, gameName))) return
         view.text = getString(R.string.spoiler_shield_title_hidden)
         view.setOnClickListener {
-            viewModel.spoilerTitleRevealed = true
+            viewModel.spoilerRevealedTitle = visibleTitle
             view.text = visibleTitle
             view.setOnClickListener { Toast.makeText(requireContext(), visibleTitle, Toast.LENGTH_SHORT).show() }
         }
@@ -2826,7 +2826,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         if (_binding == null) return
         val title = boundTitle?.takeIf { it.isNotBlank() } ?: return
         val view = binding.playerControls.title
-        viewModel.spoilerTitleRevealed = false
+        viewModel.spoilerRevealedTitle = null
         view.text = title
         view.setOnClickListener { Toast.makeText(requireContext(), title, Toast.LENGTH_SHORT).show() }
         protectPlayerTitle(boundGameId, boundGameName)
