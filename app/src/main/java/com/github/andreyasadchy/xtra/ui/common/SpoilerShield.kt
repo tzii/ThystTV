@@ -72,11 +72,14 @@ internal data class ProtectedChannel(
         if (!id.isNullOrBlank() && !subject.channelId.isNullOrBlank()) id == subject.channelId
         else (!login.isNullOrBlank() && login.equals(subject.channelLogin, true)) ||
             // A name typed in Settings may be a display name, which isn't the channel's login.
-            (id.isNullOrBlank() && !name.isNullOrBlank() && name.equals(subject.channelName, true))
+            (id.isNullOrBlank() && sameName(subject.channelName))
 
     fun sameChannel(other: ProtectedChannel): Boolean =
         if (!id.isNullOrBlank() && !other.id.isNullOrBlank()) id == other.id
-        else !login.isNullOrBlank() && login.equals(other.login, true)
+        else (!login.isNullOrBlank() && login.equals(other.login, true)) || sameName(other.name)
+
+    /** Display names can carry stray spaces, which a typed name won't have. */
+    private fun sameName(other: String?) = !name.isNullOrBlank() && name.trim().equals(other?.trim(), true)
 
     fun isActive(now: Long) = expiresAt == null || expiresAt > now
 }

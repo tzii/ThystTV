@@ -516,7 +516,8 @@ Turn on Player settings → Gestures → Extended zoom.
 - [ ] Settings > UI > Protected channels and categories: Add a channel and Add a
   category search Twitch; pick a match or use the name exactly as typed. Cancel while
   a search is running closes immediately. Offline, the typed name is still offered,
-  and a channel typed by its display name is protected too.
+  and a channel typed by its display name is protected too. Pick that channel from search with
+  a time limit: one rule remains, and protection ends when the limit does.
 
 ### VoD seek previews (performance stack)
 

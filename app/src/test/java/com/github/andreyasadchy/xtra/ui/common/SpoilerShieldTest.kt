@@ -134,6 +134,23 @@ class SpoilerShieldTest {
         val rules = SpoilerShieldRules().withChannel(ProtectedChannel(login = "some name", name = "Some Name"))
         assertTrue(rules.protects(SpoilerSubject(key = "a", channelLogin = "somename", channelName = "Some Name")))
         assertFalse(rules.protects(SpoilerSubject(key = "b", channelLogin = "other", channelName = "Other")))
+        assertTrue(rules.protects(SpoilerSubject(key = "c", channelLogin = "somename", channelName = " some name ")))
+    }
+
+    @Test fun `picking a channel from a search replaces it typed by display name, so its time limit holds`() {
+        val rules = SpoilerShieldRules()
+            .withChannel(ProtectedChannel(login = "some name", name = "Some Name"))
+            .withChannel(ProtectedChannel(id = "c9", login = "somename", name = "Some Name", expiresAt = 100L))
+        assertEquals(listOf(ProtectedChannel("c9", "somename", "Some Name", 100L)), rules.channels)
+        val subject = SpoilerSubject(key = "a", channelId = "c9", channelLogin = "somename", channelName = "Some Name")
+        assertFalse(rules.active(200L).protects(subject))
+    }
+
+    @Test fun `two channels with ids stay separate even with the same display name`() {
+        val rules = SpoilerShieldRules()
+            .withChannel(ProtectedChannel(id = "c1", login = "first", name = "Same Name"))
+            .withChannel(ProtectedChannel(id = "c2", login = "second", name = "Same Name"))
+        assertEquals(2, rules.channels.size)
     }
 
     @Test fun `a rule from a search goes by its id, not a matching name`() {
