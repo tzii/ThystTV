@@ -488,7 +488,9 @@ replay that falls back to live while offline starts a new buffer if the player s
 past the 30-second grace period, since nothing starts until the network returns; changing
 the player backend during a session means the next rewind can't play locally, since only the
 default backend plays a local replay: live carries on with a message while the default player
-still holds the stream, and otherwise it falls back to live.
+still holds the stream, and otherwise it falls back to live. Go live from a replay already
+running when the backend changed is refused with the same message, so the replay stays on
+screen until the player is closed.
 
 ## VoD seek previews
 
