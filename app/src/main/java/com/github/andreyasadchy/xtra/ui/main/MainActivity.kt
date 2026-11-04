@@ -279,6 +279,7 @@ class MainActivity : AppCompatActivity() {
                                 initialized = true
                             }
                             if (isNetworkAvailable) {
+                                viewModel.revokePendingTokens(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), tokenPrefs())
                                 if (!TwitchApiHelper.checkedValidation && prefs.getBoolean(C.VALIDATE_TOKENS, true)) {
                                     viewModel.validate(
                                         prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),

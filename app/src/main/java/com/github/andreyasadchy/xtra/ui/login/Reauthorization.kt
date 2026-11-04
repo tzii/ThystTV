@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.github.andreyasadchy.xtra.model.id.TokenResponse
 import com.github.andreyasadchy.xtra.util.C
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 
 internal data class RevokeTarget(val clientId: String, val token: String) {
@@ -20,6 +21,8 @@ internal data class CurrentSignIn(
     val gqlWebToken: String? = null,
     val userId: String? = null,
     val login: String? = null,
+    val clipClientId: String? = null,
+    val clipToken: String? = null,
 ) {
     val isSignedIn get() = !helixToken.isNullOrBlank() || !gqlToken.isNullOrBlank() || !gqlWebToken.isNullOrBlank()
 }
@@ -28,16 +31,24 @@ internal data class CurrentSignIn(
  * Reauthorizing adds Helix permissions without touching the current sign-in until a new
  * token is validated, so cancelling leaves everything as it was. Nothing is written or
  * revoked before [commit]; its single edit swaps the tokens atomically.
+ *
+ * With the same account nothing restarts, and what is already on screen keeps sending the
+ * old token because nothing tells it the token changed. So that token stays valid until no
+ * screen from before can be using it: the next app start, or logging out.
  */
 internal object Reauthorization {
     data class Plan(
         /** The app restarts only when the signed-in account differs from the one on screen. */
         val accountChanged: Boolean,
         val revoke: List<RevokeTarget>,
-    )
+    ) {
+        /** With an account change everything restarts, so nothing can still be using these. */
+        val revokeNow get() = if (accountChanged) revoke else emptyList()
+    }
 
     fun plan(current: CurrentSignIn, newHelixToken: String, newUserId: String?, newLogin: String?): Plan {
-        if (!current.isSignedIn) return Plan(accountChanged = true, revoke = emptyList())
+        val clip = target(current.clipClientId, current.clipToken)
+        if (!current.isSignedIn) return Plan(accountChanged = true, revoke = listOfNotNull(clip))
         if (isSameAccount(current, newUserId, newLogin)) {
             return Plan(
                 accountChanged = false,
@@ -50,11 +61,13 @@ internal object Reauthorization {
                 target(current.helixClientId, current.helixToken),
                 target(current.gqlClientId, current.gqlToken).takeIf { current.gqlToken != current.gqlWebToken },
                 target(current.gqlWebClientId, current.gqlWebToken),
+                clip,
             ).filter { it.token != newHelixToken },
         )
     }
 
     fun commit(tokenPrefs: SharedPreferences, plan: Plan, newHelixToken: String, newUserId: String?, newLogin: String?) {
+        val pending = pendingRevocations(tokenPrefs) + plan.revoke.filter { !plan.accountChanged }.map { it.body }
         tokenPrefs.edit {
             putString(C.TOKEN, newHelixToken)
             putString(C.USER_ID, newUserId)
@@ -64,9 +77,25 @@ internal object Reauthorization {
                 putLong(C.INTEGRITY_EXPIRATION, 0)
                 putString(C.GQL_TOKEN2, null)
                 putString(C.GQL_TOKEN_WEB, null)
+                remove(C.CLIP_CLIENT_ID)
+                remove(C.CLIP_TOKEN)
+                remove(C.CLIP_REFRESH_TOKEN)
+                remove(C.CLIP_TOKEN_EXPIRES_AT)
             }
+            // A token issued again is back in use, so it must not be revoked later.
+            putStringSet(C.PENDING_TOKEN_REVOCATIONS, pending.filterNot { it.endsWith("&token=$newHelixToken") }.toSet())
         }
     }
+
+    /** Replaced tokens no screen can still be using. Each is handed out once. */
+    fun takePendingRevocations(tokenPrefs: SharedPreferences): Set<String> {
+        val pending = pendingRevocations(tokenPrefs)
+        if (pending.isNotEmpty()) tokenPrefs.edit { remove(C.PENDING_TOKEN_REVOCATIONS) }
+        return pending
+    }
+
+    private fun pendingRevocations(tokenPrefs: SharedPreferences): Set<String> =
+        tokenPrefs.getStringSet(C.PENDING_TOKEN_REVOCATIONS, null).orEmpty().toSet()
 
     private fun isSameAccount(current: CurrentSignIn, newUserId: String?, newLogin: String?): Boolean =
         if (!current.userId.isNullOrBlank() && !newUserId.isNullOrBlank()) current.userId == newUserId
@@ -75,6 +104,9 @@ internal object Reauthorization {
     private fun target(clientId: String?, token: String?): RevokeTarget? =
         if (clientId.isNullOrBlank() || token.isNullOrBlank()) null else RevokeTarget(clientId, token)
 }
+
+/** Logging out or approving again while a refresh ran made the grant it renewed obsolete. */
+internal class ClipGrantChanged : IOException("The clip grant changed during a refresh")
 
 internal data class ClipCredentials(
     val clientId: String,
@@ -120,6 +152,11 @@ internal object ClipAuthorization {
         }
     }
 
+    /** A rejection says nothing about a grant approved since that request was sent. */
+    fun clearIfCurrent(prefs: SharedPreferences, credentials: ClipCredentials) {
+        if (load(prefs) == credentials) clear(prefs)
+    }
+
     /** Null when Twitch's response carries no access token. */
     fun fromGrant(clientId: String, response: TokenResponse, now: Long, previousRefreshToken: String? = null): ClipCredentials? {
         val token = response.token?.takeUnless { it.isBlank() } ?: return null
@@ -135,10 +172,16 @@ internal object ClipAuthorization {
      * A usable token, refreshed if needed, or null when the viewer must approve again. A
      * network failure while refreshing an expired token propagates, because the grant may
      * still be good: the caller reports a failed attempt instead of asking to sign in.
+     *
+     * A refresh can outlive the grant it renews, so its result is used only if that grant is
+     * still the stored one. Otherwise this throws [ClipGrantChanged], and [discard] receives
+     * the renewed token so it can be revoked. The checks and every change to the grant run on
+     * the main thread, so nothing can slip in between a check and what follows it.
      */
     suspend fun current(
         prefs: SharedPreferences,
         now: Long,
+        discard: (ClipCredentials) -> Unit = {},
         refresh: suspend (ClipCredentials) -> TokenResponse,
     ): ClipCredentials? {
         val credentials = load(prefs) ?: return null
@@ -153,10 +196,15 @@ internal object ClipAuthorization {
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
+            if (load(prefs) != credentials) throw ClipGrantChanged()
             if (now < credentials.expiresAt) return credentials
             throw failure
         }
         val renewed = fromGrant(credentials.clientId, response, now, credentials.refreshToken)
+        if (load(prefs) != credentials) {
+            renewed?.let(discard)
+            throw ClipGrantChanged()
+        }
         if (renewed == null) {
             clear(prefs)
             return null

@@ -106,6 +106,7 @@ class LoginActivity : AppCompatActivity() {
             val oldGQLToken = gqlHeaders[C.HEADER_TOKEN]?.removePrefix("OAuth ")
             val oldGQLWebToken = tokenPrefs().getString(C.GQL_TOKEN_WEB, null)
             if (!preservesSignIn) {
+                Reauthorization.takePendingRevocations(tokenPrefs()).forEach { authRepository.revokeInBackground(networkLibrary, it) }
                 ClipAuthorization.load(tokenPrefs())?.let { clip ->
                     ClipAuthorization.clear(tokenPrefs())
                     authRepository.revokeInBackground(networkLibrary, RevokeTarget(clip.clientId, clip.token).body)
@@ -806,6 +807,7 @@ class LoginActivity : AppCompatActivity() {
         val networkLibrary = prefs().getString(C.NETWORK_LIBRARY, "OkHttp")
         val helixHeaders = TwitchApiHelper.getHelixHeaders(this)
         val gqlHeaders = TwitchApiHelper.getGQLHeaders(this, true)
+        val clip = ClipAuthorization.load(tokenPrefs())
         val plan = Reauthorization.plan(
             CurrentSignIn(
                 helixClientId = helixHeaders[C.HEADER_CLIENT_ID],
@@ -816,6 +818,8 @@ class LoginActivity : AppCompatActivity() {
                 gqlWebToken = tokenPrefs().getString(C.GQL_TOKEN_WEB, null),
                 userId = tokenPrefs().getString(C.USER_ID, null),
                 login = tokenPrefs().getString(C.USERNAME, null),
+                clipClientId = clip?.clientId,
+                clipToken = clip?.token,
             ),
             newToken,
             userId,
@@ -823,7 +827,10 @@ class LoginActivity : AppCompatActivity() {
         )
         TwitchApiHelper.checkedValidation = true
         Reauthorization.commit(tokenPrefs(), plan, newToken, userId, userLogin)
-        plan.revoke.forEach { authRepository.revokeInBackground(networkLibrary, it.body) }
+        plan.revokeNow.forEach { authRepository.revokeInBackground(networkLibrary, it.body) }
+        if (plan.accountChanged) {
+            Reauthorization.takePendingRevocations(tokenPrefs()).forEach { authRepository.revokeInBackground(networkLibrary, it) }
+        }
         setResult(RESULT_OK, Intent().putExtra(EXTRA_ACCOUNT_CHANGED, plan.accountChanged))
         finish()
     }

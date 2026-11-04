@@ -3,6 +3,7 @@ package com.github.andreyasadchy.xtra.ui.main
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.http.HttpEngine
 import android.os.Build
 import android.os.ext.SdkExtensions
@@ -34,6 +35,7 @@ import com.github.andreyasadchy.xtra.repository.PlayerRepository
 import com.github.andreyasadchy.xtra.ui.download.StreamDownloadWorker
 import com.github.andreyasadchy.xtra.ui.download.VideoDownloadWorker
 import com.github.andreyasadchy.xtra.ui.login.LoginActivity
+import com.github.andreyasadchy.xtra.ui.login.Reauthorization
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
@@ -832,6 +834,18 @@ class MainViewModel @Inject constructor(
                     .build()
             )
         }
+    }
+
+    private var checkedPendingRevocations = false
+
+    /**
+     * Once per set of screens, so what a reauthorization replaces during this one waits for the
+     * next: until then, screens already loaded may still be sending it.
+     */
+    fun revokePendingTokens(networkLibrary: String?, tokenPrefs: SharedPreferences) {
+        if (checkedPendingRevocations) return
+        checkedPendingRevocations = true
+        Reauthorization.takePendingRevocations(tokenPrefs).forEach { authRepository.revokeInBackground(networkLibrary, it) }
     }
 
     fun validate(networkLibrary: String?, gqlHeaders: Map<String, String>, gqlWebClientId: String?, gqlWebToken: String?, helixHeaders: Map<String, String>, accountId: String?, accountLogin: String?, activity: Activity) {

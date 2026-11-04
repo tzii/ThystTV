@@ -7,9 +7,13 @@ import androidx.core.content.edit
 import com.github.andreyasadchy.xtra.model.id.TokenResponse
 import com.github.andreyasadchy.xtra.model.id.ValidationResponse
 import com.github.andreyasadchy.xtra.repository.AuthRepository
+import com.github.andreyasadchy.xtra.ui.main.MainViewModel
 import com.github.andreyasadchy.xtra.util.C
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
@@ -58,6 +62,65 @@ class ReauthorizationTest {
         assertEquals("old-gql", prefs.getString(C.GQL_TOKEN2, null))
         assertEquals("old-web", prefs.getString(C.GQL_TOKEN_WEB, null))
         assertEquals("1", prefs.getString(C.USER_ID, null))
+    }
+
+    @Test fun `what is on screen keeps a working token until nothing can be using it`() {
+        storeSignIn()
+        val plan = Reauthorization.plan(signIn, "new-helix", "1", "viewer")
+        assertTrue("nothing is revoked while pages are still loading with it", plan.revokeNow.isEmpty())
+        Reauthorization.commit(prefs, plan, "new-helix", "1", "viewer")
+        assertEquals(setOf("client_id=helix-client&token=old-helix"), Reauthorization.takePendingRevocations(prefs))
+        assertTrue("handed out once", Reauthorization.takePendingRevocations(prefs).isEmpty())
+    }
+
+    @Test fun `tokens replaced in turn all wait, and one issued again is never revoked`() {
+        storeSignIn()
+        Reauthorization.commit(prefs, Reauthorization.plan(signIn, "second", "1", "viewer"), "second", "1", "viewer")
+        val second = signIn.copy(helixToken = "second")
+        Reauthorization.commit(prefs, Reauthorization.plan(second, "third", "1", "viewer"), "third", "1", "viewer")
+        val third = signIn.copy(helixToken = "third")
+        Reauthorization.commit(prefs, Reauthorization.plan(third, "old-helix", "1", "viewer"), "old-helix", "1", "viewer")
+        assertEquals(
+            setOf("client_id=helix-client&token=second", "client_id=helix-client&token=third"),
+            Reauthorization.takePendingRevocations(prefs),
+        )
+    }
+
+    @Test fun `a different account also drops the clip grant and revokes it at once`() {
+        storeSignIn()
+        ClipAuthorization.save(prefs, credentials)
+        val current = signIn.copy(clipClientId = "client", clipToken = "access")
+        val plan = Reauthorization.plan(current, "new-helix", "2", "other")
+        assertTrue(RevokeTarget("client", "access") in plan.revokeNow)
+        Reauthorization.commit(prefs, plan, "new-helix", "2", "other")
+        assertNull(ClipAuthorization.load(prefs))
+        assertTrue(Reauthorization.takePendingRevocations(prefs).isEmpty())
+    }
+
+    @Test fun `the same account keeps its clip grant`() {
+        storeSignIn()
+        ClipAuthorization.save(prefs, credentials)
+        val current = signIn.copy(clipClientId = "client", clipToken = "access")
+        val plan = Reauthorization.plan(current, "new-helix", "1", "viewer")
+        assertFalse(plan.revoke.any { it.token == "access" })
+        Reauthorization.commit(prefs, plan, "new-helix", "1", "viewer")
+        assertEquals(credentials, ClipAuthorization.load(prefs))
+    }
+
+    private fun mainViewModel(auth: AuthRepository) = MainViewModel(
+        RuntimeEnvironment.getApplication(), mock(), mock(), mock(), mock(), auth, null, null, mock(), mock(), mock(), mock(),
+    )
+
+    @Test fun `a replaced token is revoked by the next set of screens, not the current one`() {
+        val auth = mock<AuthRepository>()
+        val running = mainViewModel(auth)
+        running.revokePendingTokens("OkHttp", prefs)
+        storeSignIn()
+        Reauthorization.commit(prefs, Reauthorization.plan(signIn, "new-helix", "1", "viewer"), "new-helix", "1", "viewer")
+        running.revokePendingTokens("OkHttp", prefs)
+        verify(auth, never()).revokeInBackground(anyOrNull(), any())
+        mainViewModel(auth).revokePendingTokens("OkHttp", prefs)
+        verify(auth).revokeInBackground("OkHttp", "client_id=helix-client&token=old-helix")
     }
 
     @Test fun `a different account replaces everything and restarts`() {
@@ -120,6 +183,56 @@ class ReauthorizationTest {
         ClipAuthorization.clear(prefs)
         assertEquals("old-helix", prefs.getString(C.TOKEN, null))
         assertEquals("1", prefs.getString(C.USER_ID, null))
+    }
+
+    @Test fun `logging out during a refresh keeps the grant gone and abandons the attempt`() = runTest {
+        ClipAuthorization.save(prefs, credentials)
+        val held = CompletableDeferred<TokenResponse>()
+        val discarded = ArrayList<ClipCredentials>()
+        val attempt = async {
+            runCatching { ClipAuthorization.current(prefs, 950_000L, discard = { discarded.add(it) }) { held.await() } }
+        }
+        runCurrent()
+        ClipAuthorization.clear(prefs)
+        held.complete(TokenResponse(token = "access2", refreshToken = "refresh2", expiresInSeconds = 14_000L))
+        assertTrue(attempt.await().exceptionOrNull() is ClipGrantChanged)
+        assertNull(ClipAuthorization.load(prefs))
+        assertEquals("revocable", listOf("access2"), discarded.map { it.token })
+    }
+
+    @Test fun `a refresh finishing after a new approval leaves the new grant in place`() = runTest {
+        ClipAuthorization.save(prefs, credentials)
+        val newer = ClipCredentials("client", "approved", "refresh-approved", 99_000_000L)
+        val rejected = async {
+            runCatching {
+                ClipAuthorization.current(prefs, 950_000L) {
+                    ClipAuthorization.save(prefs, newer)
+                    TokenResponse(message = "Invalid refresh token")
+                }
+            }
+        }
+        assertTrue(rejected.await().exceptionOrNull() is ClipGrantChanged)
+        assertEquals("a late refusal concerns the old grant only", newer, ClipAuthorization.load(prefs))
+    }
+
+    @Test fun `a refresh failing after logout doesn't bring back the old token`() = runTest {
+        ClipAuthorization.save(prefs, credentials)
+        val failure = runCatching {
+            ClipAuthorization.current(prefs, 950_000L) {
+                ClipAuthorization.clear(prefs)
+                throw IOException("offline")
+            }
+        }.exceptionOrNull()
+        assertTrue(failure is ClipGrantChanged)
+    }
+
+    @Test fun `a rejected request only clears the grant it used`() {
+        val newer = ClipCredentials("client", "approved", "refresh-approved", 99_000_000L)
+        ClipAuthorization.save(prefs, newer)
+        ClipAuthorization.clearIfCurrent(prefs, credentials)
+        assertEquals(newer, ClipAuthorization.load(prefs))
+        ClipAuthorization.clearIfCurrent(prefs, newer)
+        assertNull(ClipAuthorization.load(prefs))
     }
 
     @Test fun `a valid clip token is used without refreshing`() = runTest {
