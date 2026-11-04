@@ -482,6 +482,12 @@ Turn on Player settings → Gestures → Extended zoom.
   optional restart, seek-live, volume, compressor, audio-only and keyboard buttons.
   Rotate, minimize/restore and return from recording replay; controls stay readable.
 
+### Sign-in network requests
+
+- [ ] Network cancellation: airplane mode or a stalled connection during sign-in shows
+  an error within about 20 seconds, on OkHttp, Cronet and HttpEngine. Leaving the
+  screen cancels at once, and a later sign-in works normally.
+
 ### VoD seek previews (performance stack)
 
 - [ ] Finished online VoD: drag slowly, quickly and across sprite-sheet boundaries;

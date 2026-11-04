@@ -4,6 +4,9 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Changed
+- Sign-in requests now cancel the underlying network request and give up after 20 seconds on every network library, so a stalled connection can't hold a sign-in screen open.
+
 ## [1.5.2] - 2026-10-31
 
 ### Added
