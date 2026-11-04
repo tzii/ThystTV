@@ -23,6 +23,8 @@ import com.github.andreyasadchy.xtra.repository.HelixRepository
 import com.github.andreyasadchy.xtra.repository.liveNotificationStartedAt
 import com.github.andreyasadchy.xtra.repository.NotificationUsersRepository
 import com.github.andreyasadchy.xtra.repository.ShownNotificationsRepository
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShield
+import com.github.andreyasadchy.xtra.ui.common.spoilerSubject
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.prefs
@@ -117,7 +119,7 @@ class LiveNotificationWorker @AssistedInject constructor(
         val notification = NotificationCompat.Builder(context, channelId)
             .setGroup(GROUP_KEY)
             .setContentTitle(context.getString(R.string.live_notification, displayName))
-            .setContentText(stream.title)
+            .setContentText(stream.title.takeUnless { SpoilerShield.hidesTitle(context.prefs(), stream.spoilerSubject()) })
             .setSmallIcon(R.drawable.notification_icon)
             .setAutoCancel(true)
             .setOnlyAlertOnce(alreadyPosted)

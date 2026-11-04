@@ -94,6 +94,17 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintVertical_bias="1.0">
 
+                <ImageButton
+                    android:id="@+id/spoilerReveal"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:visibility="gone"
+                    app:tint="?attr/colorOnSurfaceVariant"
+                    tools:ignore="ContentDescription"
+                    tools:src="@drawable/ic_visibility_high"
+                    tools:visibility="visible" />
+
                 <TextView
                     android:id="@+id/viewers"
                     android:layout_width="wrap_content"
