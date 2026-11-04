@@ -1347,11 +1347,13 @@ class Media3Fragment : PlayerFragment() {
     }
 
     /**
-     * Background audio plays on without this screen, so a replay may have finished while it
-     * was away. Until this screen starts its source, the session's state is the previous one's.
+     * Background audio plays on without this screen, so a replay may have finished or failed while
+     * it was away. Until this screen starts its source, the session's state is the previous one's.
      */
     internal fun finishEndedReplay(player: Player) {
-        if (viewModel.started && player.currentMediaItem != null && player.playbackState == Player.STATE_ENDED) {
+        if (viewModel.started && player.currentMediaItem != null &&
+            (player.playbackState == Player.STATE_ENDED || player.playerError != null)
+        ) {
             handleLocalReplayEnded()
         }
     }

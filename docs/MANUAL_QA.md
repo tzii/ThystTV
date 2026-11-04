@@ -522,7 +522,10 @@ live and replay on the default player at both a high and low quality.
 - [ ] Each buffer size holds roughly the stated time at 1080p. Disk use settles near the
   setting while live, and at most doubles during a long replay.
 - [ ] ExoPlayer and MediaPlayer backends: no capture, and recordings still work. Switch to
-  MediaPlayer with video already saved, then rewind: it returns to live with a message.
+  MediaPlayer with video already saved, then rewind: live carries on with a message, and
+  disk use stays near the setting.
+- [ ] During a local replay, pick Audio only and leave the app so audio keeps playing. Clear
+  the app's cache, wait for audio to stop, then return: it goes back to live with a message.
 
 ### VoD seek previews (performance stack)
 

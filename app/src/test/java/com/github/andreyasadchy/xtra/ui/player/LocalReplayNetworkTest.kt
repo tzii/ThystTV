@@ -3,6 +3,7 @@ package com.github.andreyasadchy.xtra.ui.player
 import android.app.Application
 import android.os.Bundle
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.github.andreyasadchy.xtra.model.ui.Stream
@@ -55,7 +56,13 @@ class LocalReplayNetworkTest {
     private fun viewModel() =
         PlayerViewModel(mock(), mock(), mock(), mock(), mock(), mock(), null, null, mock(), mock(), mock(), mock(), mock())
 
-    private fun returning(fragment: Media3Fragment, vm: PlayerViewModel, started: Boolean, state: Int): Media3Fragment {
+    private fun returning(
+        fragment: Media3Fragment,
+        vm: PlayerViewModel,
+        started: Boolean,
+        state: Int,
+        error: PlaybackException? = null,
+    ): Media3Fragment {
         vm.started = started
         doReturn(false).whenever(fragment).isResumed
         doReturn(Bundle().apply {
@@ -66,6 +73,7 @@ class LocalReplayNetworkTest {
         val controller = mock<MediaController>()
         doReturn(state).whenever(controller).playbackState
         doReturn(MediaItem.EMPTY).whenever(controller).currentMediaItem
+        doReturn(error).whenever(controller).playerError
         fragment.finishEndedReplay(controller)
         return fragment
     }
@@ -75,6 +83,20 @@ class LocalReplayNetworkTest {
         returning(fragment(mock(), localReplay = true), vm, started = true, state = Player.STATE_ENDED)
         assertTrue(vm.liveRewindFailed)
     }
+
+    @Test fun `a replay that failed while its screen was away goes back to live on return`() {
+        val vm = viewModel()
+        returning(fragment(mock(), localReplay = true), vm, started = true, state = Player.STATE_IDLE, error = readFailure())
+        assertTrue(vm.liveRewindFailed)
+    }
+
+    @Test fun `a new replay isn't judged by the error of the source it is about to replace`() {
+        val vm = viewModel()
+        returning(fragment(mock(), localReplay = true), vm, started = false, state = Player.STATE_IDLE, error = readFailure())
+        assertFalse(vm.liveRewindFailed)
+    }
+
+    private fun readFailure() = PlaybackException("gone", null, PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND)
 
     @Test fun `a replay still playing on return carries on`() {
         val vm = viewModel()
