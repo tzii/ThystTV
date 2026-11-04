@@ -2,9 +2,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- New feature copy intentionally falls back to English until translations are vetted. -->
     <string name="live_rewind" tools:ignore="MissingTranslation">Rewind live stream</string>
-    <string name="live_rewind_30_seconds" tools:ignore="MissingTranslation">Watch last 30 seconds of recording</string>
-    <string name="live_rewind_1_minute" tools:ignore="MissingTranslation">Watch last minute of recording</string>
-    <string name="live_rewind_5_minutes" tools:ignore="MissingTranslation">Watch last 5 minutes of recording</string>
+    <string name="live_rewind_30_seconds" tools:ignore="MissingTranslation">Watch last 30 seconds</string>
+    <string name="live_rewind_1_minute" tools:ignore="MissingTranslation">Watch last minute</string>
+    <string name="live_rewind_3_minutes" tools:ignore="MissingTranslation">Watch last 3 minutes</string>
+    <string name="live_rewind_5_minutes" tools:ignore="MissingTranslation">Watch last 5 minutes</string>
     <string name="live_rewind_beginning" tools:ignore="MissingTranslation">Watch from beginning</string>
     <string name="live_rewind_go_live" tools:ignore="MissingTranslation">Go live</string>
     <string name="live_rewind_caught_up" tools:ignore="MissingTranslation">Caught up · back to 1x</string>

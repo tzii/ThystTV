@@ -481,6 +481,10 @@ Turn on Player settings → Gestures → Extended zoom.
   recording options. Check 360dp width, 200% text, RTL, uptime/viewer count and
   optional restart, seek-live, volume, compressor, audio-only and keyboard buttons.
   Rotate, minimize/restore and return from recording replay; controls stay readable.
+- [ ] Choose "Watch last 3 minutes" on a channel that saves broadcasts:
+  replay starts about 3 minutes behind live and replay chat follows; Go live returns
+  to the live source with one audio stream. A stream under 3 minutes old starts at
+  the beginning. A channel without recordings stays live and shows the message.
 
 ### VoD seek previews (performance stack)
 

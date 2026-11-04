@@ -434,6 +434,11 @@ up only as needed to clear that row. Rotation restores the original landscape
 rules; minimized players and recording replays do not get a live-rewind button.
 `PlayerLiveRewindControlsTest` renders compact/RTL/200% text and landscape controls.
 
+Every preset, including the last 3 minutes, plays the broadcast's recording. Twitch's
+live media playlists reach back only about 30 seconds (measured November 2026), so
+seeking within the live source cannot serve them, and larger Media3 buffers do not
+change that. Channels without a recording stay live and show the unavailable message.
+
 ## VoD seek previews
 
 `SeekPreview` draws a frame from a Twitch storyboard sprite sheet while the seek
