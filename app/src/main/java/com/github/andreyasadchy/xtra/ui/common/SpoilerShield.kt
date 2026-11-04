@@ -303,13 +303,19 @@ internal class SpoilerShieldCards(private val adapter: RecyclerView.Adapter<*>) 
 
     /** Whether [showActions] has anything to offer, for cards exposing it through a menu. */
     fun hasActions(subject: SpoilerSubject): Boolean =
-        !(subject.channelName ?: subject.channelLogin).isNullOrBlank() || !subject.gameName.isNullOrBlank()
+        channelLabel(subject) != null || !subject.gameName.isNullOrBlank()
+
+    /** A channel rule matches by id or login, so a name alone would protect nothing. */
+    private fun channelLabel(subject: SpoilerSubject): String? =
+        (subject.channelName ?: subject.channelLogin)?.takeIf {
+            it.isNotBlank() && !(subject.channelId.isNullOrBlank() && subject.channelLogin.isNullOrBlank())
+        }
 
     fun showActions(context: Context, subject: SpoilerSubject) {
         val prefs = context.prefs()
         val rules = SpoilerShield.rules(prefs)
         val actions = buildList<Pair<String, () -> Unit>> {
-            (subject.channelName ?: subject.channelLogin)?.takeIf { it.isNotBlank() }?.let { channel ->
+            channelLabel(subject)?.let { channel ->
                 if (rules.protectsChannel(subject)) {
                     add(context.getString(R.string.spoiler_shield_stop_channel, channel) to {
                         SpoilerShield.updateRules(prefs) { current ->

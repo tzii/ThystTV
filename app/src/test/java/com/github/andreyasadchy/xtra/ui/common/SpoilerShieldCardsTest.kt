@@ -3,19 +3,26 @@ package com.github.andreyasadchy.xtra.ui.common
 import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.os.Looper
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.edit
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.RecyclerView
+import coil3.ImageLoader
+import coil3.fetch.Fetcher
+import coil3.request.ImageRequest
+import coil3.request.target
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.model.ui.Clip
 import com.github.andreyasadchy.xtra.model.ui.Stream
@@ -25,6 +32,7 @@ import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragment
 import com.github.andreyasadchy.xtra.ui.team.TeamMembersAdapter
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -62,6 +70,37 @@ class SpoilerShieldCardsTest {
         assertEquals("Open", SpoilerShield.titleOrHiddenLabel(context, other, "Open"))
         context.prefs().edit { putBoolean(C.SPOILER_SHIELD_HIDE_TITLES, false) }
         assertEquals("Secret", SpoilerShield.titleOrHiddenLabel(context, protected, "Secret"))
+    }
+
+    @Test fun `a channel known only by name offers no rule that could never match`() {
+        val cards = SpoilerShieldCards(mock())
+        assertFalse(cards.hasActions(SpoilerSubject(key = "d", channelName = "Caster")))
+        assertTrue(cards.hasActions(SpoilerSubject(key = "d", channelName = "Caster", channelId = "c1")))
+        assertTrue(cards.hasActions(SpoilerSubject(key = "d", channelLogin = "caster")))
+        assertTrue("its category can still be protected", cards.hasActions(SpoilerSubject(key = "d", channelName = "Caster", gameName = "Chess")))
+    }
+
+    /** Unprotected cards load with no placeholder, and rely on this to drop a revealed preview. */
+    @Test fun `a card's next image request clears what it showed before it can draw`() {
+        val activity = Robolectric.buildActivity(AppCompatActivity::class.java).apply { get().setTheme(R.style.BaseDarkTheme) }.setup().get()
+        val list = FrameLayout(activity).also(activity::setContentView)
+        val loader = ImageLoader.Builder(activity).components {
+            add(Fetcher.Factory<Any> { _, _, _ -> Fetcher { awaitCancellation() } })
+        }.build()
+        fun card(attached: Boolean) = ImageView(activity).apply {
+            setImageDrawable(ColorDrawable(Color.RED))
+            if (attached) list.addView(this)
+        }
+        fun load(view: ImageView) = loader.enqueue(ImageRequest.Builder(activity).data("https://example.invalid/next").target(view).build())
+        val rebound = card(attached = true)
+        val reboundRequest = load(rebound)
+        assertNull(rebound.drawable)
+        val fromPool = card(attached = false)
+        val poolRequest = load(fromPool)
+        list.addView(fromPool)
+        assertNull(fromPool.drawable)
+        reboundRequest.dispose()
+        poolRequest.dispose()
     }
 
     private fun cards(context: Context): List<View> {

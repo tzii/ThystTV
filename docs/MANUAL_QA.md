@@ -504,9 +504,11 @@ Turn on Player settings → Gestures → Extended zoom.
   Change title protection while the channel page remains open: it updates without
   reloading; changing rules clears its temporary reveal.
 - [ ] VoD and clip lists (Following, channel, category, search), bookmarks and
-  downloads: long-press an item to protect its channel or category. Title and preview
-  hide on every matching card, the eye reveals one item, and fast flinging never
-  flashes a protected title or preview. Watched progress still shows. Download a protected
+  downloads: use an item's ⋮ menu to protect its channel or category. Long-press keeps
+  its usual action there (download, or delete for bookmarks and downloads). Title, preview,
+  duration and watched progress hide on every matching card, the eye reveals one item,
+  and fast flinging never flashes them, including a revealed preview on the next card
+  it recycles into. Download a protected
   VoD and clip: the progress and finished notifications say Title hidden.
 - [ ] Expiring rules: adding a rule asks how long. The list shows "until" with a date,
   "Until I remove it" shows none. Move the device clock past the date: the card shows
