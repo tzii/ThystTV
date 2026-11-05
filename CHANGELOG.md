@@ -5,6 +5,7 @@ All notable changes to ThystTV should be documented here.
 ## [Unreleased]
 
 ### Changed
+- Granting a new permission no longer signs you out first. The current sign-in stays until the new one is confirmed, cancelling changes nothing, and the app restarts only if the account changed. The older token is revoked afterward.
 - Sign-in requests now cancel the underlying network request and give up after 20 seconds on every network library, so a stalled connection can't hold a sign-in screen open.
 
 ## [1.5.2] - 2026-10-31
