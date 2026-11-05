@@ -434,6 +434,35 @@ up only as needed to clear that row. Rotation restores the original landscape
 rules; minimized players and recording replays do not get a live-rewind button.
 `PlayerLiveRewindControlsTest` renders compact/RTL/200% text and landscape controls.
 
+## Creating clips
+
+More > Create clip, or the optional player button (`C.PLAYER_CLIP_BUTTON`, off by
+default), asks for a title and a length of 5 to 60 seconds, then calls Twitch's Create
+Clip API with the viewer's Helix token and the `clips:edit` scope. The request runs in
+`PlayerViewModel` and never touches the player. `ClipCreation` maps supported refusals
+to distinct messages, reopens the options when a title is rejected, treats 503 as
+temporary unavailability, and stops waiting for Get Clips confirmation at 60 seconds.
+Both requests use `CancellableHttp`, so cancelling stops the HTTP call and each has
+an elapsed-time limit. The [endpoint reference](https://dev.twitch.tv/docs/api/reference/#create-clip)
+says 60 seconds; the separate [Clips guide](https://dev.twitch.tv/docs/api/clips/)
+still says 15 seconds. The dialog or message waits until the player is resumed,
+maximized and outside PiP. A completed result remains available after lifecycle
+dismissals until Close, Back/outside cancellation, Edit or Share. Another tap
+during processing shows Creating clip instead of starting a duplicate request.
+Further trimming happens in Twitch's editor (`edit_url`). It clips the live broadcast
+rather than the viewer's position, so recording and local replays do not offer it.
+Create Clip From VOD is limited to broadcasters and editors. Tokens from before this
+scope get a 401, which leads to a sign-in prompt. That sign-in preserves the current one
+(`EXTRA_REAUTHORIZE`): cancelling changes nothing, the same account continues without a
+restart and retries the pending clip, and only a different account restarts the app.
+TV device-code sign-in has no Helix token, so the TV approves a separate grant from
+another device (`EXTRA_CLIP_DEVICE_AUTH`), kept apart from `C.TOKEN` in
+`ClipAuthorization` and renewed with its refresh token. That grant can belong to a
+different account from the TV's sign-in until login is entered again.
+A replaced token stays valid for what is already on screen, and is revoked at the next
+app start or on logout. A grant refresh that finishes after the grant changed is
+discarded and revoked, and a refusal only clears the grant that request used.
+
 ## VoD seek previews
 
 `SeekPreview` draws a frame from a Twitch storyboard sprite sheet while the seek

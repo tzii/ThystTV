@@ -4,6 +4,9 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Added
+- Create clip in the live player's More menu (#79) lets you set a title and a length of 5 to 60 seconds, captures the live broadcast through Twitch, confirms it was saved, then offers Edit and Share. A direct player button can be turned on in Player buttons settings, and Android TV works by approving a code on another device. Accounts signed in before this version are asked to grant the permission once, and cancelling keeps their sign-in.
+
 ### Changed
 - Granting a new permission no longer signs you out first. The current sign-in stays until the new one is confirmed, cancelling changes nothing, and the app restarts only if the account changed. The older token is revoked afterward.
 - Sign-in requests now cancel the underlying network request and give up after 20 seconds on every network library, so a stalled connection can't hold a sign-in screen open.

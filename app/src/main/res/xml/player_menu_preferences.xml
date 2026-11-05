@@ -23,6 +23,13 @@
         app:singleLineTitle="false" />
 
     <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="player_menu_clip"
+        android:title="@string/clip_create"
+        app:iconSpaceReserved="false"
+        app:singleLineTitle="false" />
+
+    <SwitchPreferenceCompat
         android:defaultValue="false"
         android:key="player_menu_games"
         android:title="@string/chapters"

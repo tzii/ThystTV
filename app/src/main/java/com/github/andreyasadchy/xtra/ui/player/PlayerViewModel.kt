@@ -36,6 +36,7 @@ import com.github.andreyasadchy.xtra.repository.PlayerRepository
 import com.github.andreyasadchy.xtra.repository.liveNotificationStartedAt
 import com.github.andreyasadchy.xtra.repository.ShownNotificationsRepository
 import com.github.andreyasadchy.xtra.repository.TranslateAllMessagesUsersRepository
+import com.github.andreyasadchy.xtra.ui.login.ClipCredentials
 import com.github.andreyasadchy.xtra.ui.player.PlaybackService.Companion.MEDIA_PLAYLIST_REGEX
 import com.github.andreyasadchy.xtra.ui.player.PlaybackService.Companion.MULTIVARIANT_PLAYLIST_REGEX
 import com.github.andreyasadchy.xtra.util.C
@@ -46,6 +47,7 @@ import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
 import com.github.andreyasadchy.xtra.util.m3u8.PlaylistUtils
 import dagger.Lazy
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -144,6 +146,54 @@ class PlayerViewModel @Inject constructor(
     private val _isFollowing = MutableStateFlow<Boolean?>(null)
     val isFollowing: StateFlow<Boolean?> = _isFollowing
     val follow = MutableStateFlow<Pair<Boolean, String?>?>(null)
+
+    internal val clipCreation = MutableStateFlow<ClipCreationResult?>(null)
+    private var clipCreationJob: Job? = null
+    internal val isCreatingClip get() = clipCreationJob?.isActive == true
+    internal var lastClipRequest: ClipRequest? = null
+    internal var pendingClip: PendingClip? = null
+
+    /**
+     * [grant] is the separate clip permission a TV can hold; without one this uses the sign-in's
+     * Helix token. A grant Twitch refuses is dropped through [grantRejected] so the viewer can
+     * approve again; refusing the sign-in's token never touches the sign-in.
+     */
+    internal fun createClip(
+        networkLibrary: String?,
+        helixHeaders: Map<String, String>,
+        channelId: String,
+        request: ClipRequest,
+        grant: suspend () -> ClipCredentials?,
+        grantRejected: (ClipCredentials) -> Unit,
+    ) {
+        if (isCreatingClip) return
+        lastClipRequest = request
+        clipCreationJob = viewModelScope.launch {
+            val result = try {
+                val granted = grant()
+                val headers = granted?.let {
+                    mapOf(C.HEADER_CLIENT_ID to it.clientId, C.HEADER_TOKEN to TwitchApiHelper.addTokenPrefixHelix(it.token))
+                } ?: helixHeaders
+                if (headers[C.HEADER_TOKEN].isNullOrBlank()) {
+                    ClipCreationResult.SignInRequired
+                } else {
+                    val (status, body) = helixRepository.createClip(networkLibrary, headers, channelId, request.title, request.durationSeconds)
+                    val created = ClipCreation.parseResponse(status, body)
+                    if (created == ClipCreationResult.SignInRequired && granted != null) {
+                        grantRejected(granted)
+                    }
+                    if (created is ClipCreationResult.Created && !ClipCreation.awaitConfirmation {
+                        helixRepository.clipExists(networkLibrary, headers, created.id)
+                    }) ClipCreationResult.NotFinished else created
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                ClipCreationResult.Failed
+            }
+            clipCreation.value = result
+        }
+    }
 
     /** Resolve and preflight without disturbing the currently playing live source. */
     internal suspend fun prepareLiveRewind(
