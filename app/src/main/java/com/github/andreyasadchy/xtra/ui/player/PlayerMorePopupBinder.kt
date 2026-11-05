@@ -102,7 +102,7 @@ internal class PlayerMorePopupBinder(
                 if (vodGamesAvailable) setVodGames()
                 if (prefs.getBoolean(C.PLAYER_MENU_BOOKMARK, true)) fragment.checkBookmark()
             }
-            if (videoType != PlayerFragment.OFFLINE_VIDEO && prefs.getBoolean(C.PLAYER_MENU_DOWNLOAD, true)) {
+            if (videoType != PlayerFragment.OFFLINE_VIDEO && !fragment.isLocalReplay() && prefs.getBoolean(C.PLAYER_MENU_DOWNLOAD, true)) {
                 menuDownload.visibility = View.VISIBLE
                 menuDownload.setOnClickListener { dismissThen(fragment::showDownloadDialog) }
             }
