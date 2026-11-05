@@ -47,6 +47,22 @@
                 tools:text="8:21:33 uptime"
                 tools:visibility="visible" />
 
+            <ImageButton
+                android:id="@+id/spoilerReveal"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_spoiler_reveal"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:visibility="gone"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="@android:color/white"
+                tools:ignore="ContentDescription"
+                tools:src="@drawable/ic_visibility_high"
+                tools:visibility="visible" />
+
             <ImageView
                 android:id="@+id/userImage"
                 style="@style/UserPicture"

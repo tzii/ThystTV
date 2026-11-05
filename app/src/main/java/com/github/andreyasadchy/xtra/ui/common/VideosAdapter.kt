@@ -50,6 +50,18 @@ class VideosAdapter(
                     oldItem.durationSeconds == newItem.durationSeconds
     }) {
 
+    private val spoilerShield = SpoilerShieldCards(this)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        spoilerShield.attach(recyclerView)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        spoilerShield.detach()
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PagingViewHolder {
         val binding = FragmentVideosListItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return PagingViewHolder(binding, fragment, showGame, showChannel)
@@ -89,14 +101,21 @@ class VideosAdapter(
                         (fragment.activity as MainActivity).startVideo(item, position)
                     }
                     root.setOnLongClickListener { showDownloadDialog(item); true }
-                    fragment.requireContext().imageLoader.enqueue(
-                        ImageRequest.Builder(fragment.requireContext()).apply {
-                            data(item.thumbnail)
-                            diskCachePolicy(CachePolicy.DISABLED)
-                            crossfade(true)
-                            target(thumbnail)
-                        }.build()
-                    )
+                    val spoilerSubject = item.spoilerSubject()
+                    val spoilers = spoilerShield.presentation(context, spoilerSubject, showsThumbnail = true)
+                    spoilerShield.bindReveal(spoilerReveal, spoilerSubject, spoilers) { bindingAdapterPosition }
+                    if (spoilers.hideThumbnail) {
+                        thumbnail.showSpoilerPlaceholder()
+                    } else {
+                        fragment.requireContext().imageLoader.enqueue(
+                            ImageRequest.Builder(fragment.requireContext()).apply {
+                                data(item.thumbnail)
+                                diskCachePolicy(CachePolicy.DISABLED)
+                                crossfade(true)
+                                target(thumbnail)
+                            }.build()
+                        )
+                    }
                     if (item.createdAt != null) {
                         val text = TwitchApiHelper.formatTimeString(context, item.createdAt)
                         if (text != null) {
@@ -119,7 +138,7 @@ class VideosAdapter(
                     } else {
                         views.visibility = View.GONE
                     }
-                    val spoilerFree = SpoilerFreeVideos.hideListSpoilers(context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false))
+                    val spoilerFree = spoilers.hidesAnything || SpoilerFreeVideos.hideListSpoilers(context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false))
                     if (item.durationSeconds != null && !spoilerFree) {
                         duration.visibility = View.VISIBLE
                         duration.text = DateUtils.formatElapsedTime(item.durationSeconds.toLong())
@@ -191,7 +210,7 @@ class VideosAdapter(
                     }
                     if (item.title != null && item.title != "") {
                         title.visibility = View.VISIBLE
-                        title.text = item.title.trim()
+                        title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else item.title.trim()
                     } else {
                         title.visibility = View.GONE
                     }
@@ -222,6 +241,7 @@ class VideosAdapter(
                     options.setOnClickListener { it ->
                         PopupMenu(context, it).apply {
                             inflate(R.menu.media_item)
+                            menu.findItem(R.id.spoilerShield).isVisible = spoilerShield.hasActions(spoilerSubject)
                             if (!item.id.isNullOrBlank()) {
                                 menu.findItem(R.id.bookmark).isVisible = true
                                 if (bookmarks?.find { it.videoId == item.id } != null) {
@@ -233,6 +253,7 @@ class VideosAdapter(
                             setOnMenuItemClickListener {
                                 when (it.itemId) {
                                     R.id.download -> showDownloadDialog(item)
+                                    R.id.spoilerShield -> spoilerShield.showActions(context, spoilerSubject)
                                     R.id.bookmark -> saveBookmark(item)
                                     R.id.share -> {
                                         context.startActivity(Intent.createChooser(Intent().apply {

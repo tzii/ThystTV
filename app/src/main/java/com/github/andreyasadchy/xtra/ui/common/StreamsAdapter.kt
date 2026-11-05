@@ -47,6 +47,18 @@ class StreamsAdapter(
                     oldItem.title == newItem.title
     }) {
 
+    private val spoilerShield = SpoilerShieldCards(this)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        spoilerShield.attach(recyclerView)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        spoilerShield.detach()
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PagingViewHolder {
         val binding = FragmentStreamsListItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return PagingViewHolder(binding, fragment, showGame)
@@ -79,6 +91,13 @@ class StreamsAdapter(
                     root.setOnClickListener {
                         (fragment.activity as MainActivity).startStream(item)
                     }
+                    val spoilerListener = View.OnLongClickListener {
+                        spoilerShield.showActions(context, item.spoilerSubject())
+                        true
+                    }
+                    listOf(root, userImage, username, gameName).forEach { it.setOnLongClickListener(spoilerListener) }
+                    val spoilers = spoilerShield.presentation(context, item.spoilerSubject(), showsThumbnail = true)
+                    spoilerShield.bindReveal(spoilerReveal, item.spoilerSubject(), spoilers) { bindingAdapterPosition }
                     if (item.channelImage != null) {
                         userImage.visibility = View.VISIBLE
                         fragment.requireContext().imageLoader.enqueue(
@@ -112,7 +131,7 @@ class StreamsAdapter(
                     }
                     if (item.title != null && item.title != "") {
                         title.visibility = View.VISIBLE
-                        title.text = item.title?.trim()
+                        title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else item.title?.trim()
                     } else {
                         title.visibility = View.GONE
                     }
@@ -142,19 +161,23 @@ class StreamsAdapter(
                     }
                     if (item.thumbnailURL != null) {
                         thumbnail.visibility = View.VISIBLE
-                        //update every 5 minutes
-                        val minutes = System.currentTimeMillis() / 60000L
-                        val lastMinute = minutes % 10
-                        val key = if (lastMinute < 5) minutes - lastMinute else minutes - (lastMinute - 5)
-                        fragment.requireContext().imageLoader.enqueue(
-                            ImageRequest.Builder(fragment.requireContext()).apply {
-                                data(item.thumbnail)
-                                memoryCacheKeyExtra("minutes", key.toString())
-                                diskCachePolicy(CachePolicy.DISABLED)
-                                crossfade(true)
-                                target(thumbnail)
-                            }.build()
-                        )
+                        if (spoilers.hideThumbnail) {
+                            thumbnail.showSpoilerPlaceholder()
+                        } else {
+                            //update every 5 minutes
+                            val minutes = System.currentTimeMillis() / 60000L
+                            val lastMinute = minutes % 10
+                            val key = if (lastMinute < 5) minutes - lastMinute else minutes - (lastMinute - 5)
+                            fragment.requireContext().imageLoader.enqueue(
+                                ImageRequest.Builder(fragment.requireContext()).apply {
+                                    data(item.thumbnail)
+                                    memoryCacheKeyExtra("minutes", key.toString())
+                                    diskCachePolicy(CachePolicy.DISABLED)
+                                    crossfade(true)
+                                    target(thumbnail)
+                                }.build()
+                            )
+                        }
                     } else {
                         thumbnail.visibility = View.GONE
                     }
@@ -209,6 +232,7 @@ class StreamsAdapter(
                             text.setOnClickListener {
                                 selectTag(tag)
                             }
+                            text.setOnLongClickListener(spoilerListener)
                             val padding = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 5f, context.resources.displayMetrics).toInt()
                             text.setPadding(padding, 0, padding, 0)
                             tagsLayout.addView(text)

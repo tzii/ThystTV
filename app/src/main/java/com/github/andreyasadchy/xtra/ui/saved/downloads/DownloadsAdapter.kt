@@ -26,6 +26,9 @@ import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.FragmentDownloadsListItemBinding
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragmentDirections
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShieldCards
+import com.github.andreyasadchy.xtra.ui.common.showSpoilerPlaceholder
+import com.github.andreyasadchy.xtra.ui.common.spoilerSubject
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
@@ -55,6 +58,18 @@ class DownloadsAdapter(
             return false //bug, oldItem and newItem are sometimes the same
         }
     }) {
+
+    private val spoilerShield = SpoilerShieldCards(this)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        spoilerShield.attach(recyclerView)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        spoilerShield.detach()
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PagingViewHolder {
         val binding = FragmentDownloadsListItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -106,14 +121,21 @@ class DownloadsAdapter(
                     }
                     root.setOnLongClickListener { deleteVideo(item); true }
                     
-                    fragment.requireContext().imageLoader.enqueue(
-                        ImageRequest.Builder(fragment.requireContext()).apply {
-                            data(item.thumbnail)
-                            diskCachePolicy(CachePolicy.DISABLED)
-                            crossfade(true)
-                            target(thumbnail)
-                        }.build()
-                    )
+                    val spoilerSubject = item.spoilerSubject()
+                    val spoilers = spoilerShield.presentation(context, spoilerSubject, showsThumbnail = true)
+                    spoilerShield.bindReveal(spoilerReveal, spoilerSubject, spoilers) { bindingAdapterPosition }
+                    if (spoilers.hideThumbnail) {
+                        thumbnail.showSpoilerPlaceholder()
+                    } else {
+                        fragment.requireContext().imageLoader.enqueue(
+                            ImageRequest.Builder(fragment.requireContext()).apply {
+                                data(item.thumbnail)
+                                diskCachePolicy(CachePolicy.DISABLED)
+                                crossfade(true)
+                                target(thumbnail)
+                            }.build()
+                        )
+                    }
                     
                     item.uploadDate?.let {
                         date.visibility = View.VISIBLE
@@ -172,7 +194,7 @@ class DownloadsAdapter(
                     }
                     item.name?.let {
                         title.visibility = View.VISIBLE
-                        title.text = it.trim()
+                        title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else it.trim()
                     } ?: {
                         title.visibility = View.GONE
                     }
@@ -184,7 +206,7 @@ class DownloadsAdapter(
                         gameName.visibility = View.GONE
                     }
                     val itemDuration = item.duration.takeUnless {
-                        SpoilerFreeVideos.hideListSpoilers(context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false))
+                        spoilers.hidesAnything || SpoilerFreeVideos.hideListSpoilers(context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false))
                     }
                     if (itemDuration != null) {
                         duration.visibility = View.VISIBLE
@@ -231,6 +253,7 @@ class DownloadsAdapter(
                     options.setOnClickListener { it ->
                         PopupMenu(context, it).apply {
                             inflate(R.menu.offline_item)
+                            menu.findItem(R.id.spoilerShield).isVisible = spoilerShield.hasActions(spoilerSubject)
                             when (item.status) {
                                 OfflineVideo.STATUS_DOWNLOADING, OfflineVideo.STATUS_BLOCKED, OfflineVideo.STATUS_QUEUED, OfflineVideo.STATUS_QUEUED_WIFI, OfflineVideo.STATUS_WAITING_FOR_STREAM -> {
                                     menu.findItem(R.id.stopDownload).isVisible = true
@@ -270,6 +293,7 @@ class DownloadsAdapter(
                                     R.id.updateChatUrl -> updateChatUrl(item)
                                     R.id.shareVideo -> shareVideo(item)
                                     R.id.delete -> deleteVideo(item)
+                                    R.id.spoilerShield -> spoilerShield.showActions(context, spoilerSubject)
                                     else -> menu.close()
                                 }
                                 true

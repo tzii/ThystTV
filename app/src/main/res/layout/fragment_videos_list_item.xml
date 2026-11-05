@@ -54,6 +54,22 @@
             app:layout_constraintTop_toTopOf="parent"
             tools:text="type" />
 
+        <ImageButton
+            android:id="@+id/spoilerReveal"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_spoiler_reveal"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@id/thumbnail"
+            app:layout_constraintEnd_toEndOf="@id/thumbnail"
+            app:layout_constraintStart_toStartOf="@id/thumbnail"
+            app:layout_constraintTop_toTopOf="@id/thumbnail"
+            app:tint="@android:color/white"
+            tools:ignore="ContentDescription"
+            tools:src="@drawable/ic_visibility_high"
+            tools:visibility="visible" />
+
         <com.google.android.material.progressindicator.LinearProgressIndicator
             android:id="@+id/progressBar"
             android:layout_width="match_parent"

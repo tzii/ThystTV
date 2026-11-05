@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- New feature copy intentionally falls back to English until translations are vetted. -->
+    <string name="spoiler_shield" tools:ignore="MissingTranslation">Spoiler Shield</string>
+    <string name="spoiler_shield_title_hidden" tools:ignore="MissingTranslation">Title hidden</string>
+    <string name="spoiler_shield_reveal" tools:ignore="MissingTranslation">Show title and preview</string>
+    <string name="spoiler_shield_hide" tools:ignore="MissingTranslation">Hide title and preview</string>
+    <string name="spoiler_shield_add_channel" tools:ignore="MissingTranslation">Hide spoilers from %1$s</string>
+    <string name="spoiler_shield_stop_channel" tools:ignore="MissingTranslation">Stop hiding spoilers from %1$s</string>
+    <string name="spoiler_shield_add_category" tools:ignore="MissingTranslation">Hide spoilers in %1$s</string>
+    <string name="spoiler_shield_stop_category" tools:ignore="MissingTranslation">Stop hiding spoilers in %1$s</string>
+    <string name="spoiler_shield_hide_titles" tools:ignore="MissingTranslation">Hide titles</string>
+    <string name="spoiler_shield_hide_thumbnails" tools:ignore="MissingTranslation">Hide previews</string>
+    <string name="spoiler_shield_manage" tools:ignore="MissingTranslation">Protected channels and categories</string>
+    <string name="spoiler_shield_manage_empty" tools:ignore="MissingTranslation">None yet. Tap to add a channel or category.</string>
+    <string name="spoiler_shield_manage_summary" tools:ignore="MissingTranslation">%1$d protected. Tap to add more or remove them.</string>
+    <string name="spoiler_shield_channel_entry" tools:ignore="MissingTranslation">Channel: %1$s</string>
+    <string name="spoiler_shield_category_entry" tools:ignore="MissingTranslation">Category: %1$s</string>
+    <string name="spoiler_shield_entry_until" tools:ignore="MissingTranslation">%1$s (until %2$s)</string>
+    <string name="spoiler_shield_duration_title" tools:ignore="MissingTranslation">Hide spoilers for how long?</string>
+    <string name="spoiler_shield_duration_forever" tools:ignore="MissingTranslation">Until I remove it</string>
+    <string name="spoiler_shield_duration_day" tools:ignore="MissingTranslation">24 hours</string>
+    <string name="spoiler_shield_duration_three_days" tools:ignore="MissingTranslation">3 days</string>
+    <string name="spoiler_shield_duration_week" tools:ignore="MissingTranslation">7 days</string>
+    <string name="spoiler_shield_add" tools:ignore="MissingTranslation">Add</string>
+    <string name="spoiler_shield_add_kind_channel" tools:ignore="MissingTranslation">Add a channel</string>
+    <string name="spoiler_shield_add_kind_category" tools:ignore="MissingTranslation">Add a category</string>
+    <string name="spoiler_shield_search_channel" tools:ignore="MissingTranslation">Channel name</string>
+    <string name="spoiler_shield_search_category" tools:ignore="MissingTranslation">Category name</string>
+    <string name="spoiler_shield_search" tools:ignore="MissingTranslation">Search</string>
+    <string name="spoiler_shield_results_title" tools:ignore="MissingTranslation">Choose a match</string>
+    <string name="spoiler_shield_use_typed" tools:ignore="MissingTranslation">Use \"%1$s\" exactly as typed</string>
+</resources>

@@ -13,6 +13,7 @@ import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingSource
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -31,14 +32,20 @@ import com.github.andreyasadchy.xtra.repository.OfflineRepository
 import com.github.andreyasadchy.xtra.repository.PlayerRepository
 import com.github.andreyasadchy.xtra.repository.RecentSearchRepository
 import com.github.andreyasadchy.xtra.repository.ShownNotificationsRepository
+import com.github.andreyasadchy.xtra.repository.datasource.SearchChannelsDataSource
+import com.github.andreyasadchy.xtra.repository.datasource.SearchGamesDataSource
+import com.github.andreyasadchy.xtra.ui.common.ProtectedCategory
+import com.github.andreyasadchy.xtra.ui.common.ProtectedChannel
 import com.github.andreyasadchy.xtra.ui.main.LiveNotificationWorker
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
+import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.UpdateUtils
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
 import com.github.andreyasadchy.xtra.util.m3u8.PlaylistUtils
 import com.github.andreyasadchy.xtra.util.m3u8.Segment
+import com.github.andreyasadchy.xtra.util.prefs
 import com.github.andreyasadchy.xtra.util.update.UpdateCheckMailbox
 import com.github.andreyasadchy.xtra.util.update.UpdateHost
 import com.github.andreyasadchy.xtra.util.update.UpdateManager
@@ -67,6 +74,8 @@ import org.chromium.net.CronetEngine
 import org.chromium.net.apihelpers.RedirectHandlers
 import org.chromium.net.apihelpers.UrlRequestCallbacks
 
+private const val SPOILER_SEARCH_LIMIT = 10
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val applicationContext: Context,
@@ -89,6 +98,48 @@ class SettingsViewModel @Inject constructor(
     val updateChecks = UpdateCheckMailbox<UpdateInfo?>()
     val latestReleaseInfo = MutableSharedFlow<ReleaseInfo?>(replay = 1)
     val changelogReleases = MutableSharedFlow<List<ReleaseInfo>?>(replay = 1)
+
+    /** Search results for a Spoiler Shield rule; empty when nothing matched or the search failed. */
+    internal suspend fun searchSpoilerChannels(query: String): List<ProtectedChannel> {
+        val prefs = applicationContext.prefs()
+        val result = SearchChannelsDataSource(
+            query = query,
+            helixHeaders = TwitchApiHelper.getHelixHeaders(applicationContext),
+            helixRepository = helixRepository,
+            gqlHeaders = TwitchApiHelper.getGQLHeaders(applicationContext),
+            graphQLRepository = graphQLRepository,
+            enableIntegrity = prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+            apiPref = enabledApis(prefs.getString(C.API_PREFS_SEARCH_CHANNELS, null) ?: C.DEFAULT_API_PREFS_SEARCH_CHANNELS),
+            networkLibrary = prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+        ).load(PagingSource.LoadParams.Refresh(null, SPOILER_SEARCH_LIMIT, false))
+        return (result as? PagingSource.LoadResult.Page)?.data.orEmpty().mapNotNull { channel ->
+            if (channel.id.isNullOrBlank() && channel.login.isNullOrBlank()) null
+            else ProtectedChannel(channel.id, channel.login, channel.name)
+        }
+    }
+
+    internal suspend fun searchSpoilerCategories(query: String): List<ProtectedCategory> {
+        val prefs = applicationContext.prefs()
+        val result = SearchGamesDataSource(
+            query = query,
+            helixHeaders = TwitchApiHelper.getHelixHeaders(applicationContext),
+            helixRepository = helixRepository,
+            gqlHeaders = TwitchApiHelper.getGQLHeaders(applicationContext),
+            graphQLRepository = graphQLRepository,
+            enableIntegrity = prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+            apiPref = enabledApis(prefs.getString(C.API_PREFS_SEARCH_GAMES, null) ?: C.DEFAULT_API_PREFS_SEARCH_GAMES),
+            networkLibrary = prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+        ).load(PagingSource.LoadParams.Refresh(null, SPOILER_SEARCH_LIMIT, false))
+        return (result as? PagingSource.LoadResult.Page)?.data.orEmpty().mapNotNull { game ->
+            if (game.id.isNullOrBlank() && game.name.isNullOrBlank()) null
+            else ProtectedCategory(game.id, game.name)
+        }
+    }
+
+    private fun enabledApis(pref: String): List<String> = pref.split(',').mapNotNull {
+        val split = it.split(':')
+        if (split[1] != "0") split[0] else null
+    }
 
     fun deletePositions() {
         viewModelScope.launch {
