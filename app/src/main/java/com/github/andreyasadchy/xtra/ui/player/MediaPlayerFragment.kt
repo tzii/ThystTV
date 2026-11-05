@@ -219,7 +219,7 @@ class MediaPlayerFragment : PlayerFragment() {
                 viewLifecycleOwner.lifecycleScope.launch {
                     playbackService?.videoId = null
                     playbackService?.offlineVideoId = null
-                    playbackService?.title = requireArguments().getString(KEY_TITLE)
+                    playbackService?.title = playbackTitle()
                     playbackService?.channelName = requireArguments().getString(KEY_CHANNEL_NAME)
                     playbackService?.channelLogo = requireArguments().getString(KEY_CHANNEL_IMAGE)
                     val response = viewModel.loadPlaylist(
@@ -321,7 +321,7 @@ class MediaPlayerFragment : PlayerFragment() {
                         }
                         playbackService?.videoId = newId
                         playbackService?.offlineVideoId = null
-                        playbackService?.title = requireArguments().getString(KEY_TITLE)
+                        playbackService?.title = playbackTitle()
                         playbackService?.channelName = requireArguments().getString(KEY_CHANNEL_NAME)
                         playbackService?.channelLogo = requireArguments().getString(KEY_CHANNEL_IMAGE)
                         val response = viewModel.loadPlaylist(url, requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"))
@@ -461,7 +461,7 @@ class MediaPlayerFragment : PlayerFragment() {
                     }
                     playbackService?.videoId = newId
                     playbackService?.offlineVideoId = null
-                    playbackService?.title = requireArguments().getString(KEY_TITLE)
+                    playbackService?.title = playbackTitle()
                     playbackService?.channelName = requireArguments().getString(KEY_CHANNEL_NAME)
                     playbackService?.channelLogo = requireArguments().getString(KEY_CHANNEL_IMAGE)
                     player.reset()
@@ -493,7 +493,7 @@ class MediaPlayerFragment : PlayerFragment() {
                 }
                 playbackService?.videoId = null
                 playbackService?.offlineVideoId = null
-                playbackService?.title = requireArguments().getString(KEY_TITLE)
+                playbackService?.title = playbackTitle()
                 playbackService?.channelName = requireArguments().getString(KEY_CHANNEL_NAME)
                 playbackService?.channelLogo = requireArguments().getString(KEY_CHANNEL_IMAGE)
                 player.reset()
@@ -529,7 +529,7 @@ class MediaPlayerFragment : PlayerFragment() {
                 }
                 playbackService?.videoId = null
                 playbackService?.offlineVideoId = newId
-                playbackService?.title = requireArguments().getString(KEY_TITLE)
+                playbackService?.title = playbackTitle()
                 playbackService?.channelName = requireArguments().getString(KEY_CHANNEL_NAME)
                 playbackService?.channelLogo = requireArguments().getString(KEY_CHANNEL_IMAGE)
                 player.reset()

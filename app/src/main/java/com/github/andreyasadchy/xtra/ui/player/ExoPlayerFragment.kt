@@ -487,7 +487,7 @@ class ExoPlayerFragment : PlayerFragment() {
                         }.build())
                         setMediaMetadata(
                             MediaMetadata.Builder().apply {
-                                setTitle(requireArguments().getString(KEY_TITLE))
+                                setTitle(playbackTitle())
                                 setArtist(requireArguments().getString(KEY_CHANNEL_NAME))
                                 setArtworkUri(requireArguments().getString(KEY_CHANNEL_IMAGE)?.toUri())
                             }.build()
@@ -529,7 +529,7 @@ class ExoPlayerFragment : PlayerFragment() {
                         setUri(url?.toUri())
                         setMediaMetadata(
                             MediaMetadata.Builder().apply {
-                                setTitle(requireArguments().getString(KEY_TITLE))
+                                setTitle(playbackTitle())
                                 setArtist(requireArguments().getString(KEY_CHANNEL_NAME))
                                 setArtworkUri(requireArguments().getString(KEY_CHANNEL_IMAGE)?.toUri())
                             }.build()
@@ -571,7 +571,7 @@ class ExoPlayerFragment : PlayerFragment() {
                         setUri(url?.toUri())
                         setMediaMetadata(
                             MediaMetadata.Builder().apply {
-                                setTitle(requireArguments().getString(KEY_TITLE))
+                                setTitle(playbackTitle())
                                 setArtist(requireArguments().getString(KEY_CHANNEL_NAME))
                                 setArtworkUri(requireArguments().getString(KEY_CHANNEL_IMAGE)?.toUri())
                             }.build()
@@ -612,7 +612,7 @@ class ExoPlayerFragment : PlayerFragment() {
                     setUri(url)
                     setMediaMetadata(
                         MediaMetadata.Builder().apply {
-                            setTitle(requireArguments().getString(KEY_TITLE))
+                            setTitle(playbackTitle())
                             setArtist(requireArguments().getString(KEY_CHANNEL_NAME))
                             setArtworkUri(requireArguments().getString(KEY_CHANNEL_IMAGE)?.toUri())
                         }.build()

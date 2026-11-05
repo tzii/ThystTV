@@ -518,6 +518,15 @@ Turn on Player settings → Gestures → Extended zoom.
   a search is running closes immediately. Offline, the typed name is still offered,
   and a channel typed by its display name is protected too. Pick that channel from search with
   a time limit: one rule remains, and protection ends when the limit does.
+- [ ] Player: open a protected live stream, VoD and clip. The title shows Title hidden,
+  and tapping it reveals the title for that player only. The media notification and
+  lock screen also say Title hidden. With Hide titles off, the title shows normally.
+  Reveal a title, then let the streamer change it: the new title shows Title hidden.
+  Repeat on a live title change, and with each backend (default, ExoPlayer, MediaPlayer).
+  Protect a channel from a list while its player is minimized: restoring shows Title
+  hidden. The notification keeps the title it started with until the stream next starts.
+  Protect a category, then let the streamer change title and category to an unprotected
+  one and press Restart: the notification shows the new title, never the old one.
 
 ### VoD seek previews (performance stack)
 
