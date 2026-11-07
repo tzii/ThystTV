@@ -45,7 +45,8 @@ class EventSubWebSocket(
     /** A welcome starts a new session, which may announce a different [timeout]. */
     private fun watch(webSocket: WebSocket) {
         val scope = webSocket.coroutineScope ?: return
-        keepalive.start(scope, timeout) { webSocket.disconnect() }
+        val connection = webSocket.connection
+        keepalive.start(scope, timeout) { webSocket.disconnect(connection) }
     }
 
     interface Listener {

@@ -35,8 +35,9 @@ class ChatReadWebSocket(
     /** PING after [PING_INTERVAL_MS] without a PONG, and reconnect if the PONG does not come. */
     private fun watch(webSocket: WebSocket) {
         val scope = webSocket.coroutineScope ?: return
+        val connection = webSocket.connection
         keepalive.start(scope, PING_INTERVAL_MS, probe = { webSocket.write("PING") }, probeTimeoutMs = PONG_TIMEOUT_MS) {
-            webSocket.disconnect()
+            webSocket.disconnect(connection)
         }
     }
 

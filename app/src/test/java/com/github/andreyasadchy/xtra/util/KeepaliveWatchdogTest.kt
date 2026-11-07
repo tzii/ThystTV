@@ -4,6 +4,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -132,6 +134,23 @@ class KeepaliveWatchdogTest {
         }
         at(1_000)
         assertEquals(listOf(1_000L), expired)
+    }
+
+    @Test
+    fun `a restart after the old watch decided to expire drops the old expiry`() = runTest {
+        val expired = mutableListOf<String>()
+        val watchdog = watchdog()
+        watchdog.start(backgroundScope, 10_000) { expired += "first" }
+        // Due at the same instant but queued after the first watch's wake-up, so this restart
+        // lands after it chose to expire and before its expiry runs.
+        backgroundScope.launch {
+            delay(10_000)
+            watchdog.start(backgroundScope, 10_000) { expired += "second at ${testScheduler.currentTime}" }
+        }
+        at(10_000)
+        assertEquals(emptyList<String>(), expired)
+        at(20_000)
+        assertEquals(listOf("second at 20000"), expired)
     }
 
     @Test

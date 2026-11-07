@@ -88,13 +88,20 @@ internal class KeepaliveWatchdog(
                         }
                     }
                     Step.EXPIRE -> {
-                        scope.launch { onExpired() }
+                        // Once begun, a restart cannot cut the expiry short; one that has
+                        // not begun is dropped if a newer watch started in the meantime.
+                        scope.launch {
+                            if (isCurrent(current)) onExpired()
+                        }
                         return@launch
                     }
                 }
             }
         }
     }
+
+    @Synchronized
+    private fun isCurrent(watch: Long) = this.watch == watch
 
     /** Traffic arrived; restart the idle period. */
     @Synchronized

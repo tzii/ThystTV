@@ -360,6 +360,20 @@ class WebSocket(
         }
     }
 
+    /** The connection in use now, to pass to [disconnect] later. */
+    val connection: Any?
+        get() = socket
+
+    /**
+     * Disconnects only while [connection] is still the one in use, so a late keepalive
+     * expiry cannot close a newer connection made by a reconnect.
+     */
+    suspend fun disconnect(connection: Any?) = withContext(Dispatchers.IO) {
+        if (connection != null && socket === connection) {
+            disconnect()
+        }
+    }
+
     private suspend fun close() = withContext(Dispatchers.IO) {
         try {
             socket?.close()

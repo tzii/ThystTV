@@ -185,10 +185,10 @@ Abstractions A, B, F and G need approval before implementation.
 
 Automated checks:
 
-- [x] Targeted: `KeepaliveWatchdogTest` (8), `RecentIdsTest` (1), `WebSocketMaskTest` (1),
+- [x] Targeted: `KeepaliveWatchdogTest` (9), `RecentIdsTest` (1), `WebSocketMaskTest` (1),
   `ChatCardSlotTest` (6), `ChatNetworkRestorationTest` (4), `ChatViewModelTest` (15)
 - [x] `./gradlew assembleDebug` (JDK 21)
-- [x] `./gradlew test`: 1273 tests, 0 failures, 0 skipped
+- [x] `./gradlew test`: 1274 tests, 0 failures, 0 skipped
 - [x] `./gradlew lintDebug`: 0 errors, 332 warnings as before; none new in a changed file
 
 Independent review:
@@ -227,6 +227,19 @@ Independent review:
      code did, and dropping the timeout parameter from `feed()`, so feeding only moves
      the deadline later. Test `a new session with a shorter timeout does not wait out
      the old one`.
+- [x] Codex `gpt-6.1-sol`, reasoning `high`, re-check of `fb872cdab`: both round 1
+  findings resolved. Verdict: blocks, one new medium finding, fixed:
+  1. An expiry that had already chosen to fire could disconnect the connection made
+     by a reconnect, since `WebSocket` reuses one object and `disconnect()` closes
+     whatever socket it holds when it runs: confirmed, and present in base (the
+     `pongTimer` task launched `webSocket?.disconnect()` the same way). The window is
+     wider than reported: the socket field changes at `createSocket`, before the
+     handshake and before `onConnect` restarts the watch. Effect: one extra reconnect.
+     Fixed two ways: an expiry that has not begun is dropped if a newer watch started
+     (`isCurrent`), and each expiry calls `WebSocket.disconnect(connection)` with the
+     connection it watched, which does nothing once a reconnect has replaced it.
+     Regression test `a restart after the old watch decided to expire drops the old
+     expiry` fails without the check.
 
 Human QA required:
 
@@ -275,6 +288,10 @@ Human QA completed:
   keepalive defects (see Verification); fixed with a per-watch generation under the
   lock and a restart on every welcome. The race test fails on `7597bb646`.
   `assembleDebug test lintDebug` pass (1273 tests, lint 0 errors / 332 warnings).
+- 2026-11-07: Pushed `fb872cdab`. GPT re-check confirmed both fixes and found a stale
+  expiry could close a reconnected socket (base had the same race). Expiries now
+  check they are current and close only the connection they watched.
+  `assembleDebug test lintDebug` pass (1274 tests, lint 0 errors / 332 warnings).
 
 ## Decisions
 
