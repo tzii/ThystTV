@@ -278,7 +278,8 @@ class WebSocket(
         return@withContext false
     }
 
-    private suspend fun writeControlFrame(opcode: Int, data: ByteArray) = withContext(Dispatchers.IO) {
+    /** Writes to [target] when given, otherwise to the connection in use. */
+    private suspend fun writeControlFrame(opcode: Int, data: ByteArray, target: Socket? = null) = withContext(Dispatchers.IO) {
         val output = ByteArrayOutputStream()
         val firstByte = FIN_BIT or opcode
         output.write(firstByte)
@@ -290,7 +291,11 @@ class WebSocket(
         if (dataSize > 0) {
             output.write(mask(data, maskKey))
         }
-        if (socket?.isClosed == false) {
+        if (target != null) {
+            if (!target.isClosed) {
+                output.writeTo(target.outputStream)
+            }
+        } else if (socket?.isClosed == false) {
             outputStream?.let { output.writeTo(it) }
         }
     }
@@ -348,16 +353,7 @@ class WebSocket(
     }
 
     suspend fun disconnect() = withContext(Dispatchers.IO) {
-        if (socket?.isClosed == false) {
-            try {
-                val currentSocket = socket
-                writeControlFrame(OPCODE_CLOSE, ByteBuffer.allocate(2).putShort(1000).array())
-                delay(5000)
-                currentSocket?.close()
-            } catch (e: Exception) {
-
-            }
-        }
+        socket?.let { closeGracefully(it) }
     }
 
     /** The connection in use now, to pass to [disconnect] later. */
@@ -365,12 +361,23 @@ class WebSocket(
         get() = socket
 
     /**
-     * Disconnects only while [connection] is still the one in use, so a late keepalive
-     * expiry cannot close a newer connection made by a reconnect.
+     * Disconnects [connection] and nothing else. A reconnect replaces the socket this
+     * object holds, so a late keepalive expiry must not look it up again.
      */
     suspend fun disconnect(connection: Any?) = withContext(Dispatchers.IO) {
-        if (connection != null && socket === connection) {
-            disconnect()
+        (connection as? Socket)?.let { closeGracefully(it) }
+    }
+
+    /** Sends a close frame on [target] and closes it five seconds later. */
+    private suspend fun closeGracefully(target: Socket) {
+        if (!target.isClosed) {
+            try {
+                writeControlFrame(OPCODE_CLOSE, ByteBuffer.allocate(2).putShort(1000).array(), target)
+                delay(5000)
+                target.close()
+            } catch (e: Exception) {
+
+            }
         }
     }
 

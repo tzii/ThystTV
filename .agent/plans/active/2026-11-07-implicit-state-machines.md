@@ -186,9 +186,10 @@ Abstractions A, B, F and G need approval before implementation.
 Automated checks:
 
 - [x] Targeted: `KeepaliveWatchdogTest` (9), `RecentIdsTest` (1), `WebSocketMaskTest` (1),
+  `WebSocketDisconnectTest` (1),
   `ChatCardSlotTest` (6), `ChatNetworkRestorationTest` (4), `ChatViewModelTest` (15)
 - [x] `./gradlew assembleDebug` (JDK 21)
-- [x] `./gradlew test`: 1274 tests, 0 failures, 0 skipped
+- [x] `./gradlew test`: 1275 tests, 0 failures, 0 skipped
 - [x] `./gradlew lintDebug`: 0 errors, 332 warnings as before; none new in a changed file
 
 Independent review:
@@ -237,9 +238,19 @@ Independent review:
      handshake and before `onConnect` restarts the watch. Effect: one extra reconnect.
      Fixed two ways: an expiry that has not begun is dropped if a newer watch started
      (`isCurrent`), and each expiry calls `WebSocket.disconnect(connection)` with the
-     connection it watched, which does nothing once a reconnect has replaced it.
-     Regression test `a restart after the old watch decided to expire drops the old
-     expiry` fails without the check.
+     connection it watched. Regression test `a restart after the old watch decided to
+     expire drops the old expiry` fails without the check.
+- [x] Codex `gpt-6.1-sol`, reasoning `high`, round 3 on `1c972bfd9`: round 2 finding
+  partly resolved. Verdict: blocks, one medium finding, fixed:
+  1. `disconnect(connection)` checked `socket === connection` and then called the
+     generic `disconnect()`, which read `socket`/`outputStream` again, so a reconnect
+     between the check and the reads could still get the close: confirmed as a
+     check-then-use race (it needs the IO thread to stall past the 1 s reconnect delay
+     and a handshake). Fixed: every close goes through `closeGracefully(target)`,
+     which writes the close frame to that socket's own output stream and closes that
+     socket; `disconnect(connection)` never looks at the current socket, and
+     `disconnect()` targets the current one once. `WebSocketDisconnectTest` installs a
+     replacement before the expiry runs; it fails on `1c972bfd9` and passes now.
 
 Human QA required:
 
@@ -292,6 +303,9 @@ Human QA completed:
   expiry could close a reconnected socket (base had the same race). Expiries now
   check they are current and close only the connection they watched.
   `assembleDebug test lintDebug` pass (1274 tests, lint 0 errors / 332 warnings).
+- 2026-11-07: Pushed `1c972bfd9`. GPT round 3 found the connection check could still
+  race the close; every close now writes to and closes only its target socket.
+  `assembleDebug test lintDebug` pass (1275 tests, lint 0 errors / 332 warnings).
 
 ## Decisions
 
