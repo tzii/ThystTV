@@ -150,6 +150,10 @@ product call.
   hides a card wrongly. The reopen and dismissal rules are copied one for one and
   covered by `ChatCardSlotTest`.
 
+- Closes now write the close frame through the target socket's own
+  `getOutputStream()` instead of the stream stored at connect. Android's SSL sockets
+  return one stream per socket, but only device QA confirms a clean close.
+
 Risk level: low-medium (chat transport, no player code)
 
 ## Human approval
@@ -251,6 +255,11 @@ Independent review:
      socket; `disconnect(connection)` never looks at the current socket, and
      `disconnect()` targets the current one once. `WebSocketDisconnectTest` installs a
      replacement before the expiry runs; it fails on `1c972bfd9` and passes now.
+- [x] Codex `gpt-6.1-sol`, reasoning `high`, round 4 on `1f21fdfe1`: round 3 finding
+  resolved, earlier fixes intact, no new verified defect across the whole change.
+  Verdict: nothing blocks. It notes the disconnect test stops before the delayed
+  `close()` (that step is bound to the target by inspection), and that Android SSL
+  behavior and device QA are untested.
 
 Human QA required:
 
@@ -306,6 +315,7 @@ Human QA completed:
 - 2026-11-07: Pushed `1c972bfd9`. GPT round 3 found the connection check could still
   race the close; every close now writes to and closes only its target socket.
   `assembleDebug test lintDebug` pass (1275 tests, lint 0 errors / 332 warnings).
+- 2026-11-07: Pushed `1f21fdfe1`. GPT round 4: nothing blocks. Device QA pending.
 
 ## Decisions
 
@@ -341,7 +351,10 @@ per notification; countdowns stay correct after sleep; frame masking and zlib
 cleanup avoid needless allocation and native memory retention. Each raid, poll
 and prediction card is one value owned by the view model, replacing five fields
 per card and 18 view-side writes; the chat-mode banner no longer hides early.
-Tests: new watchdog/card/id/mask tests; Gradle checks listed above.
+Review fixes: a replaced keepalive watch cannot touch its successor, a welcome
+restarts the watch with its announced timeout, and an expiry closes only the
+connection it watched.
+Tests: new watchdog/card/id/mask/disconnect tests; Gradle checks listed above.
 Human QA: chat matrix above.
 Risks: chat reconnect timing; minute-watched no longer bursts after deep sleep;
-results hide 20 s after arrival.
+results hide 20 s after arrival; closes use the target socket's own stream.
