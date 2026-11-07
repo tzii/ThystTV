@@ -4,6 +4,14 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Changed
+- Chat connections check they are alive with one lightweight task per connection instead of starting a new background thread for each channel-points, poll, prediction or EventSub notification. Reconnect timing is unchanged.
+
+### Fixed
+- Poll and prediction countdowns show the real time left after the phone has slept, and channel points no longer report a burst of missed watch minutes on wake.
+- Raid, poll and prediction cards stay up when the chat screen is rebuilt, for example after switching dark mode, and a lock or result hides 20 seconds after it arrives.
+- The chat-mode banner (emote-only, slow mode and so on) stays up for its full five seconds when the modes change again while it is showing.
+
 ## [1.5.2] - 2026-10-31
 
 ### Added

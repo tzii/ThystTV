@@ -1,14 +1,13 @@
 package com.github.andreyasadchy.xtra.util.chat
 
+import com.github.andreyasadchy.xtra.util.KeepaliveWatchdog
 import com.github.andreyasadchy.xtra.util.WebSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Timer
 import javax.net.ssl.X509TrustManager
-import kotlin.concurrent.schedule
 import kotlin.random.Random
 
 class ChatReadWebSocket(
@@ -17,8 +16,7 @@ class ChatReadWebSocket(
     private val listener: Listener,
 ) {
     private var webSocket: WebSocket? = null
-    private var pingTimer: Timer? = null
-    private var pongTimer: Timer? = null
+    private val keepalive = KeepaliveWatchdog()
 
     fun connect(coroutineScope: CoroutineScope): Job {
         webSocket = WebSocket("wss://irc-ws.chat.twitch.tv", trustManager, WebSocketListener())
@@ -29,30 +27,17 @@ class ChatReadWebSocket(
     }
 
     suspend fun disconnect(job: Job?) = withContext(Dispatchers.IO) {
-        pingTimer?.cancel()
-        pongTimer?.cancel()
+        keepalive.stop()
         job?.cancel()
         webSocket?.disconnect()
     }
 
-    private suspend fun startPingTimer() = withContext(Dispatchers.IO) {
-        pingTimer = Timer().apply {
-            schedule(270000) {
-                webSocket?.coroutineScope?.launch {
-                    webSocket?.write("PING")
-                    startPongTimer()
-                }
-            }
-        }
-    }
-
-    private suspend fun startPongTimer() = withContext(Dispatchers.IO) {
-        pongTimer = Timer().apply {
-            schedule(10000) {
-                webSocket?.coroutineScope?.launch {
-                    webSocket?.disconnect()
-                }
-            }
+    /** PING after [PING_INTERVAL_MS] without a PONG, and reconnect if the PONG does not come. */
+    private fun watch(webSocket: WebSocket) {
+        val scope = webSocket.coroutineScope ?: return
+        val connection = webSocket.connection
+        keepalive.start(scope, PING_INTERVAL_MS, probe = { webSocket.write("PING") }, probeTimeoutMs = PONG_TIMEOUT_MS) {
+            webSocket.disconnect(connection)
         }
     }
 
@@ -73,9 +58,7 @@ class ChatReadWebSocket(
             webSocket.write("NICK justinfan${Random.nextInt(1000, 10000)}")
             webSocket.write("JOIN #$channelLogin")
             listener.onConnect()
-            pingTimer?.cancel()
-            pongTimer?.cancel()
-            startPingTimer()
+            watch(webSocket)
         }
 
         override suspend fun onMessage(webSocket: WebSocket, message: String) {
@@ -92,14 +75,9 @@ class ChatReadWebSocket(
                         startsWith("PING") -> {
                             webSocket.write("PONG")
                         }
-                        startsWith("PONG") -> {
-                            pingTimer?.cancel()
-                            pongTimer?.cancel()
-                            startPingTimer()
-                        }
+                        startsWith("PONG") -> keepalive.feed()
                         startsWith("RECONNECT") -> {
-                            pingTimer?.cancel()
-                            pongTimer?.cancel()
+                            keepalive.stop()
                             webSocket.disconnect()
                         }
                     }
@@ -110,5 +88,11 @@ class ChatReadWebSocket(
         override suspend fun onDisconnect(webSocket: WebSocket, message: String, fullMsg: String?) {
             listener.onDisconnect(message, fullMsg)
         }
+    }
+
+    internal companion object {
+        /** Time after connecting or the last PONG before the next PING. */
+        const val PING_INTERVAL_MS = 270_000L
+        const val PONG_TIMEOUT_MS = 10_000L
     }
 }

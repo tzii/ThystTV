@@ -1,10 +1,12 @@
 package com.github.andreyasadchy.xtra.util.chat
 
 import android.os.Build
+import com.github.andreyasadchy.xtra.util.KeepaliveWatchdog
 import com.github.andreyasadchy.xtra.util.WebSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -16,11 +18,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
-import java.util.Timer
 import java.util.UUID
 import javax.net.ssl.X509TrustManager
-import kotlin.concurrent.schedule
-import kotlin.concurrent.scheduleAtFixedRate
 
 class HermesWebSocket(
     private val channelId: String,
@@ -35,11 +34,11 @@ class HermesWebSocket(
     private val listener: Listener,
 ) {
     private var webSocket: WebSocket? = null
-    private var pongTimer: Timer? = null
+    private val keepalive = KeepaliveWatchdog()
     private var timeout = 15000L
-    private var minuteWatchedTimer: Timer? = null
+    private var minuteWatched: Job? = null
     private var topics = emptyMap<String, String>()
-    private val handledMessageIds = mutableListOf<String>()
+    private val handledMessageIds = RecentIds(200)
 
     fun connect(coroutineScope: CoroutineScope): Job {
         webSocket = WebSocket("wss://hermes.twitch.tv/v1?clientId=${gqlClientId}", trustManager, WebSocketListener())
@@ -50,9 +49,9 @@ class HermesWebSocket(
     }
 
     suspend fun disconnect(job: Job?) = withContext(Dispatchers.IO) {
-        pongTimer?.cancel()
-        minuteWatchedTimer?.cancel()
-        minuteWatchedTimer = null
+        keepalive.stop()
+        minuteWatched?.cancel()
+        minuteWatched = null
         job?.cancel()
         webSocket?.disconnect()
     }
@@ -117,22 +116,30 @@ class HermesWebSocket(
         }
     }
 
-    private suspend fun startPongTimer() = withContext(Dispatchers.IO) {
-        pongTimer = Timer().apply {
-            schedule(timeout) {
-                webSocket?.coroutineScope?.launch {
-                    webSocket?.disconnect()
-                }
-            }
+    /** A keepalive or notification proves the session alive for another [timeout]. */
+    private fun keepAlive(webSocket: WebSocket) {
+        if (keepalive.isRunning) {
+            keepalive.feed()
+        } else {
+            watch(webSocket)
         }
     }
 
-    private suspend fun startMinuteWatchedTimer() = withContext(Dispatchers.IO) {
-        minuteWatchedTimer = Timer().apply {
-            scheduleAtFixedRate(60000, 60000) {
-                webSocket?.coroutineScope?.launch {
-                    listener.onMinuteWatched()
-                }
+    /** A welcome starts a new session, which may announce a different [timeout]. */
+    private fun watch(webSocket: WebSocket) {
+        val scope = webSocket.coroutineScope ?: return
+        val connection = webSocket.connection
+        keepalive.start(scope, timeout) { webSocket.disconnect(connection) }
+    }
+
+    /** Reports a watched minute every minute until [disconnect]; reconnects keep the same ticker. */
+    private fun startMinuteWatched(webSocket: WebSocket) {
+        val scope = webSocket.coroutineScope ?: return
+        minuteWatched = scope.launch {
+            while (true) {
+                delay(60000)
+                // A slow report must not hold back the next minute.
+                scope.launch { listener.onMinuteWatched() }
             }
         }
     }
@@ -160,20 +167,12 @@ class HermesWebSocket(
             try {
                 val json = if (message.isNotBlank()) JSONObject(message) else null
                 val messageId = if (json?.isNull("id") == false) json.optString("id").takeIf { it.isNotBlank() } else null
-                if (!messageId.isNullOrBlank()) {
-                    if (handledMessageIds.contains(messageId)) {
-                        return
-                    } else {
-                        handledMessageIds.add(messageId)
-                        if (handledMessageIds.size > 200) {
-                            handledMessageIds.removeAt(0)
-                        }
-                    }
+                if (!messageId.isNullOrBlank() && !handledMessageIds.add(messageId)) {
+                    return
                 }
                 when (json?.optString("type")) {
                     "notification" -> {
-                        pongTimer?.cancel()
-                        startPongTimer()
+                        keepAlive(webSocket)
                         val notification = json.optJSONObject("notification")
                         val subscription = notification?.optJSONObject("subscription")
                         val subscriptionId = subscription?.optString("id")
@@ -210,14 +209,11 @@ class HermesWebSocket(
                             }
                         }
                     }
-                    "keepalive" -> {
-                        pongTimer?.cancel()
-                        startPongTimer()
-                    }
+                    "keepalive" -> keepAlive(webSocket)
                     "reconnect" -> {
                         //val reconnect = json.optJSONObject("reconnect")
                         //val reconnectUrl = if (reconnect?.isNull("url") == false) reconnect.optString("url").takeIf { it.isNotBlank() } else null
-                        pongTimer?.cancel()
+                        keepalive.stop()
                         webSocket.disconnect()
                     }
                     "welcome" -> {
@@ -227,11 +223,10 @@ class HermesWebSocket(
                                 timeout = it * 1000L
                             }
                         }
-                        pongTimer?.cancel()
-                        startPongTimer()
+                        watch(webSocket)
                         subscribe()
-                        if (collectPoints && !userId.isNullOrBlank() && !gqlToken.isNullOrBlank() && minuteWatchedTimer == null) {
-                            startMinuteWatchedTimer()
+                        if (collectPoints && !userId.isNullOrBlank() && !gqlToken.isNullOrBlank() && minuteWatched == null) {
+                            startMinuteWatched(webSocket)
                         }
                     }
                 }

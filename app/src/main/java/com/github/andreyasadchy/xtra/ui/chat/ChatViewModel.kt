@@ -61,11 +61,9 @@ import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
-import java.util.Timer
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.net.ssl.X509TrustManager
-import kotlin.concurrent.scheduleAtFixedRate
 
 
 @HiltViewModel
@@ -95,11 +93,6 @@ class ChatViewModel @Inject constructor(
     private var stvUserId: String? = null
     private var stvLastPresenceUpdate: Long? = null
     private val allEmotes = mutableListOf<String>()
-    private var usedRaidId: String? = null
-    private var usedPollId: String? = null
-    private var pollTimeoutJob: Job? = null
-    private var usedPredictionId: String? = null
-    private var predictionTimeoutJob: Job? = null
     private var started = false
     var autoReconnect = true
 
@@ -118,17 +111,11 @@ class ChatViewModel @Inject constructor(
     val cheerEmotes = mutableListOf<CheerEmote>()
 
     val roomState = MutableStateFlow<RoomState?>(null)
-    val raid = MutableStateFlow<Raid?>(null)
+    /** Raid, poll and prediction cards. The chat view renders them and reports when the viewer closes one. */
+    internal val raid = ChatCardSlot<Raid>(viewModelScope)
     val raidClicked = MutableStateFlow<Raid?>(null)
-    var raidClosed = false
-    val poll = MutableStateFlow<Poll?>(null)
-    var pollClosed = false
-    val pollSecondsLeft = MutableStateFlow<Int?>(null)
-    var pollTimer: Timer? = null
-    val prediction = MutableStateFlow<Prediction?>(null)
-    var predictionClosed = false
-    val predictionSecondsLeft = MutableStateFlow<Int?>(null)
-    var predictionTimer: Timer? = null
+    internal val poll = ChatCardSlot<Poll>(viewModelScope)
+    internal val prediction = ChatCardSlot<Prediction>(viewModelScope)
     private val _streamInfo = MutableStateFlow<PubSubUtils.StreamInfo?>(null)
     val streamInfo: StateFlow<PubSubUtils.StreamInfo?> = _streamInfo
     private val _playbackMessage = MutableStateFlow<PubSubUtils.PlaybackMessage?>(null)
@@ -144,9 +131,6 @@ class ChatViewModel @Inject constructor(
     val translateAllMessages = MutableStateFlow<Boolean?>(null)
 
     val reloadMessages = MutableStateFlow(false)
-    val hideRaid = MutableStateFlow(false)
-    val hidePoll = MutableStateFlow(false)
-    val hidePrediction = MutableStateFlow(false)
 
     /** Set by [ChatFragment] while its view exists. Called on the main thread right after [chatMessages] changes. */
     var messageListener: ((List<ChatMessageStore.Change>) -> Unit)? = null
@@ -219,10 +203,6 @@ class ChatViewModel @Inject constructor(
     override fun onCleared() {
         stopLiveChat()
         stopReplayChat()
-        pollSecondsLeft.value = null
-        pollTimer?.cancel()
-        predictionSecondsLeft.value = null
-        predictionTimer?.cancel()
         super.onCleared()
     }
 
@@ -893,27 +873,11 @@ class ChatViewModel @Inject constructor(
 
     fun disconnect() {
         stopLiveChat()
-        usedRaidId = null
-        raidClosed = true
-        usedPollId = null
-        pollClosed = true
-        pollSecondsLeft.value = null
-        pollTimer?.cancel()
-        usedPredictionId = null
-        predictionClosed = true
-        predictionSecondsLeft.value = null
-        predictionTimer?.cancel()
+        raid.reset()
+        poll.reset()
+        prediction.reset()
         clearChatMessages()
         onMessage(ChatMessage(systemMsg = ContextCompat.getString(applicationContext, R.string.disconnected)))
-        if (!hideRaid.value) {
-            hideRaid.value = true
-        }
-        if (!hidePoll.value) {
-            hidePoll.value = true
-        }
-        if (!hidePrediction.value) {
-            hidePrediction.value = true
-        }
         roomState.value = RoomState("0", "-1", "0", "0", "0")
         autoReconnect = false
     }
@@ -948,8 +912,8 @@ class ChatViewModel @Inject constructor(
                     onRewardMessage(chatMessage, networkLibrary, isLoggedIn, accountId, channelId)
                 } else {
                     onChatMessage(chatMessage, networkLibrary, isLoggedIn, accountId, channelId)
-                    if (chatMessage.msgId == "unraid" && !hideRaid.value) {
-                        hideRaid.value = true
+                    if (chatMessage.msgId == "unraid") {
+                        raid.close()
                     }
                 }
             }
@@ -981,9 +945,7 @@ class ChatViewModel @Inject constructor(
                 val messageId = result.second
                 onMessage(chatMessage)
                 if (messageId == "unraid") {
-                    if (!hideRaid.value) {
-                        hideRaid.value = true
-                    }
+                    raid.close()
                 }
             }
         }
@@ -1016,9 +978,7 @@ class ChatViewModel @Inject constructor(
             val messageId = result.second
             onMessage(chatMessage)
             if (messageId == "unraid") {
-                if (!hideRaid.value) {
-                    hideRaid.value = true
-                }
+                raid.close()
             }
         }
 
@@ -1214,9 +1174,7 @@ class ChatViewModel @Inject constructor(
         override suspend fun onRaidUpdate(message: JSONObject, openStream: Boolean) {
             if (showRaids) {
                 PubSubUtils.onRaidUpdate(message, openStream)?.let {
-                    if (it.raidId != usedRaidId) {
-                        usedRaidId = it.raidId
-                        raidClosed = false
+                    if (raid.update(it.raidId, it, CardPhase.OPEN)) {
                         if (collectPoints && !gqlHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
                             viewModelScope.launch {
                                 try {
@@ -1233,7 +1191,6 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                     }
-                    raid.value = it
                 }
             }
         }
@@ -1241,34 +1198,9 @@ class ChatViewModel @Inject constructor(
         override suspend fun onPollUpdate(message: JSONObject) {
             if (showPolls) {
                 PubSubUtils.onPollUpdate(message)?.let {
-                    if (it.id != usedPollId) {
-                        usedPollId = it.id
-                        pollClosed = false
-                        pollTimeoutJob?.cancel()
-                        if (it.remainingMilliseconds != null) {
-                            val secondsLeft = it.remainingMilliseconds / 1000
-                            if (secondsLeft > 0) {
-                                pollSecondsLeft.value = secondsLeft
-                                pollTimer?.cancel()
-                                pollTimer = Timer().apply {
-                                    scheduleAtFixedRate(1000, 1000) {
-                                        val seconds = pollSecondsLeft.value
-                                        if (seconds != null) {
-                                            pollSecondsLeft.value = seconds - 1
-                                            if (seconds <= 1) {
-                                                this@apply.cancel()
-                                            }
-                                        } else {
-                                            this@apply.cancel()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else if (it.status == "COMPLETED" || it.status == "TERMINATED") {
-                        pollClosed = false
+                    poll.update(it.id, it, pollPhase(it.status), pollReopens(it.status)) {
+                        it.remainingMilliseconds?.toLong()
                     }
-                    poll.value = it
                 }
             }
         }
@@ -1276,34 +1208,11 @@ class ChatViewModel @Inject constructor(
         override suspend fun onPredictionUpdate(message: JSONObject) {
             if (showPredictions) {
                 PubSubUtils.onPredictionUpdate(message)?.let {
-                    if (it.id != usedPredictionId) {
-                        usedPredictionId = it.id
-                        predictionClosed = false
-                        predictionTimeoutJob?.cancel()
+                    prediction.update(it.id, it, predictionPhase(it.status), predictionReopens(it.status)) {
                         if (it.createdAt != null && it.predictionWindowSeconds != null) {
-                            val secondsLeft = ((((it.createdAt + (it.predictionWindowSeconds * 1000)) - System.currentTimeMillis())) / 1000).toInt()
-                            if (secondsLeft > 0) {
-                                predictionSecondsLeft.value = secondsLeft
-                                predictionTimer?.cancel()
-                                predictionTimer = Timer().apply {
-                                    scheduleAtFixedRate(1000, 1000) {
-                                        val seconds = predictionSecondsLeft.value
-                                        if (seconds != null) {
-                                            predictionSecondsLeft.value = seconds - 1
-                                            if (seconds <= 1) {
-                                                this@apply.cancel()
-                                            }
-                                        } else {
-                                            this@apply.cancel()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else if (it.status == "LOCKED" || it.status == "CANCEL_PENDING" || it.status == "RESOLVE_PENDING") {
-                        predictionClosed = false
+                            it.createdAt + it.predictionWindowSeconds * 1000L - System.currentTimeMillis()
+                        } else null
                     }
-                    prediction.value = it
                 }
             }
         }
@@ -1602,22 +1511,6 @@ class ChatViewModel @Inject constructor(
 
                 }
             }
-        }
-    }
-
-    fun startPollTimeout(hide: () -> Unit) {
-        pollTimeoutJob?.cancel()
-        pollTimeoutJob = viewModelScope.launch {
-            delay(20000)
-            hide()
-        }
-    }
-
-    fun startPredictionTimeout(hide: () -> Unit) {
-        predictionTimeoutJob?.cancel()
-        predictionTimeoutJob = viewModelScope.launch {
-            delay(20000)
-            hide()
         }
     }
 
