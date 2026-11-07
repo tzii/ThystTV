@@ -7,7 +7,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -19,7 +18,6 @@ import java.io.OutputStreamWriter
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.security.MessageDigest
-import java.util.Timer
 import java.util.zip.Deflater
 import java.util.zip.DeflaterOutputStream
 import java.util.zip.Inflater
@@ -28,7 +26,6 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.X509TrustManager
-import kotlin.concurrent.schedule
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 
@@ -37,13 +34,10 @@ class WebSocket(
     private val trustManager: X509TrustManager?,
     private val listener: Listener,
     private val headers: Map<String, String>? = null,
-    private val sendPings: Boolean = false,
 ) {
     private var socket: Socket? = null
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
-    private var pingTimer: Timer? = null
-    private var pongTimer: Timer? = null
     private var messageByteArray: ByteArray? = null
     private var useCompression = false
     private var nextFrameCompressed = false
@@ -156,36 +150,8 @@ class WebSocket(
             listener.onDisconnect(this@WebSocket, "")
             return@withContext true
         }
-        if (sendPings) {
-            startPingTimer()
-        }
         listener.onConnect(this@WebSocket)
         return@withContext false
-    }
-
-    private suspend fun startPingTimer() = withContext(Dispatchers.IO) {
-        pingTimer = Timer().apply {
-            schedule(270000) {
-                if (socket?.isClosed == false) {
-                    coroutineScope?.launch {
-                        writeControlFrame(OPCODE_PING, byteArrayOf())
-                        startPongTimer()
-                    }
-                }
-            }
-        }
-    }
-
-    private suspend fun startPongTimer() = withContext(Dispatchers.IO) {
-        pongTimer = Timer().apply {
-            schedule(10000) {
-                try {
-                    socket?.close()
-                } catch (e: Exception) {
-
-                }
-            }
-        }
     }
 
     suspend fun readNextFrame(): Boolean = withContext(Dispatchers.IO) {
@@ -265,13 +231,6 @@ class WebSocket(
                 OPCODE_PING -> {
                     writeControlFrame(OPCODE_PONG, data)
                 }
-                OPCODE_PONG -> {
-                    if (sendPings) {
-                        pingTimer?.cancel()
-                        pongTimer?.cancel()
-                        startPingTimer()
-                    }
-                }
                 OPCODE_CLOSE -> {
                     val code = data.copyOf(2)
                     writeControlFrame(OPCODE_CLOSE, code)
@@ -284,10 +243,15 @@ class WebSocket(
                     val messageData = if ((opcode == OPCODE_CONTINUATION && nextFrameCompressed) || compressed) {
                         val decompressedStream = ByteArrayOutputStream()
                         val inflater = Inflater(true)
-                        val inflaterStream = InflaterOutputStream(decompressedStream, inflater)
-                        inflaterStream.write(data)
-                        inflaterStream.write(0x0000ffff)
-                        inflaterStream.close()
+                        try {
+                            val inflaterStream = InflaterOutputStream(decompressedStream, inflater)
+                            inflaterStream.write(data)
+                            inflaterStream.write(0x0000ffff)
+                            inflaterStream.close()
+                        } finally {
+                            // Streams only end inflaters they created; free the native zlib state now, not at GC.
+                            inflater.end()
+                        }
                         decompressedStream.toByteArray()
                     } else {
                         data
@@ -324,10 +288,7 @@ class WebSocket(
         val maskKey = Random.nextBytes(4)
         output.write(maskKey)
         if (dataSize > 0) {
-            val maskedData = data.mapIndexed { index, byte ->
-                (byte.toInt() xor maskKey[index % 4].toInt()).toByte()
-            }.toByteArray()
-            output.write(maskedData)
+            output.write(mask(data, maskKey))
         }
         if (socket?.isClosed == false) {
             outputStream?.let { output.writeTo(it) }
@@ -342,9 +303,13 @@ class WebSocket(
             firstByte = firstByte or COMPRESSED_BIT
             val compressedStream = ByteArrayOutputStream()
             val deflater = Deflater(Deflater.DEFAULT_COMPRESSION, true)
-            val deflaterStream = DeflaterOutputStream(compressedStream, deflater)
-            deflaterStream.write(messageBytes)
-            deflaterStream.close()
+            try {
+                val deflaterStream = DeflaterOutputStream(compressedStream, deflater)
+                deflaterStream.write(messageBytes)
+                deflaterStream.close()
+            } finally {
+                deflater.end()
+            }
             val compressedBytes = compressedStream.toByteArray()
             if (compressedBytes.takeLast(5) == EMPTY_DEFLATE_BLOCK) {
                 compressedBytes.dropLast(4).toByteArray()
@@ -376,18 +341,13 @@ class WebSocket(
         }
         val maskKey = Random.nextBytes(4)
         output.write(maskKey)
-        val maskedData = data.mapIndexed { index, byte ->
-            (byte.toInt() xor maskKey[index % 4].toInt()).toByte()
-        }.toByteArray()
-        output.write(maskedData)
+        output.write(mask(data, maskKey))
         if (socket?.isClosed == false) {
             outputStream?.let { output.writeTo(it) }
         }
     }
 
     suspend fun disconnect() = withContext(Dispatchers.IO) {
-        pingTimer?.cancel()
-        pongTimer?.cancel()
         if (socket?.isClosed == false) {
             try {
                 val currentSocket = socket
@@ -401,8 +361,6 @@ class WebSocket(
     }
 
     private suspend fun close() = withContext(Dispatchers.IO) {
-        pingTimer?.cancel()
-        pongTimer?.cancel()
         try {
             socket?.close()
         } catch (e: Exception) {
@@ -417,6 +375,15 @@ class WebSocket(
     }
 
     companion object {
+        /** Client frames are XOR-masked with a 4-byte key (RFC 6455 5.3), in one pass without a List<Byte>. */
+        internal fun mask(data: ByteArray, key: ByteArray): ByteArray {
+            val masked = ByteArray(data.size)
+            for (i in data.indices) {
+                masked[i] = (data[i].toInt() xor key[i and 3].toInt()).toByte()
+            }
+            return masked
+        }
+
         private const val ACCEPT_UUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
         private const val FIN_BIT = 128
         private const val COMPRESSED_BIT = 64

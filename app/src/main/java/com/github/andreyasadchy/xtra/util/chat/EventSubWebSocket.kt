@@ -1,5 +1,6 @@
 package com.github.andreyasadchy.xtra.util.chat
 
+import com.github.andreyasadchy.xtra.util.KeepaliveWatchdog
 import com.github.andreyasadchy.xtra.util.WebSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -7,18 +8,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.util.Timer
 import javax.net.ssl.X509TrustManager
-import kotlin.concurrent.schedule
 
 class EventSubWebSocket(
     private val trustManager: X509TrustManager?,
     private val listener: Listener,
 ) {
     private var webSocket: WebSocket? = null
-    private var pongTimer: Timer? = null
+    private val keepalive = KeepaliveWatchdog()
     private var timeout = 10000L
-    private val handledMessageIds = mutableListOf<String>()
+    private val handledMessageIds = RecentIds(200)
 
     fun connect(coroutineScope: CoroutineScope): Job {
         webSocket = WebSocket("wss://eventsub.wss.twitch.tv/ws", trustManager, WebSocketListener())
@@ -29,18 +28,18 @@ class EventSubWebSocket(
     }
 
     suspend fun disconnect(job: Job?) = withContext(Dispatchers.IO) {
-        pongTimer?.cancel()
+        keepalive.stop()
         job?.cancel()
         webSocket?.disconnect()
     }
 
-    private suspend fun startPongTimer() = withContext(Dispatchers.IO) {
-        pongTimer = Timer().apply {
-            schedule(timeout) {
-                webSocket?.coroutineScope?.launch {
-                    webSocket?.disconnect()
-                }
-            }
+    /** Any welcome, keepalive or notification proves the session alive for another [timeout]. */
+    private fun keepAlive(webSocket: WebSocket) {
+        if (keepalive.isRunning) {
+            keepalive.feed(timeout)
+        } else {
+            val scope = webSocket.coroutineScope ?: return
+            keepalive.start(scope, timeout) { webSocket.disconnect() }
         }
     }
 
@@ -66,20 +65,12 @@ class EventSubWebSocket(
                     val metadata = json.optJSONObject("metadata")
                     val messageId = if (metadata?.isNull("message_id") == false) metadata.optString("message_id").takeIf { it.isNotBlank() } else null
                     val timestamp = if (metadata?.isNull("message_timestamp") == false) metadata.optString("message_timestamp").takeIf { it.isNotBlank() } else null
-                    if (!messageId.isNullOrBlank()) {
-                        if (handledMessageIds.contains(messageId)) {
-                            return
-                        } else {
-                            handledMessageIds.add(messageId)
-                            if (handledMessageIds.size > 200) {
-                                handledMessageIds.removeAt(0)
-                            }
-                        }
+                    if (!messageId.isNullOrBlank() && !handledMessageIds.add(messageId)) {
+                        return
                     }
                     when (metadata?.optString("message_type")) {
                         "notification" -> {
-                            pongTimer?.cancel()
-                            startPongTimer()
+                            keepAlive(webSocket)
                             val payload = json.optJSONObject("payload")
                             val event = payload?.optJSONObject("event")
                             if (event != null) {
@@ -91,15 +82,12 @@ class EventSubWebSocket(
                                 }
                             }
                         }
-                        "session_keepalive" -> {
-                            pongTimer?.cancel()
-                            startPongTimer()
-                        }
+                        "session_keepalive" -> keepAlive(webSocket)
                         "session_reconnect" -> {
                             //val payload = json.optJSONObject("payload")
                             //val session = payload?.optJSONObject("session")
                             //val reconnectUrl = if (session?.isNull("reconnect_url") == false) session.optString("reconnect_url").takeIf { it.isNotBlank() } else null
-                            pongTimer?.cancel()
+                            keepalive.stop()
                             webSocket.disconnect()
                         }
                         "session_welcome" -> {
@@ -110,8 +98,7 @@ class EventSubWebSocket(
                                     timeout = it * 1000L
                                 }
                             }
-                            pongTimer?.cancel()
-                            startPongTimer()
+                            keepAlive(webSocket)
                             val sessionId = session?.optString("id")
                             if (!sessionId.isNullOrBlank()) {
                                 listener.onWelcomeMessage(sessionId)

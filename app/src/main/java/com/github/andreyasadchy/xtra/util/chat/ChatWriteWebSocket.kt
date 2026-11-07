@@ -1,14 +1,13 @@
 package com.github.andreyasadchy.xtra.util.chat
 
+import com.github.andreyasadchy.xtra.util.KeepaliveWatchdog
 import com.github.andreyasadchy.xtra.util.WebSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Timer
 import javax.net.ssl.X509TrustManager
-import kotlin.concurrent.schedule
 
 class ChatWriteWebSocket(
     private val userLogin: String?,
@@ -18,8 +17,7 @@ class ChatWriteWebSocket(
     private val listener: ChatReadWebSocket.Listener,
 ) {
     private var webSocket: WebSocket? = null
-    private var pingTimer: Timer? = null
-    private var pongTimer: Timer? = null
+    private val keepalive = KeepaliveWatchdog()
 
     fun connect(coroutineScope: CoroutineScope): Job {
         webSocket = WebSocket("wss://irc-ws.chat.twitch.tv", trustManager, WebSocketListener())
@@ -30,30 +28,17 @@ class ChatWriteWebSocket(
     }
 
     suspend fun disconnect(job: Job?) = withContext(Dispatchers.IO) {
-        pingTimer?.cancel()
-        pongTimer?.cancel()
+        keepalive.stop()
         job?.cancel()
         webSocket?.disconnect()
     }
 
-    private suspend fun startPingTimer() = withContext(Dispatchers.IO) {
-        pingTimer = Timer().apply {
-            schedule(270000) {
-                webSocket?.coroutineScope?.launch {
-                    webSocket?.write("PING")
-                    startPongTimer()
-                }
-            }
-        }
-    }
-
-    private suspend fun startPongTimer() = withContext(Dispatchers.IO) {
-        pongTimer = Timer().apply {
-            schedule(10000) {
-                webSocket?.coroutineScope?.launch {
-                    webSocket?.disconnect()
-                }
-            }
+    /** PING after [ChatReadWebSocket.PING_INTERVAL_MS] without a PONG, and reconnect if the PONG does not come. */
+    private fun watch(webSocket: WebSocket) {
+        val scope = webSocket.coroutineScope ?: return
+        keepalive.start(scope, ChatReadWebSocket.PING_INTERVAL_MS, probe = { webSocket.write("PING") },
+            probeTimeoutMs = ChatReadWebSocket.PONG_TIMEOUT_MS) {
+            webSocket.disconnect()
         }
     }
 
@@ -69,9 +54,7 @@ class ChatWriteWebSocket(
             webSocket.write("NICK $userLogin")
             webSocket.write("JOIN #$channelLogin")
             listener.onConnect()
-            pingTimer?.cancel()
-            pongTimer?.cancel()
-            startPingTimer()
+            watch(webSocket)
         }
 
         override suspend fun onMessage(webSocket: WebSocket, message: String) {
@@ -88,14 +71,9 @@ class ChatWriteWebSocket(
                         startsWith("PING") -> {
                             webSocket.write("PONG")
                         }
-                        startsWith("PONG") -> {
-                            pingTimer?.cancel()
-                            pongTimer?.cancel()
-                            startPingTimer()
-                        }
+                        startsWith("PONG") -> keepalive.feed()
                         startsWith("RECONNECT") -> {
-                            pingTimer?.cancel()
-                            pongTimer?.cancel()
+                            keepalive.stop()
                             webSocket.disconnect()
                         }
                     }
