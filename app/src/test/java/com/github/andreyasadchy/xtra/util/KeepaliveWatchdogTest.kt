@@ -37,7 +37,7 @@ class KeepaliveWatchdogTest {
     }
 
     @Test
-    fun `traffic pushes the deadline forward and adopts an announced timeout`() = runTest {
+    fun `traffic pushes the deadline forward`() = runTest {
         val expired = mutableListOf<Long>()
         val watchdog = watchdog()
         watchdog.start(backgroundScope, 10_000) { expired += testScheduler.currentTime }
@@ -48,12 +48,56 @@ class KeepaliveWatchdogTest {
         }
         at(18_999)
         assertTrue(expired.isEmpty())
-        watchdog.feed(30_000)
-        at(48_998)
-        assertTrue(expired.isEmpty())
-        at(48_999)
-        assertEquals(listOf(48_999L), expired)
+        at(19_000)
+        assertEquals(listOf(19_000L), expired)
         assertFalse(watchdog.isRunning)
+    }
+
+    @Test
+    fun `a new session with a shorter timeout does not wait out the old one`() = runTest {
+        val expired = mutableListOf<String>()
+        val watchdog = watchdog()
+        watchdog.start(backgroundScope, 600_000) { expired += "old" }
+        at(1_000)
+        // A reconnect's welcome announces 10 seconds.
+        watchdog.start(backgroundScope, 10_000) { expired += "new at ${testScheduler.currentTime}" }
+        at(11_000)
+        assertEquals(listOf("new at 11000"), expired)
+        at(700_000)
+        assertEquals(listOf("new at 11000"), expired)
+    }
+
+    @Test
+    fun `a restart while the old watch is waking keeps the new deadline`() = runTest {
+        val events = mutableListOf<String>()
+        var restartOnNextClockRead = false
+        lateinit var watchdog: KeepaliveWatchdog
+        fun watch(name: String) = watchdog.start(
+            backgroundScope,
+            270_000,
+            probe = { events += "$name probed at ${testScheduler.currentTime}" },
+            probeTimeoutMs = 10_000,
+        ) { events += "$name expired at ${testScheduler.currentTime}" }
+        // The clock read is where the old watch decides to probe; restart right there, as a
+        // reconnect on the socket thread can while the old watch runs on the main thread.
+        watchdog = KeepaliveWatchdog(clock = {
+            if (restartOnNextClockRead) {
+                restartOnNextClockRead = false
+                watch("second")
+            }
+            testScheduler.currentTime
+        })
+        watch("first")
+        at(269_999)
+        restartOnNextClockRead = true
+        at(270_000)
+        at(539_999)
+        // The first watch neither probed nor shortened the second one's idle period.
+        assertEquals(emptyList<String>(), events)
+        at(540_000)
+        assertEquals(listOf("second probed at 540000"), events)
+        at(550_000)
+        assertEquals(listOf("second probed at 540000", "second expired at 550000"), events)
     }
 
     @Test

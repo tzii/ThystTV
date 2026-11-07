@@ -116,14 +116,19 @@ class HermesWebSocket(
         }
     }
 
-    /** Any welcome, keepalive or notification proves the session alive for another [timeout]. */
+    /** A keepalive or notification proves the session alive for another [timeout]. */
     private fun keepAlive(webSocket: WebSocket) {
         if (keepalive.isRunning) {
-            keepalive.feed(timeout)
+            keepalive.feed()
         } else {
-            val scope = webSocket.coroutineScope ?: return
-            keepalive.start(scope, timeout) { webSocket.disconnect() }
+            watch(webSocket)
         }
+    }
+
+    /** A welcome starts a new session, which may announce a different [timeout]. */
+    private fun watch(webSocket: WebSocket) {
+        val scope = webSocket.coroutineScope ?: return
+        keepalive.start(scope, timeout) { webSocket.disconnect() }
     }
 
     /** Reports a watched minute every minute until [disconnect]; reconnects keep the same ticker. */
@@ -217,7 +222,7 @@ class HermesWebSocket(
                                 timeout = it * 1000L
                             }
                         }
-                        keepAlive(webSocket)
+                        watch(webSocket)
                         subscribe()
                         if (collectPoints && !userId.isNullOrBlank() && !gqlToken.isNullOrBlank() && minuteWatched == null) {
                             startMinuteWatched(webSocket)

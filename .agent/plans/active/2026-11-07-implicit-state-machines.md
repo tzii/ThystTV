@@ -161,12 +161,15 @@ Abstractions A, B, F and G need approval before implementation.
 
 ## Implementation steps
 
-1. Add `KeepaliveWatchdog`: a deadline that `feed()` moves, one coroutine per
+1. Add `KeepaliveWatchdog`: a deadline that `feed()` moves later, one coroutine per
    connection, optional probe (IRC PING) with its own timeout, expiry launched
-   separately so a reconnect cannot cut a disconnect short.
+   separately so a reconnect cannot cut a disconnect short. State changes only under
+   its lock and only for the current watch (a generation number), so a replaced watch
+   cannot write its successor's deadline.
 2. IRC read/write: start on connect, feed on PONG, stop on RECONNECT/disconnect.
-3. EventSub/Hermes: start or feed on welcome/keepalive/notification, adopting
-   the server's keepalive timeout; Hermes minute-watched becomes a job.
+3. EventSub/Hermes: a welcome restarts the watch with the server's keepalive timeout;
+   a keepalive or notification feeds it, or starts one if none is running. Hermes
+   minute-watched becomes a job.
 4. Replace the O(n) message-id list with `RecentIds`.
 5. `WebSocket`: remove the never-enabled `sendPings` timers, mask frames in one
    pass, end `Inflater`/`Deflater` instances explicitly.
@@ -182,13 +185,13 @@ Abstractions A, B, F and G need approval before implementation.
 
 Automated checks:
 
-- [x] Targeted: `KeepaliveWatchdogTest` (6), `RecentIdsTest` (1), `WebSocketMaskTest` (1),
+- [x] Targeted: `KeepaliveWatchdogTest` (8), `RecentIdsTest` (1), `WebSocketMaskTest` (1),
   `ChatCardSlotTest` (6), `ChatNetworkRestorationTest` (4), `ChatViewModelTest` (15)
 - [x] `./gradlew assembleDebug` (JDK 21)
-- [x] `./gradlew test`: 1271 tests, 0 failures, 0 skipped
+- [x] `./gradlew test`: 1273 tests, 0 failures, 0 skipped
 - [x] `./gradlew lintDebug`: 0 errors, 332 warnings as before; none new in a changed file
 
-Independent review (GLM lane only, as requested; GPT-6.1-sol lane not run):
+Independent review:
 
 - [x] OpenCode `zai-coding-plan/glm-5.3`, variant `max` (verified from
   `opencode session export`, `info.model`), crew run
@@ -207,6 +210,23 @@ Independent review (GLM lane only, as requested; GPT-6.1-sol lane not run):
   4. Countdown rounds up instead of truncating: intentional.
   5. Minute-watched ticker outlives a Hermes that gave up reconnecting: confirmed
      parity with base (the `Timer` was cancelled only in `disconnect`). Kept.
+- [x] Codex `gpt-6.1-sol`, reasoning `high` (echoed by the T3 delegated task), on a
+  detached snapshot of head `7597bb646` with the GLM record removed from the plan.
+  Verdict: blocks, two medium findings, both fixed:
+  1. A replaced watch could overwrite its successor's deadline: confirmed. The loop
+     runs in the connection's scope (main thread for chat) and wrote `deadline`/
+     `probing` without the lock while `start()` ran on the socket's IO thread, so a
+     reconnect landing as the old watch woke could leave the new connection with a
+     10 s probe deadline and no probe. Fixed with a per-watch generation checked under
+     the lock before every state change; `feed()` also takes the lock, which closes
+     GLM finding 1 as well. Regression test `a restart while the old watch is waking
+     keeps the new deadline` fails on `7597bb646` and passes now.
+  2. `feed(timeout)` with a shorter announced timeout left the loop sleeping until the
+     old deadline: plausible (needs a reconnect's welcome to announce less than the
+     previous session). Fixed by restarting the watch on every welcome, as the base
+     code did, and dropping the timeout parameter from `feed()`, so feeding only moves
+     the deadline later. Test `a new session with a shorter timeout does not wait out
+     the old one`.
 
 Human QA required:
 
@@ -251,6 +271,10 @@ Human QA completed:
   download inside `try` and disconnects in `finally`, so the watchdog stops on every
   exit, the same lifetime as the old ping timer. `assembleDebug test lintDebug` pass
   (1427 tests, lint 0 errors). This branch still targets master on its own.
+- 2026-11-07: Committed `7597bb646`, opened #94. GPT-6.1-sol high review found two
+  keepalive defects (see Verification); fixed with a per-watch generation under the
+  lock and a restart on every welcome. The race test fails on `7597bb646`.
+  `assembleDebug test lintDebug` pass (1273 tests, lint 0 errors / 332 warnings).
 
 ## Decisions
 
@@ -263,6 +287,12 @@ Human QA completed:
   Reason: no caller enables it; porting would add untested code.
 - Decision: keepalive on uptime, countdowns on elapsed realtime.
   Reason: idleness should exclude sleep; a poll deadline is real time.
+- Decision: a welcome restarts the keepalive watch; `feed()` cannot change the idle
+  period.
+  Reason: with a fixed idle period a feed only moves the deadline later, so the
+  sleeping loop never oversleeps. A welcome starts a new session anyway.
+  Alternative considered: waking the loop when a feed shortens the deadline (more
+  machinery for a case only a welcome produces).
 - Decision: the view counts down from the card's end time; the view model keeps
   no per-second state.
   Reason: no ticking while chat is stopped, the right value after sleep or a

@@ -13,29 +13,32 @@ import kotlinx.coroutines.launch
  * Chat sockets used to cancel and recreate a `java.util.Timer` for each keepalive, and
  * EventSub and Hermes did so for every notification. Each Timer starts its own thread,
  * and a Timer could still fire after its connection had closed. Here one coroutine per
- * connection sleeps until the deadline. [feed] only moves the deadline, so calling it for
- * every message costs a field write, and the coroutine wakes at most once per idle period.
+ * connection sleeps until the deadline. [feed] only moves the deadline later, so calling it
+ * for every message is cheap, and the coroutine wakes at most once per idle period.
  * Cancelling the scope, or [stop], ends the watch.
  *
  * With a [probe] (an IRC `PING`), a missed idle deadline first runs the probe, then
  * expires if no [feed] arrives within the probe timeout. Without one, it expires directly.
+ *
+ * [start] is called from the socket's thread while the watch runs in the connection's scope,
+ * often on the main thread. State changes only under this object's lock and only for the
+ * current watch, so a replaced watch that has not yet seen its cancellation cannot touch
+ * its replacement's deadline.
  */
 internal class KeepaliveWatchdog(
     /** Uptime, like the delays of Android's main dispatcher, so deep sleep is not idle time. */
     private val clock: () -> Long = SystemClock::uptimeMillis,
 ) {
-    @Volatile
+    private var watch = 0L
     private var deadline = Long.MAX_VALUE
-
-    @Volatile
     private var idleMs = 0L
-
-    @Volatile
     private var probing = false
     private var job: Job? = null
 
     val isRunning: Boolean
         @Synchronized get() = job?.isActive == true
+
+    private enum class Step { WAIT, PROBE, EXPIRE }
 
     /**
      * Watches in [scope] until [idleMs] passes without a [feed], replacing any earlier watch.
@@ -50,36 +53,52 @@ internal class KeepaliveWatchdog(
         onExpired: suspend () -> Unit,
     ) {
         job?.cancel()
+        // Set before launching: an immediate dispatcher runs the loop inside this call.
+        val current = ++watch
         this.idleMs = idleMs
         probing = false
         deadline = clock() + idleMs
         job = scope.launch {
             while (true) {
-                val wait = deadline - clock()
-                if (wait > 0) {
-                    delay(wait)
-                } else if (probe != null && !probing) {
-                    probing = true
-                    deadline = clock() + probeTimeoutMs
-                    try {
-                        probe()
+                val now = clock()
+                var wait = 0L
+                val step = synchronized(this@KeepaliveWatchdog) {
+                    if (watch != current) return@launch
+                    wait = deadline - now
+                    when {
+                        wait > 0 -> Step.WAIT
+                        probe != null && !probing -> {
+                            probing = true
+                            deadline = now + probeTimeoutMs
+                            Step.PROBE
+                        }
+                        else -> Step.EXPIRE
+                    }
+                }
+                when (step) {
+                    Step.WAIT -> delay(wait)
+                    Step.PROBE -> try {
+                        probe?.invoke()
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         // A probe that cannot be written means the connection is already gone.
-                        deadline = 0L
+                        synchronized(this@KeepaliveWatchdog) {
+                            if (watch == current) deadline = 0L
+                        }
                     }
-                } else {
-                    scope.launch { onExpired() }
-                    return@launch
+                    Step.EXPIRE -> {
+                        scope.launch { onExpired() }
+                        return@launch
+                    }
                 }
             }
         }
     }
 
-    /** Traffic arrived; restart the idle period, adopting [idleMs] when the server announced a new one. */
-    fun feed(idleMs: Long = this.idleMs) {
-        this.idleMs = idleMs
+    /** Traffic arrived; restart the idle period. */
+    @Synchronized
+    fun feed() {
         probing = false
         deadline = clock() + idleMs
     }
@@ -88,6 +107,7 @@ internal class KeepaliveWatchdog(
     fun stop() {
         job?.cancel()
         job = null
+        watch++
         deadline = Long.MAX_VALUE
     }
 }
