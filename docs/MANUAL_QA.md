@@ -15,6 +15,32 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### 1.6.0 signed release candidate
+
+On November 13 the maintainer reported the combined #87–#94 debug build working.
+The #96–#98 changes were checked on an emulator and supplied as a combined debug
+build. Neither certifies the signed APK. Record exact candidate SHA, run ID, APK
+hash, device and results in the release PR/RC evidence; adding evidence must not
+change the frozen source tree.
+
+- [ ] Upgrade official 1.5.2 with the exact signed 1.6.0/code18 APK; preserve
+  accounts, settings, Stats, bookmarks and downloads. Signed-in offline cold
+  start: Saved/Bookmarks/Downloads remain usable; restore networking and retry.
+- [ ] Live/VoD/download playback and resume, stream switching, minimize/restore,
+  close/reopen, PiP/background, speed/quality and audio-only labels, gestures and
+  floating chat.
+- [ ] Spoiler Shield on streams, VoDs, clips, the player title, notifications,
+  bookmarks and downloads; remove and timed entries expire.
+- [ ] Live rewind: Watch last 3 minutes; with the local rewind buffer on, rewind
+  a stream without a recording and leave it to confirm the buffer is deleted.
+- [ ] Create clip as a signed-in viewer, including the one-time permission grant
+  for an older sign-in; Watch clip, Copy link, Share and Edit on Twitch.
+- [ ] Two-pane Settings on a tablet, foldable or landscape phone, and the download
+  progress card while downloading, offline and finished (sections below).
+- [ ] Chat keepalives, countdowns and cards (section below).
+- [ ] Updater discovery, install permission and installer handover. When a
+  receiver/TV is available, repeat the existing Cast/TV matrices; document gaps.
+
 ### Chat keepalives, countdowns and cards
 
 Required for the deadline-based chat keepalive and chat card change

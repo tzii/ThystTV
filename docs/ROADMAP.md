@@ -1,6 +1,23 @@
 # Roadmap
 
-## 1.5.2 / code 17
+## 1.6.0 / code 18
+
+- Spoiler Shield for channels and categories across lists, the player,
+  notifications, bookmarks and downloads.
+- Create clip on live streams, then watch it in ThystTV, copy, share or edit it;
+  Android TV approves on another device.
+- "Watch last 3 minutes" and an opt-in local rewind buffer for live streams.
+- Two-pane Settings on wide windows and a compact download progress card.
+- Sign-in keeps the current account until a new grant is confirmed; chat timers
+  and cards survive sleep and screen rebuilds.
+
+The source is prepared for 1.6.0; database version remains 36. Publication requires
+the signed candidate, upgrade from official 1.5.2, exact-APK device approval and
+independent release reviews. See `release-notes/1.6.0.md`, `MANUAL_QA.md` and
+`RELEASE_PROCESS.md`; candidate evidence belongs in the release PR/workflow record
+so recording QA does not change the frozen source SHA.
+
+## Upgrade baseline: 1.5.2 / code 17 (published November 2, 2026)
 
 - Landscape swipe to show/hide chat, with a chat-side strip on seekable media.
 - Optional extended zoom past Fill and one-finger dragging while magnified.
@@ -8,13 +25,9 @@
 - A 16:9 mini-player on landscape phones, foldables and tablets; scrollable
   gesture-guide rows on short screens.
 
-The source is prepared for 1.5.2; database version remains 36. Publication requires
-the combined signed candidate, upgrade from official 1.5.1, exact-APK device
-approval and independent release reviews. See `release-notes/1.5.2.md`,
-`MANUAL_QA.md` and `RELEASE_PROCESS.md`; candidate evidence belongs in the release
-PR/workflow record so recording QA does not change the frozen source SHA.
+See `release-notes/1.5.2.md` for the previous release's scope and limitations.
 
-## Upgrade baseline: 1.5.1 / code 16 (published October 28, 2026)
+## Previous release: 1.5.1 / code 16 (published October 28, 2026)
 
 - Live casting fixed for Chromecast with Google TV (#62); VoDs stay on the phone.
 - "Stop casting and play here" when a VoD is opened while casting (#64).

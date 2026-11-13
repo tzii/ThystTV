@@ -13,15 +13,17 @@ ThystTV is viewer-first. Protect stable playback, fast VoD controls, floating ch
 Read:
 
 - `docs/ROADMAP.md`
+- `docs/release-notes/1.6.0.md`
 - `docs/release-notes/1.5.2.md`
 - `docs/release-notes/1.5.1.md`
 - `docs/release-notes/1.5.0.md`
 - `CHANGELOG.md`
 
-This source targets 1.5.2/code 17, based on published 1.5.1/code 16. It adds
-landscape chat swipes and optional extended zoom/pan, fixes restored starts and
-PiP Audio only timing, and keeps the mini-player 16:9 across window shapes.
-Database version remains 36. Version 1.5.1 is the upgrade baseline for the exact
+This source targets 1.6.0/code 18, based on published 1.5.2/code 17. It adds
+Spoiler Shield, live clip creation with in-app watching, a three-minute rewind
+preset, an opt-in local rewind buffer, two-pane Settings on wide windows and a
+compact download progress card, with safer sign-in and chat timer fixes.
+Database version remains 36. Version 1.5.2 is the upgrade baseline for the exact
 signed-candidate QA; debug acceptance does not certify a signed release APK.
 Cast stays experimental and off by default. Authenticated TV sign-in and physical
 Cast/TV coverage retain their documented limitations. Keep player lifecycle and

@@ -31,7 +31,7 @@
 
 **ThystTV** is a third-party Twitch client for Android. It is based on [Xtra](https://github.com/crackededed/Xtra), with ThystTV-specific work aimed at making the viewing experience cleaner, faster, and more comfortable on phones, tablets, and large displays.
 
-The **1.5.2 update** adds landscape chat swipes and optional extended zoom with dragging, and fixes restored-player startup, PiP Audio only timing and mini-player sizing. See the [1.5.2 release notes](docs/release-notes/1.5.2.md) for changes, limitations and upgrade guidance, or [download the latest official signed APK](https://github.com/tzii/ThystTV/releases/latest).
+The **1.6.0 update** adds Spoiler Shield, live clip creation, a three-minute rewind preset and an optional local rewind buffer, two-pane Settings on wide screens and clearer download progress. See the [1.6.0 release notes](docs/release-notes/1.6.0.md) for changes, limitations and upgrade guidance, or [download the latest official signed APK](https://github.com/tzii/ThystTV/releases/latest).
 
 > ThystTV is a fork of Xtra. A lot of credit goes to the Xtra project for the foundation this app builds on.
 
