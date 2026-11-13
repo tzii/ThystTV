@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -78,6 +80,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.window.layout.FoldingFeature
 import androidx.window.layout.WindowInfoTracker
 import com.github.andreyasadchy.xtra.R
+import com.github.andreyasadchy.xtra.databinding.DialogClipCreatedBinding
 import com.github.andreyasadchy.xtra.databinding.DialogClipOptionsBinding
 import com.github.andreyasadchy.xtra.databinding.FragmentPlayerBinding
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerMorePopupBinding
@@ -494,29 +497,56 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun showClipCreated(clip: ClipCreationResult.Created) {
+        val context = requireContext()
         clipDialog?.dismiss()
-        clipDialog = requireContext().getAlertDialogBuilder()
+        val builder = context.getAlertDialogBuilder()
+        // The dialog's own themed context, so the rows match its surface.
+        val actions = DialogClipCreatedBinding.inflate(LayoutInflater.from(builder.context))
+        clipDialog = builder
             .setTitle(R.string.clip_created)
-            .setMessage(R.string.clip_created_message)
+            .setView(actions.root)
             .setNegativeButton(R.string.close) { _, _ -> viewModel.clipCreation.compareAndSet(clip, null) }
-            .setNeutralButton(R.string.share) { _, _ ->
-                viewModel.clipCreation.compareAndSet(clip, null)
-                shareClip(clip.id)
-            }
-            .apply {
-                clip.editUrl?.let { url ->
-                    setPositiveButton(R.string.clip_edit) { _, _ ->
-                        viewModel.clipCreation.compareAndSet(clip, null)
-                        openClipEditor(url)
-                    }
-                }
-            }
             .create().also { dialog ->
-                // Lifecycle dismissals preserve the result; Back/outside and buttons acknowledge it.
+                // Acknowledges the result and leaves the dialog, like Close.
+                fun finish(action: () -> Unit) = View.OnClickListener {
+                    viewModel.clipCreation.compareAndSet(clip, null)
+                    dialog.dismiss()
+                    action()
+                }
+                actions.clipWatch.setOnClickListener(finish { watchCreatedClip(clip.id) })
+                // Copying keeps the dialog open, so the viewer can still watch or share it.
+                actions.clipCopyLink.setOnClickListener { copyClipLink(clip.id) }
+                // A TV has nowhere to paste a link.
+                actions.clipCopyLink.isVisible = !context.isTelevision()
+                actions.clipShare.setOnClickListener(finish { shareClip(clip.id) })
+                val editUrl = clip.editUrl
+                actions.clipEdit.isVisible = editUrl != null
+                if (editUrl != null) actions.clipEdit.setOnClickListener(finish { openClipEditor(editUrl) })
+                // Lifecycle dismissals preserve the result; Back/outside and the actions acknowledge it.
                 dialog.setOnCancelListener { viewModel.clipCreation.compareAndSet(clip, null) }
                 dialog.setOnDismissListener { if (clipDialog === dialog) clipDialog = null }
                 dialog.show()
             }
+    }
+
+    /** Plays the new clip here, the same way opening a clip link does. It replaces the live stream. */
+    internal fun watchCreatedClip(id: String) {
+        (activity as? MainActivity)?.openClip(id)
+    }
+
+    private fun clipLink(id: String): String {
+        val login = requireArguments().getString(KEY_CHANNEL_LOGIN)
+        return if (login.isNullOrBlank()) "https://clips.twitch.tv/$id" else "https://twitch.tv/$login/clip/$id"
+    }
+
+    private fun copyClipLink(id: String) {
+        val context = requireContext()
+        val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
+        clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.clip_created), clipLink(id)))
+        // Android 13 and later confirm copies themselves.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Toast.makeText(context, R.string.clip_link_copied, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showClipSignIn(message: Int, request: ClipRequest?) {
@@ -539,10 +569,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     private fun shareClip(id: String) {
-        val login = requireArguments().getString(KEY_CHANNEL_LOGIN)
         startActivity(Intent.createChooser(Intent().apply {
             action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_TEXT, if (login.isNullOrBlank()) "https://clips.twitch.tv/$id" else "https://twitch.tv/$login/clip/$id")
+            putExtra(Intent.EXTRA_TEXT, clipLink(id))
             type = "text/plain"
         }, null))
     }

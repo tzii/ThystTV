@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:text="@string/clip_created_message"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?android:attr/textColorSecondary" />
+
+        <TextView
+            android:id="@+id/clipWatch"
+            style="@style/ClipActionRow"
+            android:drawableStart="@drawable/baseline_play_arrow_24"
+            android:text="@string/clip_watch" />
+
+        <TextView
+            android:id="@+id/clipCopyLink"
+            style="@style/ClipActionRow"
+            android:drawableStart="@drawable/baseline_content_copy_24"
+            android:text="@string/clip_copy_link" />
+
+        <TextView
+            android:id="@+id/clipShare"
+            style="@style/ClipActionRow"
+            android:drawableStart="@drawable/baseline_share_24"
+            android:text="@string/share" />
+
+        <TextView
+            android:id="@+id/clipEdit"
+            style="@style/ClipActionRow"
+            android:drawableStart="@drawable/baseline_open_in_new_24"
+            android:text="@string/clip_edit" />
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>
