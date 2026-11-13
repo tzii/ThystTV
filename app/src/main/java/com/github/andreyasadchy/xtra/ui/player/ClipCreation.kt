@@ -24,7 +24,8 @@ internal data class ClipRequest(val title: String?, val durationSeconds: Float) 
 internal data class PendingClip(val channelId: String, val request: ClipRequest?, val tokenAtLaunch: String?)
 
 internal sealed interface ClipCreationResult {
-    data class Created(val id: String, val editUrl: String?) : ClipCreationResult
+    /** [title] is the one the viewer asked for; Twitch's lookups don't return it. */
+    data class Created(val id: String, val editUrl: String?, val title: String? = null) : ClipCreationResult
     data object SignInRequired : ClipCreationResult
     data object NotAllowed : ClipCreationResult
     data object NotClippable : ClipCreationResult

@@ -513,7 +513,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     dialog.dismiss()
                     action()
                 }
-                actions.clipWatch.setOnClickListener(finish { watchCreatedClip(clip.id) })
+                actions.clipWatch.setOnClickListener(finish { watchCreatedClip(clip.id, clip.title) })
                 // Copying keeps the dialog open, so the viewer can still watch or share it.
                 actions.clipCopyLink.setOnClickListener { copyClipLink(clip.id) }
                 // A TV has nowhere to paste a link.
@@ -530,8 +530,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     /** Plays the new clip here, the same way opening a clip link does. It replaces the live stream. */
-    internal fun watchCreatedClip(id: String) {
-        (activity as? MainActivity)?.openClip(id, this)
+    internal fun watchCreatedClip(id: String, title: String?) {
+        (activity as? MainActivity)?.openClip(id, title)
     }
 
     private fun clipLink(id: String): String {

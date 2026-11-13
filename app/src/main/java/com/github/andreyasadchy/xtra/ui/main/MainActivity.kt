@@ -129,8 +129,6 @@ class MainActivity : AppCompatActivity() {
     }
     var playerFragment: PlayerFragment? = null
         private set
-    /** The clip a player asked to watch, and that player, until the lookup returns. */
-    private var watchClipRequest: Pair<String, PlayerFragment>? = null
     private var lastPlaybackNetworkProfile: PlayerQualityNetworkProfile? = null
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -364,8 +362,19 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.clip.collectLatest { clip ->
                     if (clip != null) {
-                        deliverClip(clip)
+                        if (!clip.id.isNullOrBlank()) {
+                            startClip(clip)
+                        }
                         viewModel.clip.value = null
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.watchClip.collectLatest { result ->
+                    if (result != null) {
+                        viewModel.takeWatchClip(result)?.let { startClip(it) }
                     }
                 }
             }
@@ -854,27 +863,18 @@ class MainActivity : AppCompatActivity() {
             supportFragmentManager.findFragmentById(R.id.playerContainer) === source
 
     /**
-     * Loads a clip by id and plays it, the same path a clip link takes. The lookup can outlast
-     * [source], so the clip only replaces it while it is still the open player.
+     * Looks up a clip and plays it in place of the open player. The lookup can outlast that
+     * player: if it has closed or another one has started by then, the clip is dropped.
      */
-    fun openClip(clipId: String, source: PlayerFragment) {
-        watchClipRequest = clipId to source
-        viewModel.loadClip(
+    fun openClip(clipId: String, title: String?) {
+        viewModel.loadWatchClip(
             clipId,
+            title,
             prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
             TwitchApiHelper.getGQLHeaders(this),
             TwitchApiHelper.getHelixHeaders(this),
             prefs.getBoolean(C.ENABLE_INTEGRITY, false),
         )
-    }
-
-    /** A clip asked for from a player that has since closed or been replaced is dropped. */
-    internal fun deliverClip(clip: Clip) {
-        val request = watchClipRequest?.takeIf { it.first == clip.id }
-        if (request != null) watchClipRequest = null
-        if (clip.id.isNullOrBlank()) return
-        if (request != null && !canReplacePlayer(request.second)) return
-        startClip(clip)
     }
 
     fun startClip(clip: Clip) {
@@ -925,6 +925,7 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.playerContainer, fragment).commit()
         viewModel.isPlayerOpened = true
+        viewModel.onPlayerChanged()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) &&
             prefs.getBoolean(C.PLAYER_PICTURE_IN_PICTURE, true)
@@ -959,6 +960,7 @@ class MainActivity : AppCompatActivity() {
         }
         playerFragment = null
         viewModel.isPlayerOpened = false
+        viewModel.onPlayerChanged()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
             setPictureInPictureParams(PictureInPictureParams.Builder().setAutoEnterEnabled(false).build())
         }

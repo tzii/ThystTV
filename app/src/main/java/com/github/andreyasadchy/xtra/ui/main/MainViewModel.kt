@@ -57,6 +57,8 @@ import javax.inject.Inject
 import kotlin.math.max
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -96,6 +98,23 @@ class MainViewModel @Inject constructor(
 
     val video = MutableStateFlow<Pair<Video?, Long?>?>(null)
     val clip = MutableStateFlow<Clip?>(null)
+
+    /** A clip looked up for Watch clip, and the [playerGeneration] it was asked from. */
+    class WatchClip(val clip: Clip, val playerGeneration: Int)
+
+    val watchClip = MutableStateFlow<WatchClip?>(null)
+    private var watchClipJob: Job? = null
+
+    /**
+     * Counts player starts and closes. It outlives the activity, so a Watch clip lookup that
+     * finishes after a recreation can still tell whether its player has gone.
+     */
+    var playerGeneration = 0
+        private set
+
+    fun onPlayerChanged() {
+        playerGeneration++
+    }
     val user = MutableStateFlow<User?>(null)
     val game = MutableStateFlow<Pair<Game?, String?>?>(null)
     val tag = MutableStateFlow<Tag?>(null)
@@ -167,68 +186,94 @@ class MainViewModel @Inject constructor(
     fun loadClip(clipId: String?, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean) {
         if (clip.value == null) {
             viewModelScope.launch {
-                clip.value = try {
-                    val user = try {
-                        graphQLRepository.loadClipData(networkLibrary, gqlHeaders, clipId).data?.clip
-                    } catch (e: Exception) {
-                        null
-                    }
-                    val clip = graphQLRepository.loadClipVideo(networkLibrary, gqlHeaders, clipId).also { response ->
-                        if (enableIntegrity && integrity.value == null) {
-                            response.errors?.find { it.message == "failed integrity check" }?.let {
-                                integrity.value = "refresh"
-                                return@launch
-                            }
-                        }
-                    }.data?.clip
-                    Clip(
-                        id = clipId,
-                        channelId = user?.broadcaster?.id,
-                        channelLogin = user?.broadcaster?.login,
-                        channelName = user?.broadcaster?.displayName,
-                        channelImageURL = user?.broadcaster?.profileImageURL,
-                        durationSeconds = clip?.durationSeconds,
-                        videoId = clip?.video?.id,
-                        videoOffsetSeconds = (clip?.videoOffsetSeconds ?: user?.videoOffsetSeconds).let {
-                            if (it != null && clip?.durationSeconds != null) {
-                                max(it - clip.durationSeconds, 0)
-                            } else {
-                                it
-                            }
-                        },
-                    )
-                } catch (e: Exception) {
-                    if (!helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
-                        try {
-                            helixRepository.getClips(
-                                networkLibrary = networkLibrary,
-                                headers = helixHeaders,
-                                ids = clipId?.let { listOf(it) }
-                            ).data.firstOrNull()?.let {
-                                Clip(
-                                    id = it.id,
-                                    channelId = it.channelId,
-                                    channelName = it.channelName,
-                                    gameId = it.gameId,
-                                    title = it.title,
-                                    thumbnailURL = it.thumbnailURL,
-                                    createdAt = it.createdAt,
-                                    viewCount = it.viewCount,
-                                    durationSeconds = it.duration?.toInt(),
-                                    videoId = it.videoId,
-                                    videoOffsetSeconds = if (it.vodOffset != null && it.duration != null) {
-                                        max(it.vodOffset - it.duration.toInt(), 0)
-                                    } else {
-                                        it.vodOffset
-                                    },
-                                )
-                            }
-                        } catch (e: Exception) {
-                            null
-                        }
-                    } else null
-                }
+                fetchClip(clipId, null, networkLibrary, gqlHeaders, helixHeaders, enableIntegrity)?.let { clip.value = it }
             }
+        }
+    }
+
+    /**
+     * Looks up a clip for Watch clip, for the player open now. A newer request replaces this
+     * one, and a failed lookup leaves nothing behind.
+     */
+    fun loadWatchClip(clipId: String, title: String?, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean) {
+        val generation = playerGeneration
+        watchClipJob?.cancel()
+        watchClip.value = null
+        watchClipJob = viewModelScope.launch {
+            val found = fetchClip(clipId, title, networkLibrary, gqlHeaders, helixHeaders, enableIntegrity)
+            ensureActive()
+            watchClip.value = found?.let { WatchClip(it, generation) }
+        }
+    }
+
+    /** Takes a Watch clip result. The clip comes back only while the player that asked is still open. */
+    fun takeWatchClip(result: WatchClip): Clip? {
+        watchClip.compareAndSet(result, null)
+        return result.clip.takeIf { result.playerGeneration == playerGeneration && !it.id.isNullOrBlank() }
+    }
+
+    /** Null when the clip can't be found, or when the integrity check has to be refreshed first. */
+    private suspend fun fetchClip(clipId: String?, title: String?, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>, enableIntegrity: Boolean): Clip? {
+        return try {
+            val user = try {
+                graphQLRepository.loadClipData(networkLibrary, gqlHeaders, clipId).data?.clip
+            } catch (e: Exception) {
+                null
+            }
+            val response = graphQLRepository.loadClipVideo(networkLibrary, gqlHeaders, clipId)
+            if (enableIntegrity && integrity.value == null && response.errors?.any { it.message == "failed integrity check" } == true) {
+                integrity.value = "refresh"
+                return null
+            }
+            val clip = response.data?.clip
+            Clip(
+                id = clipId,
+                channelId = user?.broadcaster?.id,
+                channelLogin = user?.broadcaster?.login,
+                channelName = user?.broadcaster?.displayName,
+                channelImageURL = user?.broadcaster?.profileImageURL,
+                // Neither query returns a title; Watch clip passes the one the viewer gave.
+                title = title,
+                durationSeconds = clip?.durationSeconds,
+                videoId = clip?.video?.id,
+                videoOffsetSeconds = (clip?.videoOffsetSeconds ?: user?.videoOffsetSeconds).let {
+                    if (it != null && clip?.durationSeconds != null) {
+                        max(it - clip.durationSeconds, 0)
+                    } else {
+                        it
+                    }
+                },
+            )
+        } catch (e: Exception) {
+            if (!helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
+                try {
+                    helixRepository.getClips(
+                        networkLibrary = networkLibrary,
+                        headers = helixHeaders,
+                        ids = clipId?.let { listOf(it) }
+                    ).data.firstOrNull()?.let {
+                        Clip(
+                            id = it.id,
+                            channelId = it.channelId,
+                            channelName = it.channelName,
+                            gameId = it.gameId,
+                            title = it.title,
+                            thumbnailURL = it.thumbnailURL,
+                            createdAt = it.createdAt,
+                            viewCount = it.viewCount,
+                            durationSeconds = it.duration?.toInt(),
+                            videoId = it.videoId,
+                            videoOffsetSeconds = if (it.vodOffset != null && it.duration != null) {
+                                max(it.vodOffset - it.duration.toInt(), 0)
+                            } else {
+                                it.vodOffset
+                            },
+                        )
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            } else null
         }
     }
 
