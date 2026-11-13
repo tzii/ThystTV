@@ -5,7 +5,7 @@ All notable changes to ThystTV should be documented here.
 ## [Unreleased]
 
 ### Added
-- Spoiler Shield (#78): long-press a stream, or use the ⋮ menu on a VoD or clip, to hide titles and previews for its channel or category, until removed or for 24 hours, 3 days or 7 days, with an eye button to reveal one item. Add or remove channels and categories in Settings > UI. It also covers bookmarks, downloads, team cards, the channel page title and live notifications.
+- Spoiler Shield (#78): long-press a stream, or use the ⋮ menu on a VoD or clip, to hide titles and previews for its channel or category, until removed or for 24 hours, 3 days or 7 days, with an eye button to reveal one item. Add or remove channels and categories in Settings > UI. It also covers bookmarks, downloads, team cards, the channel page title, the player title and live notifications.
 
 ## [1.5.2] - 2026-10-31
 

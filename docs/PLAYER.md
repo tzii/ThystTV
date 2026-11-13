@@ -476,6 +476,20 @@ For release-risk player work, also verify:
 ./gradlew assembleRelease
 ```
 
+## Spoiler Shield in the player
+
+`protectPlayerTitle` replaces the visible title when `SpoilerShield.hidesTitle` matches
+the channel or category, including after a live title or category update. A tap
+reveals that title for that player through `PlayerViewModel.spoilerRevealedTitle`,
+and a new live title stays hidden until revealed too.
+`playbackTitle()` supplies the media-session title on every backend, so the notification
+and lock screen follow the same rule. A rule changed while the player stays open updates
+the visible title at once. The media session keeps its title until a source next starts:
+nothing updates it during playback, so it never shows anything newer than what was already
+there. A start uses the latest live title with the category it came with, so an old protected
+title can't return after the stream moves to an unprotected category. Share intents still
+carry the real title.
+
 ## Optional Google Cast (default Media3 backend)
 
 Google Cast is experimental and off by default; receiver playback remains
