@@ -75,6 +75,7 @@ import com.github.andreyasadchy.xtra.ui.common.UpdateDialogController
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.games.GamesFragmentDirections
+import com.github.andreyasadchy.xtra.ui.login.LoginActivity
 import com.github.andreyasadchy.xtra.ui.player.LiveRewind
 import com.github.andreyasadchy.xtra.ui.player.PreparedLiveRewind
 import com.github.andreyasadchy.xtra.ui.player.ExoPlayerFragment
@@ -178,6 +179,7 @@ class MainActivity : AppCompatActivity() {
     var settingsResultLauncher: ActivityResultLauncher<Intent>? = null
     var loginResultLauncher: ActivityResultLauncher<Intent>? = null
     var logoutResultLauncher: ActivityResultLauncher<Intent>? = null
+    var reauthorizeResultLauncher: ActivityResultLauncher<Intent>? = null
 
     //Lifecycle methods
 
@@ -239,6 +241,12 @@ class MainActivity : AppCompatActivity() {
         logoutResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             restartActivity()
         }
+        reauthorizeResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            // Reauthorizing the same account swaps its token in place, so playback and the UI carry on.
+            if (result.resultCode == RESULT_OK && result.data?.getBooleanExtra(LoginActivity.EXTRA_ACCOUNT_CHANGED, false) == true) {
+                restartActivity()
+            }
+        }
 
         var initialized = savedInstanceState != null
         initNavigation()
@@ -271,6 +279,7 @@ class MainActivity : AppCompatActivity() {
                                 initialized = true
                             }
                             if (isNetworkAvailable) {
+                                viewModel.revokePendingTokens(prefs.getString(C.NETWORK_LIBRARY, "OkHttp"), tokenPrefs())
                                 if (!TwitchApiHelper.checkedValidation && prefs.getBoolean(C.VALIDATE_TOKENS, true)) {
                                     viewModel.validate(
                                         prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),

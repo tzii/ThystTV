@@ -17,9 +17,12 @@ import com.github.andreyasadchy.xtra.model.helix.game.GamesResponse
 import com.github.andreyasadchy.xtra.model.helix.stream.StreamsResponse
 import com.github.andreyasadchy.xtra.model.helix.user.UsersResponse
 import com.github.andreyasadchy.xtra.model.helix.video.VideosResponse
+import com.github.andreyasadchy.xtra.util.CancellableHttp
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
 import com.github.andreyasadchy.xtra.util.getByteArrayCronetCallback
 import dagger.Lazy
+import java.io.IOException
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -1533,6 +1536,29 @@ class HelixRepository @Inject constructor(
                 }
             }
         }
+    }
+
+    private val cancellableHttp by lazy { CancellableHttp(httpEngine, cronetEngine, cronetExecutor, okHttpClient) }
+
+    /** Returns the HTTP status and body, because Twitch's refusals need different handling. */
+    suspend fun createClip(networkLibrary: String?, headers: Map<String, String>, channelId: String, title: String? = null, durationSeconds: Float? = null): Pair<Int, String> {
+        val url = "https://api.twitch.tv/helix/clips".toUri().buildUpon().apply {
+            appendQueryParameter("broadcaster_id", channelId)
+            title?.let { appendQueryParameter("title", it) }
+            durationSeconds?.let { appendQueryParameter("duration", String.format(Locale.ROOT, "%.1f", it)) }
+        }.build().toString()
+        val response = cancellableHttp.execute(networkLibrary, url, method = "POST", headers = headers)
+        return response.status to response.body
+    }
+
+    /** Whether a created clip has finished. A refused or unreadable check is a failed check, not a "no". */
+    suspend fun clipExists(networkLibrary: String?, headers: Map<String, String>, id: String): Boolean {
+        val url = "https://api.twitch.tv/helix/clips".toUri().buildUpon().apply {
+            appendQueryParameter("id", id)
+        }.build().toString()
+        val response = cancellableHttp.execute(networkLibrary, url, headers = headers)
+        if (response.status != 200) throw IOException("Clip lookup failed: ${response.status}")
+        return withContext(Dispatchers.Default) { json.decodeFromString<ClipsResponse>(response.body).data.isNotEmpty() }
     }
 
     suspend fun addModerator(networkLibrary: String?, headers: Map<String, String>, channelId: String?, targetId: String?): String? = withContext(Dispatchers.IO) {

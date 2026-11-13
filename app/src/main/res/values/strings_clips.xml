@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- New feature copy intentionally falls back to English until translations are vetted. -->
+    <string name="clip_create" tools:ignore="MissingTranslation">Create clip</string>
+    <string name="clip_creating" tools:ignore="MissingTranslation">Creating clip…</string>
+    <string name="clip_created" tools:ignore="MissingTranslation">Clip created</string>
+    <string name="clip_created_message" tools:ignore="MissingTranslation">Twitch saved this clip from the live broadcast. Edit it on Twitch to trim it or change the title.</string>
+    <string name="clip_edit" tools:ignore="MissingTranslation">Edit</string>
+    <string name="clip_sign_in" tools:ignore="MissingTranslation">Sign in to create clips. The app restarts after you sign in.</string>
+    <string name="clip_sign_in_again" tools:ignore="MissingTranslation">Twitch needs your permission to create clips. Cancelling changes nothing. If you sign in with a different account, the app switches to it and restarts.</string>
+    <string name="clip_sign_in_action" tools:ignore="MissingTranslation">Sign in</string>
+    <string name="clip_authorize_tv" tools:ignore="MissingTranslation">Approve clip creation from another device. Your TV sign-in doesn’t change.</string>
+    <string name="clip_title_hint" tools:ignore="MissingTranslation">Title (optional)</string>
+    <string name="clip_length" tools:ignore="MissingTranslation">Clip length</string>
+    <string name="clip_length_seconds" tools:ignore="MissingTranslation">Length: %1$d seconds</string>
+    <string name="clip_options_hint" tools:ignore="MissingTranslation">The clip ends around when you tap Create, not when you opened this dialog.</string>
+    <string name="clip_create_action" tools:ignore="MissingTranslation">Create</string>
+    <string name="clip_title_rejected" tools:ignore="MissingTranslation">Twitch rejected this title. Try a different one.</string>
+    <string name="clip_not_allowed" tools:ignore="MissingTranslation">This channel doesn’t let you create clips. Clips may be off or limited to followers or subscribers.</string>
+    <string name="clip_not_clippable" tools:ignore="MissingTranslation">Twitch can’t create a clip here. This category may not allow clips.</string>
+    <string name="clip_not_live" tools:ignore="MissingTranslation">Clips can only be created while the channel is live.</string>
+    <string name="clip_rate_limited" tools:ignore="MissingTranslation">Too many clips in a short time. Try again in a moment.</string>
+    <string name="clip_not_finished" tools:ignore="MissingTranslation">Twitch didn’t finish this clip. Try again.</string>
+    <string name="clip_unavailable" tools:ignore="MissingTranslation">Twitch can’t create this clip right now. Try again later.</string>
+    <string name="clip_failed" tools:ignore="MissingTranslation">The clip couldn’t be created. Try again.</string>
+</resources>
