@@ -15,6 +15,33 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### Chat keepalives, countdowns and cards
+
+Required for the deadline-based chat keepalive and chat card change
+(`.agent/plans/active/2026-11-07-implicit-state-machines.md`).
+
+- [ ] Signed out, keep a quiet live channel's chat open for 15+ minutes (the IRC
+  ping runs after 4.5 idle minutes). Messages keep arriving without reconnect
+  notices. Signed in, send a message after 15 idle minutes.
+- [ ] Airplane mode for 30 s and back: chat reconnects once. A manual disconnect
+  stays disconnected.
+- [ ] Signed in for 15+ minutes: channel points accrue and the claim appears.
+- [ ] Poll and prediction cards count down. On a channel that is not playing, turn
+  the screen off for 30 s and back on: the countdown shows the real time left.
+- [ ] Debug > EventSub chat on a busy channel: messages flow and continue after a
+  quiet minute. Floating chat and PiP/background chat behave as before.
+- [ ] Poll: close the card while voting is open; it stays closed, then the result
+  appears with the winner marked and hides 20 s later. Prediction: closed while
+  open, it reappears when locked; a locked card that was closed does not reappear
+  for the final outcome.
+- [ ] Raid: the card shows the target and viewer count; tapping it opens the
+  target, the close button hides it, and with auto-switch on the player follows
+  the raid when it goes through. A cancelled raid hides the card.
+- [ ] With a poll or prediction card showing, switch dark mode: the card stays,
+  and its countdown shows the real time left.
+- [ ] As a moderator, change chat modes twice within five seconds: the banner
+  stays up for five seconds after the second change.
+
 ### 1.5.2 signed release candidate
 
 On October 31 the maintainer accepted the supplied lifecycle/mini-player debug
