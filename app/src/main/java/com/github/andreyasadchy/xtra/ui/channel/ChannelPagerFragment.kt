@@ -51,6 +51,8 @@ import com.github.andreyasadchy.xtra.ui.common.FragmentHost
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.ui.common.Scrollable
 import com.github.andreyasadchy.xtra.ui.common.Sortable
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShield
+import com.github.andreyasadchy.xtra.ui.common.spoilerSubject
 import com.github.andreyasadchy.xtra.ui.download.DownloadDialog
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
@@ -87,6 +89,15 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
     private val args: ChannelPagerFragmentArgs by navArgs()
     private val viewModel: ChannelPagerViewModel by viewModels()
     private var firstLaunch = true
+    private var spoilerStream: Stream? = null
+    private var spoilerTitleRevealed = false
+    private var spoilerPreferences: android.content.SharedPreferences? = null
+    private val spoilerPreferenceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == C.SPOILER_SHIELD_RULES || key == C.SPOILER_SHIELD_HIDE_TITLES || key == null) {
+            spoilerTitleRevealed = false
+            bindSpoilerTitle()
+        }
+    }
 
     override val currentFragment: Fragment?
         get() = childFragmentManager.findFragmentByTag("f${binding.viewPager.currentItem}")
@@ -98,6 +109,9 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentChannelBinding.inflate(inflater, container, false)
+        spoilerPreferences = binding.root.context.prefs().also {
+            it.registerOnSharedPreferenceChangeListener(spoilerPreferenceListener)
+        }
         return binding.root
     }
 
@@ -627,12 +641,11 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
                     requireArguments().putString(C.STREAM_ID, it)
                 }
             }
+            if (spoilerStream?.id != stream?.id || spoilerStream?.title != stream?.title) spoilerTitleRevealed = false
+            spoilerStream = stream
+            bindSpoilerTitle()
             if (!stream?.title.isNullOrBlank()) {
                 streamLayout.visibility = View.VISIBLE
-                title.visibility = View.VISIBLE
-                title.text = stream.title?.trim()
-            } else {
-                title.visibility = View.GONE
             }
             if (!stream?.gameName.isNullOrBlank()) {
                 streamLayout.visibility = View.VISIBLE
@@ -858,6 +871,30 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
         }
     }
 
+    private fun bindSpoilerTitle() {
+        val title = _binding?.title ?: return
+        val stream = spoilerStream
+        if (stream?.title.isNullOrBlank()) {
+            title.visibility = View.GONE
+            title.text = null
+            title.setOnClickListener(null)
+            title.isClickable = false
+            return
+        }
+        title.visibility = View.VISIBLE
+        if (!spoilerTitleRevealed && SpoilerShield.hidesTitle(title.context.prefs(), stream.spoilerSubject())) {
+            title.text = title.context.getString(R.string.spoiler_shield_title_hidden)
+            title.setOnClickListener {
+                spoilerTitleRevealed = true
+                bindSpoilerTitle()
+            }
+        } else {
+            title.text = stream.title?.trim()
+            title.setOnClickListener(null)
+            title.isClickable = false
+        }
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -871,6 +908,10 @@ class ChannelPagerFragment : BaseNetworkFragment(), Scrollable, FragmentHost, In
     }
 
     override fun onDestroyView() {
+        spoilerPreferences?.unregisterOnSharedPreferenceChangeListener(spoilerPreferenceListener)
+        spoilerPreferences = null
+        spoilerStream = null
+        spoilerTitleRevealed = false
         super.onDestroyView()
         _binding = null
     }

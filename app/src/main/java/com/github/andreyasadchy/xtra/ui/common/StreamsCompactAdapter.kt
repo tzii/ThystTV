@@ -20,6 +20,7 @@ import coil3.request.crossfade
 import coil3.request.target
 import coil3.request.transformations
 import coil3.transform.CircleCropTransformation
+import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.FragmentStreamsListItemCompactBinding
 import com.github.andreyasadchy.xtra.model.ui.Stream
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragmentDirections
@@ -44,6 +45,18 @@ class StreamsCompactAdapter(
                     oldItem.gameName == newItem.gameName &&
                     oldItem.title == newItem.title
     }) {
+
+    private val spoilerShield = SpoilerShieldCards(this)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        spoilerShield.attach(recyclerView)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        spoilerShield.detach()
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PagingViewHolder {
         val binding = FragmentStreamsListItemCompactBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -77,6 +90,13 @@ class StreamsCompactAdapter(
                     root.setOnClickListener {
                         (fragment.activity as MainActivity).startStream(item)
                     }
+                    val spoilerListener = View.OnLongClickListener {
+                        spoilerShield.showActions(context, item.spoilerSubject())
+                        true
+                    }
+                    listOf(root, userImage, username, gameName).forEach { it.setOnLongClickListener(spoilerListener) }
+                    val spoilers = spoilerShield.presentation(context, item.spoilerSubject(), showsThumbnail = false)
+                    spoilerShield.bindReveal(spoilerReveal, item.spoilerSubject(), spoilers) { bindingAdapterPosition }
                     if (item.channelImage != null) {
                         userImage.visibility = View.VISIBLE
                         fragment.requireContext().imageLoader.enqueue(
@@ -110,7 +130,7 @@ class StreamsCompactAdapter(
                     }
                     if (item.title != null && item.title != "") {
                         title.visibility = View.VISIBLE
-                        title.text = item.title?.trim()
+                        title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else item.title?.trim()
                     } else {
                         title.visibility = View.GONE
                     }
@@ -184,6 +204,7 @@ class StreamsCompactAdapter(
                             text.setOnClickListener {
                                 selectTag(tag)
                             }
+                            text.setOnLongClickListener(spoilerListener)
                             val padding = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 5f, context.resources.displayMetrics).toInt()
                             text.setPadding(padding, 0, padding, 0)
                             tagsLayout.addView(text)

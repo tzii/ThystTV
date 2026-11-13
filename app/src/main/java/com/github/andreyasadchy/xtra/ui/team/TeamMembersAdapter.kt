@@ -20,16 +20,18 @@ import coil3.request.crossfade
 import coil3.request.target
 import coil3.request.transformations
 import coil3.transform.CircleCropTransformation
+import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.FragmentStreamsListItemCompactBinding
 import com.github.andreyasadchy.xtra.model.ui.Stream
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragmentDirections
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShieldCards
+import com.github.andreyasadchy.xtra.ui.common.spoilerSubject
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.prefs
-import com.google.android.material.R
 
 class TeamMembersAdapter(
     private val fragment: Fragment,
@@ -44,6 +46,18 @@ class TeamMembersAdapter(
                     oldItem.gameName == newItem.gameName &&
                     oldItem.title == newItem.title
     }) {
+
+    private val spoilerShield = SpoilerShieldCards(this)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        spoilerShield.attach(recyclerView)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        spoilerShield.detach()
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PagingViewHolder {
         val binding = FragmentStreamsListItemCompactBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -73,6 +87,13 @@ class TeamMembersAdapter(
                             )
                         )
                     }
+                    val spoilerListener = View.OnLongClickListener {
+                        spoilerShield.showActions(context, item.spoilerSubject())
+                        true
+                    }
+                    listOf(root, userImage, username, gameName).forEach { it.setOnLongClickListener(spoilerListener) }
+                    val spoilers = spoilerShield.presentation(context, item.spoilerSubject(), showsThumbnail = false)
+                    spoilerShield.bindReveal(spoilerReveal, item.spoilerSubject(), spoilers) { bindingAdapterPosition }
                     if (item.channelImage != null) {
                         userImage.visibility = View.VISIBLE
                         fragment.requireContext().imageLoader.enqueue(
@@ -112,7 +133,7 @@ class TeamMembersAdapter(
                         }
                         if (item.title != null && item.title != "") {
                             title.visibility = View.VISIBLE
-                            title.text = item.title?.trim()
+                            title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else item.title?.trim()
                         } else {
                             title.visibility = View.GONE
                         }
@@ -174,12 +195,13 @@ class TeamMembersAdapter(
                                 text.id = id
                                 ids.add(id)
                                 text.text = tag
-                                context.obtainStyledAttributes(intArrayOf(R.attr.textAppearanceBodyMedium)).use {
+                                context.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.textAppearanceBodyMedium)).use {
                                     TextViewCompat.setTextAppearance(text, it.getResourceId(0, 0))
                                 }
                                 text.setOnClickListener {
                                     selectTag(tag)
                                 }
+                                text.setOnLongClickListener(spoilerListener)
                                 val padding = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 5f, context.resources.displayMetrics).toInt()
                                 text.setPadding(padding, 0, padding, 0)
                                 tagsLayout.addView(text)
@@ -192,6 +214,7 @@ class TeamMembersAdapter(
                         viewers.visibility = View.GONE
                         root.setOnClickListener(channelListener)
                         title.visibility = View.GONE
+                        spoilerReveal.visibility = View.GONE
                         gameName.visibility = View.GONE
                         uptime.visibility = View.GONE
                         tagsLayout.visibility = View.GONE

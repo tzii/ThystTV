@@ -44,6 +44,18 @@ class ClipsAdapter(
                     oldItem.title == newItem.title
     }) {
 
+    private val spoilerShield = SpoilerShieldCards(this)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        spoilerShield.attach(recyclerView)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        spoilerShield.detach()
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PagingViewHolder {
         val binding = FragmentVideosListItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return PagingViewHolder(binding, fragment, showGame, showChannel)
@@ -67,14 +79,21 @@ class ClipsAdapter(
                         (fragment.activity as MainActivity).startClip(item)
                     }
                     root.setOnLongClickListener { showDownloadDialog(item); true }
-                    fragment.requireContext().imageLoader.enqueue(
-                        ImageRequest.Builder(fragment.requireContext()).apply {
-                            data(item.thumbnail)
-                            diskCachePolicy(CachePolicy.DISABLED)
-                            crossfade(true)
-                            target(thumbnail)
-                        }.build()
-                    )
+                    val spoilerSubject = item.spoilerSubject()
+                    val spoilers = spoilerShield.presentation(context, spoilerSubject, showsThumbnail = true)
+                    spoilerShield.bindReveal(spoilerReveal, spoilerSubject, spoilers) { bindingAdapterPosition }
+                    if (spoilers.hideThumbnail) {
+                        thumbnail.showSpoilerPlaceholder()
+                    } else {
+                        fragment.requireContext().imageLoader.enqueue(
+                            ImageRequest.Builder(fragment.requireContext()).apply {
+                                data(item.thumbnail)
+                                diskCachePolicy(CachePolicy.DISABLED)
+                                crossfade(true)
+                                target(thumbnail)
+                            }.build()
+                        )
+                    }
                     if (item.createdAt != null) {
                         val text = item.createdAt.let { TwitchApiHelper.formatTimeString(context, it) }
                         if (text != null) {
@@ -97,7 +116,7 @@ class ClipsAdapter(
                     } else {
                         views.visibility = View.GONE
                     }
-                    if (item.durationSeconds != null) {
+                    if (item.durationSeconds != null && !spoilers.hidesAnything) {
                         duration.visibility = View.VISIBLE
                         duration.text = DateUtils.formatElapsedTime(item.durationSeconds.toLong())
                     } else {
@@ -151,7 +170,7 @@ class ClipsAdapter(
                     }
                     if (item.title != null && item.title != "") {
                         title.visibility = View.VISIBLE
-                        title.text = item.title.trim()
+                        title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else item.title.trim()
                     } else {
                         title.visibility = View.GONE
                     }
@@ -182,9 +201,11 @@ class ClipsAdapter(
                     options.setOnClickListener { it ->
                         PopupMenu(context, it).apply {
                             inflate(R.menu.media_item)
+                            menu.findItem(R.id.spoilerShield).isVisible = spoilerShield.hasActions(spoilerSubject)
                             setOnMenuItemClickListener {
                                 when (it.itemId) {
                                     R.id.download -> showDownloadDialog(item)
+                                    R.id.spoilerShield -> spoilerShield.showActions(context, spoilerSubject)
                                     R.id.share -> {
                                         context.startActivity(Intent.createChooser(Intent().apply {
                                             action = Intent.ACTION_SEND

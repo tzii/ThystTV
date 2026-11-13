@@ -222,6 +222,32 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:title="@string/spoiler_shield"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="spoiler_shield_manage"
+            android:title="@string/spoiler_shield_manage"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="spoiler_shield_hide_titles"
+            android:title="@string/spoiler_shield_hide_titles"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="spoiler_shield_hide_thumbnails"
+            android:title="@string/spoiler_shield_hide_thumbnails"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:title="@string/settings_group_search"
         app:iconSpaceReserved="false">
 

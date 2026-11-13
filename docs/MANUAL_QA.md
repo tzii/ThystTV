@@ -482,6 +482,43 @@ Turn on Player settings → Gestures → Extended zoom.
   optional restart, seek-live, volume, compressor, audio-only and keyboard buttons.
   Rotate, minimize/restore and return from recording replay; controls stay readable.
 
+### Spoiler Shield
+
+- [ ] Long-press a stream in Top, Following, a category, search and a team, in normal and
+  compact layouts. Protecting a channel or category updates every matching visible
+  card; the channel, category, viewers and uptime stay readable.
+- [ ] Long-press the channel name, avatar, category and a tag as well as the card.
+  Single taps retain their navigation actions.
+- [ ] Fling through a long list with protected streams: no protected preview or title
+  ever flashes, including in recycled cards and on a slow network.
+- [ ] The eye reveals one stream and hides it again; leaving the list hides it. Check
+  TalkBack reads no hidden title, and the D-pad reaches the eye on TV.
+  Compact cards keep the full 48dp eye inside their bounds with viewers and uptime,
+  at normal/200% fonts and in RTL.
+- [ ] Settings: Hide titles and Hide previews apply independently; unchecking a rule
+  removes it, and open lists update on return. The list stays after an app restart.
+  With Settings and the main app in separate windows, add a rule while the removal
+  dialog is open: confirming removals must preserve that newly added rule.
+- [ ] A protected live channel's page shows Title hidden until tapped, and its live
+  notification has no title. Opening a protected stream plays normally.
+  Change title protection while the channel page remains open: it updates without
+  reloading; changing rules clears its temporary reveal.
+- [ ] VoD and clip lists (Following, channel, category, search), bookmarks and
+  downloads: use an item's ⋮ menu to protect its channel or category. Long-press keeps
+  its usual action there (download, or delete for bookmarks and downloads). Title, preview,
+  duration and watched progress hide on every matching card, the eye reveals one item,
+  and fast flinging never flashes them, including a revealed preview on the next card
+  it recycles into. Download a protected
+  VoD and clip: the progress and finished notifications say Title hidden.
+- [ ] Expiring rules: adding a rule asks how long. The list shows "until" with a date,
+  "Until I remove it" shows none. Move the device clock past the date: the card shows
+  again at its next bind, and the rule is gone from Settings.
+- [ ] Settings > UI > Protected channels and categories: Add a channel and Add a
+  category search Twitch; pick a match or use the name exactly as typed. Cancel while
+  a search is running closes immediately. Offline, the typed name is still offered,
+  and a channel typed by its display name is protected too. Pick that channel from search with
+  a time limit: one rule remains, and protection ends when the limit does.
+
 ### VoD seek previews (performance stack)
 
 - [ ] Finished online VoD: drag slowly, quickly and across sprite-sheet boundaries;

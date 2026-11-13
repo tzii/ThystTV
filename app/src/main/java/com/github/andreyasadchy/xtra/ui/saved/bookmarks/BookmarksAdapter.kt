@@ -24,6 +24,9 @@ import com.github.andreyasadchy.xtra.model.ui.Bookmark
 import com.github.andreyasadchy.xtra.model.ui.Video
 import com.github.andreyasadchy.xtra.model.ui.VodBookmarkIgnoredUser
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragmentDirections
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShieldCards
+import com.github.andreyasadchy.xtra.ui.common.showSpoilerPlaceholder
+import com.github.andreyasadchy.xtra.ui.common.spoilerSubject
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
@@ -48,6 +51,18 @@ class BookmarksAdapter(
                     oldItem.duration == newItem.duration &&
                     oldItem.thumbnail == newItem.thumbnail
     }) {
+
+    private val spoilerShield = SpoilerShieldCards(this)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        spoilerShield.attach(recyclerView)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        spoilerShield.detach()
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PagingViewHolder {
         val binding = FragmentVideosListItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -136,14 +151,21 @@ class BookmarksAdapter(
                         )
                     }
                     root.setOnLongClickListener { deleteVideo(item); true }
-                    fragment.requireContext().imageLoader.enqueue(
-                        ImageRequest.Builder(fragment.requireContext()).apply {
-                            data(item.thumbnail)
-                            diskCachePolicy(CachePolicy.DISABLED)
-                            crossfade(true)
-                            target(thumbnail)
-                        }.build()
-                    )
+                    val spoilerSubject = item.spoilerSubject()
+                    val spoilers = spoilerShield.presentation(context, spoilerSubject, showsThumbnail = true)
+                    spoilerShield.bindReveal(spoilerReveal, spoilerSubject, spoilers) { bindingAdapterPosition }
+                    if (spoilers.hideThumbnail) {
+                        thumbnail.showSpoilerPlaceholder()
+                    } else {
+                        fragment.requireContext().imageLoader.enqueue(
+                            ImageRequest.Builder(fragment.requireContext()).apply {
+                                data(item.thumbnail)
+                                diskCachePolicy(CachePolicy.DISABLED)
+                                crossfade(true)
+                                target(thumbnail)
+                            }.build()
+                        )
+                    }
                     if (item.createdAt != null) {
                         val text = TwitchApiHelper.formatTimeString(context, item.createdAt)
                         if (text != null) {
@@ -170,7 +192,7 @@ class BookmarksAdapter(
                     } else {
                         views.visibility = View.GONE
                     }
-                    val spoilerFree = SpoilerFreeVideos.hideListSpoilers(context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false))
+                    val spoilerFree = spoilers.hidesAnything || SpoilerFreeVideos.hideListSpoilers(context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false))
                     if (durationSeconds != null && !spoilerFree) {
                         duration.visibility = View.VISIBLE
                         duration.text = DateUtils.formatElapsedTime(durationSeconds.toLong())
@@ -228,7 +250,7 @@ class BookmarksAdapter(
                     }
                     if (item.title != null) {
                         title.visibility = View.VISIBLE
-                        title.text = item.title.trim()
+                        title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else item.title.trim()
                     } else {
                         title.visibility = View.GONE
                     }
@@ -242,6 +264,7 @@ class BookmarksAdapter(
                     options.setOnClickListener { it ->
                         PopupMenu(context, it).apply {
                             inflate(R.menu.bookmark_item)
+                            menu.findItem(R.id.spoilerShield).isVisible = spoilerShield.hasActions(spoilerSubject)
                             if (!item.videoId.isNullOrBlank()) {
                                 menu.findItem(R.id.refresh).isVisible = true
                                 menu.findItem(R.id.download).isVisible = true
@@ -257,6 +280,7 @@ class BookmarksAdapter(
                             setOnMenuItemClickListener {
                                 when (it.itemId) {
                                     R.id.delete -> deleteVideo(item)
+                                    R.id.spoilerShield -> spoilerShield.showActions(context, spoilerSubject)
                                     R.id.download -> showDownloadDialog(
                                         Video(
                                             id = item.videoId,

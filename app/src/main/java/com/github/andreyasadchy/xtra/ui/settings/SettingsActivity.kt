@@ -72,6 +72,7 @@ import com.github.andreyasadchy.xtra.model.ui.SettingsDragListItem
 import com.github.andreyasadchy.xtra.model.ui.SettingsSearchItem
 import com.github.andreyasadchy.xtra.model.ui.UpdateInfo
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShield
 import com.github.andreyasadchy.xtra.ui.common.UpdateAvailableDialog
 import com.github.andreyasadchy.xtra.ui.common.UpdateDialogController
 import com.github.andreyasadchy.xtra.ui.player.PlayerGestureGuideContext
@@ -628,9 +629,36 @@ class SettingsActivity : AppCompatActivity() {
 
     class UiSettingsFragment : MaterialPreferenceFragment() {
         private val viewModel: SettingsViewModel by activityViewModels()
+        private val spoilerRulesListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == C.SPOILER_SHIELD_RULES || key == null) {
+                findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
+            }
+        }
+
+        override fun onResume() {
+            super.onResume()
+            requireContext().prefs().registerOnSharedPreferenceChangeListener(spoilerRulesListener)
+            findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
+        }
+
+        override fun onPause() {
+            requireContext().prefs().unregisterOnSharedPreferenceChangeListener(spoilerRulesListener)
+            super.onPause()
+        }
+
+        private fun bindSpoilerShield(preference: Preference) {
+            val rules = SpoilerShield.rules(requireContext().prefs())
+            val count = rules.channels.size + rules.categories.size
+            preference.summary = if (rules.isEmpty) getString(R.string.spoiler_shield_manage_empty) else getString(R.string.spoiler_shield_manage_summary, count)
+            preference.setOnPreferenceClickListener {
+                showSpoilerShieldManager(viewModel) { bindSpoilerShield(preference) }
+                true
+            }
+        }
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.ui_preferences, rootKey)
+            findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
             findPreference<ListPreference>(C.UI_LANGUAGE)?.apply {
                 val lang = AppCompatDelegate.getApplicationLocales()
                 if (lang.isEmpty) {

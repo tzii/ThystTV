@@ -35,6 +35,8 @@ import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.repository.GraphQLRepository
 import com.github.andreyasadchy.xtra.repository.OfflineRepository
 import com.github.andreyasadchy.xtra.repository.PlayerRepository
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShield
+import com.github.andreyasadchy.xtra.ui.common.spoilerSubject
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.HttpEngineUtils
@@ -785,7 +787,7 @@ class VideoDownloadWorker @AssistedInject constructor(
             val notification = NotificationCompat.Builder(context, context.getString(R.string.notification_downloads_channel_id)).apply {
                 setGroup(GROUP_KEY)
                 setContentTitle(ContextCompat.getString(context, R.string.downloaded))
-                setContentText(offlineVideo.name)
+                setContentText(SpoilerShield.titleOrHiddenLabel(context, offlineVideo.spoilerSubject(), offlineVideo.name))
                 setSmallIcon(android.R.drawable.stat_sys_download_done)
                 setAutoCancel(true)
                 setContentIntent(
@@ -1559,7 +1561,7 @@ class VideoDownloadWorker @AssistedInject constructor(
         val notification = NotificationCompat.Builder(context, channelId).apply {
             setGroup(GROUP_KEY)
             setContentTitle(ContextCompat.getString(context, R.string.downloading))
-            setContentText(offlineVideo.name)
+            setContentText(SpoilerShield.titleOrHiddenLabel(context, offlineVideo.spoilerSubject(), offlineVideo.name))
             setSmallIcon(android.R.drawable.stat_sys_download)
             setProgress(offlineVideo.maxProgress, offlineVideo.progress, false)
             setOngoing(true)
