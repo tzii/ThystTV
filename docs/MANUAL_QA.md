@@ -485,6 +485,25 @@ Turn on Player settings → Gestures → Extended zoom.
 | Icon/banner assets look correct | [ ] | [ ] | |
 | No private account data exposed | [ ] | [ ] | |
 
+### Download progress card
+
+- [ ] Start a VoD download with chat: the card keeps its title readable, and the
+  picture shows a small "Downloading: N% · Chat: N%" label with a bar along its
+  bottom edge that fills as the download runs. No large text covers the card.
+- [ ] Phone portrait with one and with two columns (Settings > UI > Portrait column count), and a
+  wide landscape window: the label stays inside the picture, wraps to at most two
+  lines, and the upload and download dates share a row or wrap without overlapping.
+- [ ] Turn networking off mid-download: the label reads "Waiting for Internet
+  connection" with no bar; turn it back on and the bar returns.
+- [ ] Stop a download (Pending), queue a second one behind it (Queued), and start a
+  live recording: the live card shows a moving bar without a percent.
+- [ ] Move, convert and delete a finished download: each shows its percent and bar,
+  and a finished card shows no label, no dim and both dates.
+- [ ] Spoiler Shield on the channel: the reveal button stays usable on a
+  downloading card.
+- [ ] Scroll a long Downloads list while one item downloads: recycled cards don't
+  keep another card's dates, title or Start/End labels.
+
 ### Startup profiling (performance stack)
 
 - [ ] On physical hardware, compare cold startup with/without the saved profile

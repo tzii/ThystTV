@@ -567,6 +567,7 @@
     <string name="download_chat">Download chat replay</string>
     <string name="download_chat_emotes">Download emotes and badges</string>
     <string name="chat_downloading_progress">Chat: %d%%</string>
+    <string name="download_status_with_chat" translatable="false">%1$s · %2$s</string>
     <string name="change_chat_file">Change chat file</string>
     <string name="download_queued">Queued</string>
     <string name="download_blocked">Waiting for Internet connection</string>
