@@ -1,3 +1,84 @@
+# ThystTV 1.6.0
+
+ThystTV 1.6.0 adds Spoiler Shield, live clip creation, a three-minute rewind
+preset and an optional local rewind buffer. Settings use two panes on wide
+screens, download progress is easier to read, and sign-in and chat timers are
+more reliable.
+
+## Spoiler Shield
+
+- Long-press a stream, or use the ⋮ menu on a VoD or clip, to hide titles and
+  previews for its channel or category: until you remove it, or for 24 hours,
+  3 days or 7 days. An eye button reveals a single item.
+- Shielded titles stay hidden in bookmarks, downloads, team cards, the channel
+  page, the player title, the media notification and live notifications.
+- Add or remove channels and categories in Settings > UI.
+
+## Live rewind
+
+- Live rewind offers "Watch last 3 minutes". Like the other presets, it plays
+  the broadcast's recording.
+- Local rewind buffer, off by default in Player settings > Videos, saves the
+  live video you're watching (250 MB to 2 GB) so a rewind works even when the
+  broadcast has no recording. It uses the default player, needs 1 GB of free
+  storage, and is deleted shortly after you leave the stream.
+
+## Clips
+
+- Create clip in the live player's More menu sets a title and a length of 5 to
+  60 seconds and captures the live broadcast through Twitch. A direct player
+  button can be turned on in Player buttons settings.
+- When the clip is ready you can watch it in ThystTV, copy its link, share it
+  or open Twitch's editor. Watching it replaces the live stream in the player.
+- Android TV creates clips by approving a code on another device.
+- Accounts signed in before this version are asked once to grant the clip
+  permission. Cancelling keeps the current sign-in.
+
+## Settings and downloads
+
+- On windows at least 840dp wide (tablets, unfolded foldables, landscape
+  phones), Settings shows the sections list beside the open section instead of
+  stretching every row across the screen. Narrower windows are unchanged.
+- Download progress is a small label and a thin bar in the corner of the
+  picture instead of large text across the card, and the dates wrap instead of
+  overlapping on narrow cards.
+- Download cards reused while scrolling no longer show another download's
+  dates, title or Start/End labels.
+
+## Sign-in and chat
+
+- Granting a new permission no longer signs you out first. The current sign-in
+  stays until the new one is confirmed, and the app restarts only if the
+  account changed.
+- Sign-in requests give up after 20 seconds on every network library, so a
+  stalled connection can't hold a sign-in screen open.
+- Poll and prediction countdowns show the real time left after the phone has
+  slept, and channel points no longer report a burst of missed minutes on wake.
+- Raid, poll and prediction cards stay up when the chat screen is rebuilt, and
+  the chat-mode banner stays up for its full five seconds.
+- Chat connections check they are alive with one lightweight task per
+  connection instead of a new background thread per notification.
+
+## Scope and limitations
+
+Create clip captures the live broadcast, not your position in a rewind, and
+Edit opens Twitch's editor; there is no in-app editor or clipping from VoDs.
+The local rewind buffer works only with the default player and does not keep
+replay chat. Spoiler Shield does not cover share links or chat. Google Cast
+remains experimental and off by default. New text falls back to English where
+not yet translated.
+
+## Upgrading
+
+Version 1.6.0 uses version code 18 and database version 36, unchanged from
+1.5.2. Install the official signed APK over official 1.5.2 to retain accounts,
+settings, Stats, bookmarks and downloads. Debug builds use a separate
+application ID.
+
+See the [APK verification guide](https://github.com/tzii/ThystTV/blob/master/docs/APK_VERIFICATION.md)
+for checksum and official signing-certificate verification.
+
+
 # ThystTV 1.5.2
 
 ThystTV 1.5.2 adds chat swipes and optional extended zoom with dragging, and fixes

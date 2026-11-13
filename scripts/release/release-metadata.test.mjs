@@ -132,18 +132,19 @@ test("verifyPromotion rejects every mismatched field", () => {
   assert.throws(() => verifyPromotion({ extra: true }, validManifestFields), /manifest schema mismatch/);
 });
 
-test("1.5.2 release metadata is finalized", () => {
+test("1.6.0 release metadata is finalized", () => {
   const buildGradle = fs.readFileSync("app/build.gradle.kts", "utf8");
   const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
   const bundledChangelog = fs.readFileSync("app/src/main/res/raw/thysttv_changelog.md", "utf8");
-  const releaseNotes = fs.readFileSync("docs/release-notes/1.5.2.md", "utf8");
-  const fastlaneNotes = fs.readFileSync("fastlane/metadata/android/en-US/changelogs/17.txt", "utf8");
+  const releaseNotes = fs.readFileSync("docs/release-notes/1.6.0.md", "utf8");
+  const fastlaneNotes = fs.readFileSync("fastlane/metadata/android/en-US/changelogs/18.txt", "utf8");
 
   assert.deepEqual(readVersionConfig(buildGradle), {
-    versionName: "1.5.2",
-    versionCode: 17,
+    versionName: "1.6.0",
+    versionCode: 18,
   });
-  assert.match(changelog, /^## \[1\.5\.2\] - \d{4}-\d{2}-\d{2}$/m);
+  assert.match(changelog, /^## \[1\.6\.0\] - \d{4}-\d{2}-\d{2}$/m);
+  assert.match(bundledChangelog, /^# ThystTV 1\.6\.0$/m);
   assert.match(bundledChangelog, /^# ThystTV 1\.5\.2$/m);
   assert.match(bundledChangelog, /^# ThystTV 1\.5\.1$/m);
   assert.match(bundledChangelog, /^# ThystTV 1\.5\.0$/m);
@@ -151,12 +152,11 @@ test("1.5.2 release metadata is finalized", () => {
   assert.match(bundledChangelog, /^# ThystTV 1\.3\.1$/m);
   assert.match(bundledChangelog, /^# ThystTV 1\.3\.0$/m);
   assert.match(bundledChangelog, /^# ThystTV 1\.2\.1$/m);
-  assert.match(releaseNotes, /^# ThystTV 1\.5\.2$/m);
-  assert.match(releaseNotes, /chat swipes/i);
-  assert.match(releaseNotes, /mini-player sizing/i);
-  assert.match(releaseNotes, /database version 36, unchanged from\s+1\.5\.1/i);
-  assert.match(releaseNotes, /PiP Audio only/);
-  assert.match(releaseNotes, /Extended zoom/);
+  assert.match(releaseNotes, /^# ThystTV 1\.6\.0$/m);
+  assert.match(releaseNotes, /Spoiler Shield/);
+  assert.match(releaseNotes, /Create clip/);
+  assert.match(releaseNotes, /local rewind buffer/i);
+  assert.match(releaseNotes, /database version 36, unchanged from\s+1\.5\.2/i);
   assert.doesNotMatch(releaseNotes, /TBD|TODO|placeholder|Release notes were not found/i);
   assert.ok(fastlaneNotes.length <= 500);
 });
