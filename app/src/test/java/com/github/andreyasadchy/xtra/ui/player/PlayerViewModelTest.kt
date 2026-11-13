@@ -15,6 +15,7 @@ import com.github.andreyasadchy.xtra.model.ui.Stream
  import kotlinx.coroutines.Dispatchers
  import kotlinx.coroutines.ExperimentalCoroutinesApi
  import kotlinx.coroutines.test.StandardTestDispatcher
+ import kotlinx.coroutines.test.advanceUntilIdle
  import kotlinx.coroutines.test.resetMain
  import kotlinx.coroutines.test.runTest
  import kotlinx.coroutines.test.setMain
@@ -23,7 +24,11 @@ import com.github.andreyasadchy.xtra.model.ui.Stream
  import org.junit.Assert.*
  import org.junit.Before
  import org.junit.Test
+ import com.github.andreyasadchy.xtra.util.C
+ import org.mockito.kotlin.any
+ import org.mockito.kotlin.anyOrNull
  import org.mockito.kotlin.mock
+ import org.mockito.kotlin.wheneverBlocking
  import java.util.concurrent.ExecutorService
  
  @OptIn(ExperimentalCoroutinesApi::class)
@@ -287,5 +292,15 @@ import com.github.andreyasadchy.xtra.model.ui.Stream
          viewModel.follow.value = Pair(false, "Error message")
          assertFalse(viewModel.follow.value?.first == true)
          assertEquals("Error message", viewModel.follow.value?.second)
+     }
+ 
+     @Test
+     fun `a created clip keeps the title the viewer asked for`() = runTest(testDispatcher) {
+         wheneverBlocking { helixRepository.createClip(anyOrNull(), any(), any(), anyOrNull(), anyOrNull()) }
+             .thenReturn(202 to """{"data":[{"id":"clip-id","edit_url":""}]}""")
+         wheneverBlocking { helixRepository.clipExists(anyOrNull(), any(), any()) }.thenReturn(true)
+         viewModel.createClip("OkHttp", mapOf(C.HEADER_TOKEN to "Bearer token"), "channel", ClipRequest("Big play", 30f), { null }, {})
+         advanceUntilIdle()
+         assertEquals(ClipCreationResult.Created("clip-id", null, "Big play"), viewModel.clipCreation.value)
      }
  }

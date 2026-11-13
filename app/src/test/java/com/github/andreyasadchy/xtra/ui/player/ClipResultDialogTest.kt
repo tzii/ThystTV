@@ -258,9 +258,17 @@ class ClipResultDialogTest {
         val shown = dialog()!!
         shown.findViewById<View>(R.id.clipWatch)!!.performClick()
         shadowOf(Looper.getMainLooper()).idle()
-        verify(fragment).watchCreatedClip("clip-id")
+        verify(fragment).watchCreatedClip("clip-id", null)
         assertFalse(shown.isShowing)
         assertNull(result.value)
         assertNull(dialog())
+    }
+
+    @Test fun `watching passes on the title the viewer gave`() {
+        result.value = ClipCreationResult.Created("clip-id", null, "Big play")
+        show()
+        dialog()!!.findViewById<View>(R.id.clipWatch)!!.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        verify(fragment).watchCreatedClip("clip-id", "Big play")
     }
 }

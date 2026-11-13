@@ -184,9 +184,12 @@ class PlayerViewModel @Inject constructor(
                     if (created == ClipCreationResult.SignInRequired && granted != null) {
                         grantRejected(granted)
                     }
-                    if (created is ClipCreationResult.Created && !ClipCreation.awaitConfirmation {
-                        helixRepository.clipExists(networkLibrary, headers, created.id)
-                    }) ClipCreationResult.NotFinished else created
+                    when {
+                        created !is ClipCreationResult.Created -> created
+                        !ClipCreation.awaitConfirmation { helixRepository.clipExists(networkLibrary, headers, created.id) } ->
+                            ClipCreationResult.NotFinished
+                        else -> created.copy(title = request.title)
+                    }
                 }
             } catch (error: CancellationException) {
                 throw error
