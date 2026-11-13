@@ -64,9 +64,10 @@ more reliable.
 Create clip captures the live broadcast, not your position in a rewind, and
 Edit opens Twitch's editor; there is no in-app editor or clipping from VoDs.
 The local rewind buffer works only with the default player and does not keep
-replay chat. Spoiler Shield does not cover share links or chat. Google Cast
-remains experimental and off by default. New text falls back to English where
-not yet translated.
+replay chat. Spoiler Shield does not cover share links or chat, and a shield
+added during playback reaches the media notification only when the next stream
+starts. Google Cast remains experimental and off by default. New text falls
+back to English where not yet translated.
 
 ## Upgrading
 

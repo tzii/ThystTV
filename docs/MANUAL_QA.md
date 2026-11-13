@@ -718,6 +718,8 @@ live and replay on the default player at both a high and low quality.
   below Android 13), keeps the dialog open, and Watch or Share still work after it.
   Icons and labels read in light and dark themes. Android TV hides Copy link; D-pad
   reaches every row and Close.
+- [ ] On a slow connection, tap Watch clip, then close the player or open another
+  stream before the clip starts: the clip does not open over it.
 - [ ] Recording replay, local replay, VoDs, clips and downloads do not show Create clip;
   hiding it in Player menu settings works. Check OkHttp, Cronet and HttpEngine network
   libraries, and that a stalled connection gives up instead of waiting indefinitely.

@@ -531,7 +531,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     /** Plays the new clip here, the same way opening a clip link does. It replaces the live stream. */
     internal fun watchCreatedClip(id: String) {
-        (activity as? MainActivity)?.openClip(id)
+        (activity as? MainActivity)?.openClip(id, this)
     }
 
     private fun clipLink(id: String): String {
