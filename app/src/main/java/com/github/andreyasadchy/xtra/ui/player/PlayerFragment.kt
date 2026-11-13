@@ -6,6 +6,7 @@ import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -52,6 +53,7 @@ import androidx.annotation.OptIn
 import androidx.core.content.edit
 import androidx.core.graphics.ColorUtils
 import androidx.core.os.bundleOf
+import androidx.core.net.toUri
 import androidx.core.os.BundleCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -76,6 +78,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.window.layout.FoldingFeature
 import androidx.window.layout.WindowInfoTracker
 import com.github.andreyasadchy.xtra.R
+import com.github.andreyasadchy.xtra.databinding.DialogClipOptionsBinding
 import com.github.andreyasadchy.xtra.databinding.FragmentPlayerBinding
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerMorePopupBinding
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerQualityPopupBinding
@@ -86,14 +89,20 @@ import com.github.andreyasadchy.xtra.model.ui.Clip
 import com.github.andreyasadchy.xtra.model.ui.OfflineVideo
 import com.github.andreyasadchy.xtra.model.ui.Stream
 import com.github.andreyasadchy.xtra.model.ui.Video
+import com.github.andreyasadchy.xtra.repository.AuthRepository
 import com.github.andreyasadchy.xtra.ui.channel.ChannelPagerFragmentDirections
 import com.github.andreyasadchy.xtra.ui.chat.ChatFragment
 import com.github.andreyasadchy.xtra.ui.common.BaseNetworkFragment
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.ui.common.RadioButtonDialogFragment
+import com.github.andreyasadchy.xtra.ui.common.SpoilerShield
+import com.github.andreyasadchy.xtra.ui.common.SpoilerSubject
 import com.github.andreyasadchy.xtra.ui.download.DownloadDialog
 import com.github.andreyasadchy.xtra.ui.game.GameMediaFragmentDirections
 import com.github.andreyasadchy.xtra.ui.game.GamePagerFragmentDirections
+import com.github.andreyasadchy.xtra.ui.login.ClipAuthorization
+import com.github.andreyasadchy.xtra.ui.login.LoginActivity
+import com.github.andreyasadchy.xtra.ui.login.RevokeTarget
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
@@ -109,6 +118,7 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -161,6 +171,15 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var pipPresentation: PlayerPipPolicy.Presentation? = null
     private var pipSupported = false
     private var presentationPreferenceListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+
+    /** What the player last bound, so a Spoiler Shield rule change can re-evaluate it. */
+    private var boundTitle: String? = null
+    private var boundGameId: String? = null
+    private var boundGameName: String? = null
+
+    /** The latest live title, kept apart from the view, which may hide titles or show a label. */
+    private var reportedTitle: String? = null
+    private var streamInfoReported = false
     private val pipLayoutListener = ViewTreeObserver.OnGlobalLayoutListener { refreshPipPresentation() }
     private var isKeyboardShown = false
     protected var displayMode = PlayerDisplayMode.FIT
@@ -328,12 +347,214 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     /** Called when the activity finishes; [keepCasting] leaves active receiver playback running. */
     open fun closeOnExit(keepCasting: Boolean) { closeSession() }
 
+    @Inject
+    lateinit var liveDvr: LiveDvr
+
     private var liveRewindDiscovery: Job? = null
     private var liveRewindStartup: Job? = null
     private var liveRewindDialog: androidx.appcompat.app.AlertDialog? = null
+    private var clipDialog: androidx.appcompat.app.AlertDialog? = null
+
+    @Inject
+    lateinit var authRepository: AuthRepository
 
     internal fun liveRewindOrigin(): Stream? = arguments?.let {
         BundleCompat.getParcelable(it, LiveRewind.ORIGIN, Stream::class.java)
+    }
+
+    /** Twitch needs the broadcaster's id, and a stream opened by login alone may not have one. */
+    internal fun canCreateClip(): Boolean =
+        videoType == STREAM && !requireArguments().getString(KEY_CHANNEL_ID).isNullOrBlank()
+
+    internal fun createClip() {
+        val context = requireContext()
+        val channelId = requireArguments().getString(KEY_CHANNEL_ID)
+        if (videoType != STREAM || channelId.isNullOrBlank()) return
+        if (viewModel.isCreatingClip) {
+            Toast.makeText(context, R.string.clip_creating, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (viewModel.clipCreation.value is ClipCreationResult.Created) {
+            showClipResult()
+            return
+        }
+        if (clipAccessToken(context).isNullOrBlank()) {
+            showClipSignIn(clipSignInMessage(context), null)
+            return
+        }
+        showClipOptions(channelId, viewModel.lastClipRequest)
+    }
+
+    /** The token a clip would use: a TV's separate grant first, then the sign-in's. */
+    private fun clipAccessToken(context: Context): String? =
+        ClipAuthorization.load(context.tokenPrefs())?.token ?: TwitchApiHelper.getHelixHeaders(context)[C.HEADER_TOKEN]
+
+    private fun clipSignInMessage(context: Context): Int = when {
+        context.isTelevision() -> R.string.clip_authorize_tv
+        context.tokenPrefs().getString(C.USERNAME, null).isNullOrBlank() -> R.string.clip_sign_in
+        else -> R.string.clip_sign_in_again
+    }
+
+    private fun showClipOptions(channelId: String, previous: ClipRequest?) {
+        val context = requireContext()
+        clipDialog?.dismiss()
+        val options = DialogClipOptionsBinding.inflate(LayoutInflater.from(context))
+        fun showLength(seconds: Float) {
+            options.clipLength.text = getString(R.string.clip_length_seconds, seconds.roundToInt())
+        }
+        options.clipTitle.setText(previous?.title)
+        options.clipDuration.addOnChangeListener { _, seconds, _ -> showLength(seconds) }
+        options.clipDuration.value = previous?.durationSeconds?.roundToInt()?.toFloat() ?: ClipCreation.DEFAULT_DURATION_SECONDS
+        showLength(options.clipDuration.value)
+        clipDialog = context.getAlertDialogBuilder()
+            .setTitle(R.string.clip_create)
+            .setView(options.root)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.clip_create_action) { _, _ ->
+                startClip(channelId, ClipRequest.of(options.clipTitle.text, options.clipDuration.value))
+            }
+            .create().also { dialog ->
+                dialog.setOnDismissListener { if (clipDialog === dialog) clipDialog = null }
+                dialog.show()
+                // A remote reaches the length and Create first; typing a title stays optional.
+                if (context.isTelevision()) options.clipDuration.requestFocus()
+            }
+    }
+
+    private fun startClip(channelId: String, request: ClipRequest) {
+        val context = requireContext()
+        val networkLibrary = context.prefs().getString(C.NETWORK_LIBRARY, "OkHttp")
+        val tokenPrefs = context.tokenPrefs()
+        val auth = authRepository
+        Toast.makeText(context, R.string.clip_creating, Toast.LENGTH_SHORT).show()
+        viewModel.createClip(
+            networkLibrary,
+            TwitchApiHelper.getHelixHeaders(context),
+            channelId,
+            request,
+            grant = {
+                ClipAuthorization.current(
+                    tokenPrefs,
+                    System::currentTimeMillis,
+                    discard = { auth.revokeInBackground(networkLibrary, RevokeTarget(it.clientId, it.token).body) },
+                ) {
+                    auth.refreshToken(networkLibrary, it.clientId, it.refreshToken.orEmpty())
+                }
+            },
+            grantRejected = { ClipAuthorization.clearIfCurrent(tokenPrefs, it) },
+        )
+    }
+
+    /** Continue the clip the viewer left to authorize, unless they came back without doing so. */
+    private fun resumePendingClip() {
+        val pending = viewModel.pendingClip ?: return
+        viewModel.pendingClip = null
+        val context = requireContext()
+        if (!isMaximized || videoType != STREAM || requireArguments().getString(KEY_CHANNEL_ID) != pending.channelId) return
+        if (clipAccessToken(context) == pending.tokenAtLaunch || clipAccessToken(context).isNullOrBlank()) return
+        pending.request?.let { startClip(pending.channelId, it) } ?: showClipOptions(pending.channelId, viewModel.lastClipRequest)
+    }
+
+    private fun watchClipCreation() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.clipCreation.collect { showClipResult() }
+            }
+        }
+    }
+
+    /** A result waits for the maximized player, so nothing opens over browsing or PiP. */
+    private fun showClipResult() {
+        if (!isResumed || !isMaximized || clipDialog != null) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && requireActivity().isInPictureInPictureMode) return
+        val result = viewModel.clipCreation.value ?: return
+        if (result is ClipCreationResult.Created) {
+            showClipCreated(result)
+            return
+        }
+        viewModel.clipCreation.value = null
+        val message = when (result) {
+            is ClipCreationResult.Created -> return
+            ClipCreationResult.SignInRequired -> return showClipSignIn(clipSignInMessage(requireContext()), viewModel.lastClipRequest)
+            ClipCreationResult.TitleRejected -> {
+                // Nothing was created, so let the viewer change the title without starting over.
+                Toast.makeText(requireContext(), R.string.clip_title_rejected, Toast.LENGTH_LONG).show()
+                requireArguments().getString(KEY_CHANNEL_ID)?.let { showClipOptions(it, viewModel.lastClipRequest) }
+                return
+            }
+            ClipCreationResult.NotAllowed -> R.string.clip_not_allowed
+            ClipCreationResult.NotClippable -> R.string.clip_not_clippable
+            ClipCreationResult.NotLive -> R.string.clip_not_live
+            ClipCreationResult.RateLimited -> R.string.clip_rate_limited
+            ClipCreationResult.NotFinished -> R.string.clip_not_finished
+            ClipCreationResult.Unavailable -> R.string.clip_unavailable
+            ClipCreationResult.Failed -> R.string.clip_failed
+        }
+        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+    }
+
+    private fun showClipCreated(clip: ClipCreationResult.Created) {
+        clipDialog?.dismiss()
+        clipDialog = requireContext().getAlertDialogBuilder()
+            .setTitle(R.string.clip_created)
+            .setMessage(R.string.clip_created_message)
+            .setNegativeButton(R.string.close) { _, _ -> viewModel.clipCreation.compareAndSet(clip, null) }
+            .setNeutralButton(R.string.share) { _, _ ->
+                viewModel.clipCreation.compareAndSet(clip, null)
+                shareClip(clip.id)
+            }
+            .apply {
+                clip.editUrl?.let { url ->
+                    setPositiveButton(R.string.clip_edit) { _, _ ->
+                        viewModel.clipCreation.compareAndSet(clip, null)
+                        openClipEditor(url)
+                    }
+                }
+            }
+            .create().also { dialog ->
+                // Lifecycle dismissals preserve the result; Back/outside and buttons acknowledge it.
+                dialog.setOnCancelListener { viewModel.clipCreation.compareAndSet(clip, null) }
+                dialog.setOnDismissListener { if (clipDialog === dialog) clipDialog = null }
+                dialog.show()
+            }
+    }
+
+    private fun showClipSignIn(message: Int, request: ClipRequest?) {
+        val activity = activity as? MainActivity ?: return
+        val channelId = requireArguments().getString(KEY_CHANNEL_ID) ?: return
+        clipDialog?.dismiss()
+        clipDialog = activity.getAlertDialogBuilder()
+            .setTitle(R.string.clip_create)
+            .setMessage(message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.clip_sign_in_action) { _, _ ->
+                viewModel.pendingClip = PendingClip(channelId, request, clipAccessToken(activity))
+                val mode = if (activity.isTelevision()) LoginActivity.EXTRA_CLIP_DEVICE_AUTH else LoginActivity.EXTRA_REAUTHORIZE
+                activity.reauthorizeResultLauncher?.launch(Intent(activity, LoginActivity::class.java).putExtra(mode, true))
+            }
+            .create().also { dialog ->
+                dialog.setOnDismissListener { if (clipDialog === dialog) clipDialog = null }
+                dialog.show()
+            }
+    }
+
+    private fun shareClip(id: String) {
+        val login = requireArguments().getString(KEY_CHANNEL_LOGIN)
+        startActivity(Intent.createChooser(Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, if (login.isNullOrBlank()) "https://clips.twitch.tv/$id" else "https://twitch.tv/$login/clip/$id")
+            type = "text/plain"
+        }, null))
+    }
+
+    private fun openClipEditor(url: String) {
+        val uri = url.toUri()
+        if (uri.scheme != "https" && uri.scheme != "http") return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(requireContext(), R.string.no_browser_found, Toast.LENGTH_LONG).show()
+        }
     }
 
     internal fun showLiveRewindOptions() {
@@ -343,8 +564,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             .setTitle(R.string.live_rewind)
             .setItems(arrayOf(
                 getString(R.string.live_rewind_30_seconds), getString(R.string.live_rewind_1_minute),
-                getString(R.string.live_rewind_5_minutes), getString(R.string.live_rewind_beginning),
-            )) { _, which -> requestLiveRewind(listOf(30_000L, 60_000L, 300_000L, null)[which]) }
+                getString(R.string.live_rewind_3_minutes), getString(R.string.live_rewind_5_minutes),
+                getString(R.string.live_rewind_beginning),
+            )) { _, which -> requestLiveRewind(listOf(30_000L, 60_000L, 180_000L, 300_000L, null)[which]) }
             .setNegativeButton(android.R.string.cancel, null)
             .create().also { dialog ->
                 dialog.setOnDismissListener { liveRewindDialog = null }
@@ -361,9 +583,18 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             createdAt = viewModel.stream.value?.createdAt ?: requireArguments().getString(KEY_STARTED_AT),
         )
         val context = requireContext()
-        Toast.makeText(context, R.string.live_rewind_searching, Toast.LENGTH_SHORT).show()
+        val channel = source.channelId ?: source.channelLogin
+        val preferLocal = LiveRewind.localBufferCovers(rewindMs, liveDvr.availableMs(channel))
+        if (!preferLocal) Toast.makeText(context, R.string.live_rewind_searching, Toast.LENGTH_SHORT).show()
         liveRewindDiscovery = viewLifecycleOwner.lifecycleScope.launch {
             try {
+                if (preferLocal) {
+                    prepareLocalReplay(channel, rewindMs)?.let {
+                        finishLiveRewindDiscovery(it)
+                        return@launch
+                    }
+                    Toast.makeText(context, R.string.live_rewind_searching, Toast.LENGTH_SHORT).show()
+                }
                 val prepared = withTimeoutOrNull(20_000L) {
                     viewModel.prepareLiveRewind(
                         source, rewindMs, context.prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
@@ -375,25 +606,61 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     )
                 }
                 currentCoroutineContext().ensureActive()
-                finishLiveRewindDiscovery(prepared)
+                finishLiveRewindDiscovery(prepared ?: prepareLocalReplay(channel, rewindMs))
             } catch (error: CancellationException) {
+                // This screen is still live, so nothing is playing a replay prepared just now.
+                liveDvr.cancelReplay()
                 throw error
             } catch (_: Exception) {
-                finishLiveRewindDiscovery(null)
+                finishLiveRewindDiscovery(prepareLocalReplay(channel, rewindMs))
             }
         }
+    }
+
+    /** The replay is pinned from here on, so this runs only when it will be used right away. */
+    internal suspend fun prepareLocalReplay(channel: String?, rewindMs: Long?): PreparedLiveRewind? {
+        if (!isResumed || !isMaximized) return null
+        val replay = liveDvr.prepareReplay(channel, rewindMs) ?: return null
+        val arguments = requireArguments()
+        val stream = viewModel.stream.value
+        val origin = Stream(
+            id = stream?.id ?: arguments.getString(KEY_STREAM_ID),
+            channelId = arguments.getString(KEY_CHANNEL_ID),
+            channelLogin = arguments.getString(KEY_CHANNEL_LOGIN),
+            channelName = arguments.getString(KEY_CHANNEL_NAME),
+            channelImageURL = arguments.getString(KEY_CHANNEL_IMAGE),
+            createdAt = stream?.createdAt ?: arguments.getString(KEY_STARTED_AT),
+        )
+        val video = Video(
+            channelId = origin.channelId,
+            channelLogin = origin.channelLogin,
+            channelName = origin.channelName,
+            channelImageURL = origin.channelImageURL,
+            title = stream?.title ?: arguments.getString(KEY_TITLE),
+            gameId = stream?.gameId ?: arguments.getString(KEY_GAME_ID),
+            gameSlug = stream?.gameSlug ?: arguments.getString(KEY_GAME_SLUG),
+            gameName = stream?.gameName ?: arguments.getString(KEY_GAME_NAME),
+        )
+        // Clearing a cache can shrink what looked like enough, so check what was really saved.
+        if (rewindMs != null && !LiveRewind.localBufferCovers(rewindMs, replay.availableMs)) {
+            Toast.makeText(requireContext(), getString(R.string.live_dvr_partial, DateUtils.formatElapsedTime(replay.availableMs / 1000)), Toast.LENGTH_LONG).show()
+        }
+        return PreparedLiveRewind(origin, video, replay.playlistUrl, replay.positionMs, local = true)
     }
 
     /** Never expand over browsing: a result that arrives while minimized or backgrounded is dropped. */
     internal fun finishLiveRewindDiscovery(prepared: PreparedLiveRewind?) {
         if (!isResumed || !isMaximized) {
             viewModel.liveRewindDropped = true
+            // Nothing will play it, and a pinned buffer would keep growing behind the live player.
+            if (prepared?.local == true) liveDvr.cancelReplay()
             return
         }
         if (prepared == null) {
-            Toast.makeText(requireContext(), R.string.live_rewind_unavailable, Toast.LENGTH_LONG).show()
-        } else {
-            (activity as? MainActivity)?.startLiveRewind(this, prepared)
+            val message = if (requireContext().prefs().getBoolean(C.PLAYER_LIVE_DVR, false)) R.string.live_rewind_unavailable else R.string.live_dvr_turn_on_hint
+            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+        } else if ((activity as? MainActivity)?.startLiveRewind(this, prepared) != true && prepared.local) {
+            liveDvr.cancelReplay()
         }
     }
 
@@ -475,6 +742,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private fun updateFullscreenLiveRewind() {
         val show = !isRemotePlayback() && LiveRewind.shouldShowFullscreenLiveRewind(videoType, liveRewindOrigin() != null, isMaximized)
         binding.playerControls.bindLiveRewindButton(show, isPortrait) { showLiveRewindOptions() }
+        // Shares the rewind row, which is what keeps it clear of the uptime and viewer counts.
+        binding.playerControls.createClipButton.isVisible = show && canCreateClip() && requireContext().prefs().getBoolean(C.PLAYER_CLIP_BUTTON, false)
+        binding.playerControls.createClipButton.setOnClickListener { createClip() }
     }
 
     protected open fun isLiveRewindPlaybackReady(): Boolean = false
@@ -492,15 +762,29 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
      */
     protected fun handleLiveRewindFailure(): Boolean {
         val origin = liveRewindOrigin() ?: return false
-        if (!viewModel.liveRewindPending && !viewModel.liveRewindFailed) return false
+        // A local replay has nothing to reload from, so any failure ends it.
+        if (!viewModel.liveRewindPending && !viewModel.liveRewindFailed && !isLocalReplay()) return false
         if (!viewModel.started) return true
         viewModel.liveRewindPending = false
         viewModel.liveRewindFailed = true
         liveRewindStartup?.cancel()
         if (isResumed && isMaximized && (activity as? MainActivity)?.returnFromLiveRewind(this, origin) == true) {
-            Toast.makeText(requireContext(), R.string.live_rewind_failed_returning, Toast.LENGTH_LONG).show()
+            Toast.makeText(requireContext(), if (isLocalReplay()) R.string.live_dvr_ended_returning else R.string.live_rewind_failed_returning, Toast.LENGTH_LONG).show()
         }
         return true
+    }
+
+    /** Playing the viewer's own saved video, which exists only for this playback session. */
+    internal fun isLocalReplay(): Boolean = arguments?.getBoolean(LiveRewind.LOCAL) == true
+
+    /** Its video is on disk, so starting one can't wait for a connection. */
+    override val initializeWhileOffline: Boolean get() = isLocalReplay()
+
+    /** Everything saved has played, or capture stopped: only live is left to watch. */
+    protected fun handleLocalReplayEnded() {
+        if (!isLocalReplay()) return
+        viewModel.liveRewindFailed = true
+        handleLiveRewindFailure()
     }
 
     private fun watchLiveRewindStartup() {
@@ -812,6 +1096,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         super.onViewCreated(view, savedInstanceState)
         watchPlayerPresentation(view)
         watchLiveRewindCatchUp()
+        watchClipCreation()
         watchFoldPosture()
         with(binding) {
             viewLifecycleOwner.lifecycleScope.launch {
@@ -1342,8 +1627,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 val titleText = requireArguments().getString(KEY_TITLE)
                 if (!titleText.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_TITLE, true)) {
                     title.visibility = View.VISIBLE
-                    title.text = if (liveRewindOrigin() != null) getString(R.string.live_rewind_recording_title, titleText) else titleText
+                    title.text = when {
+                        isLocalReplay() -> getString(R.string.live_dvr_title, titleText)
+                        liveRewindOrigin() != null -> getString(R.string.live_rewind_recording_title, titleText)
+                        else -> titleText
+                    }
                 }
+                protectPlayerTitle(requireArguments().getString(KEY_GAME_ID), requireArguments().getString(KEY_GAME_NAME))
                 val gameName = requireArguments().getString(KEY_GAME_NAME)
                 if (!gameName.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_CATEGORY, true)) {
                     category.visibility = View.VISIBLE
@@ -1690,7 +1980,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             }
                         }
                     }
-                    if (requireContext().prefs().getBoolean(C.PLAYER_DOWNLOAD, false)) {
+                    if (requireContext().prefs().getBoolean(C.PLAYER_DOWNLOAD, false) && !isLocalReplay()) {
                         download.visibility = View.VISIBLE
                         download.setOnClickListener { showDownloadDialog() }
                     }
@@ -2793,7 +3083,62 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
+    /**
+     * Replace a Spoiler Shield protected title with a tap-to-reveal label. It runs after the
+     * title is bound, so callers keep deciding what the title says and whether it shows.
+     */
+    private fun protectPlayerTitle(gameId: String?, gameName: String?) {
+        val view = binding.playerControls.title
+        val visibleTitle = view.text?.toString()
+        boundTitle = visibleTitle
+        boundGameId = gameId
+        boundGameName = gameName
+        if (!view.isVisible || visibleTitle.isNullOrBlank() || viewModel.spoilerRevealedTitle == visibleTitle) return
+        if (!SpoilerShield.hidesTitle(requireContext().prefs(), playerSpoilerSubject(gameId, gameName))) return
+        view.text = getString(R.string.spoiler_shield_title_hidden)
+        view.setOnClickListener {
+            viewModel.spoilerRevealedTitle = visibleTitle
+            view.text = visibleTitle
+            view.setOnClickListener { Toast.makeText(requireContext(), visibleTitle, Toast.LENGTH_SHORT).show() }
+        }
+    }
+
+    /** A rule can change while this player stays open, such as from a list while it is minimized. */
+    internal fun refreshPlayerTitleProtection() {
+        if (_binding == null) return
+        val title = boundTitle?.takeIf { it.isNotBlank() } ?: return
+        val view = binding.playerControls.title
+        viewModel.spoilerRevealedTitle = null
+        view.text = title
+        view.setOnClickListener { Toast.makeText(requireContext(), title, Toast.LENGTH_SHORT).show() }
+        protectPlayerTitle(boundGameId, boundGameName)
+    }
+
+    private fun playerSpoilerSubject(gameId: String?, gameName: String?) = SpoilerSubject(
+        key = "player",
+        channelId = requireArguments().getString(KEY_CHANNEL_ID),
+        channelLogin = requireArguments().getString(KEY_CHANNEL_LOGIN),
+        channelName = requireArguments().getString(KEY_CHANNEL_NAME),
+        gameId = gameId,
+        gameName = gameName,
+    )
+
+    /**
+     * The media notification and Cast receiver have no reveal control, so they stay hidden. A title
+     * is judged with the category it came with, so an old title can't get out under a newer category.
+     */
+    protected fun playbackTitle(): String? = SpoilerShield.titleOrHiddenLabel(
+        requireContext(),
+        playerSpoilerSubject(
+            boundGameId ?: requireArguments().getString(KEY_GAME_ID),
+            boundGameName ?: requireArguments().getString(KEY_GAME_NAME),
+        ),
+        if (streamInfoReported) reportedTitle else requireArguments().getString(KEY_TITLE),
+    )
+
     fun updateStreamInfo(title: String?, gameId: String?, gameSlug: String?, gameName: String?) {
+        reportedTitle = title?.trim()
+        streamInfoReported = true
         binding.playerControls.title.apply {
             if (!title.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_TITLE, true)) {
                 text = title.trim()
@@ -2806,6 +3151,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 visibility = View.GONE
             }
         }
+        protectPlayerTitle(gameId, gameName)
         binding.playerControls.category.apply {
             if (!gameName.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_CATEGORY, true)) {
                 text = gameName
@@ -3227,6 +3573,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (key == C.PLAYER_PIP_CHAT || key == C.PLAYER_PICTURE_IN_PICTURE || key == C.CHAT_DISABLE) {
                 refreshPipPresentation()
             }
+            if (key == C.SPOILER_SHIELD_RULES || key == C.SPOILER_SHIELD_HIDE_TITLES || key == null) {
+                refreshPlayerTitleProtection()
+            }
         }.also { prefs.registerOnSharedPreferenceChangeListener(it) }
         // Zoom is available from API 24 and must also update on devices without PiP.
         pipSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
@@ -3331,6 +3680,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override fun onResume() {
         super.onResume()
         if (viewModel.liveRewindFailed && isMaximized && handleLiveRewindFailure()) return
+        resumePendingClip()
         markLiveRewindReady()
         watchLiveRewindStartup()
         showDroppedLiveRewindNotice()
@@ -3488,6 +3838,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     protected fun playVideo(skipAccessToken: Boolean, playbackPosition: Long?) {
+        // Its files are gone after process death, and it has no id to load again.
+        if (isLocalReplay()) {
+            handleLocalReplayEnded()
+            return
+        }
         if (skipAccessToken && !requireArguments().getString(KEY_VIDEO_ANIMATED_PREVIEW).isNullOrBlank()) {
             requireArguments().getString(KEY_VIDEO_ANIMATED_PREVIEW)?.let { preview ->
                 val urls = TwitchApiHelper.getVideoUrlsFromPreview(preview, requireArguments().getString(KEY_VIDEO_TYPE), viewModel.backupQualities)
@@ -3561,6 +3916,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 seekPreview?.hide()
                 liveRewindDiscovery?.cancel()
                 liveRewindDialog?.dismiss()
+                clipDialog?.dismiss()
                 restoreBrightness()
                 hidePlayerPopup(restoreFocus = false, animate = false)
                 // PiP draws plain Fill and leaving full screen recenters.
@@ -3599,6 +3955,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         updateFoldLayout()
         refreshDisplayZoom()
         refreshPipPresentation()
+        if (!isInPictureInPictureMode) showClipResult()
     }
 
     override fun onStop() {
@@ -3607,6 +3964,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         liveRewindStartup?.cancel()
         liveRewindStartup = null
         liveRewindDialog?.dismiss()
+        clipDialog?.dismiss()
         restoreBrightness()
         super.onStop()
         binding.playerControls.root.removeCallbacks(controllerHideAction)
@@ -3636,6 +3994,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     fun minimize() {
         liveRewindDiscovery?.cancel()
         liveRewindDialog?.dismiss()
+        clipDialog?.dismiss()
         with(binding) {
             isMaximized = false
             // Restore original brightness when minimizing
@@ -3715,6 +4074,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             isMaximized = true
             if (viewModel.liveRewindFailed && handleLiveRewindFailure()) return
             showDroppedLiveRewindNotice()
+            showClipResult()
             requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback)
             if (videoType == STREAM && chatFragment?.emoteMenuIsVisible() == true) {
                 chatFragment?.toggleBackPressedCallback(true)
@@ -4074,6 +4434,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         liveRewindDiscovery?.cancel()
         liveRewindStartup?.cancel()
         liveRewindDialog?.dismiss()
+        clipDialog?.dismiss()
         doubleTapChatSnapshot = null
         systemUiListener.detach()
         finalizePinchSurface()
@@ -4169,7 +4530,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 requireArguments().getString(KEY_CHANNEL_NAME),
                 requireArguments().getString(KEY_STREAM_ID)
             )
-            VIDEO -> ChatFragment.newInstance(
+            // A local replay has no recorded chat to follow, so the channel's chat stays live.
+            VIDEO -> if (isLocalReplay()) ChatFragment.newInstance(
+                requireArguments().getString(KEY_CHANNEL_ID),
+                requireArguments().getString(KEY_CHANNEL_LOGIN),
+                requireArguments().getString(KEY_CHANNEL_NAME),
+                liveRewindOrigin()?.id
+            ) else ChatFragment.newInstance(
                 requireArguments().getString(KEY_CHANNEL_ID),
                 requireArguments().getString(KEY_CHANNEL_LOGIN),
                 requireArguments().getString(KEY_VIDEO_ID),

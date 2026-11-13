@@ -103,6 +103,16 @@
             android:visibility="gone" />
 
         <TextView
+            android:id="@+id/menuCreateClip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:padding="10dp"
+            android:text="@string/clip_create"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/menuGoLive"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

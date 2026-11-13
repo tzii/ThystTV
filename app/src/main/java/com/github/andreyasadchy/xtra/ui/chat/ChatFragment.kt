@@ -3,6 +3,7 @@ package com.github.andreyasadchy.xtra.ui.chat
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.format.DateUtils
 import android.util.TypedValue
 import android.view.KeyEvent
@@ -63,6 +64,7 @@ import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -83,6 +85,8 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
 
     private var isChatTouched = false
     private var showChatStatus = false
+    /** One instance, so showing the banner again restarts its timeout instead of adding another. */
+    private val hideChatStatus = Runnable { _binding?.chatStatus?.visibility = View.GONE }
     private var hasRecentEmotes = false
     private var messagingEnabled = false
 
@@ -106,6 +110,22 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentChatBinding.inflate(inflater, container, false)
         return binding.root
+    }
+
+    private fun showChatStatusBriefly() {
+        val chatStatus = _binding?.chatStatus ?: return
+        chatStatus.visibility = View.VISIBLE
+        chatStatus.removeCallbacks(hideChatStatus)
+        chatStatus.postDelayed(hideChatStatus, 5000)
+    }
+
+    /** Shows the time left until [endsAt] in [view] as each second passes, until it reaches zero. */
+    private suspend fun showTimeLeft(view: TextView, endsAt: Long) {
+        while (true) {
+            val now = SystemClock.elapsedRealtime()
+            view.text = getString(R.string.remaining_time, DateUtils.formatElapsedTime(secondsUntil(endsAt, now)))
+            delay(nextTickIn(endsAt, now) ?: return)
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -229,8 +249,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                     btnDown.isVisible = percentage < 100f
                                 }
                                 if (showChatStatus && chatStatus.isGone) {
-                                    chatStatus.visibility = View.VISIBLE
-                                    chatStatus.postDelayed({ chatStatus.visibility = View.GONE }, 5000)
+                                    showChatStatusBriefly()
                                 }
                             }
                         })
@@ -397,11 +416,11 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                     }
                                     if (textEmote.isGone && textFollowers.isGone && textUnique.isGone && textSlow.isGone && textSubs.isGone) {
                                         showChatStatus = false
+                                        chatStatus.removeCallbacks(hideChatStatus)
                                         chatStatus.visibility = View.GONE
                                     } else {
                                         showChatStatus = true
-                                        chatStatus.visibility = View.VISIBLE
-                                        chatStatus.postDelayed({ chatStatus.visibility = View.GONE }, 5000)
+                                        showChatStatusBriefly()
                                     }
                                     viewModel.roomState.value = null
                                 }
@@ -435,68 +454,53 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                             }
                         }
                     }
+                    // Cards render from their state; the view model owns every transition.
                     viewLifecycleOwner.lifecycleScope.launch {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            viewModel.hideRaid.collectLatest {
-                                if (it) {
+                            viewModel.raid.card.collectLatest { card ->
+                                val raid = card?.item
+                                if (raid == null) {
                                     raidLayout.visibility = View.GONE
-                                    viewModel.raidClosed = true
-                                    viewModel.hideRaid.value = false
-                                }
-                            }
-                        }
-                    }
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            viewModel.raid.collectLatest { raid ->
-                                if (raid != null) {
-                                    if (!viewModel.raidClosed) {
-                                        if (raid.openStream) {
-                                            if (requireContext().prefs().getBoolean(C.CHAT_RAIDS_AUTO_SWITCH, true) && parentFragment is PlayerFragment) {
-                                                (requireActivity() as? MainActivity)?.startStream(
-                                                    Stream(
-                                                        channelId = raid.targetId,
-                                                        channelLogin = raid.targetLogin,
-                                                        channelName = raid.targetName,
-                                                        channelImageURL = raid.targetImageURL,
-                                                    )
-                                                )
-                                            }
-                                            raidLayout.visibility = View.GONE
-                                            viewModel.raidClosed = true
-                                        } else {
-                                            raidLayout.visibility = View.VISIBLE
-                                            raidLayout.setOnClickListener { viewModel.raidClicked.value = raid }
-                                            requireContext().imageLoader.enqueue(
-                                                ImageRequest.Builder(requireContext()).apply {
-                                                    data(raid.targetImage)
-                                                    if (requireContext().prefs().getBoolean(C.UI_ROUNDUSERIMAGE, true)) {
-                                                        transformations(CircleCropTransformation())
-                                                    }
-                                                    crossfade(true)
-                                                    target(raidImage)
-                                                }.build()
+                                } else if (raid.openStream) {
+                                    if (requireContext().prefs().getBoolean(C.CHAT_RAIDS_AUTO_SWITCH, true) && parentFragment is PlayerFragment) {
+                                        (requireActivity() as? MainActivity)?.startStream(
+                                            Stream(
+                                                channelId = raid.targetId,
+                                                channelLogin = raid.targetLogin,
+                                                channelName = raid.targetName,
+                                                channelImageURL = raid.targetImageURL,
                                             )
-                                            raidClose.setOnClickListener {
-                                                raidLayout.visibility = View.GONE
-                                                viewModel.raidClosed = true
-                                            }
-                                            raidText.text = getString(
-                                                R.string.raid_text,
-                                                if (raid.targetLogin != null && !raid.targetLogin.equals(raid.targetName, true)) {
-                                                    when (requireContext().prefs().getString(C.UI_NAME_DISPLAY, "0")) {
-                                                        "0" -> "${raid.targetName}(${raid.targetLogin})"
-                                                        "1" -> raid.targetName
-                                                        else -> raid.targetLogin
-                                                    }
-                                                } else {
-                                                    raid.targetName
-                                                },
-                                                raid.viewerCount
-                                            )
-                                        }
+                                        )
                                     }
-                                    viewModel.raid.value = null
+                                    raidLayout.visibility = View.GONE
+                                    viewModel.raid.close()
+                                } else {
+                                    raidLayout.visibility = View.VISIBLE
+                                    raidLayout.setOnClickListener { viewModel.raidClicked.value = raid }
+                                    requireContext().imageLoader.enqueue(
+                                        ImageRequest.Builder(requireContext()).apply {
+                                            data(raid.targetImage)
+                                            if (requireContext().prefs().getBoolean(C.UI_ROUNDUSERIMAGE, true)) {
+                                                transformations(CircleCropTransformation())
+                                            }
+                                            crossfade(true)
+                                            target(raidImage)
+                                        }.build()
+                                    )
+                                    raidClose.setOnClickListener { viewModel.raid.close() }
+                                    raidText.text = getString(
+                                        R.string.raid_text,
+                                        if (raid.targetLogin != null && !raid.targetLogin.equals(raid.targetName, true)) {
+                                            when (requireContext().prefs().getString(C.UI_NAME_DISPLAY, "0")) {
+                                                "0" -> "${raid.targetName}(${raid.targetLogin})"
+                                                "1" -> raid.targetName
+                                                else -> raid.targetLogin
+                                            }
+                                        } else {
+                                            raid.targetName
+                                        },
+                                        raid.viewerCount
+                                    )
                                 }
                             }
                         }
@@ -518,197 +522,71 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                             }
                         }
                     }
+                    pollClose.setOnClickListener { viewModel.poll.close() }
                     viewLifecycleOwner.lifecycleScope.launch {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            viewModel.hidePoll.collectLatest {
-                                if (it) {
-                                    pollLayout.visibility = View.GONE
-                                    viewModel.pollSecondsLeft.value = null
-                                    viewModel.pollTimer?.cancel()
-                                    viewModel.pollClosed = true
-                                    viewModel.hidePoll.value = false
+                            viewModel.poll.card.collectLatest { card ->
+                                pollLayout.isVisible = card != null
+                                if (card != null) {
+                                    val poll = card.item
+                                    pollTitle.text = getString(R.string.poll_title, poll.title)
+                                    // Only a finished poll marks its winners.
+                                    val winningTotal = if (poll.status != "ACTIVE") poll.choices?.maxOfOrNull { it.totalVotes ?: 0 } ?: 0 else null
+                                    pollChoices.text = poll.choices?.joinToString("\n") {
+                                        getString(
+                                            if (winningTotal != null && winningTotal == it.totalVotes) {
+                                                R.string.poll_choice_winner
+                                            } else {
+                                                R.string.poll_choice
+                                            },
+                                            (((it.totalVotes ?: 0).toLong() * 100.0) / max((poll.totalVotes ?: 0), 1)).roundToInt(),
+                                            it.totalVotes?.let { NumberFormat.getInstance().format(it) },
+                                            it.title
+                                        )
+                                    }
+                                    pollStatus.isVisible = card.endsAt != null
+                                    card.endsAt?.let { showTimeLeft(pollStatus, it) }
                                 }
                             }
                         }
                     }
-                    pollClose.setOnClickListener {
-                        pollLayout.visibility = View.GONE
-                        viewModel.pollSecondsLeft.value = null
-                        viewModel.pollTimer?.cancel()
-                        viewModel.pollClosed = true
-                    }
+                    predictionClose.setOnClickListener { viewModel.prediction.close() }
                     viewLifecycleOwner.lifecycleScope.launch {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            viewModel.poll.collectLatest { poll ->
-                                if (poll != null) {
-                                    if (!viewModel.pollClosed) {
-                                        when (poll.status) {
-                                            "ACTIVE" -> {
-                                                pollLayout.visibility = View.VISIBLE
-                                                pollTitle.text = getString(R.string.poll_title, poll.title)
-                                                pollChoices.text = poll.choices?.joinToString("\n") {
-                                                    getString(
-                                                        R.string.poll_choice,
-                                                        (((it.totalVotes ?: 0).toLong() * 100.0) / max((poll.totalVotes ?: 0), 1)).roundToInt(),
-                                                        it.totalVotes?.let { NumberFormat.getInstance().format(it) },
-                                                        it.title
-                                                    )
-                                                }
-                                                pollStatus.visibility = View.VISIBLE
-                                            }
-                                            "COMPLETED", "TERMINATED" -> {
-                                                pollLayout.visibility = View.VISIBLE
-                                                pollTitle.text = getString(R.string.poll_title, poll.title)
-                                                val winningTotal = poll.choices?.maxOfOrNull { it.totalVotes ?: 0 } ?: 0
-                                                pollChoices.text = poll.choices?.joinToString("\n") {
-                                                    getString(
-                                                        if (winningTotal == it.totalVotes) {
-                                                            R.string.poll_choice_winner
-                                                        } else {
-                                                            R.string.poll_choice
-                                                        },
-                                                        (((it.totalVotes ?: 0).toLong() * 100.0) / max((poll.totalVotes ?: 0), 1)).roundToInt(),
-                                                        it.totalVotes?.let { NumberFormat.getInstance().format(it) },
-                                                        it.title
-                                                    )
-                                                }
-                                                pollStatus.visibility = View.GONE
-                                                viewModel.pollSecondsLeft.value = null
-                                                viewModel.pollTimer?.cancel()
-                                                viewModel.startPollTimeout { pollLayout.visibility = View.GONE }
-                                            }
-                                            else -> {
-                                                pollLayout.visibility = View.GONE
-                                                viewModel.pollSecondsLeft.value = null
-                                                viewModel.pollTimer?.cancel()
-                                                viewModel.pollClosed = true
-                                            }
+                            viewModel.prediction.card.collectLatest { card ->
+                                predictionLayout.isVisible = card != null
+                                if (card != null) {
+                                    val prediction = card.item
+                                    predictionTitle.text = getString(R.string.prediction_title, prediction.title)
+                                    val resolved = prediction.status == "RESOLVED" || prediction.status == "RESOLVE_PENDING"
+                                    val totalPoints = prediction.outcomes?.sumOf { it.totalPoints?.toLong() ?: 0 } ?: 0
+                                    predictionOutcomes.text = prediction.outcomes?.joinToString("\n") {
+                                        getString(
+                                            if (resolved && prediction.winningOutcomeId != null && prediction.winningOutcomeId == it.id) {
+                                                R.string.prediction_outcome_winner
+                                            } else {
+                                                R.string.prediction_outcome
+                                            },
+                                            (((it.totalPoints ?: 0).toLong() * 100.0) / max(totalPoints, 1)).roundToInt(),
+                                            it.totalPoints?.let { NumberFormat.getInstance().format(it) },
+                                            it.totalUsers?.let { NumberFormat.getInstance().format(it) },
+                                            it.title
+                                        )
+                                    }
+                                    when {
+                                        prediction.status == "ACTIVE" -> {
+                                            predictionStatus.isVisible = card.endsAt != null
+                                            card.endsAt?.let { showTimeLeft(predictionStatus, it) }
                                         }
-                                    }
-                                    viewModel.poll.value = null
-                                }
-                            }
-                        }
-                    }
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            viewModel.pollSecondsLeft.collectLatest {
-                                if (it != null) {
-                                    pollStatus.text = getString(R.string.remaining_time, DateUtils.formatElapsedTime(it.toLong()))
-                                    if (it <= 0) {
-                                        viewModel.pollSecondsLeft.value = null
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            viewModel.hidePrediction.collectLatest {
-                                if (it) {
-                                    predictionLayout.visibility = View.GONE
-                                    viewModel.predictionSecondsLeft.value = null
-                                    viewModel.predictionTimer?.cancel()
-                                    viewModel.predictionClosed = true
-                                    viewModel.hidePrediction.value = false
-                                }
-                            }
-                        }
-                    }
-                    predictionClose.setOnClickListener {
-                        predictionLayout.visibility = View.GONE
-                        viewModel.predictionSecondsLeft.value = null
-                        viewModel.predictionTimer?.cancel()
-                        viewModel.predictionClosed = true
-                    }
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            viewModel.prediction.collectLatest { prediction ->
-                                if (prediction != null) {
-                                    if (!viewModel.predictionClosed) {
-                                        when (prediction.status) {
-                                            "ACTIVE" -> {
-                                                predictionLayout.visibility = View.VISIBLE
-                                                predictionTitle.text = getString(R.string.prediction_title, prediction.title)
-                                                val totalPoints = prediction.outcomes?.sumOf { it.totalPoints?.toLong() ?: 0 } ?: 0
-                                                predictionOutcomes.text = prediction.outcomes?.joinToString("\n") {
-                                                    getString(
-                                                        R.string.prediction_outcome,
-                                                        (((it.totalPoints ?: 0).toLong() * 100.0) / max(totalPoints, 1)).roundToInt(),
-                                                        it.totalPoints?.let { NumberFormat.getInstance().format(it) },
-                                                        it.totalUsers?.let { NumberFormat.getInstance().format(it) },
-                                                        it.title
-                                                    )
-                                                }
-                                                predictionStatus.visibility = View.VISIBLE
-                                            }
-                                            "LOCKED" -> {
-                                                predictionLayout.visibility = View.VISIBLE
-                                                predictionTitle.text = getString(R.string.prediction_title, prediction.title)
-                                                val totalPoints = prediction.outcomes?.sumOf { it.totalPoints?.toLong() ?: 0 } ?: 0
-                                                predictionOutcomes.text = prediction.outcomes?.joinToString("\n") {
-                                                    getString(
-                                                        R.string.prediction_outcome,
-                                                        (((it.totalPoints ?: 0).toLong() * 100.0) / max(totalPoints, 1)).roundToInt(),
-                                                        it.totalPoints?.let { NumberFormat.getInstance().format(it) },
-                                                        it.totalUsers?.let { NumberFormat.getInstance().format(it) },
-                                                        it.title
-                                                    )
-                                                }
-                                                viewModel.predictionSecondsLeft.value = null
-                                                viewModel.predictionTimer?.cancel()
-                                                viewModel.startPredictionTimeout { predictionLayout.visibility = View.GONE }
-                                                predictionStatus.visibility = View.VISIBLE
-                                                predictionStatus.text = getString(R.string.prediction_locked)
-                                            }
-                                            "CANCELED", "CANCEL_PENDING", "RESOLVED", "RESOLVE_PENDING" -> {
-                                                predictionLayout.visibility = View.VISIBLE
-                                                predictionTitle.text = getString(R.string.prediction_title, prediction.title)
-                                                val resolved = prediction.status == "RESOLVED" || prediction.status == "RESOLVE_PENDING"
-                                                val totalPoints = prediction.outcomes?.sumOf { it.totalPoints?.toLong() ?: 0 } ?: 0
-                                                predictionOutcomes.text = prediction.outcomes?.joinToString("\n") {
-                                                    getString(
-                                                        if (resolved && prediction.winningOutcomeId != null && prediction.winningOutcomeId == it.id) {
-                                                            R.string.prediction_outcome_winner
-                                                        } else {
-                                                            R.string.prediction_outcome
-                                                        },
-                                                        (((it.totalPoints ?: 0).toLong() * 100.0) / max(totalPoints, 1)).roundToInt(),
-                                                        it.totalPoints?.let { NumberFormat.getInstance().format(it) },
-                                                        it.totalUsers?.let { NumberFormat.getInstance().format(it) },
-                                                        it.title
-                                                    )
-                                                }
-                                                viewModel.predictionSecondsLeft.value = null
-                                                viewModel.predictionTimer?.cancel()
-                                                viewModel.startPredictionTimeout { predictionLayout.visibility = View.GONE }
-                                                if (resolved) {
-                                                    predictionStatus.visibility = View.GONE
-                                                } else {
-                                                    predictionStatus.visibility = View.VISIBLE
-                                                    predictionStatus.text = getString(R.string.prediction_refunded)
-                                                }
-                                            }
-                                            else -> {
-                                                predictionLayout.visibility = View.GONE
-                                                viewModel.predictionSecondsLeft.value = null
-                                                viewModel.predictionTimer?.cancel()
-                                                viewModel.predictionClosed = true
-                                            }
+                                        prediction.status == "LOCKED" -> {
+                                            predictionStatus.visibility = View.VISIBLE
+                                            predictionStatus.text = getString(R.string.prediction_locked)
                                         }
-                                    }
-                                    viewModel.prediction.value = null
-                                }
-                            }
-                        }
-                    }
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            viewModel.predictionSecondsLeft.collectLatest {
-                                if (it != null) {
-                                    predictionStatus.text = getString(R.string.remaining_time, DateUtils.formatElapsedTime(it.toLong()))
-                                    if (it <= 0) {
-                                        viewModel.predictionSecondsLeft.value = null
+                                        resolved -> predictionStatus.visibility = View.GONE
+                                        else -> {
+                                            predictionStatus.visibility = View.VISIBLE
+                                            predictionStatus.text = getString(R.string.prediction_refunded)
+                                        }
                                     }
                                 }
                             }

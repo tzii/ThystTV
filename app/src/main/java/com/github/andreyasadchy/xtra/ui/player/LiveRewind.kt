@@ -7,8 +7,9 @@ import kotlin.math.max
 
 /**
  * Recording matching adapted from thiscallnet/Xtra LiveRewind.kt (fbffe567), AGPL-3.0.
- * ThystTV deliberately uses its established single-player VoD handoff, not a DVR
- * buffer or a second playback service. A recording is not guaranteed to exist.
+ * ThystTV deliberately uses its established single-player VoD handoff, not a second
+ * playback service. A recording is not guaranteed to exist, so a rewind can also play
+ * the viewer's own [LiveDvr] buffer through that same handoff.
  */
 internal data class LiveRewindCandidate(
     val video: Video,
@@ -21,12 +22,14 @@ internal data class PreparedLiveRewind(
     val video: Video,
     val playlistUrl: String,
     val positionMs: Long,
+    val local: Boolean = false,
 )
 
 internal object LiveRewind {
     const val ORIGIN = "liveRewindOrigin"
     const val PLAYLIST = "liveRewindPlaylist"
     const val POSITION = "liveRewindPosition"
+    const val LOCAL = "liveRewindLocal"
     const val MAX_START_DELTA_MS = 180_000L
     const val DURATION_QUANTUM_MS = 10_000L
 
@@ -94,6 +97,13 @@ internal object LiveRewind {
         if (positionMs == null || durationMs == null || durationMs <= 0L) return false
         return durationMs - positionMs <= edgeSlackMs(currentSpeed)
     }
+
+    /**
+     * The viewer's own buffer needs no network and no recording, so it wins whenever it
+     * reaches back far enough. "From the beginning" is only ever a recording's to offer.
+     */
+    fun localBufferCovers(rewindMs: Long?, availableMs: Long): Boolean =
+        rewindMs != null && availableMs >= rewindMs
 
     fun shouldShowFullscreenLiveRewind(
         videoType: String?,

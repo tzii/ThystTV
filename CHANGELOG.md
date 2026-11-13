@@ -5,7 +5,20 @@ All notable changes to ThystTV should be documented here.
 ## [Unreleased]
 
 ### Added
-- Spoiler Shield (#78): long-press a stream, or use the ⋮ menu on a VoD or clip, to hide titles and previews for its channel or category, until removed or for 24 hours, 3 days or 7 days, with an eye button to reveal one item. Add or remove channels and categories in Settings > UI. It also covers bookmarks, downloads, team cards, the channel page title and live notifications.
+- Spoiler Shield (#78): long-press a stream, or use the ⋮ menu on a VoD or clip, to hide titles and previews for its channel or category, until removed or for 24 hours, 3 days or 7 days, with an eye button to reveal one item. Add or remove channels and categories in Settings > UI. It also covers bookmarks, downloads, team cards, the channel page title, the player title and live notifications.
+- Live rewind offers "Watch last 3 minutes" (#79). Like the other presets, it plays the broadcast's recording.
+- Local rewind buffer, off by default in Player settings > Videos. It saves the live video you're watching (250 MB to 2 GB) so a rewind works even when the broadcast has no recording. It uses the default player, needs 1 GB of free storage, and is deleted shortly after you leave the stream.
+- Create clip in the live player's More menu (#79) lets you set a title and a length of 5 to 60 seconds, captures the live broadcast through Twitch, confirms it was saved, then offers Edit and Share. A direct player button can be turned on in Player buttons settings, and Android TV works by approving a code on another device. Accounts signed in before this version are asked to grant the permission once, and cancelling keeps their sign-in.
+
+### Changed
+- Granting a new permission no longer signs you out first. The current sign-in stays until the new one is confirmed, cancelling changes nothing, and the app restarts only if the account changed. The older token is revoked afterward.
+- Sign-in requests now cancel the underlying network request and give up after 20 seconds on every network library, so a stalled connection can't hold a sign-in screen open.
+- Chat connections check they are alive with one lightweight task per connection instead of starting a new background thread for each channel-points, poll, prediction or EventSub notification. Reconnect timing is unchanged.
+
+### Fixed
+- Poll and prediction countdowns show the real time left after the phone has slept, and channel points no longer report a burst of missed watch minutes on wake.
+- Raid, poll and prediction cards stay up when the chat screen is rebuilt, for example after switching dark mode, and a lock or result hides 20 seconds after it arrives.
+- The chat-mode banner (emote-only, slow mode and so on) stays up for its full five seconds when the modes change again while it is showing.
 
 ## [1.5.2] - 2026-10-31
 

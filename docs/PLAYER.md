@@ -434,6 +434,92 @@ up only as needed to clear that row. Rotation restores the original landscape
 rules; minimized players and recording replays do not get a live-rewind button.
 `PlayerLiveRewindControlsTest` renders compact/RTL/200% text and landscape controls.
 
+Unless the local rewind buffer below covers a request, every preset, including the last
+3 minutes, plays the broadcast's recording. Twitch's
+live media playlists reach back only about 30 seconds (measured November 2026), so
+seeking within the live source cannot serve them, and larger Media3 buffers do not
+change that. With neither a recording nor saved video, the player stays live and shows the
+unavailable message.
+
+## Local rewind buffer
+
+Off by default (`C.PLAYER_LIVE_DVR`, `C.PLAYER_LIVE_DVR_SIZE`), and wired only to the
+default Media3 backend. On the others the buffer stays empty and only recordings are used.
+
+- `LiveDvrHlsDataSourceFactory` tees the player's own playlist and segment loads into
+  `LiveDvrBuffer`. It adds no requests while live, and capture failures never reach the
+  player. Only a segment read from its start through to its end is stored, under the URL
+  its playlist lists rather than wherever a redirect sent it.
+- `LiveDvrBuffer` joins bytes with playlist metadata, keeps one copy of each moment
+  across variants, and evicts the oldest video to stay under the size setting. Init
+  segments count toward that limit and go with the last video that used them.
+- A rewind uses the buffer when it covers the request, otherwise a recording, then the
+  buffer as a shorter fallback with a toast. "Watch from beginning" always tries the
+  recording first. It reuses the single-player VoD handoff through `LiveRewind.LOCAL`, and
+  needs no connection to start. A replay prepared just as the viewer minimizes or leaves is
+  cancelled, so the buffer goes back to evicting.
+- Pinning (`pin`) stops eviction and makes the playlist append-only, because a player
+  holding an EVENT playlist needs the listed segments to stay in place.
+- `LiveDvrRecorder` keeps a replay's playlist growing, since nothing else fetches new
+  video then. Each saved segment is published at once. If the stream ends, nothing new
+  arrives for 60 seconds, or the buffer reaches twice its size, it closes the playlist with
+  ENDLIST and playback returns to live at the end. The 60 seconds also bounds a response
+  that trickles in without finishing. A replay that ended during background audio returns to
+  live once its screen is resumed and maximized. A viewer who reaches the end of the saved
+  video during a shorter drop gets Exo's stuck-playlist error (3.5 target durations, 21s),
+  which also returns to live. Losing the network doesn't stop a replay the way it stops a
+  VoD, since the video is on disk.
+- The replay playlist has no PROGRAM-DATE-TIME, which would switch on Exo's live speed
+  control, and its target duration is at least 6 seconds.
+
+`LiveDvr` owns one session per channel and outlives player fragments, because a rewind
+and Go live each replace the fragment and source: closing a source starts a 30-second
+grace period that the matching next start cancels. Anything else deletes the session.
+
+The buffer lives in the app's cache. Android clears every app's cache when free space
+falls below 150% of its low-storage threshold (at most 750 MB), which an emulator run hit
+in practice, so capture evicts and stops below 1 GB free. If the cache is cleared anyway,
+the buffer starts over; a replay in progress fails its next read and returns to live.
+
+Known limits: ads are saved as they played; replay chat stays live; pausing or chat-only
+leaves a gap; the rewind distance is measured from the newest saved segment, a few seconds
+ahead of the viewer's position; a process death ends the replay and returns to live; a
+replay that falls back to live while offline starts a new buffer if the player stays blank
+past the 30-second grace period, since nothing starts until the network returns; changing
+the player backend during a session means the next rewind can't play locally, since only the
+default backend plays a local replay: live carries on with a message while the default player
+still holds the stream, and otherwise it falls back to live. Go live from a replay already
+running when the backend changed is refused with the same message, so the replay stays on
+screen until the player is closed.
+## Creating clips
+
+More > Create clip, or the optional player button (`C.PLAYER_CLIP_BUTTON`, off by
+default), asks for a title and a length of 5 to 60 seconds, then calls Twitch's Create
+Clip API with the viewer's Helix token and the `clips:edit` scope. The request runs in
+`PlayerViewModel` and never touches the player. `ClipCreation` maps supported refusals
+to distinct messages, reopens the options when a title is rejected, treats 503 as
+temporary unavailability, and stops waiting for Get Clips confirmation at 60 seconds.
+Both requests use `CancellableHttp`, so cancelling stops the HTTP call and each has
+an elapsed-time limit. The [endpoint reference](https://dev.twitch.tv/docs/api/reference/#create-clip)
+says 60 seconds; the separate [Clips guide](https://dev.twitch.tv/docs/api/clips/)
+still says 15 seconds. The dialog or message waits until the player is resumed,
+maximized and outside PiP. A completed result remains available after lifecycle
+dismissals until Close, Back/outside cancellation, Edit or Share. Another tap
+during processing shows Creating clip instead of starting a duplicate request.
+Further trimming happens in Twitch's editor (`edit_url`). It clips the live broadcast
+rather than the viewer's position, so recording and local replays do not offer it.
+Create Clip From VOD is limited to broadcasters and editors. Tokens from before this
+scope get a 401, which leads to a sign-in prompt. That sign-in preserves the current one
+(`EXTRA_REAUTHORIZE`): cancelling changes nothing, the same account continues without a
+restart and retries the pending clip, and only a different account restarts the app.
+TV device-code sign-in has no Helix token, so the TV approves a separate grant from
+another device (`EXTRA_CLIP_DEVICE_AUTH`), kept apart from `C.TOKEN` in
+`ClipAuthorization` and renewed with its refresh token. That grant can belong to a
+different account from the TV's sign-in until login is entered again.
+A replaced token stays valid for what is already on screen, and is revoked at the next
+app start or on logout. A grant refresh that finishes after the grant changed is
+discarded and revoked, and a refusal only clears the grant that request used.
+
 ## VoD seek previews
 
 `SeekPreview` draws a frame from a Twitch storyboard sprite sheet while the seek
@@ -475,6 +561,20 @@ For release-risk player work, also verify:
 ```bash
 ./gradlew assembleRelease
 ```
+
+## Spoiler Shield in the player
+
+`protectPlayerTitle` replaces the visible title when `SpoilerShield.hidesTitle` matches
+the channel or category, including after a live title or category update. A tap
+reveals that title for that player through `PlayerViewModel.spoilerRevealedTitle`,
+and a new live title stays hidden until revealed too.
+`playbackTitle()` supplies the media-session title on every backend, so the notification
+and lock screen follow the same rule. A rule changed while the player stays open updates
+the visible title at once. The media session keeps its title until a source next starts:
+nothing updates it during playback, so it never shows anything newer than what was already
+there. A start uses the latest live title with the category it came with, so an old protected
+title can't return after the stream moves to an unprotected category. Share intents still
+carry the real title.
 
 ## Optional Google Cast (default Media3 backend)
 

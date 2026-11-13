@@ -15,6 +15,33 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### Chat keepalives, countdowns and cards
+
+Required for the deadline-based chat keepalive and chat card change
+(`.agent/plans/active/2026-11-07-implicit-state-machines.md`).
+
+- [ ] Signed out, keep a quiet live channel's chat open for 15+ minutes (the IRC
+  ping runs after 4.5 idle minutes). Messages keep arriving without reconnect
+  notices. Signed in, send a message after 15 idle minutes.
+- [ ] Airplane mode for 30 s and back: chat reconnects once. A manual disconnect
+  stays disconnected.
+- [ ] Signed in for 15+ minutes: channel points accrue and the claim appears.
+- [ ] Poll and prediction cards count down. On a channel that is not playing, turn
+  the screen off for 30 s and back on: the countdown shows the real time left.
+- [ ] Debug > EventSub chat on a busy channel: messages flow and continue after a
+  quiet minute. Floating chat and PiP/background chat behave as before.
+- [ ] Poll: close the card while voting is open; it stays closed, then the result
+  appears with the winner marked and hides 20 s later. Prediction: closed while
+  open, it reappears when locked; a locked card that was closed does not reappear
+  for the final outcome.
+- [ ] Raid: the card shows the target and viewer count; tapping it opens the
+  target, the close button hides it, and with auto-switch on the player follows
+  the raid when it goes through. A cancelled raid hides the card.
+- [ ] With a poll or prediction card showing, switch dark mode: the card stays,
+  and its countdown shows the real time left.
+- [ ] As a moderator, change chat modes twice within five seconds: the banner
+  stays up for five seconds after the second change.
+
 ### 1.5.2 signed release candidate
 
 On October 31 the maintainer accepted the supplied lifecycle/mini-player debug
@@ -481,6 +508,54 @@ Turn on Player settings → Gestures → Extended zoom.
   recording options. Check 360dp width, 200% text, RTL, uptime/viewer count and
   optional restart, seek-live, volume, compressor, audio-only and keyboard buttons.
   Rotate, minimize/restore and return from recording replay; controls stay readable.
+- [ ] Choose "Watch last 3 minutes" on a channel that saves broadcasts:
+  replay starts about 3 minutes behind live and replay chat follows; Go live returns
+  to the live source with one audio stream. A stream under 3 minutes old starts at
+  the beginning. A channel without recordings stays live and shows the message.
+
+### Local rewind buffer
+
+Turn on Player settings > Videos > Local rewind buffer, then open a stream. Check
+live and replay on the default player at both a high and low quality.
+
+- [ ] Off (default): live and recording rewinds behave as before. A channel without a
+  recording says so and mentions the setting. No `cache/live-dvr` folder appears.
+- [ ] On, on a channel without a recording, after 2 minutes: Rewind > Watch last minute
+  starts right away from about a minute ago, with no search message. Title reads
+  "Replay · ...", seeking works across the saved range, and Go live returns to live.
+- [ ] Ask for more than is saved on a channel without a recording: a toast says how much is
+  saved and playback starts at the oldest video. With a recording, a request longer than
+  the buffer and "Watch from beginning" use the recording as before.
+- [ ] Watch a replay long enough to reach the live edge: it keeps following the stream,
+  with no stuck-playlist error. Airplane mode for about 20 seconds at least a minute behind
+  live: the replay keeps playing and carries on saving afterwards. End of stream, or
+  airplane mode for over a minute: it plays what's saved, then returns to live with a message.
+  Airplane mode first, then Rewind > Watch last minute: the replay starts from disk and is
+  still playing after 30 seconds.
+- [ ] Quality: change it during live, then rewind across the change. Pictures continue
+  with no error. The replay's quality menu shows a sensible label or stays hidden.
+- [ ] Replay controls: Download and Bookmark are hidden, Create clip isn't offered, the
+  position isn't saved, and speed controls work. Chat stays live.
+- [ ] Rewind then Go live repeatedly: it keeps the buffer. Stream switching replaces it.
+  Close the player: `cache/live-dvr` empties within about 30 seconds. VoD or clip: at once.
+- [ ] Minimize, restore, PiP, background and rotate during replay and at its end. A replay
+  that ended while minimized returns to live on restore, never in the background. Let one
+  end during background audio, then reopen the app: it returns to live.
+- [ ] Kill the app during replay and reopen: no crash, and the leftover folder is removed
+  by the next stream. Clear the app's cache from Android settings during live, then rewind
+  after a minute: only the new video is offered. During replay: it returns to live.
+- [ ] Under 1 GB free: nothing is saved, and rewinding falls back to recordings. Live
+  playback stays unaffected, and the device's cache isn't cleared.
+- [ ] Each buffer size holds roughly the stated time at 1080p. Disk use settles near the
+  setting while live, and at most doubles during a long replay.
+- [ ] ExoPlayer and MediaPlayer backends: no capture, and recordings still work. Switch to
+  MediaPlayer with video already saved, then rewind: live carries on with a message, and
+  disk use stays near the setting. Switch during a replay, then Go live: a message says the
+  session is in use, with no claim of returning, and closing the player clears it.
+- [ ] During a local replay, pick Audio only and leave the app so audio keeps playing. Clear
+  the app's cache, wait for audio to stop, then return: it goes back to live with a message.
+  Repeat, returning within about 10 seconds of the error: it still goes back to live, because
+  a local replay has nothing to reload from.
 
 ### Spoiler Shield
 
@@ -518,6 +593,61 @@ Turn on Player settings → Gestures → Extended zoom.
   a search is running closes immediately. Offline, the typed name is still offered,
   and a channel typed by its display name is protected too. Pick that channel from search with
   a time limit: one rule remains, and protection ends when the limit does.
+- [ ] Player: open a protected live stream, VoD and clip. The title shows Title hidden,
+  and tapping it reveals the title for that player only. The media notification and
+  lock screen also say Title hidden. With Hide titles off, the title shows normally.
+  Reveal a title, then let the streamer change it: the new title shows Title hidden.
+  Repeat on a live title change, and with each backend (default, ExoPlayer, MediaPlayer).
+  Protect a channel from a list while its player is minimized: restoring shows Title
+  hidden. The notification keeps the title it started with until the stream next starts.
+  Protect a category, then let the streamer change title and category to an unprotected
+  one and press Restart: the notification shows the new title, never the old one.
+
+### Safer sign-in
+
+- [ ] With an account signed in before clip permission existed, start Create clip and
+  accept sign-in. Press Back on the login screen: still signed in, Following still
+  loads, nothing restarts, and playback continues if it was playing.
+- [ ] Complete it with the same account: no restart, the current sign-in continues
+  and its features work. Scroll on through Following loaded before signing in: more
+  channels still load. The old token is revoked the next time the app starts or on Log out.
+  If that request fails, the next app start tries again.
+- [ ] Complete it with a different account: the app restarts on the new account.
+- [ ] Log in and Log out from the menu behave as before, including restart.
+- [ ] Network cancellation: airplane mode or a stalled connection during sign-in shows
+  an error within about 20 seconds, on OkHttp, Cronet and HttpEngine. Leaving the
+  screen cancels at once, and a later sign-in works normally.
+
+### Create clip
+
+- [ ] Signed in after this version: More > Create clip on a live channel opens options
+  while video and audio keep playing. Create shows Clip created. Share sends a working
+  link; Edit opens Twitch's editor; the clip contains the moment just watched.
+- [ ] Title and length: a title up to 100 characters and lengths of 5, 30 and 60
+  seconds appear on the published clip. A blank title uses Twitch's default. Reopening
+  the dialog remembers the last choice. A title Twitch rejects reopens the dialog with
+  the rejection message, keeping what was typed.
+- [ ] Player button: off by default. Turn on Create clip in Player buttons settings and
+  it appears in the live player only, in portrait and landscape, and matches the More
+  action. Check 360dp width and 200% text with the other optional buttons on.
+- [ ] Signed in from an earlier version: Create clip offers sign-in; cancelling it, or
+  leaving the login screen, keeps the sign-in and playback. Finishing with the same
+  account retries the clip automatically with no restart. A different account restarts
+  the app on that account. Check background audio.
+- [ ] Android TV: Create clip shows a code to approve on another device. The TV's sign-in
+  doesn't change, and the clip then works. A later clip reuses the grant; after about
+  4 hours it refreshes without a new code. Check D-pad through the dialog and slider.
+- [ ] Refusals: subscriber/follower-only clips and clips disabled show a readable
+  message and playback continues; 503 says temporarily unavailable. Repeated
+  Create clip taps while processing show feedback without duplicate requests.
+- [ ] Tap, then minimize or enter PiP: nothing opens until the player is maximized.
+  Rotate during the wait: one result only. Close the player: no late dialog.
+- [ ] After Clip created is already visible, minimize, enter PiP or background
+  the app. Returning to the full player restores its links. Close/Back/outside,
+  Edit and Share acknowledge it, so it does not reopen after a later return.
+- [ ] Recording replay, local replay, VoDs, clips and downloads do not show Create clip;
+  hiding it in Player menu settings works. Check OkHttp, Cronet and HttpEngine network
+  libraries, and that a stalled connection gives up instead of waiting indefinitely.
 
 ### VoD seek previews (performance stack)
 

@@ -42,6 +42,8 @@ class LiveRewindTest {
     @Test fun `seek target rounds completed chunks and clamps at beginning`() {
         assertEquals(570_000L, LiveRewind.targetPosition(609_999L, 30_000L))
         assertEquals(540_000L, LiveRewind.targetPosition(609_999L, 60_000L))
+        assertEquals(420_000L, LiveRewind.targetPosition(609_999L, 180_000L))
+        assertEquals(0L, LiveRewind.targetPosition(120_000L, 180_000L))
         assertEquals(0L, LiveRewind.targetPosition(20_000L, 30_000L))
         assertEquals(0L, LiveRewind.targetPosition(600_000L, null))
         assertEquals(0L, LiveRewind.targetPosition(-1L, 30_000L))

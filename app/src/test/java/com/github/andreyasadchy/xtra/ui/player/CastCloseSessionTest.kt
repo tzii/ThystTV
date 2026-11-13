@@ -231,6 +231,7 @@ class CastCloseSessionTest {
         val bridge = mock<PlayerCastBridge>()
         whenever(bridge.handoff).thenReturn(handoff)
         val service = mock<PlaybackService>(defaultAnswer = Mockito.CALLS_REAL_METHODS)
+        service.liveDvr = mock()
         ReflectionHelpers.setField(service, "mediaSession", session)
         ReflectionHelpers.setField(service, "castBridge", bridge)
         ReflectionHelpers.setField(service, "sourceRequest", "accepted")
