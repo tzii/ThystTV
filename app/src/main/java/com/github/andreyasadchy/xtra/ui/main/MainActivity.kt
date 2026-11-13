@@ -129,6 +129,8 @@ class MainActivity : AppCompatActivity() {
     }
     var playerFragment: PlayerFragment? = null
         private set
+    /** The clip a player asked to watch, and that player, until the lookup returns. */
+    private var watchClipRequest: Pair<String, PlayerFragment>? = null
     private var lastPlaybackNetworkProfile: PlayerQualityNetworkProfile? = null
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -362,9 +364,7 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.clip.collectLatest { clip ->
                     if (clip != null) {
-                        if (!clip.id.isNullOrBlank()) {
-                            startClip(clip)
-                        }
+                        deliverClip(clip)
                         viewModel.clip.value = null
                     }
                 }
@@ -853,8 +853,12 @@ class MainActivity : AppCompatActivity() {
         !supportFragmentManager.isStateSaved && playerFragment === source &&
             supportFragmentManager.findFragmentById(R.id.playerContainer) === source
 
-    /** Loads a clip by id and plays it, the same path a clip link takes. */
-    fun openClip(clipId: String) {
+    /**
+     * Loads a clip by id and plays it, the same path a clip link takes. The lookup can outlast
+     * [source], so the clip only replaces it while it is still the open player.
+     */
+    fun openClip(clipId: String, source: PlayerFragment) {
+        watchClipRequest = clipId to source
         viewModel.loadClip(
             clipId,
             prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
@@ -862,6 +866,15 @@ class MainActivity : AppCompatActivity() {
             TwitchApiHelper.getHelixHeaders(this),
             prefs.getBoolean(C.ENABLE_INTEGRITY, false),
         )
+    }
+
+    /** A clip asked for from a player that has since closed or been replaced is dropped. */
+    internal fun deliverClip(clip: Clip) {
+        val request = watchClipRequest?.takeIf { it.first == clip.id }
+        if (request != null) watchClipRequest = null
+        if (clip.id.isNullOrBlank()) return
+        if (request != null && !canReplacePlayer(request.second)) return
+        startClip(clip)
     }
 
     fun startClip(clip: Clip) {
