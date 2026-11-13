@@ -25,7 +25,7 @@ abstract class BaseNetworkFragment : Fragment() {
     private val mainViewModel: MainViewModel by activityViewModels()
 
     protected open var enableNetworkCheck = true
-    protected open var initializeWhileOffline = false
+    protected open val initializeWhileOffline: Boolean = false
     private var lastIsOnlineState = false
     private var shouldRestore = false
     protected var isInitialized = false

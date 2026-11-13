@@ -481,6 +481,54 @@ Turn on Player settings → Gestures → Extended zoom.
   recording options. Check 360dp width, 200% text, RTL, uptime/viewer count and
   optional restart, seek-live, volume, compressor, audio-only and keyboard buttons.
   Rotate, minimize/restore and return from recording replay; controls stay readable.
+- [ ] Choose "Watch last 3 minutes" on a channel that saves broadcasts:
+  replay starts about 3 minutes behind live and replay chat follows; Go live returns
+  to the live source with one audio stream. A stream under 3 minutes old starts at
+  the beginning. A channel without recordings stays live and shows the message.
+
+### Local rewind buffer
+
+Turn on Player settings > Videos > Local rewind buffer, then open a stream. Check
+live and replay on the default player at both a high and low quality.
+
+- [ ] Off (default): live and recording rewinds behave as before. A channel without a
+  recording says so and mentions the setting. No `cache/live-dvr` folder appears.
+- [ ] On, on a channel without a recording, after 2 minutes: Rewind > Watch last minute
+  starts right away from about a minute ago, with no search message. Title reads
+  "Replay · ...", seeking works across the saved range, and Go live returns to live.
+- [ ] Ask for more than is saved on a channel without a recording: a toast says how much is
+  saved and playback starts at the oldest video. With a recording, a request longer than
+  the buffer and "Watch from beginning" use the recording as before.
+- [ ] Watch a replay long enough to reach the live edge: it keeps following the stream,
+  with no stuck-playlist error. Airplane mode for about 20 seconds at least a minute behind
+  live: the replay keeps playing and carries on saving afterwards. End of stream, or
+  airplane mode for over a minute: it plays what's saved, then returns to live with a message.
+  Airplane mode first, then Rewind > Watch last minute: the replay starts from disk and is
+  still playing after 30 seconds.
+- [ ] Quality: change it during live, then rewind across the change. Pictures continue
+  with no error. The replay's quality menu shows a sensible label or stays hidden.
+- [ ] Replay controls: Download and Bookmark are hidden, Create clip isn't offered, the
+  position isn't saved, and speed controls work. Chat stays live.
+- [ ] Rewind then Go live repeatedly: it keeps the buffer. Stream switching replaces it.
+  Close the player: `cache/live-dvr` empties within about 30 seconds. VoD or clip: at once.
+- [ ] Minimize, restore, PiP, background and rotate during replay and at its end. A replay
+  that ended while minimized returns to live on restore, never in the background. Let one
+  end during background audio, then reopen the app: it returns to live.
+- [ ] Kill the app during replay and reopen: no crash, and the leftover folder is removed
+  by the next stream. Clear the app's cache from Android settings during live, then rewind
+  after a minute: only the new video is offered. During replay: it returns to live.
+- [ ] Under 1 GB free: nothing is saved, and rewinding falls back to recordings. Live
+  playback stays unaffected, and the device's cache isn't cleared.
+- [ ] Each buffer size holds roughly the stated time at 1080p. Disk use settles near the
+  setting while live, and at most doubles during a long replay.
+- [ ] ExoPlayer and MediaPlayer backends: no capture, and recordings still work. Switch to
+  MediaPlayer with video already saved, then rewind: live carries on with a message, and
+  disk use stays near the setting. Switch during a replay, then Go live: a message says the
+  session is in use, with no claim of returning, and closing the player clears it.
+- [ ] During a local replay, pick Audio only and leave the app so audio keeps playing. Clear
+  the app's cache, wait for audio to stop, then return: it goes back to live with a message.
+  Repeat, returning within about 10 seconds of the error: it still goes back to live, because
+  a local replay has nothing to reload from.
 
 ### Spoiler Shield
 

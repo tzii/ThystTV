@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- New feature copy intentionally falls back to English until translations are vetted. -->
+    <string name="live_dvr" tools:ignore="MissingTranslation">Local rewind buffer</string>
+    <string name="live_dvr_summary" tools:ignore="MissingTranslation">Saves live video you’re watching on this device, so you can rewind when the broadcast has no recording. Needs at least 1 GB of free storage and uses the default player. Starts with the next stream you open; rewinding keeps downloading while you watch.</string>
+    <string name="live_dvr_size" tools:ignore="MissingTranslation">Buffer size</string>
+    <string name="live_dvr_title" tools:ignore="MissingTranslation">Replay · %1$s</string>
+    <string name="live_dvr_partial" tools:ignore="MissingTranslation">Only %1$s is saved on this device.</string>
+    <string name="live_dvr_ended_returning" tools:ignore="MissingTranslation">The local replay ended. Returning to live.</string>
+    <string name="live_dvr_turn_on_hint" tools:ignore="MissingTranslation">No playable recording is available for this live broadcast. Staying live. To rewind without recordings, turn on Local rewind buffer in the Player settings.</string>
+    <string-array name="liveDvrSizeEntries" tools:ignore="MissingTranslation">
+        <item>250 MB (about 4 minutes at 1080p)</item>
+        <item>500 MB (about 8 minutes at 1080p)</item>
+        <item>1 GB (about 16 minutes at 1080p)</item>
+        <item>2 GB (about 30 minutes at 1080p)</item>
+    </string-array>
+    <string-array name="liveDvrSizeValues" translatable="false">
+        <item>250</item>
+        <item>500</item>
+        <item>1024</item>
+        <item>2048</item>
+    </string-array>
+</resources>

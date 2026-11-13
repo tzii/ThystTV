@@ -28,6 +28,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.hls.DefaultHlsDataSourceFactory
 import androidx.media3.exoplayer.hls.HlsManifest
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.hls.playlist.HlsMediaPlaylist
@@ -101,6 +102,9 @@ class PlaybackService : MediaSessionService() {
 
     @Inject
     lateinit var okHttpClient: OkHttpClient
+
+    @Inject
+    lateinit var liveDvr: LiveDvr
 
     @Inject
     lateinit var playerRepository: PlayerRepository
@@ -386,8 +390,17 @@ class PlaybackService : MediaSessionService() {
                                         }
                                     }
                                 )
+                                val liveDvrBuffer = liveDvr.beginLive(
+                                    channelId ?: channelLogin,
+                                    prefs().getBoolean(C.PLAYER_LIVE_DVR, false),
+                                    LiveDvr.maxBytes(prefs().getString(C.PLAYER_LIVE_DVR_SIZE, null)),
+                                    dataSourceFactory,
+                                )
                                 val accepted = bridge.handoff.setSource(player,
-                                    HlsMediaSource.Factory(dataSourceFactory).apply {
+                                    HlsMediaSource.Factory(
+                                        liveDvrBuffer?.let { LiveDvrHlsDataSourceFactory(dataSourceFactory, it) }
+                                            ?: DefaultHlsDataSourceFactory(dataSourceFactory)
+                                    ).apply {
                                         setPlaylistParserFactory(playlistParsers)
                                         setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(6))
                                     },
@@ -434,7 +447,15 @@ class PlaybackService : MediaSessionService() {
                                 currentGameName = gameName
                                 lastStatsTime = if (session.player.isPlaying) System.currentTimeMillis() else 0L
                                 val newId = customCommand.customExtras.getLong(VIDEO_ID).takeIf { it != 0L }
-                                val position = if (videoId == newId && session.player.currentMediaItem != null) {
+                                // A local replay has no id, and neither does the live stream it replaces.
+                                val isLocalReplay = liveDvr.isReplayUri(uri)
+                                if (isLocalReplay) liveDvr.replayStarted() else liveDvr.otherSourceStarted()
+                                val continuesCurrent = if (isLocalReplay) {
+                                    session.player.currentMediaItem?.localConfiguration?.uri?.toString() == uri
+                                } else {
+                                    videoId == newId && session.player.currentMediaItem != null
+                                }
+                                val position = if (continuesCurrent) {
                                     session.player.currentPosition
                                 } else {
                                     customCommand.customExtras.getLong(PLAYBACK_POSITION)
@@ -483,6 +504,7 @@ class PlaybackService : MediaSessionService() {
                                 Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                             }
                             START_CLIP -> {
+                                liveDvr.otherSourceStarted()
                                 liveRecovery?.startSource(false)
                                 val uri = customCommand.customExtras.getString(URI)
                                 val title = customCommand.customExtras.getString(TITLE)
@@ -538,6 +560,7 @@ class PlaybackService : MediaSessionService() {
                                 Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                             }
                             START_OFFLINE_VIDEO -> {
+                                liveDvr.otherSourceStarted()
                                 bridge.handoff.clear()
                                 liveRecovery?.startSource(false)
                                 val uri = customCommand.customExtras.getString(URI)
@@ -757,6 +780,7 @@ class PlaybackService : MediaSessionService() {
     internal fun closeSource(request: String?, disconnect: Boolean) {
         if (request == null || request != sourceRequest) return
         sourceRequest = null
+        liveDvr.sourceClosed()
         savePosition()
         castBridge?.handoff?.cancelPending(clearOwnership = true)
         mediaSession?.player?.let {
@@ -859,6 +883,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        liveDvr.sourceClosed()
         mediaSession?.player?.let(PlaybackSessionOwner::unregister)
         stopRecoveryConnectivity()
         liveRecovery?.dispose()

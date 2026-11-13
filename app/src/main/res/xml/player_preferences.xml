@@ -245,6 +245,25 @@
 
         <SwitchPreferenceCompat
             android:defaultValue="false"
+            android:key="player_live_dvr"
+            android:summary="@string/live_dvr_summary"
+            android:title="@string/live_dvr"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <ListPreference
+            android:defaultValue="500"
+            android:dependency="player_live_dvr"
+            android:entries="@array/liveDvrSizeEntries"
+            android:entryValues="@array/liveDvrSizeValues"
+            android:key="player_live_dvr_size"
+            android:summary="%s"
+            android:title="@string/live_dvr_size"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
             android:key="player_spoiler_free_vods"
             android:summary="@string/spoiler_free_vods_summary"
             android:title="@string/spoiler_free_vods"

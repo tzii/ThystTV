@@ -170,6 +170,8 @@ object C {
     const val PLAYER_BACKGROUND_PLAYBACK = "player_background_playback"
     const val PLAYER_PICTURE_IN_PICTURE = "player_picture_in_picture"
     const val PLAYER_PIP_CHAT = "player_pip_chat"
+    const val PLAYER_LIVE_DVR = "player_live_dvr"
+    const val PLAYER_LIVE_DVR_SIZE = "player_live_dvr_size"
     const val PLAYER_CAST = "player_cast"
     const val PLAYER_CAST_KEEP_ON_EXIT = "player_cast_keep_on_exit"
     const val PLAYER_BACKGROUND_AUDIO = "player_background_audio"

@@ -786,7 +786,8 @@ class MainActivity : AppCompatActivity() {
 
 //Navigation listeners
 
-    fun startStream(stream: Stream) {
+    /** False when it was refused and the current player carries on. */
+    fun startStream(stream: Stream): Boolean {
         val fragment = when (prefs.getString(C.PLAYER, "ExoPlayer")) {
             "MediaPlayer" -> MediaPlayerFragment.newInstance(stream)
             else -> {
@@ -797,7 +798,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        startPlayer(fragment)
+        return startPlayer(fragment)
     }
 
     fun startVideo(video: Video, offset: Long?, ignoreSavedPosition: Boolean = false) {
@@ -823,20 +824,19 @@ class MainActivity : AppCompatActivity() {
             putParcelable(LiveRewind.ORIGIN, prepared.origin)
             putString(LiveRewind.PLAYLIST, prepared.playlistUrl)
             putLong(LiveRewind.POSITION, prepared.positionMs)
+            putBoolean(LiveRewind.LOCAL, prepared.local)
         }
-        startPlayer(fragment)
-        return true
+        return startPlayer(fragment)
     }
 
     internal fun returnFromLiveRewind(source: PlayerFragment, origin: Stream): Boolean {
         if (!canReplacePlayer(source)) return false
         // The broadcaster may have restarted while the recording was playing.
         // Keep channel identity, but force fresh live-session metadata lookup.
-        startStream(Stream(
+        return startStream(Stream(
             channelId = origin.channelId, channelLogin = origin.channelLogin,
             channelName = origin.channelName, channelImageURL = origin.channelImageURL,
         ))
-        return true
     }
 
     /** Reject late discovery/error callbacks after navigation, close or state save. */
@@ -878,13 +878,14 @@ class MainActivity : AppCompatActivity() {
 
 //Player methods
 
-    private fun startPlayer(fragment: PlayerFragment) {
+    /** False when it was refused and the current player carries on. */
+    private fun startPlayer(fragment: PlayerFragment): Boolean {
         val previous = supportFragmentManager.findFragmentById(R.id.playerContainer) as? PlayerFragment
         // Closing a visible Media3 fragment sends asynchronous service commands.
         // Do not start another backend until the service has actually released its media.
         if (fragment !is Media3Fragment && PlaybackSessionOwner.hasMedia()) {
             Toast.makeText(this, R.string.player_session_in_use, Toast.LENGTH_LONG).show()
-            return
+            return false
         }
         previous?.close()
         playerFragment = fragment
@@ -897,6 +898,7 @@ class MainActivity : AppCompatActivity() {
         ) {
             setPictureInPictureParams(PictureInPictureParams.Builder().setAutoEnterEnabled(true).build())
         }
+        return true
     }
 
     fun closePlayer(sourceFragment: PlayerFragment? = null) {

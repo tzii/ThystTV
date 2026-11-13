@@ -111,6 +111,7 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -339,6 +340,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     /** Called when the activity finishes; [keepCasting] leaves active receiver playback running. */
     open fun closeOnExit(keepCasting: Boolean) { closeSession() }
 
+    @Inject
+    lateinit var liveDvr: LiveDvr
+
     private var liveRewindDiscovery: Job? = null
     private var liveRewindStartup: Job? = null
     private var liveRewindDialog: androidx.appcompat.app.AlertDialog? = null
@@ -354,8 +358,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             .setTitle(R.string.live_rewind)
             .setItems(arrayOf(
                 getString(R.string.live_rewind_30_seconds), getString(R.string.live_rewind_1_minute),
-                getString(R.string.live_rewind_5_minutes), getString(R.string.live_rewind_beginning),
-            )) { _, which -> requestLiveRewind(listOf(30_000L, 60_000L, 300_000L, null)[which]) }
+                getString(R.string.live_rewind_3_minutes), getString(R.string.live_rewind_5_minutes),
+                getString(R.string.live_rewind_beginning),
+            )) { _, which -> requestLiveRewind(listOf(30_000L, 60_000L, 180_000L, 300_000L, null)[which]) }
             .setNegativeButton(android.R.string.cancel, null)
             .create().also { dialog ->
                 dialog.setOnDismissListener { liveRewindDialog = null }
@@ -372,9 +377,18 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             createdAt = viewModel.stream.value?.createdAt ?: requireArguments().getString(KEY_STARTED_AT),
         )
         val context = requireContext()
-        Toast.makeText(context, R.string.live_rewind_searching, Toast.LENGTH_SHORT).show()
+        val channel = source.channelId ?: source.channelLogin
+        val preferLocal = LiveRewind.localBufferCovers(rewindMs, liveDvr.availableMs(channel))
+        if (!preferLocal) Toast.makeText(context, R.string.live_rewind_searching, Toast.LENGTH_SHORT).show()
         liveRewindDiscovery = viewLifecycleOwner.lifecycleScope.launch {
             try {
+                if (preferLocal) {
+                    prepareLocalReplay(channel, rewindMs)?.let {
+                        finishLiveRewindDiscovery(it)
+                        return@launch
+                    }
+                    Toast.makeText(context, R.string.live_rewind_searching, Toast.LENGTH_SHORT).show()
+                }
                 val prepared = withTimeoutOrNull(20_000L) {
                     viewModel.prepareLiveRewind(
                         source, rewindMs, context.prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
@@ -386,25 +400,61 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     )
                 }
                 currentCoroutineContext().ensureActive()
-                finishLiveRewindDiscovery(prepared)
+                finishLiveRewindDiscovery(prepared ?: prepareLocalReplay(channel, rewindMs))
             } catch (error: CancellationException) {
+                // This screen is still live, so nothing is playing a replay prepared just now.
+                liveDvr.cancelReplay()
                 throw error
             } catch (_: Exception) {
-                finishLiveRewindDiscovery(null)
+                finishLiveRewindDiscovery(prepareLocalReplay(channel, rewindMs))
             }
         }
+    }
+
+    /** The replay is pinned from here on, so this runs only when it will be used right away. */
+    internal suspend fun prepareLocalReplay(channel: String?, rewindMs: Long?): PreparedLiveRewind? {
+        if (!isResumed || !isMaximized) return null
+        val replay = liveDvr.prepareReplay(channel, rewindMs) ?: return null
+        val arguments = requireArguments()
+        val stream = viewModel.stream.value
+        val origin = Stream(
+            id = stream?.id ?: arguments.getString(KEY_STREAM_ID),
+            channelId = arguments.getString(KEY_CHANNEL_ID),
+            channelLogin = arguments.getString(KEY_CHANNEL_LOGIN),
+            channelName = arguments.getString(KEY_CHANNEL_NAME),
+            channelImageURL = arguments.getString(KEY_CHANNEL_IMAGE),
+            createdAt = stream?.createdAt ?: arguments.getString(KEY_STARTED_AT),
+        )
+        val video = Video(
+            channelId = origin.channelId,
+            channelLogin = origin.channelLogin,
+            channelName = origin.channelName,
+            channelImageURL = origin.channelImageURL,
+            title = stream?.title ?: arguments.getString(KEY_TITLE),
+            gameId = stream?.gameId ?: arguments.getString(KEY_GAME_ID),
+            gameSlug = stream?.gameSlug ?: arguments.getString(KEY_GAME_SLUG),
+            gameName = stream?.gameName ?: arguments.getString(KEY_GAME_NAME),
+        )
+        // Clearing a cache can shrink what looked like enough, so check what was really saved.
+        if (rewindMs != null && !LiveRewind.localBufferCovers(rewindMs, replay.availableMs)) {
+            Toast.makeText(requireContext(), getString(R.string.live_dvr_partial, DateUtils.formatElapsedTime(replay.availableMs / 1000)), Toast.LENGTH_LONG).show()
+        }
+        return PreparedLiveRewind(origin, video, replay.playlistUrl, replay.positionMs, local = true)
     }
 
     /** Never expand over browsing: a result that arrives while minimized or backgrounded is dropped. */
     internal fun finishLiveRewindDiscovery(prepared: PreparedLiveRewind?) {
         if (!isResumed || !isMaximized) {
             viewModel.liveRewindDropped = true
+            // Nothing will play it, and a pinned buffer would keep growing behind the live player.
+            if (prepared?.local == true) liveDvr.cancelReplay()
             return
         }
         if (prepared == null) {
-            Toast.makeText(requireContext(), R.string.live_rewind_unavailable, Toast.LENGTH_LONG).show()
-        } else {
-            (activity as? MainActivity)?.startLiveRewind(this, prepared)
+            val message = if (requireContext().prefs().getBoolean(C.PLAYER_LIVE_DVR, false)) R.string.live_rewind_unavailable else R.string.live_dvr_turn_on_hint
+            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+        } else if ((activity as? MainActivity)?.startLiveRewind(this, prepared) != true && prepared.local) {
+            liveDvr.cancelReplay()
         }
     }
 
@@ -503,15 +553,29 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
      */
     protected fun handleLiveRewindFailure(): Boolean {
         val origin = liveRewindOrigin() ?: return false
-        if (!viewModel.liveRewindPending && !viewModel.liveRewindFailed) return false
+        // A local replay has nothing to reload from, so any failure ends it.
+        if (!viewModel.liveRewindPending && !viewModel.liveRewindFailed && !isLocalReplay()) return false
         if (!viewModel.started) return true
         viewModel.liveRewindPending = false
         viewModel.liveRewindFailed = true
         liveRewindStartup?.cancel()
         if (isResumed && isMaximized && (activity as? MainActivity)?.returnFromLiveRewind(this, origin) == true) {
-            Toast.makeText(requireContext(), R.string.live_rewind_failed_returning, Toast.LENGTH_LONG).show()
+            Toast.makeText(requireContext(), if (isLocalReplay()) R.string.live_dvr_ended_returning else R.string.live_rewind_failed_returning, Toast.LENGTH_LONG).show()
         }
         return true
+    }
+
+    /** Playing the viewer's own saved video, which exists only for this playback session. */
+    internal fun isLocalReplay(): Boolean = arguments?.getBoolean(LiveRewind.LOCAL) == true
+
+    /** Its video is on disk, so starting one can't wait for a connection. */
+    override val initializeWhileOffline: Boolean get() = isLocalReplay()
+
+    /** Everything saved has played, or capture stopped: only live is left to watch. */
+    protected fun handleLocalReplayEnded() {
+        if (!isLocalReplay()) return
+        viewModel.liveRewindFailed = true
+        handleLiveRewindFailure()
     }
 
     private fun watchLiveRewindStartup() {
@@ -1353,7 +1417,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 val titleText = requireArguments().getString(KEY_TITLE)
                 if (!titleText.isNullOrBlank() && requireContext().prefs().getBoolean(C.PLAYER_TITLE, true)) {
                     title.visibility = View.VISIBLE
-                    title.text = if (liveRewindOrigin() != null) getString(R.string.live_rewind_recording_title, titleText) else titleText
+                    title.text = when {
+                        isLocalReplay() -> getString(R.string.live_dvr_title, titleText)
+                        liveRewindOrigin() != null -> getString(R.string.live_rewind_recording_title, titleText)
+                        else -> titleText
+                    }
                 }
                 protectPlayerTitle(requireArguments().getString(KEY_GAME_ID), requireArguments().getString(KEY_GAME_NAME))
                 val gameName = requireArguments().getString(KEY_GAME_NAME)
@@ -1702,7 +1770,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             }
                         }
                     }
-                    if (requireContext().prefs().getBoolean(C.PLAYER_DOWNLOAD, false)) {
+                    if (requireContext().prefs().getBoolean(C.PLAYER_DOWNLOAD, false) && !isLocalReplay()) {
                         download.visibility = View.VISIBLE
                         download.setOnClickListener { showDownloadDialog() }
                     }
@@ -3559,6 +3627,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     protected fun playVideo(skipAccessToken: Boolean, playbackPosition: Long?) {
+        // Its files are gone after process death, and it has no id to load again.
+        if (isLocalReplay()) {
+            handleLocalReplayEnded()
+            return
+        }
         if (skipAccessToken && !requireArguments().getString(KEY_VIDEO_ANIMATED_PREVIEW).isNullOrBlank()) {
             requireArguments().getString(KEY_VIDEO_ANIMATED_PREVIEW)?.let { preview ->
                 val urls = TwitchApiHelper.getVideoUrlsFromPreview(preview, requireArguments().getString(KEY_VIDEO_TYPE), viewModel.backupQualities)
@@ -4240,7 +4313,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 requireArguments().getString(KEY_CHANNEL_NAME),
                 requireArguments().getString(KEY_STREAM_ID)
             )
-            VIDEO -> ChatFragment.newInstance(
+            // A local replay has no recorded chat to follow, so the channel's chat stays live.
+            VIDEO -> if (isLocalReplay()) ChatFragment.newInstance(
+                requireArguments().getString(KEY_CHANNEL_ID),
+                requireArguments().getString(KEY_CHANNEL_LOGIN),
+                requireArguments().getString(KEY_CHANNEL_NAME),
+                liveRewindOrigin()?.id
+            ) else ChatFragment.newInstance(
                 requireArguments().getString(KEY_CHANNEL_ID),
                 requireArguments().getString(KEY_CHANNEL_LOGIN),
                 requireArguments().getString(KEY_VIDEO_ID),

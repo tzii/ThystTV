@@ -152,6 +152,7 @@ class Media3Fragment : PlayerFragment() {
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY) markLiveRewindReady()
+                    if (playbackState == Player.STATE_ENDED) handleLocalReplayEnded()
                     binding.bufferingIndicator.isVisible = playbackState == Player.STATE_BUFFERING
                     val showPlayButton = Util.shouldShowPlayButton(player)
                     if (showPlayButton) {
@@ -491,6 +492,7 @@ class Media3Fragment : PlayerFragment() {
                     markLiveRewindReady()
                     chatFragment?.startReplayChatLoad()
                 }
+                finishEndedReplay(player)
                 updateKeepScreenOn()
                 updateProgress()
                 if (Util.shouldShowPlayButton(player)) {
@@ -1344,6 +1346,18 @@ class Media3Fragment : PlayerFragment() {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode)
     }
 
+    /**
+     * Background audio plays on without this screen, so a replay may have finished or failed while
+     * it was away. Until this screen starts its source, the session's state is the previous one's.
+     */
+    internal fun finishEndedReplay(player: Player) {
+        if (viewModel.started && player.currentMediaItem != null &&
+            (player.playbackState == Player.STATE_ENDED || player.playerError != null)
+        ) {
+            handleLocalReplayEnded()
+        }
+    }
+
     override fun onNetworkRestored() {
         if (isRemotePlayback()) return
         // Live recovery belongs to the service, including background playback.
@@ -1354,7 +1368,8 @@ class Media3Fragment : PlayerFragment() {
 
     override fun onNetworkLost() {
         if (isRemotePlayback()) return
-        if (videoType != STREAM && isResumed) {
+        // A local replay reads its video from disk, so it can carry on.
+        if (videoType != STREAM && isResumed && !isLocalReplay()) {
             player?.stop()
         }
     }
