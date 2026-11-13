@@ -19,23 +19,48 @@
             app:layout_constraintTop_toTopOf="parent"
             tools:src="@tools:sample/backgrounds/scenic" />
 
+        <!-- Dims an unfinished download's picture so it doesn't read as ready to play. -->
+        <View
+            android:id="@+id/statusScrim"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#4D000000"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@id/thumbnail"
+            app:layout_constraintEnd_toEndOf="@id/thumbnail"
+            app:layout_constraintStart_toStartOf="@id/thumbnail"
+            app:layout_constraintTop_toTopOf="@id/thumbnail" />
+
         <com.github.andreyasadchy.xtra.ui.view.TextWithShadow
             android:id="@+id/date"
             style="@style/ThumbnailItem"
-            android:layout_marginStart="5dp"
-            android:layout_marginBottom="5dp"
-            app:layout_constraintBottom_toBottomOf="@id/thumbnail"
-            app:layout_constraintStart_toStartOf="parent"
+            android:ellipsize="end"
+            android:maxLines="1"
             tools:text="Uploaded: July 16" />
 
         <com.github.andreyasadchy.xtra.ui.view.TextWithShadow
             android:id="@+id/downloadDate"
             style="@style/ThumbnailItem"
+            android:ellipsize="end"
+            android:maxLines="1"
+            tools:text="Downloaded: August 7" />
+
+        <!-- Both dates share one row when they fit and wrap to two rows on narrow cards. -->
+        <androidx.constraintlayout.helper.widget.Flow
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="5dp"
             android:layout_marginEnd="5dp"
             android:layout_marginBottom="5dp"
+            app:constraint_referenced_ids="date,downloadDate"
+            app:flow_horizontalBias="0"
+            app:flow_horizontalGap="8dp"
+            app:flow_horizontalStyle="packed"
+            app:flow_verticalGap="2dp"
+            app:flow_wrapMode="chain"
             app:layout_constraintBottom_toBottomOf="@id/thumbnail"
-            app:layout_constraintEnd_toEndOf="parent"
-            tools:text="Downloaded: August 7" />
+            app:layout_constraintEnd_toEndOf="@id/thumbnail"
+            app:layout_constraintStart_toStartOf="@id/thumbnail" />
 
         <com.github.andreyasadchy.xtra.ui.view.TextWithShadow
             android:id="@+id/duration"
@@ -90,6 +115,48 @@
             app:tint="@android:color/white"
             tools:ignore="ContentDescription"
             tools:src="@drawable/ic_visibility_high"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/downloadStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/bg_download_status"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:paddingStart="8dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="3dp"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="@android:color/white"
+            android:visibility="gone"
+            app:layout_constrainedWidth="true"
+            app:layout_constraintBottom_toBottomOf="@id/thumbnail"
+            app:layout_constraintEnd_toEndOf="@id/thumbnail"
+            app:layout_constraintHorizontal_bias="0"
+            app:layout_constraintStart_toStartOf="@id/thumbnail"
+            tools:text="Downloading: 24% · Chat: 40%"
+            tools:visibility="visible" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/downloadProgressBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:visibility="gone"
+            app:indicatorTrackGapSize="0dp"
+            app:layout_constraintBottom_toBottomOf="@id/thumbnail"
+            app:layout_constraintEnd_toEndOf="@id/thumbnail"
+            app:layout_constraintStart_toStartOf="@id/thumbnail"
+            app:trackColor="#59FFFFFF"
+            app:trackCornerRadius="0dp"
+            app:trackStopIndicatorSize="0dp"
+            app:trackThickness="4dp"
+            tools:progress="24"
             tools:visibility="visible" />
 
         <com.google.android.material.progressindicator.LinearProgressIndicator
@@ -170,42 +237,5 @@
             app:layout_constraintTop_toBottomOf="@id/thumbnail" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <LinearLayout
-        android:id="@+id/status"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/downloadProgress"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:shadowColor="#000000"
-            android:shadowRadius="4"
-            android:textAllCaps="true"
-            android:textAppearance="?attr/textAppearanceTitleLarge"
-            android:textColor="@android:color/white"
-            android:textSize="30sp" />
-
-        <TextView
-            android:id="@+id/chatDownloadProgress"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:shadowColor="#000000"
-            android:shadowRadius="4"
-            android:textAllCaps="true"
-            android:textAppearance="?attr/textAppearanceTitleLarge"
-            android:textColor="@android:color/white"
-            android:textSize="30sp"
-            android:visibility="gone" />
-
-    </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

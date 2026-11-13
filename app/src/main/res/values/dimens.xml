@@ -22,4 +22,5 @@
     <dimen name="stats_dashboard_item_spacing">8dp</dimen>
     <dimen name="stats_loyalty_min_item_width">240dp</dimen>
     <dimen name="stats_loyalty_min_item_width_expanded">200dp</dimen>
+    <dimen name="settings_list_pane_width">360dp</dimen>
 </resources>

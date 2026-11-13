@@ -1,6 +1,7 @@
 package com.github.andreyasadchy.xtra.ui.saved.downloads
 
 import android.content.ContentResolver
+import android.content.Context
 import android.text.format.DateUtils
 import android.util.TypedValue
 import android.view.LayoutInflater
@@ -36,7 +37,6 @@ import com.github.andreyasadchy.xtra.ui.player.SpoilerFreeVideos
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
 import com.github.andreyasadchy.xtra.util.prefs
-import kotlin.math.min
 
 class DownloadsAdapter(
     private val fragment: Fragment,
@@ -84,6 +84,59 @@ class DownloadsAdapter(
         private val binding: FragmentDownloadsListItemBinding,
         private val fragment: Fragment,
     ) : RecyclerView.ViewHolder(binding.root) {
+        private var boundId: Int? = null
+
+        private fun bindStatus(item: OfflineVideo, context: Context) {
+            with(binding) {
+                val status = DownloadStatus.of(item)
+                val sameItem = boundId == item.id
+                boundId = item.id
+                statusScrim.isVisible = status != null
+                downloadStatus.isVisible = status != null
+                if (status == null) {
+                    downloadProgressBar.isVisible = false
+                    return
+                }
+                // The pill takes the bottom of the picture, where the dates would sit.
+                date.isVisible = false
+                downloadDate.isVisible = false
+                val label = if (status.percent != null) context.getString(status.label, status.percent) else context.getString(status.label)
+                downloadStatus.text = if (status.chatPercent != null) {
+                    context.getString(R.string.download_status_with_chat, label, context.getString(R.string.chat_downloading_progress, status.chatPercent))
+                } else {
+                    label
+                }
+                when (status.bar) {
+                    DownloadStatus.Bar.NONE -> downloadProgressBar.isVisible = false
+                    DownloadStatus.Bar.INDETERMINATE -> {
+                        if (!downloadProgressBar.isIndeterminate) {
+                            // Material won't switch modes on a shown indicator.
+                            downloadProgressBar.isVisible = false
+                            downloadProgressBar.isIndeterminate = true
+                        }
+                        downloadProgressBar.isVisible = true
+                    }
+                    DownloadStatus.Bar.DETERMINATE -> {
+                        if (downloadProgressBar.isIndeterminate) {
+                            downloadProgressBar.isVisible = false
+                            downloadProgressBar.isIndeterminate = false
+                        }
+                        // Animate steps of one download, not a jump to a recycled card's value.
+                        downloadProgressBar.setProgressCompat(status.percent ?: 0, sameItem && downloadProgressBar.isVisible)
+                        downloadProgressBar.isVisible = true
+                    }
+                }
+                if (item.status == OfflineVideo.STATUS_DOWNLOADING ||
+                    item.status == OfflineVideo.STATUS_BLOCKED ||
+                    item.status == OfflineVideo.STATUS_QUEUED ||
+                    item.status == OfflineVideo.STATUS_QUEUED_WIFI ||
+                    item.status == OfflineVideo.STATUS_WAITING_FOR_STREAM
+                ) {
+                    checkDownloadStatus(item)
+                }
+            }
+        }
+
         fun bind(item: OfflineVideo?) {
             with(binding) {
                 if (item != null) {
@@ -137,10 +190,11 @@ class DownloadsAdapter(
                         )
                     }
                     
-                    item.uploadDate?.let {
+                    val uploadDate = item.uploadDate
+                    if (uploadDate != null) {
                         date.visibility = View.VISIBLE
-                        date.text = context.getString(R.string.uploaded_date, TwitchApiHelper.formatTime(context, it))
-                    } ?: {
+                        date.text = context.getString(R.string.uploaded_date, TwitchApiHelper.formatTime(context, uploadDate))
+                    } else {
                         date.visibility = View.GONE
                     }
                     if (item.downloadDate != null) {
@@ -192,10 +246,11 @@ class DownloadsAdapter(
                     } else {
                         username.visibility = View.GONE
                     }
-                    item.name?.let {
+                    val name = item.name
+                    if (name != null) {
                         title.visibility = View.VISIBLE
-                        title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else it.trim()
-                    } ?: {
+                        title.text = if (spoilers.hideTitle) context.getString(R.string.spoiler_shield_title_hidden) else name.trim()
+                    } else {
                         title.visibility = View.GONE
                     }
                     if (item.gameName != null) {
@@ -211,12 +266,13 @@ class DownloadsAdapter(
                     if (itemDuration != null) {
                         duration.visibility = View.VISIBLE
                         duration.text = DateUtils.formatElapsedTime(itemDuration / 1000L)
-                        item.sourceStartPosition?.let { sourceStartPosition ->
+                        val sourceStartPosition = item.sourceStartPosition
+                        if (sourceStartPosition != null) {
                             sourceStart.visibility = View.VISIBLE
                             sourceStart.text = context.getString(R.string.source_vod_start, DateUtils.formatElapsedTime(sourceStartPosition / 1000L))
                             sourceEnd.visibility = View.VISIBLE
                             sourceEnd.text = context.getString(R.string.source_vod_end, DateUtils.formatElapsedTime((sourceStartPosition + itemDuration) / 1000L))
-                        } ?: {
+                        } else {
                             sourceStart.visibility = View.GONE
                             sourceEnd.visibility = View.GONE
                         }
@@ -301,42 +357,7 @@ class DownloadsAdapter(
                             show()
                         }
                     }
-                    if (item.status == OfflineVideo.STATUS_DOWNLOADED) {
-                        status.visibility = View.GONE
-                    } else {
-                        downloadProgress.text = when (item.status) {
-                            OfflineVideo.STATUS_DOWNLOADING -> {
-                                if (item.live) {
-                                    context.getString(R.string.downloading)
-                                } else {
-                                    context.getString(R.string.downloading_progress, ((item.progress.toFloat() / item.maxProgress) * 100f).toInt())
-                                }
-                            }
-                            OfflineVideo.STATUS_MOVING -> context.getString(R.string.download_moving, ((item.progress.toFloat() / item.maxProgress) * 100f).toInt())
-                            OfflineVideo.STATUS_DELETING -> context.getString(R.string.download_deleting, ((item.progress.toFloat() / item.maxProgress) * 100f).toInt())
-                            OfflineVideo.STATUS_CONVERTING -> context.getString(R.string.download_converting, ((item.progress.toFloat() / item.maxProgress) * 100f).toInt())
-                            OfflineVideo.STATUS_BLOCKED -> context.getString(R.string.download_queued)
-                            OfflineVideo.STATUS_QUEUED -> context.getString(R.string.download_blocked)
-                            OfflineVideo.STATUS_QUEUED_WIFI -> context.getString(R.string.download_blocked_wifi)
-                            OfflineVideo.STATUS_WAITING_FOR_STREAM -> context.getString(R.string.download_waiting_for_stream)
-                            else -> context.getString(R.string.download_pending)
-                        }
-                        if (item.downloadChat && item.status == OfflineVideo.STATUS_DOWNLOADING && !item.live) {
-                            chatDownloadProgress.visibility = View.VISIBLE
-                            chatDownloadProgress.text = context.getString(R.string.chat_downloading_progress, min(((item.chatProgress.toFloat() / item.maxChatProgress) * 100f).toInt(), 100))
-                        } else {
-                            chatDownloadProgress.visibility = View.GONE
-                        }
-                        status.visibility = View.VISIBLE
-                        if (item.status == OfflineVideo.STATUS_DOWNLOADING ||
-                            item.status == OfflineVideo.STATUS_BLOCKED ||
-                            item.status == OfflineVideo.STATUS_QUEUED ||
-                            item.status == OfflineVideo.STATUS_QUEUED_WIFI ||
-                            item.status == OfflineVideo.STATUS_WAITING_FOR_STREAM
-                        ) {
-                            checkDownloadStatus(item)
-                        }
-                    }
+                    bindStatus(item, context)
                 }
             }
         }

@@ -2,11 +2,14 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import android.app.Application
 import android.os.Bundle
+import android.content.ClipboardManager
 import android.os.Looper
+import android.view.View
 import androidx.appcompat.app.AlertDialog
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.TextViewCompat
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.repository.AuthRepository
 import com.github.andreyasadchy.xtra.util.C
@@ -220,5 +223,44 @@ class ClipResultDialogTest {
         } finally {
             activity.get().tokenPrefs().edit().clear().commit()
         }
+    }
+
+    @Test fun `the result offers watching, copying, sharing and editing`() {
+        show()
+        val shown = dialog()!!
+        listOf(R.id.clipWatch, R.id.clipCopyLink, R.id.clipShare, R.id.clipEdit).forEach {
+            assertEquals(View.VISIBLE, shown.findViewById<View>(it)!!.visibility)
+            // The icons are white vectors; without the tint they vanish on a light dialog.
+            assertNotNull(TextViewCompat.getCompoundDrawableTintList(shown.findViewById<TextView>(it)!!))
+        }
+    }
+
+    @Test fun `a clip without an editor link hides Edit`() {
+        result.value = ClipCreationResult.Created("clip-id", null)
+        show()
+        assertEquals(View.GONE, dialog()!!.findViewById<View>(R.id.clipEdit)!!.visibility)
+    }
+
+    @Test fun `copying the link keeps the result open for another action`() {
+        show()
+        val shown = dialog()!!
+        shown.findViewById<View>(R.id.clipCopyLink)!!.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        val clipboard = activity.get().getSystemService(ClipboardManager::class.java)
+        assertEquals("https://clips.twitch.tv/clip-id", clipboard.primaryClip!!.getItemAt(0).text.toString())
+        assertEquals(activity.get().getString(R.string.clip_link_copied), ShadowToast.getTextOfLatestToast())
+        assertTrue(shown.isShowing)
+        assertEquals(clip, result.value)
+    }
+
+    @Test fun `watching acknowledges the result and opens the clip`() {
+        show()
+        val shown = dialog()!!
+        shown.findViewById<View>(R.id.clipWatch)!!.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        verify(fragment).watchCreatedClip("clip-id")
+        assertFalse(shown.isShowing)
+        assertNull(result.value)
+        assertNull(dialog())
     }
 }

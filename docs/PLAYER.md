@@ -504,8 +504,11 @@ an elapsed-time limit. The [endpoint reference](https://dev.twitch.tv/docs/api/r
 says 60 seconds; the separate [Clips guide](https://dev.twitch.tv/docs/api/clips/)
 still says 15 seconds. The dialog or message waits until the player is resumed,
 maximized and outside PiP. A completed result remains available after lifecycle
-dismissals until Close, Back/outside cancellation, Edit or Share. Another tap
-during processing shows Creating clip instead of starting a duplicate request.
+dismissals until Close, Back/outside cancellation, Watch clip, Edit or Share; Copy
+link copies without closing it. Watch clip goes through `MainActivity.openClip`, the
+same load a clip link uses, so the new clip replaces the live stream in the single
+player. Another tap during processing shows Creating clip instead of starting a
+duplicate request.
 Further trimming happens in Twitch's editor (`edit_url`). It clips the live broadcast
 rather than the viewer's position, so recording and local replays do not offer it.
 Create Clip From VOD is limited to broadcasters and editors. Tokens from before this

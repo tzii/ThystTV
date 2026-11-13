@@ -40,8 +40,13 @@ class SettingsSearchAdapter(
             with(binding) {
                 if (item != null) {
                     root.setOnClickListener {
-                        (fragment.requireActivity() as? SettingsActivity)?.searchItem = item.key
-                        fragment.findNavController().navigate(item.navDirections)
+                        val activity = fragment.requireActivity() as? SettingsActivity
+                        if (activity != null) {
+                            activity.searchItem = item.key
+                            activity.openSection(item.navDirections)
+                        } else {
+                            fragment.findNavController().navigate(item.navDirections)
+                        }
                     }
                     if (item.location != null) {
                         preferenceLocation.visibility = View.VISIBLE
