@@ -22,6 +22,7 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -47,9 +48,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.withResumed
+import androidx.navigation.NavController
+import androidx.navigation.NavDirections
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.ui.AppBarConfiguration
+import androidx.navigation.navOptions
 import androidx.navigation.ui.setupWithNavController
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -159,7 +163,7 @@ class SettingsActivity : AppCompatActivity() {
                 leftMargin = cutoutInsets.left
                 rightMargin = cutoutInsets.right
             }
-            binding.navHostFragment.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+            (binding.panes ?: binding.navHostFragment).updateLayoutParams<ViewGroup.MarginLayoutParams> {
                 leftMargin = cutoutInsets.left
                 rightMargin = cutoutInsets.right
             }
@@ -171,6 +175,14 @@ class SettingsActivity : AppCompatActivity() {
             true
         })
         binding.toolbar.setupWithNavController(navController, appBarConfiguration)
+        if (binding.settingsListPane != null) {
+            setUpTwoPane(navController)
+        } else {
+            // A sections list restored from a wider window has no container in this layout.
+            supportFragmentManager.findFragmentById(R.id.settingsListPane)?.let {
+                supportFragmentManager.beginTransaction().remove(it).commitNowAllowingStateLoss()
+            }
+        }
         binding.toolbar.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.search -> {
@@ -203,6 +215,66 @@ class SettingsActivity : AppCompatActivity() {
                 return false
             }
         })
+    }
+
+    private val navController: NavController
+        get() = (supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment).navController
+
+    private val sectionsList: SettingsFragment?
+        get() = supportFragmentManager.findFragmentById(R.id.settingsListPane) as? SettingsFragment
+
+    /**
+     * Wide windows keep the root list in its own pane and show one section at a time on the
+     * right, always directly above the root entry so Back from a section leaves Settings.
+     */
+    private fun setUpTwoPane(navController: NavController) {
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment
+        // Same owner as the NavController's own callback and added after it, so this runs first while enabled.
+        val leaveSettings = onBackPressedDispatcher.addCallback(host, enabled = false) { finish() }
+        binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        navController.addOnDestinationChangedListener { controller, destination, _ ->
+            val section = SettingsPanes.sectionKey(destination.id)
+            // Only a section sitting directly on the root leaves Settings; search and sub-screens pop.
+            leaveSettings.isEnabled = section != null &&
+                controller.previousBackStackEntry?.destination?.id == R.id.settingsFragment
+            section?.let { sectionsList?.selectSection(it) }
+            if (destination.id == R.id.settingsFragment) {
+                // The list pane already shows the root, so the right pane always holds a section.
+                // Reached when search opened over the root list in a narrow window is closed here.
+                binding.root.post {
+                    if (controller.currentDestination?.id == R.id.settingsFragment) {
+                        controller.navigate(SettingsPanes.DEFAULT_SECTION, null, navOptions { launchSingleTop = true })
+                    }
+                }
+            }
+        }
+        if (navController.currentDestination?.id == R.id.settingsFragment) {
+            navController.navigate(SettingsPanes.DEFAULT_SECTION, null, navOptions { launchSingleTop = true })
+        }
+    }
+
+    /** Opens a section from the root list or a search result, replacing the open section on wide windows. */
+    fun openSection(directions: NavDirections) {
+        binding.appBar.setExpanded(true)
+        val nav = navController
+        if (binding.settingsListPane == null) {
+            nav.navigate(directions)
+            return
+        }
+        val destination = nav.graph.getAction(directions.actionId)?.destinationId
+        when {
+            destination == null -> nav.navigate(directions)
+            destination == R.id.settingsFragment -> {
+                // Root rows already sit in the list pane: close search and point at the row there.
+                if (nav.currentDestination?.id == R.id.settingsSearchFragment) nav.popBackStack()
+                getSelectedSearchItem()?.let { sectionsList?.scrollToPreference(it) }
+            }
+            nav.currentDestination?.id == destination -> Unit
+            nav.popBackStack(destination, false) -> Unit
+            else -> nav.navigate(directions, navOptions {
+                popUpTo(R.id.settingsFragment) { inclusive = false }
+            })
+        }
     }
 
     fun showDragListDialog(list: List<SettingsDragListItem>, prefKey: String, title: CharSequence?) {
@@ -290,16 +362,41 @@ class SettingsActivity : AppCompatActivity() {
 
     companion object {
         const val KEY_CHANGED = "changed"
+        private const val KEY_SELECTED_SECTION = "selected_section"
     }
 
     class SettingsFragment : MaterialPreferenceFragment() {
 
         private val viewModel: SettingsViewModel by activityViewModels()
+        private var selectedSection: String? = null
+        private var sectionDecoration: SelectedSectionDecoration? = null
         private var backupResultLauncher: ActivityResultLauncher<Intent>? = null
         private var restoreResultLauncher: ActivityResultLauncher<Intent>? = null
 
+        /** True for the sections list beside the open section on wide windows. */
+        private val isListPane: Boolean
+            get() = id == R.id.settingsListPane
+
+        private fun openSection(directions: NavDirections) {
+            (requireActivity() as SettingsActivity).openSection(directions)
+        }
+
+        fun selectSection(key: String) {
+            selectedSection = key
+            sectionDecoration?.let {
+                it.selectedKey = key
+                listView?.invalidateItemDecorations()
+            }
+        }
+
+        override fun onSaveInstanceState(outState: Bundle) {
+            super.onSaveInstanceState(outState)
+            outState.putString(KEY_SELECTED_SECTION, selectedSection)
+        }
+
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
+            selectedSection = savedInstanceState?.getString(KEY_SELECTED_SECTION) ?: selectedSection
             backupResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 if (result.resultCode == RESULT_OK) {
                     result.data?.data?.let {
@@ -347,53 +444,43 @@ class SettingsActivity : AppCompatActivity() {
                 true
             }
             findPreference<Preference>("theme_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalThemeSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalThemeSettingsFragment())
                 true
             }
             findPreference<Preference>("ui_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalUiSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalUiSettingsFragment())
                 true
             }
             findPreference<Preference>("chat_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalChatSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalChatSettingsFragment())
                 true
             }
             findPreference<Preference>("player_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalPlayerSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalPlayerSettingsFragment())
                 true
             }
             findPreference<Preference>("player_button_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalPlayerButtonSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalPlayerButtonSettingsFragment())
                 true
             }
             findPreference<Preference>("buffer_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalBufferSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalBufferSettingsFragment())
                 true
             }
             findPreference<Preference>("proxy_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalProxySettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalProxySettingsFragment())
                 true
             }
             findPreference<Preference>("playback_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalPlaybackSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalPlaybackSettingsFragment())
                 true
             }
             findPreference<Preference>("api_token_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalApiTokenSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalApiTokenSettingsFragment())
                 true
             }
             findPreference<Preference>("download_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalDownloadSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalDownloadSettingsFragment())
                 true
             }
             findPreference<Preference>("check_updates")?.summary = getString(R.string.current_version, BuildConfig.VERSION_NAME)
@@ -405,13 +492,11 @@ class SettingsActivity : AppCompatActivity() {
                 true
             }
             findPreference<Preference>("changelog_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalChangelogSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalChangelogSettingsFragment())
                 true
             }
             findPreference<Preference>("update_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalUpdateSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalUpdateSettingsFragment())
                 true
             }
             findPreference<Preference>("about_settings")?.setOnPreferenceClickListener {
@@ -441,8 +526,7 @@ class SettingsActivity : AppCompatActivity() {
                 true
             }
             findPreference<Preference>("debug_settings")?.setOnPreferenceClickListener {
-                requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.setExpanded(true)
-                findNavController().navigate(SettingsNavGraphDirections.actionGlobalDebugSettingsFragment())
+                openSection(SettingsNavGraphDirections.actionGlobalDebugSettingsFragment())
                 true
             }
         }
@@ -454,7 +538,14 @@ class SettingsActivity : AppCompatActivity() {
                 listView.updatePadding(bottom = insets.bottom)
                 WindowInsetsCompat.CONSUMED
             }
-            requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.let { appBar ->
+            if (isListPane) {
+                sectionDecoration = SelectedSectionDecoration(requireContext()).also {
+                    it.selectedKey = selectedSection
+                    listView.addItemDecoration(it)
+                }
+            }
+            // The open section on the right drives the app bar's lift, not the list beside it.
+            requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.takeUnless { isListPane }?.let { appBar ->
                 if (requireContext().prefs().getBoolean(C.UI_THEME_APPBAR_LIFT, true)) {
                     listView.let {
                         appBar.setLiftOnScrollTargetView(it)
@@ -504,6 +595,11 @@ class SettingsActivity : AppCompatActivity() {
                 requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
                 UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
             )
+        }
+
+        override fun onDestroyView() {
+            sectionDecoration = null
+            super.onDestroyView()
         }
 
         private fun showAboutDialog() {

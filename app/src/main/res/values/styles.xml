@@ -1132,6 +1132,22 @@
         <item name="layout_constraintDimensionRatio">H,16:9</item>
     </style>
 
+    <!-- A full-width action in a dialog list, like a Material one-line list item. -->
+    <style name="ClipActionRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:paddingStart">24dp</item>
+        <item name="android:paddingEnd">24dp</item>
+        <item name="android:gravity">center_vertical|start</item>
+        <item name="android:drawablePadding">16dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:textAppearance">?attr/textAppearanceBodyLarge</item>
+        <item name="drawableTint">?attr/colorOnSurfaceVariant</item>
+    </style>
+
     <style name="ThumbnailItem">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>

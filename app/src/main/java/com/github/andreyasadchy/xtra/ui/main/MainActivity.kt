@@ -853,6 +853,17 @@ class MainActivity : AppCompatActivity() {
         !supportFragmentManager.isStateSaved && playerFragment === source &&
             supportFragmentManager.findFragmentById(R.id.playerContainer) === source
 
+    /** Loads a clip by id and plays it, the same path a clip link takes. */
+    fun openClip(clipId: String) {
+        viewModel.loadClip(
+            clipId,
+            prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+            TwitchApiHelper.getGQLHeaders(this),
+            TwitchApiHelper.getHelixHeaders(this),
+            prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+        )
+    }
+
     fun startClip(clip: Clip) {
         val fragment = when (prefs.getString(C.PLAYER, "ExoPlayer")) {
             "MediaPlayer" -> MediaPlayerFragment.newInstance(clip)

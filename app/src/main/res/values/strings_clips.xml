@@ -5,7 +5,10 @@
     <string name="clip_creating" tools:ignore="MissingTranslation">Creating clip…</string>
     <string name="clip_created" tools:ignore="MissingTranslation">Clip created</string>
     <string name="clip_created_message" tools:ignore="MissingTranslation">Twitch saved this clip from the live broadcast. Edit it on Twitch to trim it or change the title.</string>
-    <string name="clip_edit" tools:ignore="MissingTranslation">Edit</string>
+    <string name="clip_edit" tools:ignore="MissingTranslation">Edit on Twitch</string>
+    <string name="clip_watch" tools:ignore="MissingTranslation">Watch clip</string>
+    <string name="clip_copy_link" tools:ignore="MissingTranslation">Copy link</string>
+    <string name="clip_link_copied" tools:ignore="MissingTranslation">Link copied</string>
     <string name="clip_sign_in" tools:ignore="MissingTranslation">Sign in to create clips. The app restarts after you sign in.</string>
     <string name="clip_sign_in_again" tools:ignore="MissingTranslation">Twitch needs your permission to create clips. Cancelling changes nothing. If you sign in with a different account, the app switches to it and restarts.</string>
     <string name="clip_sign_in_action" tools:ignore="MissingTranslation">Sign in</string>

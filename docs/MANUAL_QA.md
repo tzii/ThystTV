@@ -344,6 +344,28 @@ behavior remain unverified; emulator results are recorded separately in
   APK. The previous destroyed pager/RecyclerView retention groups must not recur.
   Keep heap dumps and private analysis out of public issues and commits.
 
+### Two-pane settings on wide windows
+
+- [ ] A window at least 840dp wide (tablet or unfolded foldable in landscape, landscape
+  phone, Android TV) opens Settings with the sections list on the left and Theme on the
+  right, Theme marked in the list. Narrower windows keep the single list.
+- [ ] Tap each section: it replaces the right pane and becomes the marked row. Player
+  buttons > Player menu keeps Player buttons marked. Tapping the open section again
+  does nothing.
+- [ ] Back and the toolbar arrow: from a section's sub-screen they return to the
+  section; from a section they leave Settings. Hold, cancel and finish a predictive back
+  swipe on both.
+- [ ] Search on a wide window: a result opens its section on the right and scrolls to
+  the row; a result from the main list (Backup, Check for updates) closes search and
+  scrolls the left list to it.
+- [ ] Rotate or fold/unfold between wide and narrow while a section is open: the same
+  section stays open, no blank pane, and Back still works. Open search from the narrow
+  main list, then widen the window: Back closes search instead of leaving Settings,
+  and the right pane shows Theme rather than a second copy of the list.
+- [ ] Toggle Live notifications, Backup and Restore from the left list. The app bar lifts
+  with the right pane's scrolling.
+- [ ] Android TV: D-pad moves between the list and the open section and back.
+
 ### Swipe to show or hide chat
 
 - [ ] Gesture navigation, landscape live stream, controls hidden: swipe right to
@@ -664,6 +686,12 @@ live and replay on the default player at both a high and low quality.
 - [ ] After Clip created is already visible, minimize, enter PiP or background
   the app. Returning to the full player restores its links. Close/Back/outside,
   Edit and Share acknowledge it, so it does not reopen after a later return.
+- [ ] Clip created lists Watch clip, Copy link, Share and Edit on Twitch. Watch clip
+  closes the dialog and plays the new clip in the ThystTV player in place of the live
+  stream, with its title and channel. Copy link copies the twitch.tv clip link (a toast
+  below Android 13), keeps the dialog open, and Watch or Share still work after it.
+  Icons and labels read in light and dark themes. Android TV hides Copy link; D-pad
+  reaches every row and Close.
 - [ ] Recording replay, local replay, VoDs, clips and downloads do not show Create clip;
   hiding it in Player menu settings works. Check OkHttp, Cronet and HttpEngine network
   libraries, and that a stalled connection gives up instead of waiting indefinitely.
