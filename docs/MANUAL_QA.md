@@ -821,3 +821,11 @@ Screenshots, videos, logs, or APK links:
 - Test an exact signed 1.3 APK upgrading official 1.2.1, retaining data and migrating
   landscape display mode. Repeat the player, gestures, floating chat, Stats and launcher
   matrix on that same candidate. See RELEASE_1_3_REVIEW.md and RELEASE_PROCESS.md.
+
+### Clip download duration
+
+- [ ] Download a clip from a channel, category and the player. Its Downloads length matches the clip; play it offline and check replay chat.
+- [ ] A clip with no known length hides its duration instead of showing 00:00. Existing zero-length metadata is hidden; re-download to populate it.
+- [ ] VoD segment download lengths, source offsets, watched bars and spoiler hiding remain correct.
+- [ ] Player download entry smoke: live and VoD playback, stream switching, minimize/restore, close/reopen, PiP/background, speed/quality, gestures and floating chat remain usable.
+- [ ] A clip with no source VoD offset shows no Start/End labels; a known zero offset still shows 00:00. Legacy negative offsets are hidden.

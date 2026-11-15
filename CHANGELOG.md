@@ -4,6 +4,10 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+## Unreleased
+
+- Clip downloads keep their known duration from channel/category lists and the player. Unknown lengths are hidden instead of shown as 00:00, and missing source offsets no longer show negative Start/End labels.
+
 ## [1.6.0] - 2026-11-13
 
 ### Added
