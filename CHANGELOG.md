@@ -10,15 +10,13 @@ All notable changes to ThystTV should be documented here.
 - A chat connection that dies without closing is noticed after one quiet minute instead of four and a half.
 - Leaving sign-in to get a code from an authenticator, SMS or email app no longer loses it. Going back with the ThystTV icon closed the sign-in screen, because the icon opened the main screen in a way that closed everything above it. The icon now returns to whatever was open, as in most apps, including Settings.
 - Sign-in also survives folding, resizing in split screen and dark mode changes. If Android closes the app in the background, the restarted sign-in keeps the Twitch web session it had begun.
+- On wide windows, opening a Settings search result now marks its section in the list at once instead of leaving the previous one marked.
+- Stop an existing Cast session from the top of Settings, including after closing the player. The VoD “Stop casting and play here” offer remains available.
+- Clip downloads keep their known duration from channel/category lists and the player. Unknown lengths are hidden instead of shown as 00:00, and missing source offsets no longer show negative Start/End labels.
+
 ### Changed
 - Settings has a Spoilers screen under Watching that holds Spoiler Shield (moved from UI) and Spoiler-free VODs (moved from Player > Videos). The local rewind buffer moved to a new Live section in Player settings. Saved values and backups are unchanged.
 - Settings search also matches the section a setting sits in, so "spoiler" finds Spoiler Shield's options, and results show that section next to the screen name.
-
-### Fixed
-- On wide windows, opening a Settings search result now marks its section in the list at once instead of leaving the previous one marked.
-## Unreleased
-
-- Stop an existing Cast session from the top of Settings, including after closing the player. The VoD “Stop casting and play here” offer remains available.
 
 ## [1.6.0] - 2026-11-13
 

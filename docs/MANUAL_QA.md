@@ -884,3 +884,11 @@ Screenshots, videos, logs, or APK links:
 - [ ] Disconnect/reconnect externally while Settings is open; the row tracks the session. Return after background and rotation; no duplicate callbacks.
 - [ ] VoD opened during Cast still offers Stop casting and play here; cancel preserves the receiver, accept resumes the VoD locally.
 - [ ] Cast off or unavailable: no row, initialization, crash or change to local live/VoD playback. Check switching, minimize/restore, close/reopen, PiP/background, quality/speed, gestures and floating chat.
+
+### Clip download duration
+
+- [ ] Download a clip from a channel, category and the player. Its Downloads length matches the clip; play it offline and check replay chat.
+- [ ] A clip with no known length hides its duration instead of showing 00:00. Existing zero-length metadata is hidden; re-download to populate it.
+- [ ] VoD segment download lengths, source offsets, watched bars and spoiler hiding remain correct.
+- [ ] Player download entry smoke: live and VoD playback, stream switching, minimize/restore, close/reopen, PiP/background, speed/quality, gestures and floating chat remain usable.
+- [ ] A clip with no source VoD offset shows no Start/End labels; a known zero offset still shows 00:00. Legacy negative offsets are hidden.

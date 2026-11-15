@@ -260,13 +260,13 @@ class DownloadsAdapter(
                     } else {
                         gameName.visibility = View.GONE
                     }
-                    val itemDuration = item.duration.takeUnless {
+                    val itemDuration = item.duration?.takeIf { it > 0L }.takeUnless {
                         spoilers.hidesAnything || SpoilerFreeVideos.hideListSpoilers(context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false))
                     }
                     if (itemDuration != null) {
                         duration.visibility = View.VISIBLE
                         duration.text = DateUtils.formatElapsedTime(itemDuration / 1000L)
-                        val sourceStartPosition = item.sourceStartPosition
+                        val sourceStartPosition = item.sourceStartPosition?.takeIf { it >= 0L }
                         if (sourceStartPosition != null) {
                             sourceStart.visibility = View.VISIBLE
                             sourceStart.text = context.getString(R.string.source_vod_start, DateUtils.formatElapsedTime(sourceStartPosition / 1000L))
