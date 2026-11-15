@@ -14,6 +14,22 @@ import com.github.andreyasadchy.xtra.util.isTelevision
 class PlayerTvControlsLayout @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0,
 ) : RelativeLayout(context, attrs, defStyleAttr) {
+    private var portraitLiveRow: PortraitLiveControlRow? = null
+
+    internal fun setPortraitLiveControls(enabled: Boolean) {
+        if (enabled) {
+            val row = portraitLiveRow ?: PortraitLiveControlRow(this).also { portraitLiveRow = it }
+            row.attach()
+        } else {
+            portraitLiveRow?.detach()
+        }
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        super.onLayout(changed, l, t, r, b)
+        portraitLiveRow?.onLayout()
+    }
+
     override fun focusSearch(focused: View, direction: Int): View? =
         if (context.isTelevision()) FocusFinder.getInstance().findNextFocus(this, focused, direction) ?: focused
         else super.focusSearch(focused, direction)

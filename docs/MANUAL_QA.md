@@ -821,3 +821,10 @@ Screenshots, videos, logs, or APK links:
 - Test an exact signed 1.3 APK upgrading official 1.2.1, retaining data and migrating
   landscape display mode. Repeat the player, gestures, floating chat, Stats and launcher
   matrix on that same candidate. See RELEASE_1_3_REVIEW.md and RELEASE_PROCESS.md.
+
+### Portrait live controls at the video edge
+
+- [ ] Force stop and open a fresh live stream in portrait: rewind/volume/fullscreen actions stay at the video bottom, uptime/viewers share the same bottom row, and play/pause stays centered.
+- [ ] Enable optional buttons and use enlarged text/long stats; the bar can scroll horizontally, but never creates a second row; all actions and full stats remain reachable, with fullscreen pinned. Check RTL and compact/wide windows.
+- [ ] Let uptime/viewer count update, switch streams, hide/show controls, rotate, minimize/restore, close/reopen and enter/exit PiP/background. No stale row or displaced play/pause.
+- [ ] Live and VoD playback, speed/quality, gestures and floating chat remain usable. Check TV remote focus; no phone geometry is imposed on landscape TV.

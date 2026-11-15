@@ -4,6 +4,9 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Fixed
+- Portrait live-player controls use one bottom row with compact uptime/viewer indicators and centered play/pause. Extra enabled buttons and large text use horizontal overflow instead of lifting the controls into a second row.
+
 ## [1.6.0] - 2026-11-13
 
 ### Added

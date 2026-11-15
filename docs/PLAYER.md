@@ -428,11 +428,16 @@ window insets still require the human player matrix below.
 ## Live rewind controls
 
 The live-rewind button is available for maximized live streams in portrait and
-landscape. Portrait uses a separate stats row below the actions so uptime/viewer
-count do not overlap optional volume/audio controls. The center play/pause shifts
-up only as needed to clear that row. Rotation restores the original landscape
-rules; minimized players and recording replays do not get a live-rewind button.
-`PlayerLiveRewindControlsTest` renders compact/RTL/200% text and landscape controls.
+landscape. Portrait uses one bottom bar: compact uptime/viewer indicators share
+space with the existing actions, while fullscreen and the other right-hand
+controls stay pinned. Play/pause stays centered. A native HorizontalScrollView
+provides horizontal overflow for optional buttons and enlarged text instead of
+creating a second row, dropping controls or shrinking the user's text size.
+The original views/listeners are reused; leaving portrait live playback restores
+the original XML parents, parameters and stats styling. Native layout handles
+later text changes without a deferred fragment callback. Minimized players,
+recording replays and TV keep their normal layout. `PlayerLiveRewindControlsTest`
+checks defaults, overflow/RTL/200% text, later updates and repeated restoration.
 
 Unless the local rewind buffer below covers a request, every preset, including the last
 3 minutes, plays the broadcast's recording. Twitch's
