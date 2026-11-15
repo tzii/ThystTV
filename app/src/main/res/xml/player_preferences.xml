@@ -240,7 +240,7 @@
     </PreferenceCategory>
 
     <PreferenceCategory
-        android:title="@string/settings_group_videos"
+        android:title="@string/live"
         app:iconSpaceReserved="false">
 
         <SwitchPreferenceCompat
@@ -262,13 +262,11 @@
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
 
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="player_spoiler_free_vods"
-            android:summary="@string/spoiler_free_vods_summary"
-            android:title="@string/spoiler_free_vods"
-            app:iconSpaceReserved="false"
-            app:singleLineTitle="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_group_videos"
+        app:iconSpaceReserved="false">
 
         <SwitchPreferenceCompat
             android:defaultValue="true"

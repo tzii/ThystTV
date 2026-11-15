@@ -26,6 +26,7 @@ internal object SettingsPanes {
         // Opened from Player buttons, so that row stays marked.
         R.id.playerMenuSettingsFragment -> "player_button_settings"
         R.id.chatSettingsFragment -> "chat_settings"
+        R.id.spoilerSettingsFragment -> "spoiler_settings"
         R.id.downloadSettingsFragment -> "download_settings"
         R.id.apiTokenSettingsFragment -> "api_token_settings"
         R.id.playbackSettingsFragment -> "playback_settings"

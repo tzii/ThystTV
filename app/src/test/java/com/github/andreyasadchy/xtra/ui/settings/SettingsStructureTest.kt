@@ -38,6 +38,7 @@ class SettingsStructureTest {
         R.xml.player_preferences, R.xml.player_button_preferences, R.xml.player_menu_preferences,
         R.xml.buffer_preferences, R.xml.proxy_preferences, R.xml.playback_preferences,
         R.xml.api_token_preferences, R.xml.download_preferences, R.xml.update_preferences, R.xml.debug_preferences,
+        R.xml.spoiler_preferences,
     )
 
     @Test fun `root is a short list of sections with an icon and summary on every row`() {
@@ -62,6 +63,7 @@ class SettingsStructureTest {
             R.xml.ui_preferences to listOf("ui_language", "ui_draw_behind_cutouts"),
             R.xml.player_preferences to listOf("player_picture_in_picture", "player_background_audio", "player_background_audio_locked"),
             R.xml.proxy_preferences to listOf("player_stream_proxy", "player_proxy_url"),
+            R.xml.spoiler_preferences to listOf("spoiler_shield_manage", "spoiler_shield_hide_titles", "spoiler_shield_hide_thumbnails", "player_spoiler_free_vods"),
         )
         val root = inflate(R.xml.root_preferences)
         for ((xml, keys) in moved) {
@@ -70,6 +72,27 @@ class SettingsStructureTest {
                 assertNotNull("$key missing from its section", screen.findPreference<Preference>(key))
                 assertNull("$key still on the root", root.findPreference<Preference>(key))
             }
+        }
+    }
+
+    @Test fun `spoiler settings share one screen and the rewind buffer sits under Live`() {
+        for (key in listOf("spoiler_shield_manage", "spoiler_shield_hide_titles", "player_spoiler_free_vods")) {
+            assertNull("$key still on UI", inflate(R.xml.ui_preferences).findPreference<Preference>(key))
+            assertNull("$key still on Player", inflate(R.xml.player_preferences).findPreference<Preference>(key))
+        }
+        val player = inflate(R.xml.player_preferences)
+        for (key in listOf("player_live_dvr", "player_live_dvr_size")) {
+            val section = player.findPreference<Preference>(key)?.parent as? PreferenceCategory
+            assertEquals(key, context.getString(R.string.live), section?.title)
+        }
+        assertEquals(context.getString(R.string.settings_group_videos),
+            (player.findPreference<Preference>("player_use_videopositions")?.parent as? PreferenceCategory)?.title)
+    }
+
+    @Test fun `search covers every settings screen`() {
+        val searched = settingsSearchScreens(context).map { it.xml }
+        for (xml in screens) {
+            assertTrue("${context.resources.getResourceEntryName(xml)} is not searched", xml in searched)
         }
     }
 

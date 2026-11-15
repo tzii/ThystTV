@@ -33,6 +33,13 @@
         android:id="@+id/action_global_chatSettingsFragment"
         app:destination="@id/chatSettingsFragment" />
     <fragment
+        android:id="@+id/spoilerSettingsFragment"
+        android:name="com.github.andreyasadchy.xtra.ui.settings.SettingsActivity$SpoilerSettingsFragment"
+        android:label="@string/spoiler_settings" />
+    <action
+        android:id="@+id/action_global_spoilerSettingsFragment"
+        app:destination="@id/spoilerSettingsFragment" />
+    <fragment
         android:id="@+id/playerSettingsFragment"
         android:name="com.github.andreyasadchy.xtra.ui.settings.SettingsActivity$PlayerSettingsFragment"
         android:label="@string/player_settings" />

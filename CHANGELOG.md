@@ -10,6 +10,12 @@ All notable changes to ThystTV should be documented here.
 - A chat connection that dies without closing is noticed after one quiet minute instead of four and a half.
 - Leaving sign-in to get a code from an authenticator, SMS or email app no longer loses it. Going back with the ThystTV icon closed the sign-in screen, because the icon opened the main screen in a way that closed everything above it. The icon now returns to whatever was open, as in most apps, including Settings.
 - Sign-in also survives folding, resizing in split screen and dark mode changes. If Android closes the app in the background, the restarted sign-in keeps the Twitch web session it had begun.
+### Changed
+- Settings has a Spoilers screen under Watching that holds Spoiler Shield (moved from UI) and Spoiler-free VODs (moved from Player > Videos). The local rewind buffer moved to a new Live section in Player settings. Saved values and backups are unchanged.
+- Settings search also matches the section a setting sits in, so "spoiler" finds Spoiler Shield's options, and results show that section next to the screen name.
+
+### Fixed
+- On wide windows, opening a Settings search result now marks its section in the list at once instead of leaving the previous one marked.
 
 ## [1.6.0] - 2026-11-13
 
