@@ -5,6 +5,7 @@ All notable changes to ThystTV should be documented here.
 ## [Unreleased]
 
 ### Fixed
+- Portrait live-player controls use one bottom row with compact uptime/viewer indicators and centered play/pause. Extra enabled buttons and large text use horizontal overflow instead of lifting the controls into a second row.
 - `clips.twitch.tv` links open the clip with its channel name, chat replay and Watch full video again; the app passed that link's request headers in the wrong order. `clips.twitch.tv/embed?clip=` player links open their clip too.
 - Chat reconnects after a long stretch of bad signal. Chat, channel points, polls and 7TV updates used to stop for good after about 20 seconds of failed attempts when Android still reported the network as working, until you reopened the player. They now keep retrying, waiting longer each time up to 30 seconds. Each attempt times out after 10 seconds to connect and 15 to complete the handshake, instead of waiting for minutes, and an outage shows one disconnect line instead of one per attempt.
 - A chat connection that dies without closing is noticed after one quiet minute instead of four and a half.

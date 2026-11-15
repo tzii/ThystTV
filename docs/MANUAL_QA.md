@@ -892,3 +892,10 @@ Screenshots, videos, logs, or APK links:
 - [ ] VoD segment download lengths, source offsets, watched bars and spoiler hiding remain correct.
 - [ ] Player download entry smoke: live and VoD playback, stream switching, minimize/restore, close/reopen, PiP/background, speed/quality, gestures and floating chat remain usable.
 - [ ] A clip with no source VoD offset shows no Start/End labels; a known zero offset still shows 00:00. Legacy negative offsets are hidden.
+
+### Portrait live controls at the video edge
+
+- [ ] Force stop and open a fresh live stream in portrait: rewind/volume/fullscreen actions stay at the video bottom, uptime/viewers share the same bottom row, and play/pause stays centered.
+- [ ] Enable optional buttons and use enlarged text/long stats; the bar can scroll horizontally, but never creates a second row; all actions and full stats remain reachable, with fullscreen pinned. Check RTL and compact/wide windows.
+- [ ] Let uptime/viewer count update, switch streams, hide/show controls, rotate, minimize/restore, close/reopen and enter/exit PiP/background. No stale row or displaced play/pause.
+- [ ] Live and VoD playback, speed/quality, gestures and floating chat remain usable. Check TV remote focus; no phone geometry is imposed on landscape TV.
