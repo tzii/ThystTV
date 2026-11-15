@@ -47,10 +47,18 @@ Required for the deadline-based chat keepalive and chat card change
 (`.agent/plans/active/2026-11-07-implicit-state-machines.md`).
 
 - [ ] Signed out, keep a quiet live channel's chat open for 15+ minutes (the IRC
-  ping runs after 4.5 idle minutes). Messages keep arriving without reconnect
+  ping runs after one quiet minute). Messages keep arriving without reconnect
   notices. Signed in, send a message after 15 idle minutes.
 - [ ] Airplane mode for 30 s and back: chat reconnects once. A manual disconnect
   stays disconnected.
+- [ ] Weak signal without a network loss: keep the player open where the signal
+  drops out for a minute or more while Android still shows the network (a lift,
+  a basement, or on an emulator `adb root` then
+  `adb shell iptables -I OUTPUT -p tcp -d <irc-ws.chat.twitch.tv address> -j REJECT --reject-with tcp-reset`
+  for 2 minutes, then `-D` the same rule). Chat shows at most one disconnect line,
+  then joins again within about 30 s of the signal returning, without leaving the
+  player. Repeat with `-j DROP`: a silent dead connection is replaced within about
+  70 s. Channel points, polls and 7TV updates come back too.
 - [ ] Signed in for 15+ minutes: channel points accrue and the claim appears.
 - [ ] Poll and prediction cards count down. On a channel that is not playing, turn
   the screen off for 30 s and back on: the countdown shows the real time left.
