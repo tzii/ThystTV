@@ -4,6 +4,9 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Fixed
+- `clips.twitch.tv` links open the clip with its channel name, chat replay and Watch full video again; the app passed that link's request headers in the wrong order. `clips.twitch.tv/embed?clip=` player links open their clip too.
+
 ## [1.6.0] - 2026-11-13
 
 ### Added

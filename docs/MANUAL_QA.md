@@ -722,6 +722,9 @@ live and replay on the default player at both a high and low quality.
   stream before the clip starts: the clip does not open over it, also if you change the
   system font size or dark mode while it loads. Two quick Watch taps on different clips
   play only the second.
+- [ ] Clip links: open a `clips.twitch.tv/<slug>` link, a `twitch.tv/<channel>/clip/<slug>`
+  link and a `clips.twitch.tv/embed?clip=<slug>` link from another app. Each plays the clip
+  with its channel name, chat replay and Watch full video (when the VoD still exists).
 - [ ] Recording replay, local replay, VoDs, clips and downloads do not show Create clip;
   hiding it in Player menu settings works. Check OkHttp, Cronet and HttpEngine network
   libraries, and that a stalled connection gives up instead of waiting indefinitely.
