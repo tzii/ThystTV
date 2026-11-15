@@ -338,3 +338,23 @@ html[data-motion="paused"] *, html[data-motion="paused"] *::before, html[data-mo
   .feature-tab[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
   .rules, .brand-tv { color: CanvasText; }
 }
+
+/* Current release gallery keeps the existing editorial palette and native image ratios. */
+.release-feature { padding: 72px 0 0; }
+.release-feature a { text-decoration: underline; text-underline-offset: 4px; }
+.release-inventory { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin: 32px 0; }
+.release-inventory h3 { font-size: 1.2rem; margin-bottom: 12px; }
+.release-inventory p, .release-recording p { color: var(--muted); line-height: 1.65; }
+.release-gallery { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 24px; align-items: start; }
+.release-gallery img { width: 100%; border: 1px solid var(--line); border-radius: 12px; }
+.release-gallery figcaption { color: var(--muted); font-size: .85rem; line-height: 1.5; margin-top: 12px; }
+.release-recording { border-block: 1px solid var(--line); margin: 32px 0 16px; padding: 20px 0; }
+.release-recording summary { cursor: pointer; padding: 8px 0; }
+.release-recording summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+.release-recording video { display: block; width: 100%; max-height: 65vh; background: #0b0c0e; margin: 16px 0; }
+@media (max-width: 760px) {
+  .release-inventory { grid-template-columns: 1fr; gap: 24px; }
+  .release-gallery { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .release-wide { grid-column: 1 / -1; }
+  .release-feature { padding-top: 48px; }
+}

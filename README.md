@@ -37,33 +37,27 @@ The **1.6.0 update** adds Spoiler Shield, live clip creation, a three-minute rew
 
 ## Screenshots
 
-Version 1.3 layouts, rendered with sample data ([how they were made](docs/images/review-1.3/README.md)).
+Current 1.6 app captures on an Android 16 emulator. [Capture details and full-size media](docs/images/features-1.6/README.md).
 
 <table>
   <tr>
     <td width="50%" align="center" valign="top">
-      <strong>Video quality</strong><br><br>
-      <img src="docs/images/review-1.3/quality-font-1.0.png" alt="ThystTV 1.3 Quality overlay with readable codec labels and audio-only and chat-only actions" width="288">
+      <strong>Spoiler Shield</strong><br><br>
+      <img src="docs/images/features-1.6/spoiler-shield.png" alt="Native ThystTV Spoiler Shield manager with a protected Chess category and a timed rule" width="288">
     </td>
     <td width="50%" align="center" valign="top">
-      <strong>Playback speed · enlarged text</strong><br><br>
-      <img src="docs/images/review-1.3/speed-large-text.png" alt="ThystTV 1.3 Speed overlay with the current speed, slider and preset buttons at enlarged text size" width="288">
+      <strong>Local live rewind</strong><br><br>
+      <img src="docs/images/features-1.6/live-buffer.png" alt="Native ThystTV Player settings showing the optional local rewind buffer and its storage budget" width="288">
     </td>
   </tr>
 </table>
 
-<table>
-  <tr>
-    <td width="50%" align="center" valign="top">
-      <strong>Local Stats</strong><br><br>
-      <img src="docs/images/review-1.3/stats-font-1.0.png" alt="ThystTV 1.3 Stats layout with sample viewing totals, a weekly chart and streaks" width="288">
-    </td>
-    <td width="50%" align="center" valign="top">
-      <strong>Updater and release notes</strong><br><br>
-      <img src="docs/images/review-1.3/updater-dark-1.0.png" alt="ThystTV 1.3 update dialog with sample version details, rendered release notes and download actions" width="288">
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <strong>Two-pane Settings on wide windows</strong><br><br>
+  <img src="docs/images/features-1.6/settings-wide.png" alt="Native ThystTV Settings with a section list beside the open Player settings on a wide window" width="900">
+</p>
+
+[Watch the new Spoiler Shield recording](docs/images/features-1.6/spoiler-shield.mp4): apply a timed category rule and review it in the manager. The recording is silent and uses an anonymous emulator.
 
 ## Floating chat
 
@@ -81,48 +75,43 @@ https://github.com/user-attachments/assets/99d97579-3340-4200-8aa7-3cae0414560e
 
 ## What ThystTV adds
 
-### Player refinement
+### Playback and live rewind
 
-- Gesture-based playback controls for horizontal seek, playback speed, brightness, and volume.
-- Pinch to any zoom between Fit and Fill in landscape, with Stretch available in display settings.
-- Rewind a live stream to its recording with replay chat, then return with Go live.
-- Exact quality picks by resolution, frame rate, codec and bitrate, with a separate metered Wi-Fi default.
-- An optional spoiler-free mode that hides VoD lengths and watched progress.
-- On a half-open foldable, video above the hinge with chat below, or side by side in book posture.
-- Quality, Speed, Stream volume and More share consistent overlays with reachable controls.
-- Clearer feedback while interacting with the player.
-- Better visual handling for minimized player states.
-- VoD scrubbing improvements that scale with video duration.
+- VoD seek previews when Twitch provides storyboards, fast scrubbing, saved positions and replay chat.
+- Swipe for seek, speed, brightness and volume. Swipe sideways in landscape to show or hide chat.
+- Pinch between Fit and Fill; enable extended zoom to magnify further and drag the picture.
+- Rewind through the broadcast's recording, including **Watch last 3 minutes**, then return with Go live.
+- Optional **local rewind buffer** for streams without a recording: 250 MB–2 GB, default player only, at least 1 GB free storage. It keeps video from the current viewing session and clears shortly after leaving; it does not keep replay chat.
+- Exact quality picks by resolution, frame rate, codec and bitrate, including a metered Wi-Fi default. Quality, Speed, Stream volume and More use consistent overlays.
+- A 16:9 mini-player, background audio, and optional read-only live chat below portrait PiP video.
 
-### Floating chat
+### Spoilers and clips
 
-- Chat overlay designed for full-screen viewing.
-- A cleaner way to keep stream context visible while the video remains primary.
-- Better fit for phones, tablets, and wide layouts.
+- **Spoiler Shield** hides titles and previews for selected channels or categories until removed, or for 24 hours, 3 days or 7 days. Reveal an individual item when ready.
+- Shielded titles stay hidden across supported lists, the player and notifications. Chat and shared links remain outside the shield; notification changes during playback apply at the next stream start.
+- **Spoiler-free VoDs** hide lengths, seek bars and watched progress, including downloads. System media controls may still show length.
+- Create a **5–60 second live clip**, then watch it in ThystTV, copy, share or open Twitch's editor. TV approval happens on another device. Requires sign-in and clip permission; captures the live broadcast, not a rewind position or a VoD.
 
 ### Chat and notifications
 
-- Redeem a channel's custom Channel Points rewards from chat after an explicit confirmation.
-- Live notifications follow each channel's notification setting and avoid repeat alerts.
+- Move and resize floating chat over full-screen video; third-party emotes and chat replay remain available.
+- Redeem custom Channel Points rewards after an explicit confirmation.
+- Live notifications respect per-channel settings and avoid repeat alerts.
+- Poll and prediction timers account for time spent asleep, and event cards survive chat screen rebuilds.
 
-### Local stats
+### Phones, foldables and TV
 
-- Watch-history and screen-time insights.
-- Category breakdowns and viewing patterns.
-- Favorite channel and session-focused views.
-- Stats stay local on the device.
+- Half-folded layouts put video above the hinge or beside chat in book posture.
+- Two-pane Settings on windows at least 840dp wide; compact screens keep one pane.
+- Android TV D-pad navigation and sign-in from a phone with a QR or activation code.
+- **Experimental Google Cast**, off by default: live streams and clips with the default player, Google Play services and a compatible receiver on the same network. VoDs and downloads play on the phone. Keeping receiver playback after closing the app is a separate opt-in setting.
 
-### Updater and changelog
+### Local stats, downloads and updates
 
-- In-app update checks with release details.
-- Changelog previews before downloading a new build.
-- Direct links to the GitHub release when more context is needed.
-
-### Large-screen comfort
-
-- Layout work for tablets and wider Android screens.
-- Player and browsing screens tuned to avoid cramped controls.
-- Player menus and Stats adapt to enlarged text and resized windows.
+- On-device viewing time, favorite channels, category breakdowns and streaks.
+- Video downloads with compact progress indicators and local playback.
+- In-app update checks, rendered release notes and links to the GitHub release.
+- New sign-in grants preserve the current account until confirmed.
 
 ## Build from source
 
@@ -160,6 +149,9 @@ ThystTV is distributed independently. It is not affiliated with, endorsed by, or
 - [Player notes](docs/PLAYER.md)
 - [Gesture system](docs/GESTURE_SYSTEM.md)
 - [Release process](docs/RELEASE_PROCESS.md)
+- [1.6.0 release notes](docs/release-notes/1.6.0.md)
+- [1.5.2 release notes](docs/release-notes/1.5.2.md)
+- [1.5.0 release notes](docs/release-notes/1.5.0.md)
 - [1.4.0 release notes](docs/release-notes/1.4.0.md)
 - [1.3.1 release notes](docs/release-notes/1.3.1.md)
 - [Distribution policy](docs/DISTRIBUTION.md)
