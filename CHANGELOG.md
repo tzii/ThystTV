@@ -4,6 +4,10 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Fixed
+- Leaving sign-in to get a code from an authenticator, SMS or email app no longer loses it. Going back with the ThystTV icon closed the sign-in screen, because the icon opened the main screen in a way that closed everything above it. The icon now returns to whatever was open, as in most apps, including Settings.
+- Sign-in also survives folding, resizing in split screen and dark mode changes. If Android closes the app in the background, the restarted sign-in keeps the Twitch web session it had begun.
+
 ## [1.6.0] - 2026-11-13
 
 ### Added

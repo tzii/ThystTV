@@ -685,6 +685,30 @@ live and replay on the default player at both a high and low quality.
   an error within about 20 seconds, on OkHttp, Cronet and HttpEngine. Leaving the
   screen cancels at once, and a later sign-in works normally.
 
+### Leaving sign-in for another app
+
+Launcher entry `ui/main/LaunchActivity.kt`
+(`.agent/plans/active/2026-11-15-sign-in-app-switch.md`).
+
+- [ ] Start Log in, enter the password, and when Twitch asks for a code, open an
+  authenticator, SMS or email app. Return with the ThystTV home-screen icon: the
+  code page is still there and the sign-in completes. Repeat returning from Recents.
+- [ ] Same from Settings: press Home, tap the icon, Settings is still open; Back
+  returns to the main screen.
+- [ ] Rotate, fold/unfold, resize in split screen and switch dark mode during
+  sign-in: the page and anything typed stay.
+- [ ] Cold start from the icon after a reboot or force stop: the main screen opens
+  once (no extra screen in Back), with the same splash and timing as before.
+- [ ] With a stream playing in PiP, tap the icon: the player returns to full screen
+  without restarting or doubling audio. With it minimized, the icon returns to the
+  same screen with the mini-player. Notification taps and twitch.tv links open as before.
+- [ ] Android TV: the launcher row opens ThystTV and returns to the open screen.
+- [ ] After an update from 1.6.0, the home-screen icon still opens ThystTV (some
+  launchers re-link the icon to the new entry; none should drop it).
+- [ ] Optional: start sign-in, open another app, run `adb shell am kill com.tzii.thysttv`
+  and return from Recents. The screen restarts at the first step; a Twitch web
+  session that was already signed in continues without the password again.
+
 ### Create clip
 
 - [ ] Signed in after this version: More > Create clip on a live channel opens options
