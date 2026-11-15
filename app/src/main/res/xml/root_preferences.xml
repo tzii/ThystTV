@@ -51,6 +51,13 @@
             android:title="@string/chat_settings"
             app:singleLineTitle="false" />
 
+        <Preference
+            android:icon="@drawable/ic_ms_visibility_off_24"
+            android:key="spoiler_settings"
+            android:summary="@string/settings_spoilers_summary"
+            android:title="@string/spoiler_settings"
+            app:singleLineTitle="false" />
+
         <SwitchPreferenceCompat
             android:defaultValue="false"
             android:icon="@drawable/ic_ms_notifications_24"

@@ -381,9 +381,10 @@ behavior remain unverified; emulator results are recorded separately in
 - [ ] Back and the toolbar arrow: from a section's sub-screen they return to the
   section; from a section they leave Settings. Hold, cancel and finish a predictive back
   swipe on both.
-- [ ] Search on a wide window: a result opens its section on the right and scrolls to
-  the row; a result from the main list (Backup, Check for updates) closes search and
-  scrolls the left list to it.
+- [ ] Search on a wide window: a result opens its section on the right, scrolls to
+  the row and marks that section in the left list at once, without touching the list;
+  a result from the main list (Backup, Check for updates) closes search and scrolls the
+  left list to it.
 - [ ] Rotate or fold/unfold between wide and narrow while a section is open: the same
   section stays open, no blank pane, and Back still works. Open search from the narrow
   main list, then widen the window: Back closes search instead of leaving Settings,
@@ -391,6 +392,25 @@ behavior remain unverified; emulator results are recorded separately in
 - [ ] Toggle Live notifications, Backup and Restore from the left list. The app bar lifts
   with the right pane's scrolling.
 - [ ] Android TV: D-pad moves between the list and the open section and back.
+
+### Spoilers screen and Live section
+
+Upgrade from 1.6.0 with Spoiler Shield rules, Hide previews off, Spoiler-free VODs on
+and the local rewind buffer on at 1 GB.
+
+- [ ] Settings > Watching has a Spoilers row (eye icon) below Chat. It opens Spoiler
+  Shield (Protected channels and categories, Hide titles, Hide previews) and Videos
+  (Spoiler-free VODs). The upgraded values are kept and the rule count is right.
+- [ ] UI settings no longer show Spoiler Shield, and Player settings no longer show
+  Spoiler-free VODs. Player settings has a Live section with Local rewind buffer and
+  Buffer size (greyed out while the buffer is off), above Videos.
+- [ ] Changing each spoiler setting on the new screen still takes effect in lists, the
+  player and downloads, and a backup made before the update restores them.
+- [ ] Search "spoiler": all four spoiler settings appear, each labelled "Spoilers ·"
+  with its section. Search "live": Local rewind buffer and Buffer size appear as
+  "Player · Live".
+- [ ] Two-pane window: the Spoilers row is marked while its screen is open, including
+  when opened from search.
 
 ### Swipe to show or hide chat
 
@@ -582,7 +602,7 @@ Turn on Player settings → Gestures → Extended zoom.
 
 ### Local rewind buffer
 
-Turn on Player settings > Videos > Local rewind buffer, then open a stream. Check
+Turn on Player settings > Live > Local rewind buffer, then open a stream. Check
 live and replay on the default player at both a high and low quality.
 
 - [ ] Off (default): live and recording rewinds behave as before. A channel without a
@@ -655,7 +675,7 @@ live and replay on the default player at both a high and low quality.
 - [ ] Expiring rules: adding a rule asks how long. The list shows "until" with a date,
   "Until I remove it" shows none. Move the device clock past the date: the card shows
   again at its next bind, and the rule is gone from Settings.
-- [ ] Settings > UI > Protected channels and categories: Add a channel and Add a
+- [ ] Settings > Spoilers > Protected channels and categories: Add a channel and Add a
   category search Twitch; pick a match or use the name exactly as typed. Cancel while
   a search is running closes immediately. Offline, the typed name is still offered,
   and a channel typed by its display name is protected too. Pick that channel from search with

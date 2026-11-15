@@ -613,6 +613,8 @@
     <string name="settings_player_summary" tools:ignore="MissingTranslation">Picture-in-picture, gestures, quality and layout</string>
     <string name="settings_player_buttons_summary" tools:ignore="MissingTranslation">Controls, speeds and the player menu</string>
     <string name="settings_chat_summary" tools:ignore="MissingTranslation">Floating chat, emotes, translation and events</string>
+    <string name="spoiler_settings" tools:ignore="MissingTranslation">Spoilers</string>
+    <string name="settings_spoilers_summary" tools:ignore="MissingTranslation">Protected channels, hidden titles and spoiler-free VODs</string>
     <string name="settings_live_notifications_summary" tools:ignore="MissingTranslation">Alert me when followed channels go live</string>
     <string name="settings_download_summary" tools:ignore="MissingTranslation">Storage, Wi-Fi only and stream recording</string>
     <string name="settings_api_token_summary" tools:ignore="MissingTranslation">Login, client IDs and tokens</string>

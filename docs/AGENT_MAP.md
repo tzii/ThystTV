@@ -53,6 +53,8 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
   `view_device_code_login.xml`, existing `AuthRepository` and token validation/storage.
 - Player area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/player/`
 - Chat/floating chat area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/chat/`
+- Settings: `ui/settings/SettingsActivity.kt`, `SettingsSearch.kt` and `SettingsPanes.kt`;
+  dedicated Spoilers screen, Player Live category, category-aware search and wide section selection.
 - Stats area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/stats/`
 - Android resources: `app/src/main/res/`
 - In-app updater/changelog UI: search under `app/src/main/java/com/github/andreyasadchy/xtra/ui/common/`, `app/src/main/java/com/github/andreyasadchy/xtra/ui/settings/`, and `app/src/main/res/layout/`

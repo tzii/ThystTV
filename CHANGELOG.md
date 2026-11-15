@@ -4,6 +4,13 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Changed
+- Settings has a Spoilers screen under Watching that holds Spoiler Shield (moved from UI) and Spoiler-free VODs (moved from Player > Videos). The local rewind buffer moved to a new Live section in Player settings. Saved values and backups are unchanged.
+- Settings search also matches the section a setting sits in, so "spoiler" finds Spoiler Shield's options, and results show that section next to the screen name.
+
+### Fixed
+- On wide windows, opening a Settings search result now marks its section in the list at once instead of leaving the previous one marked.
+
 ## [1.6.0] - 2026-11-13
 
 ### Added
