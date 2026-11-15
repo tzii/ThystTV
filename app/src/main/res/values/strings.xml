@@ -980,4 +980,6 @@
     <string name="cast_quality_managed" tools:ignore="MissingTranslation">Quality can’t be changed while casting. Choose it before you start casting.</string>
     <string name="cast_auto_quality" tools:ignore="MissingTranslation">Cast</string>
     <string name="cast_playing_remotely" tools:ignore="MissingTranslation">Playing on your Cast device</string>
+    <string name="cast_stop" tools:ignore="MissingTranslation">Stop casting</string>
+    <string name="cast_stop_summary" tools:ignore="MissingTranslation">Disconnect and stop playback on the Cast device</string>
 </resources>

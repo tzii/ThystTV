@@ -370,6 +370,7 @@ class SettingsActivity : AppCompatActivity() {
         private val viewModel: SettingsViewModel by activityViewModels()
         private var selectedSection: String? = null
         private var sectionDecoration: SelectedSectionDecoration? = null
+        private var castSessionPreference: CastSessionPreference? = null
         private var backupResultLauncher: ActivityResultLauncher<Intent>? = null
         private var restoreResultLauncher: ActivityResultLauncher<Intent>? = null
 
@@ -392,6 +393,16 @@ class SettingsActivity : AppCompatActivity() {
         override fun onSaveInstanceState(outState: Bundle) {
             super.onSaveInstanceState(outState)
             outState.putString(KEY_SELECTED_SECTION, selectedSection)
+        }
+
+        override fun onStart() {
+            super.onStart()
+            castSessionPreference?.start()
+        }
+
+        override fun onStop() {
+            castSessionPreference?.stop()
+            super.onStop()
         }
 
         override fun onCreate(savedInstanceState: Bundle?) {
@@ -591,6 +602,7 @@ class SettingsActivity : AppCompatActivity() {
                     }
                 }
             }
+            castSessionPreference = CastSessionPreference.attach(preferenceScreen)
             viewModel.loadLatestRelease(
                 requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
                 UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
@@ -598,6 +610,8 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         override fun onDestroyView() {
+            castSessionPreference?.stop()
+            castSessionPreference = null
             sectionDecoration = null
             super.onDestroyView()
         }

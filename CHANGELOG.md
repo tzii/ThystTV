@@ -4,6 +4,10 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+## Unreleased
+
+- Stop an existing Cast session from the top of Settings, including after closing the player. The VoD “Stop casting and play here” offer remains available.
+
 ## [1.6.0] - 2026-11-13
 
 ### Added
