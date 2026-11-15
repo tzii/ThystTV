@@ -659,27 +659,16 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
                         }
-                        url.contains("/clip/") -> {
-                            val id = url.substringAfter("/clip/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
+                        url.contains("/clip/") || url.contains("clips.twitch.tv/") -> {
+                            // One call for both link shapes: the clips.twitch.tv branch once passed the headers swapped.
+                            val id = clipLinkId(url)
                             if (!id.isNullOrBlank()) {
                                 viewModel.loadClip(
-                                    id,
-                                    prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
-                                    TwitchApiHelper.getGQLHeaders(this),
-                                    TwitchApiHelper.getHelixHeaders(this),
-                                    prefs.getBoolean(C.ENABLE_INTEGRITY, false),
-                                )
-                            }
-                        }
-                        url.contains("clips.twitch.tv/") -> {
-                            val id = url.substringAfter("clips.twitch.tv/").takeIf { it.isNotBlank() }?.let { it.substringBefore("?", it.substringBefore("/")) }
-                            if (!id.isNullOrBlank()) {
-                                viewModel.loadClip(
-                                    id,
-                                    prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
-                                    TwitchApiHelper.getHelixHeaders(this),
-                                    TwitchApiHelper.getGQLHeaders(this),
-                                    prefs.getBoolean(C.ENABLE_INTEGRITY, false),
+                                    clipId = id,
+                                    networkLibrary = prefs.getString(C.NETWORK_LIBRARY, "OkHttp"),
+                                    gqlHeaders = TwitchApiHelper.getGQLHeaders(this),
+                                    helixHeaders = TwitchApiHelper.getHelixHeaders(this),
+                                    enableIntegrity = prefs.getBoolean(C.ENABLE_INTEGRITY, false),
                                 )
                             }
                         }
