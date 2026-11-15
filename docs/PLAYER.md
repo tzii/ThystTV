@@ -275,6 +275,9 @@ and floating-chat behavior remain the player regression checklist.
 Update this list as the code evolves.
 
 - `app/src/main/java/com/github/andreyasadchy/xtra/ui/main/MainActivity.kt`
+- `app/src/main/java/com/github/andreyasadchy/xtra/ui/main/LaunchActivity.kt` and the
+  launcher filters in `AndroidManifest.xml`: the home-screen icon reaches the player's
+  activity through it, so check PiP and minimized-player return from the icon.
 - `app/src/main/java/com/github/andreyasadchy/xtra/ui/player/`
 - `app/src/main/java/com/github/andreyasadchy/xtra/ui/chat/`
 - `app/src/main/java/com/github/andreyasadchy/xtra/player/lowlatency/`

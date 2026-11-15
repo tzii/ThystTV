@@ -47,6 +47,9 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
 - App module: `app/`
 - Build config: `app/build.gradle.kts`
 - Main activity / app-level player entry point: `app/src/main/java/com/github/andreyasadchy/xtra/ui/main/MainActivity.kt`
+- Launcher entry: `ui/main/LaunchActivity.kt` opens `MainActivity` and finishes. Keep the
+  launcher filters there: `MainActivity` is singleTask, so a launcher intent sent to it
+  closes the screens above it (sign-in, Settings).
 - TV focus routing: `ui/main/TvNavigationFocus.kt`, `ui/player/PlayerTvFocus.kt` and `util/TvUi.kt` under the app's Kotlin package.
 - Device-code sign-in: `ui/login/LoginActivity.kt`, `DeviceCodeLoginController.kt`,
   `DeviceCodeContentLayout.kt` and `DeviceCodeQr.kt`; adaptive
