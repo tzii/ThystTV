@@ -876,3 +876,11 @@ Screenshots, videos, logs, or APK links:
 - Test an exact signed 1.3 APK upgrading official 1.2.1, retaining data and migrating
   landscape display mode. Repeat the player, gestures, floating chat, Stats and launcher
   matrix on that same candidate. See RELEASE_1_3_REVIEW.md and RELEASE_PROCESS.md.
+
+### Stop casting outside the player
+
+- [ ] Start Cast on real hardware. Open Settings: Stop casting is at the top. Tap it: receiver stops, the row disappears, and local playback follows the existing handoff.
+- [ ] Repeat after closing the player with Keep casting after closing the app on, and after reopening ThystTV with retained receiver playback. Repeat in wide Settings and with a TV remote.
+- [ ] Disconnect/reconnect externally while Settings is open; the row tracks the session. Return after background and rotation; no duplicate callbacks.
+- [ ] VoD opened during Cast still offers Stop casting and play here; cancel preserves the receiver, accept resumes the VoD locally.
+- [ ] Cast off or unavailable: no row, initialization, crash or change to local live/VoD playback. Check switching, minimize/restore, close/reopen, PiP/background, quality/speed, gestures and floating chat.
