@@ -59,6 +59,11 @@ Required for the deadline-based chat keepalive and chat card change
   then joins again within about 30 s of the signal returning, without leaving the
   player. Repeat with `-j DROP`: a silent dead connection is replaced within about
   70 s. Channel points, polls and 7TV updates come back too.
+- [ ] Live download with Download chat on (emulator, `adb root`): let a stream
+  download finish, or cancel it. Within about 10 s `adb shell netstat -tn` lists no
+  connection to the address of `irc-ws.chat.twitch.tv` (look it up with `nslookup`),
+  and none comes back a minute later. With the end wait on, the next stream's
+  download still saves its own chat.
 - [ ] Signed in for 15+ minutes: channel points accrue and the claim appears.
 - [ ] Poll and prediction cards count down. On a channel that is not playing, turn
   the screen off for 30 s and back on: the countdown shows the real time left.
