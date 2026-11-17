@@ -14,6 +14,7 @@ All notable changes to ThystTV should be documented here.
 - On wide windows, opening a Settings search result now marks its section in the list at once instead of leaving the previous one marked.
 - Stop an existing Cast session from the top of Settings, including after closing the player. The VoD “Stop casting and play here” offer remains available.
 - Clip downloads keep their known duration from channel/category lists and the player. Unknown lengths are hidden instead of shown as 00:00, and missing source offsets no longer show negative Start/End labels.
+- Downloading a clip with "Download chat" on no longer fails when Twitch hasn't yet reported where the clip sits in its VoD, as for a clip made moments ago. The clip downloads without replay chat. A clip with no VoD at all now finishes as Downloaded instead of staying Pending.
 
 ### Changed
 - Settings has a Spoilers screen under Watching that holds Spoiler Shield (moved from UI) and Spoiler-free VODs (moved from Player > Videos). The local rewind buffer moved to a new Live section in Player settings. Saved values and backups are unchanged.

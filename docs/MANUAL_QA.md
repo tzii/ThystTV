@@ -892,6 +892,8 @@ Screenshots, videos, logs, or APK links:
 - [ ] VoD segment download lengths, source offsets, watched bars and spoiler hiding remain correct.
 - [ ] Player download entry smoke: live and VoD playback, stream switching, minimize/restore, close/reopen, PiP/background, speed/quality, gestures and floating chat remain usable.
 - [ ] A clip with no source VoD offset shows no Start/End labels; a known zero offset still shows 00:00. Legacy negative offsets are hidden.
+- [ ] With Download chat on, create a clip on a live channel, tap Watch clip and download it at once. The download finishes as Downloaded without replay chat instead of failing or staying in Downloading. Once Twitch reports the clip's VoD offset, downloading it again from the channel's Clips tab saves replay chat.
+- [ ] With Download chat on, download a clip whose VoD was deleted: it finishes as Downloaded, not Pending.
 
 ### Portrait live controls at the video edge
 

@@ -810,11 +810,18 @@ class VideoDownloadWorker @AssistedInject constructor(
 
     private suspend fun startChatJob(path: String) {
         if (offlineVideo.downloadChat && offlineVideo.chatProgress < offlineVideo.maxChatProgress) {
+            val window = ChatDownloadWindow.of(offlineVideo.videoId, offlineVideo.sourceStartPosition, offlineVideo.duration)
+            if (window == null) {
+                // No VoD, or no known place in it: there is no replay chat to save. Count chat as
+                // done so the finished video is not left pending, instead of failing the worker.
+                offlineRepository.updateVideo(offlineVideo.apply { chatProgress = maxChatProgress })
+                return
+            }
             offlineVideo.videoId?.let { videoId ->
                 val isShared = path.toUri().scheme == ContentResolver.SCHEME_CONTENT
-                val startTimeSeconds = (offlineVideo.sourceStartPosition!! / 1000).toInt()
-                val durationSeconds = (offlineVideo.duration!! / 1000).toInt()
-                val endTimeSeconds = startTimeSeconds + durationSeconds
+                val startTimeSeconds = window.startSeconds
+                val durationSeconds = window.durationSeconds
+                val endTimeSeconds = window.endSeconds
                 val fileName = "${videoId}${offlineVideo.quality ?: ""}${offlineVideo.downloadDate}_chat.json"
                 val resumed = !offlineVideo.chatUrl.isNullOrBlank()
                 val savedOffset = offlineVideo.chatOffsetSeconds
