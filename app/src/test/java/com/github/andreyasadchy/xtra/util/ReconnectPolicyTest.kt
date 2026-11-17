@@ -31,12 +31,41 @@ class ReconnectPolicyTest {
     }
 
     @Test
-    fun `an opened connection makes the next drop retry quickly`() {
-        val policy = ReconnectPolicy(Extreme(high = true))
+    fun `a connection that stayed up makes the next drop retry quickly`() {
+        var now = 0L
+        val policy = ReconnectPolicy(Extreme(high = true)) { now }
         repeat(10) { policy.nextDelayMs() }
         policy.connected()
+        now += ReconnectPolicy.HEALTHY_MS
         assertEquals(1_000L, policy.nextDelayMs())
         assertEquals(2_000L, policy.nextDelayMs())
+    }
+
+    @Test
+    fun `a connection dropped at once keeps backing off`() {
+        // A rejected login, or a listener that throws on the first message, used to reconnect
+        // about once a second forever because every opened connection reset the wait.
+        var now = 0L
+        val policy = ReconnectPolicy(Extreme(high = true)) { now }
+        val waits = List(7) {
+            policy.connected()
+            now += 500L
+            policy.nextDelayMs().also { now += it }
+        }
+        assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 30_000L, 30_000L), waits)
+    }
+
+    @Test
+    fun `only the latest connection decides whether the wait resets`() {
+        var now = 0L
+        val policy = ReconnectPolicy(Extreme(high = true)) { now }
+        repeat(3) { policy.nextDelayMs() }
+        policy.connected()
+        now += ReconnectPolicy.HEALTHY_MS - 1
+        assertEquals(8_000L, policy.nextDelayMs())
+        // A failed attempt after that drop opened nothing, so time passing does not reset it.
+        now += 60_000L
+        assertEquals(16_000L, policy.nextDelayMs())
     }
 
     @Test

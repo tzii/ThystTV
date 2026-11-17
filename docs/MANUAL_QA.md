@@ -64,6 +64,12 @@ Required for the deadline-based chat keepalive and chat card change
   connection to the address of `irc-ws.chat.twitch.tv` (look it up with `nslookup`),
   and none comes back a minute later. With the end wait on, the next stream's
   download still saves its own chat.
+- [ ] Signed in with a revoked token (disconnect ThystTV at
+  twitch.tv/settings/connections without signing out in the app), open a live
+  channel on an emulator with `adb root`. Chat reading keeps working. Polling
+  `adb shell netstat -tn` shows the rejected chat sign-in reconnecting at growing
+  intervals up to about 30 s, not every second. The weak-signal and airplane-mode
+  checks above still rejoin quickly once a connection has held for 10 s.
 - [ ] Signed in for 15+ minutes: channel points accrue and the claim appears.
 - [ ] Poll and prediction cards count down. On a channel that is not playing, turn
   the screen off for 30 s and back on: the countdown shows the real time left.
