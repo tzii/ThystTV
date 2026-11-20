@@ -411,19 +411,137 @@ already-handled seek. Test actual headset and background dispatch on devices.
 
 ## Side gesture feedback
 
-Brightness and device-volume feedback use larger 64 × 216dp edge pills on player
-surfaces at least 600dp wide, with 32dp icons and 8dp level tracks. Icons use
-explicit AppCompat image views with white tint for readability over video. Surface classification
-uses the measured video/player width, so side chat and resized windows can return
-to the unchanged compact horizontal treatment. Edge pill height is capped to 45%
-of the measured player height; padding, icon and spacing shrink together below
-96dp pill height to keep a visible level track in short windows. Returning to a
-compact or non-side gesture resets icon size, spacing and pill corners.
+Gesture feedback follows Material 3 Expressive and always reads as a video
+overlay. It uses the dark-scheme accent roles of the theme's primary color
+(`PlayerPanelTheme.gestureFeedback`) on a dark translucent container, in light
+and dark app themes alike.
 
-`PlayerGestureFeedbackRenderTest` checks native Android layout, edge placement,
-progress/accessibility updates, very short players and compact restoration, and
-renders phone/tablet feedback previews. Device gesture timing, playback and actual
-window insets still require the human player matrix below.
+Settings > Player > Gestures > Gesture indicator
+(`C.PLAYER_GESTURE_FEEDBACK_STYLE`, `PlayerGestureFeedbackStyle`) picks one of
+two styles. Both show the same readings; neither shows a label such as
+"Brightness" or "Seek".
+
+**Sliders** (the default) use Material 3 Expressive slider geometry: a 40dp
+track split by a 4 × 44dp handle with 6dp gaps, 12dp outer and 2dp inner
+corners, and a small dot marking a reference point. The accent part runs from
+the start of the track to the handle; the dark part is the rest.
+
+- Brightness and device volume (vertical swipes) show a vertical slider at the
+  edge of the half being swiped (`PlayerGestureLevelView`), 176dp long and capped
+  to 60% of the player. It has no number. The icon sits in the accent fill and
+  moves above the handle when the fill is too short; a slider too short for either
+  drops the icon. A stop dot marks the top until the handle reaches it. The icon
+  follows the level (auto/low/half/high brightness; off/low/high volume), and the
+  handle glides between volume's coarse steps.
+- Seek, speed and pinch zoom (horizontal gestures) show a horizontal slider at
+  the top of the video (`PlayerGestureSliderView`), 300dp wide, or 220dp on
+  players shorter or narrower than 320dp, and narrower still in a tiny window.
+  The icon sits at the start of the track and the value at its end, with
+  tabular digits. Near the end of the track the value moves into the accent
+  part beside the handle. A value too long for either part shrinks instead of
+  clipping. The dot marks where the gesture started and hides under the
+  handle, icon or value. The slider draws left to right in RTL too, because
+  right is always later, faster or closer to Fill.
+  - Seek shows the signed change (`+1:25`, `−0:30`), and the handle and the
+    dot sit on the whole VoD, so the track shows where in the video the seek
+    lands. Back at the start, the icon turns into undo and the value reads
+    "Cancel". When the seek reaches the start or end of the video, the handle
+    stops there. With spoiler-free VoDs the track is relative instead: the
+    start sits in the middle and the handle follows the finger, reaching an
+    end after half the player width, so it never reveals the position or the
+    length.
+  - Speed shows the speed (`1.50x`, the speed button's format) on a
+    logarithmic 0.25x–4x track with 1x in the middle.
+  - Pinch shows the mode or zoom it points to (`Fit`, `Fill`, `125%`). To Fit
+    or Fill the handle grows from the middle toward the mode it arms. Free zoom
+    is placed between Fit (left) and Fill (right), with the dot where the pinch
+    began.
+
+**Number in the center** shows every gesture as one large number in the middle
+of the video (`PlayerGestureValueView`), on a soft dark glow rather than a
+container. The glow is 60% black behind the value, so white text stays
+readable over white video. The number is 48sp (36sp on small players) and
+shrinks to fit.
+
+- Seek shows the change, with the target time small under it (`24:00`).
+  Spoiler-free VoDs show the position but never the length, as before. Back
+  at the start it shows the undo icon over "Cancel".
+- Brightness and volume show their icon above the percentage.
+- Speed and pinch show only the value.
+
+Plain messages (the pinch hint, live-rewind caught up) use the fully rounded
+top pill in both styles: an accent icon badge, a 6dp bar with a track gap and
+end stop where a level applies, and a tabular-digit label.
+
+Sliders draw a soft shadow on API 28 and later. Their views include 4dp of
+shadow room on each side, and placement measures margins and the top gap to
+the drawn track.
+
+A freshly shown indicator springs in with the "fast spatial" spring
+(`PlayerSpringInterpolator`, damping 0.6, stiffness 800):
+
+- the edge slider grows from its edge;
+- the top slider and the pill drop in;
+- the number grows from its center.
+
+Updates while visible move the handle in place instead of replaying the
+entrance. Animator duration scale 0 lands on the final state.
+
+Brightness is always on the physical left and volume on the physical right,
+matching the screen halves that drive them, including in RTL. Their margins
+come from `measureEdges`, which reads the player's offset in the window and
+the root display-cutout and back-gesture insets.
+
+- When both player sides lie on the window edge, both sliders sit the same
+  distance from their physical screen edge. The cutout padding of the
+  landscape player no longer pushes one slider further in, and with "draw
+  behind cutouts" the slider stays clear of the camera.
+- When a side is inside the window, such as the side chat's edge, the sliders
+  mirror around the player instead.
+
+`PlayerGestureFeedbackRenderTest` renders previews under
+`app/build/ui-previews` with native Android layout and checks:
+
+- side-chat and cutout placement;
+- the edge slider's icon placement, stop dot and level glide;
+- the top slider's handle, start dot, icon and value placement at every
+  position, in compact and narrow sizes;
+- the centered number's size, centering and text fitting in both sizes;
+- entrances, short players and pill restoration;
+- overlay contrast in every app theme.
+
+Device gesture timing, haptics, playback and actual window insets still
+require the human player matrix below.
+
+## Horizontal scrub gestures
+
+Seek and speed share one set of rules (`PlayerScrubPolicy`):
+
+- **Lock.** A drag is classified from touch-down, not from its first move. Vertical
+  wins as soon as it dominates, as before. Seek or speed needs 24dp of sideways
+  travel within about 27° of horizontal (|dx| ≥ 2|dy|). Until then the drag stays
+  undecided, so a tap that slides, a diagonal swipe, or the first finger of a pinch
+  does not seek. A vertical swipe that starts with a sideways wobble still becomes
+  brightness or volume. Chat swipes keep their own trigger.
+- **Start detent.** Travel is measured from the near edge of a 10dp band at the
+  lock point, so the value starts changing straight away. Dragging back into the
+  band returns exactly to the starting value, so a seek can be undone by feel.
+- **Live seeking without repeats.** The player seeks only when the target changes.
+  Holding still, staying in the detent, or pushing past either end of the video
+  issues no repeated seeks.
+- **Haptics**, when the gesture haptics setting is on, use one vocabulary for every
+  gesture (`PlayerGestureHaptic`, `PlayerScrubHapticTracker`, `PlayerGestureHaptics`):
+  - a start tick when a swipe claims its gesture;
+  - step ticks: every volume step, every 10% brightness, every quarter speed, and
+    seek intervals from the start, rounded to give about a dozen per full-width drag;
+  - a detent when a scrub returns to or passes over its start, and when a pinch
+    arms Fit or Fill or snaps free zoom to an end;
+  - a limit at either end: auto or full brightness, mute or maximum volume,
+    0.25x or 4x, and the start or end of the video.
+
+  Step ticks closer than 30ms apart are dropped. On Android 14 and later these use
+  the segment tick effects and on Android 11 and later the reject effect. Older
+  releases fall back to clock tick, context click and virtual key.
 
 ## Live rewind controls
 

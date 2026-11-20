@@ -4,6 +4,17 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Changed
+- Gesture feedback has a Material 3 Expressive look with no extra text. Brightness and volume show a vertical slider at the edge you swipe, in small windows too. Seek, speed and zoom show a slider at the top of the video with the change (`+1:25`, `1.50x`, `Fill`) and a dot where you started; a seek's handle shows where in the VoD it lands, and returning to the start reads "Cancel". Icons follow the level, the feedback springs in, and the colors follow the app accent while staying dark over video in every theme.
+- New setting, Gesture indicator: "Number in the center" shows every gesture as one clean number in the middle of the video instead, with the target time under a seek and the icon above brightness and volume.
+- Seek and speed swipes need a clearly sideways drag before they start. A tap that slides, a diagonal swipe or a vertical swipe that starts with a wobble no longer seeks. Dragging back to where you started returns exactly to the starting position or speed.
+- With gesture haptics on, the player ticks through volume steps, brightness, speed quarters and seek intervals. It clicks when you return to a seek's start or a pinch snaps, and bumps at the end of each range.
+
+### Fixed
+- With the side chat open on a landscape phone, brightness and volume show their side sliders instead of a bar at the top of the video.
+- A camera cutout no longer puts the brightness and volume sliders at different distances from their screen edges. With "draw behind cutouts" on, the brightness slider stays clear of the camera.
+- In right-to-left languages, brightness and volume feedback appears on the half of the screen you swipe instead of the opposite side.
+
 ## [1.6.0] - 2026-11-13
 
 ### Added
