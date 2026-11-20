@@ -346,6 +346,10 @@ indicator on Sliders (the default) and once on Number in the center.
   handle and stays readable.
 - [ ] Same seek, Number: the change is large in the middle with the target time
   small under it; back at the start it shows the undo icon over "Cancel".
+- [ ] Seek distance on a multi-hour VoD: a short, careful drag moves a few
+  seconds; a medium drag a minute or two; a swipe across a landscape phone
+  about an hour. On a one-minute clip, a full-width drag reaches the end and no
+  further. Low and high gesture sensitivity scale it.
 - [ ] Both styles read at a glance on a phone held at arm's length, over bright and
   dark video, and the value never clips (try a seek of over an hour on a long
   VoD). In a short split-screen window or the portrait player both are smaller
@@ -365,8 +369,8 @@ indicator on Sliders (the default) and once on Number in the center.
   slider does not change size between Fit, a zoom and Fill. Number: only the
   value. The first-time pinch hint still shows as the top pill.
 - [ ] Gesture haptics on: one tick when a swipe starts; step ticks through volume
-  steps, every 10% brightness, quarter speeds and seek intervals, without
-  buzzing on a fast drag; a
+  steps, every 10% brightness, quarter speeds and seek intervals, evenly spaced
+  under the finger as a long seek speeds up, without buzzing on a fast drag; a
   distinct detent back at a scrub's start and when a pinch arms Fit or Fill; a
   limit at auto or full brightness, mute or maximum volume, 0.25x or 4x and the
   start or end of the video. With haptics off, nothing vibrates.

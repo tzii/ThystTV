@@ -228,18 +228,11 @@ class PlayerGestureListener(
                              callback.getPlayerVideoType(),
                          )
                          if (duration > 0) {
-                             val reach = helper.calculateResponsiveSeekPosition(
-                                 currentPosition = 0L,
-                                 duration = duration,
-                                 gestureDelta = callback.playerWidth.toFloat(),
-                                 screenWidth = callback.playerWidth,
-                                 sensitivity = sensitivity,
-                             )
                              hapticTracker = PlayerScrubHapticTracker(
                                  start = startPosition,
                                  min = 0L,
                                  max = duration,
-                                 step = PlayerScrubPolicy.seekTickStepMs(reach),
+                                 step = PlayerScrubPolicy.seekTickStepMs(0f, callback.playerWidth / density, duration, sensitivity),
                                  origin = startPosition,
                                  startDetent = true,
                              )
@@ -377,13 +370,9 @@ class PlayerGestureListener(
                 // Dragging back into the start detent returns exactly to the
                 // starting position, so a seek can be undone by feel.
                 val travel = PlayerScrubPolicy.detentTravel(e2.x - scrubAnchorX, startDetentPx)
-                val newPosition = helper.calculateResponsiveSeekPosition(
-                    currentPosition = startPosition,
-                    duration = duration,
-                    gestureDelta = travel,
-                    screenWidth = callback.playerWidth,
-                    sensitivity = sensitivity
-                )
+                val widthDp = callback.playerWidth / density
+                val offset = PlayerScrubPolicy.seekOffsetMs(travel / density, widthDp, duration, sensitivity)
+                val newPosition = (startPosition + offset).coerceIn(0L, duration)
                 val seekAmount = newPosition - startPosition
                 // Seek only when the target moves: holding still, or pushing
                 // past either end of the video, issues no repeated seeks.
@@ -395,7 +384,13 @@ class PlayerGestureListener(
                     seekForward = seekAmount > 0
                     seekMoved = true
                 }
-                haptic(hapticTracker?.update(newPosition), e2.eventTime)
+                haptic(
+                    hapticTracker?.update(
+                        newPosition,
+                        PlayerScrubPolicy.seekTickStepMs(travel / density, widthDp, duration, sensitivity),
+                    ),
+                    e2.eventTime,
+                )
 
                 val targetTime = helper.formatDuration(newPosition)
                 // The description keeps the length unless spoiler-free VODs hide it.

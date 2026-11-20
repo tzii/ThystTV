@@ -2,6 +2,7 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlayerScrubPolicyTest {
@@ -113,15 +114,61 @@ class PlayerScrubPolicyTest {
     }
 
     private val sixHours = 6 * 3_600_000L
+    private val landscapeDp = 800f
 
     @Test
-    fun `seek ticks use round steps of about a dozen per drag`() {
-        assertEquals(5_000L, PlayerScrubPolicy.seekTickStepMs(29_000L))
-        assertEquals(30_000L, PlayerScrubPolicy.seekTickStepMs(204_000L))
-        assertEquals(60_000L, PlayerScrubPolicy.seekTickStepMs(648_000L))
-        assertEquals(300_000L, PlayerScrubPolicy.seekTickStepMs(2_300_000L))
-        assertEquals(3_600_000L, PlayerScrubPolicy.seekTickStepMs(Long.MAX_VALUE / 2))
-        assertEquals(1_000L, PlayerScrubPolicy.seekTickStepMs(0L))
+    fun `seek starts fine and accelerates the same way on every long video`() {
+        // 0.3 s per dp at first, then the cubic term takes over.
+        assertEquals(6_080L, PlayerScrubPolicy.seekOffsetMs(20f, landscapeDp, sixHours))
+        assertEquals(40_000L, PlayerScrubPolicy.seekOffsetMs(100f, landscapeDp, sixHours))
+        assertEquals(140_000L, PlayerScrubPolicy.seekOffsetMs(200f, landscapeDp, sixHours))
+        assertEquals(360_000L, PlayerScrubPolicy.seekOffsetMs(300f, landscapeDp, sixHours))
+        assertEquals(3_640_000L, PlayerScrubPolicy.seekOffsetMs(700f, landscapeDp, sixHours))
+        // A two-hour VoD gets the same short seeks as a six-hour one.
+        assertEquals(40_000L, PlayerScrubPolicy.seekOffsetMs(100f, landscapeDp, 2 * 3_600_000L))
+        // Each further 50 dp covers more time than the last.
+        var previousGain = 0L
+        for (travel in 50..700 step 50) {
+            val gain = PlayerScrubPolicy.seekOffsetMs(travel.toFloat(), landscapeDp, sixHours) -
+                PlayerScrubPolicy.seekOffsetMs(travel - 50f, landscapeDp, sixHours)
+            assertTrue("gain at $travel dp", gain > previousGain)
+            previousGain = gain
+        }
+    }
+
+    @Test
+    fun `a short video spreads over the full width instead`() {
+        val minute = 60_000L
+        assertEquals(7_500L, PlayerScrubPolicy.seekOffsetMs(100f, landscapeDp, minute))
+        assertEquals(minute, PlayerScrubPolicy.seekOffsetMs(landscapeDp, landscapeDp, minute))
+        // Without a measured width only the curve applies.
+        assertEquals(40_000L, PlayerScrubPolicy.seekOffsetMs(100f, 0f, minute))
+    }
+
+    @Test
+    fun `seek offset is symmetric and scales with sensitivity`() {
+        assertEquals(-40_000L, PlayerScrubPolicy.seekOffsetMs(-100f, landscapeDp, sixHours))
+        assertEquals(60_000L, PlayerScrubPolicy.seekOffsetMs(100f, landscapeDp, sixHours, sensitivity = 1.5f))
+        assertEquals(20_000L, PlayerScrubPolicy.seekOffsetMs(100f, landscapeDp, sixHours, sensitivity = 0.5f))
+        assertEquals(0L, PlayerScrubPolicy.seekOffsetMs(0f, landscapeDp, sixHours))
+        assertEquals(0L, PlayerScrubPolicy.seekOffsetMs(100f, landscapeDp, 0L))
+    }
+
+    @Test
+    fun `seek tick steps follow the pace so ticks stay evenly spaced`() {
+        // About one tick per 32 dp, rounded up to a readable step.
+        assertEquals(10_000L, PlayerScrubPolicy.seekTickStepMs(0f, landscapeDp, sixHours))
+        assertEquals(120_000L, PlayerScrubPolicy.seekTickStepMs(300f, landscapeDp, sixHours))
+        assertEquals(600_000L, PlayerScrubPolicy.seekTickStepMs(600f, landscapeDp, sixHours))
+        assertEquals(3_600_000L, PlayerScrubPolicy.seekTickStepMs(5_000f, 10_000f, 1_000 * sixHours))
+        // A one-minute video ticks every 5 s; nothing to seek ticks every second.
+        assertEquals(5_000L, PlayerScrubPolicy.seekTickStepMs(0f, landscapeDp, 60_000L))
+        assertEquals(1_000L, PlayerScrubPolicy.seekTickStepMs(0f, landscapeDp, 0L))
+        // Travel in either direction gives the same step.
+        assertEquals(
+            PlayerScrubPolicy.seekTickStepMs(300f, landscapeDp, sixHours),
+            PlayerScrubPolicy.seekTickStepMs(-300f, landscapeDp, sixHours),
+        )
     }
 
     @Test

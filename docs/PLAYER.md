@@ -526,6 +526,13 @@ Seek and speed share one set of rules (`PlayerScrubPolicy`):
 - **Start detent.** Travel is measured from the near edge of a 10dp band at the
   lock point, so the value starts changing straight away. Dragging back into the
   band returns exactly to the starting value, so a seek can be undone by feel.
+- **Seek distance.** `PlayerScrubPolicy.seekOffsetMs` maps finger travel to time
+  on one accelerating curve, the same on every long video:
+  `0.3 s × dp + 10 s × (dp / 100)³`, scaled by the gesture sensitivity setting.
+  That is about 6 s at 20dp, 40 s at 100dp, 2:20 at 200dp, 6 min at 300dp and an
+  hour at 700dp. Small corrections stay precise on a six-hour VoD, and a long
+  swipe still crosses it. A drag across the whole player never covers more than
+  the whole video, so a short video spreads over the full width instead.
 - **Live seeking without repeats.** The player seeks only when the target changes.
   Holding still, staying in the detent, or pushing past either end of the video
   issues no repeated seeks.
@@ -533,7 +540,9 @@ Seek and speed share one set of rules (`PlayerScrubPolicy`):
   gesture (`PlayerGestureHaptic`, `PlayerScrubHapticTracker`, `PlayerGestureHaptics`):
   - a start tick when a swipe claims its gesture;
   - step ticks: every volume step, every 10% brightness, every quarter speed, and
-    seek intervals from the start, rounded to give about a dozen per full-width drag;
+    seek intervals counted from the start. The seek step is the round interval
+    (1 s up to 1 h) the swipe covers in about 32dp at its current pace, so ticks
+    stay evenly spaced under the finger while the seek speeds up;
   - a detent when a scrub returns to or passes over its start, and when a pinch
     arms Fit or Fill or snaps free zoom to an end;
   - a limit at either end: auto or full brightness, mute or maximum volume,

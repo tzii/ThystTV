@@ -2,12 +2,13 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import kotlin.math.abs
 import kotlin.math.ln
+import kotlin.math.min
 import kotlin.math.sign
 
 /**
  * Pure rules for the horizontal scrub gestures, seek and playback speed: when
  * a sideways drag may claim the gesture, the detent that holds the starting
- * value, the slider positions, and the haptic steps.
+ * value, how far a seek goes, the slider positions, and the haptic steps.
  */
 object PlayerScrubPolicy {
 
@@ -39,8 +40,15 @@ object PlayerScrubPolicy {
     /** Brightness ticks every 10%. */
     const val BRIGHTNESS_TICK_PERCENT = 10L
 
-    /** Target number of seek ticks across a full-width drag. */
-    private const val SEEK_TICKS_PER_REACH = 12L
+    /** Seek time per dp of finger travel at the start of a swipe. */
+    const val SEEK_FINE_MS_PER_DP = 300f
+
+    /** Time the curve adds at [SEEK_CURVE_UNIT_DP] of travel, growing with the cube of the travel. */
+    const val SEEK_CURVE_MS = 10_000f
+    const val SEEK_CURVE_UNIT_DP = 100f
+
+    /** Finger travel between seek ticks, at whatever pace the swipe has reached. */
+    const val SEEK_TICK_TRAVEL_DP = 32f
 
     private val SEEK_TICK_STEPS_MS = longArrayOf(
         1_000, 2_000, 5_000, 10_000, 15_000, 30_000,
@@ -82,12 +90,32 @@ object PlayerScrubPolicy {
     }
 
     /**
-     * Haptic step for a seek whose full-width drag covers [reachMs]: the round
-     * interval that gives about a dozen ticks per drag.
+     * How far a seek goes, in milliseconds, for [travelDp] of finger travel
+     * past the start detent. The same travel gives the same time on every
+     * video: fine at first (0.3 s per dp, so 20 dp is about 6 s), then
+     * accelerating to about an hour across a landscape phone. A drag across
+     * the whole [surfaceWidthDp] never covers more than the whole video, so a
+     * short video still uses the full width. [sensitivity] scales the result.
      */
-    fun seekTickStepMs(reachMs: Long): Long {
-        val wanted = reachMs / SEEK_TICKS_PER_REACH
-        return SEEK_TICK_STEPS_MS.firstOrNull { it >= wanted } ?: SEEK_TICK_STEPS_MS.last()
+    fun seekOffsetMs(travelDp: Float, surfaceWidthDp: Float, durationMs: Long, sensitivity: Float = 1f): Long {
+        val distance = abs(travelDp)
+        if (distance == 0f || durationMs <= 0L) return 0L
+        val unit = distance / SEEK_CURVE_UNIT_DP
+        val curve = SEEK_FINE_MS_PER_DP * distance + SEEK_CURVE_MS * unit * unit * unit
+        val wholeVideo = if (surfaceWidthDp > 0f) durationMs * distance / surfaceWidthDp else curve
+        return (sign(travelDp) * sensitivity * min(curve, wholeVideo)).toLong()
+    }
+
+    /**
+     * Haptic step for a seek at [travelDp]: the round time the swipe covers
+     * in about [SEEK_TICK_TRAVEL_DP] of travel at its current pace, so ticks
+     * stay evenly spaced under the finger while the seek speeds up.
+     */
+    fun seekTickStepMs(travelDp: Float, surfaceWidthDp: Float, durationMs: Long, sensitivity: Float = 1f): Long {
+        val distance = abs(travelDp)
+        val pace = seekOffsetMs(distance + SEEK_TICK_TRAVEL_DP, surfaceWidthDp, durationMs, sensitivity) -
+            seekOffsetMs(distance, surfaceWidthDp, durationMs, sensitivity)
+        return SEEK_TICK_STEPS_MS.firstOrNull { it >= pace } ?: SEEK_TICK_STEPS_MS.last()
     }
 
     /**
