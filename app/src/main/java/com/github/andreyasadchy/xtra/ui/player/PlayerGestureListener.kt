@@ -3,13 +3,12 @@ package com.github.andreyasadchy.xtra.ui.player
 import android.content.Context
 import android.media.AudioManager
 import android.view.GestureDetector
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.prefs
-import kotlin.math.abs
+import java.util.Locale
 
 interface PlayerGestureCallback {
     val isPortrait: Boolean
@@ -20,8 +19,6 @@ interface PlayerGestureCallback {
     val playerHeight: Int
     val windowAttributes: android.view.WindowManager.LayoutParams
     val isEdgeSwipe: Boolean
-    val playerGestureInsets: androidx.core.graphics.Insets?
-    
     fun setWindowAttributes(params: android.view.WindowManager.LayoutParams)
     fun showController()
     fun hideController()
@@ -100,6 +97,27 @@ class PlayerGestureListener(
     private var gestureStartX = 0f
     private var duration = 0L
 
+    // Horizontal scrubs (seek, speed) measure travel from this anchor, the
+    // near edge of the start detent, rather than from touch-down.
+    private var scrubAnchorX = 0f
+    private var lastSeekPosition = 0L
+
+    // Spoiler-free seeks use a track centered on the start instead of the
+    // whole video. There the handle stays where a seek reached either end of
+    // the video while the finger pushes on, since the value cannot move.
+    private var pinnedSeekFraction: Float? = null
+    private var seekForward = true
+    // Whether this seek has left its start, so coming back reads as a cancel.
+    private var seekMoved = false
+    private var hideSeekProgress = false
+    private var hapticTracker: PlayerScrubHapticTracker? = null
+    private var lastStepHapticAt = 0L
+    private var feedbackStyle = PlayerGestureFeedbackStyle.DEFAULT
+
+    private val density get() = context.resources.displayMetrics.density
+    private val horizontalLockPx get() = PlayerScrubPolicy.HORIZONTAL_LOCK_DP * density
+    private val startDetentPx get() = PlayerScrubPolicy.START_DETENT_DP * density
+
     override fun onDown(e: MotionEvent): Boolean {
         // End any previous gesture cleanup if needed
         if (hasNotifiedGestureStart) {
@@ -117,6 +135,13 @@ class PlayerGestureListener(
         isPan = false
         panPointers = 0
         isScrolling = false
+        hapticTracker = null
+        lastStepHapticAt = 0L
+        // Read per gesture, so a style changed in settings applies to an
+        // open player at its next gesture.
+        feedbackStyle = PlayerGestureFeedbackStyle.fromPref(
+            context.prefs().getString(C.PLAYER_GESTURE_FEEDBACK_STYLE, null)
+        )
 
         // Capture start coordinates
         gestureStartY = e.y
@@ -139,38 +164,78 @@ class PlayerGestureListener(
         
         // If we haven't locked onto a specific gesture type yet, determine it now
         if (!isVolume && !isBrightness && !isSeek && !isSpeed && !isChatSwipe && !isPan) {
+             // Measured from touch-down, so an early sideways wobble cannot
+             // decide a swipe that then turns vertical.
+             val dx = e2.x - gestureStartX
+             val direction = PlayerScrubPolicy.classify(dx, e2.y - gestureStartY, horizontalLockPx)
              if (callback.canPanMagnified()) {
                  // A magnified picture moves with the finger in every direction.
                  isPan = true
-             } else if (abs(distanceY) > abs(distanceX)) {
+             } else if (direction == PlayerScrubPolicy.Direction.VERTICAL) {
                  // Vertical Swipes (Volume / Brightness)
                  // Split left/right halves
                  if (e1.x < width / 2) {
                      isBrightness = true
                      startBrightness = helper.getCurrentBrightness(callback.windowAttributes)
+                     hapticTracker = PlayerScrubHapticTracker(
+                         start = (startBrightness * 100).toLong(),
+                         min = 0L,
+                         max = 100L,
+                         step = PlayerScrubPolicy.BRIGHTNESS_TICK_PERCENT,
+                     )
                  } else {
                      isVolume = true
                      val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                      startVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                     hapticTracker = PlayerScrubHapticTracker(
+                         start = startVolume.toLong(),
+                         min = 0L,
+                         max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toLong(),
+                         step = 1L,
+                     )
                  }
-             } else {
-                 // Horizontal Swipes: chat where the policy allows it, otherwise
-                 // seekable media only: Speed / Seek
-                 if (callback.startsChatSwipe(e1.x)) {
-                     isChatSwipe = true
-                 } else if (callback.getPlayerVideoType() != PlayerFragment.STREAM) {
-                     // Split top/bottom using the configured zone split ratio
-                     when (PlayerGestureZonePolicy.horizontalZone(e1.y, height, zoneSplit)) {
-                         PlayerHorizontalGestureZone.PLAYBACK_SPEED -> {
-                             // Upper zone -> Playback speed
-                             isSpeed = true
-                             startSpeed = callback.getCurrentSpeed() ?: 1f
-                         }
-                         PlayerHorizontalGestureZone.SEEK -> {
-                             // Lower zone -> Seek
-                             isSeek = true
-                             startPosition = callback.getCurrentPosition() ?: 0L
-                             duration = callback.getDuration()
+             } else if (callback.startsChatSwipe(e1.x)) {
+                 // Horizontal-leaning swipes: chat where the policy allows it
+                 isChatSwipe = true
+             } else if (direction == PlayerScrubPolicy.Direction.HORIZONTAL && callback.getPlayerVideoType() != PlayerFragment.STREAM) {
+                 // Seekable media only, once the drag is clearly sideways:
+                 // split top/bottom using the configured zone split ratio.
+                 scrubAnchorX = PlayerScrubPolicy.anchorX(e2.x, dx, startDetentPx)
+                 when (PlayerGestureZonePolicy.horizontalZone(e1.y, height, zoneSplit)) {
+                     PlayerHorizontalGestureZone.PLAYBACK_SPEED -> {
+                         // Upper zone -> Playback speed
+                         isSpeed = true
+                         startSpeed = callback.getCurrentSpeed() ?: 1f
+                         hapticTracker = PlayerScrubHapticTracker(
+                             start = speedHundredths(snapSpeed(startSpeed)),
+                             min = speedHundredths(PlayerScrubPolicy.SPEED_MIN),
+                             max = speedHundredths(PlayerScrubPolicy.SPEED_MAX),
+                             step = PlayerScrubPolicy.SPEED_TICK_HUNDREDTHS,
+                             startDetent = true,
+                         )
+                     }
+                     PlayerHorizontalGestureZone.SEEK -> {
+                         // Lower zone -> Seek
+                         isSeek = true
+                         startPosition = callback.getCurrentPosition() ?: 0L
+                         duration = callback.getDuration()
+                         lastSeekPosition = startPosition
+                         pinnedSeekFraction = null
+                         seekForward = dx >= 0f
+                         seekMoved = false
+                         hideSeekProgress = SpoilerFreeVideos.hidePlayerProgress(
+                             context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false),
+                             callback.getPlayerVideoType(),
+                         )
+                         if (duration > 0) {
+                             hapticTracker = PlayerScrubHapticTracker(
+                                 start = startPosition,
+                                 min = 0L,
+                                 max = duration,
+                                 step = PlayerScrubPolicy.seekTickStepMs(0f, callback.playerWidth / density, duration, sensitivity),
+                                 origin = startPosition,
+                                 startDetent = true,
+                             )
                          }
                      }
                  }
@@ -200,7 +265,7 @@ class PlayerGestureListener(
                 if (!hasNotifiedGestureStart) {
                     callback.onSwipeGestureStarted()
                     // A chat swipe gives its feedback when it acts; a pan needs none.
-                    if (!isChatSwipe && !isPan) performHapticFeedback() // Feedback on gesture start
+                    if (!isChatSwipe && !isPan) haptic(PlayerGestureHaptic.START)
                     hasNotifiedGestureStart = true
                 }
             }
@@ -239,7 +304,7 @@ class PlayerGestureListener(
                 if (PlayerChatSwipePolicy.reachedTrigger(dx, dy, trigger)) {
                     chatSwipeDone = true
                     if (callback.swipeChat(dx)) {
-                        performHapticFeedback()
+                        haptic(PlayerGestureHaptic.START)
                     }
                 }
             }
@@ -247,7 +312,6 @@ class PlayerGestureListener(
         }
 
         val percentY = (gestureStartY - e2.y) / height
-        val percentX = (e2.x - gestureStartX) / width // Left to Right is positive
 
         if (isBrightness) {
             val rawBrightness = startBrightness + percentY
@@ -259,10 +323,11 @@ class PlayerGestureListener(
             callback.setWindowAttributes(lp)
 
             val percent = if (isAuto) 0 else (newBrightness * 100).toInt()
+            haptic(hapticTracker?.update(percent.toLong()), e2.eventTime)
             val valueText = if (isAuto) "Auto" else "%d%%".format(percent)
             presentFeedback(
                 kind = PlayerGestureFeedbackKind.BRIGHTNESS,
-                iconRes = R.drawable.ic_brightness_medium_black_24dp,
+                iconRes = PlayerGestureFeedbackState.brightnessIcon(percent, isAuto),
                 level = percent,
                 visibleText = valueText,
                 a11yText = if (isAuto) {
@@ -270,6 +335,9 @@ class PlayerGestureListener(
                 } else {
                     labeledA11y(PlayerGestureFeedbackKind.BRIGHTNESS, valueText)
                 },
+                // The slider shows no number; the centered value keeps its
+                // icon so it cannot be mistaken for volume.
+                reading = PlayerGestureReading(fraction = percent / 100f, value = valueText, valueIcon = true),
             )
             return true
         }
@@ -279,47 +347,95 @@ class PlayerGestureListener(
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val newVolume = (startVolume + (percentY * maxVolume)).toInt().coerceIn(0, maxVolume)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+            haptic(hapticTracker?.update(newVolume.toLong()), e2.eventTime)
 
             val percent = ((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt()
+            val valueText = "%d%%".format(percent)
             presentFeedback(
                 kind = PlayerGestureFeedbackKind.DEVICE_VOLUME,
-                iconRes = if (newVolume == 0) R.drawable.baseline_volume_off_black_24 else R.drawable.baseline_volume_up_black_24,
+                iconRes = PlayerGestureFeedbackState.volumeIcon(percent),
                 level = percent,
-                visibleText = "%d".format(percent),
+                visibleText = valueText,
                 a11yText = labeledA11y(
                     PlayerGestureFeedbackKind.DEVICE_VOLUME,
-                    if (newVolume == 0) context.getString(R.string.gesture_feedback_muted) else "%d%%".format(percent),
+                    if (newVolume == 0) context.getString(R.string.gesture_feedback_muted) else valueText,
                 ),
+                reading = PlayerGestureReading(fraction = percent / 100f, value = valueText, valueIcon = true),
             )
             return true
         }
 
         if (isSeek) {
             if (duration > 0) {
-                val newPosition = helper.calculateResponsiveSeekPosition(
-                    currentPosition = startPosition,
-                    duration = duration,
-                    gestureDelta = e2.x - gestureStartX,
-                    screenWidth = callback.playerWidth,
-                    sensitivity = sensitivity
-                )
+                // Dragging back into the start detent returns exactly to the
+                // starting position, so a seek can be undone by feel.
+                val travel = PlayerScrubPolicy.detentTravel(e2.x - scrubAnchorX, startDetentPx)
+                val widthDp = callback.playerWidth / density
+                val offset = PlayerScrubPolicy.seekOffsetMs(travel / density, widthDp, duration, sensitivity)
+                val newPosition = (startPosition + offset).coerceIn(0L, duration)
                 val seekAmount = newPosition - startPosition
-                callback.seek(newPosition)
-
-                val valueText = SpoilerFreeVideos.seekLabel(
-                    helper.formatDuration(newPosition),
-                    helper.formatDuration(duration),
-                    SpoilerFreeVideos.hidePlayerProgress(
-                        context.prefs().getBoolean(C.PLAYER_SPOILER_FREE_VODS, false),
-                        callback.getPlayerVideoType(),
+                // Seek only when the target moves: holding still, or pushing
+                // past either end of the video, issues no repeated seeks.
+                if (newPosition != lastSeekPosition) {
+                    callback.seek(newPosition)
+                    lastSeekPosition = newPosition
+                }
+                if (seekAmount != 0L) {
+                    seekForward = seekAmount > 0
+                    seekMoved = true
+                }
+                haptic(
+                    hapticTracker?.update(
+                        newPosition,
+                        PlayerScrubPolicy.seekTickStepMs(travel / density, widthDp, duration, sensitivity),
                     ),
+                    e2.eventTime,
                 )
+
+                val targetTime = helper.formatDuration(newPosition)
+                // The description keeps the length unless spoiler-free VODs hide it.
+                val target = SpoilerFreeVideos.seekLabel(
+                    targetTime,
+                    helper.formatDuration(duration),
+                    hideSeekProgress,
+                )
+                val change = PlayerScrubPolicy.signedDuration(seekAmount, helper::formatDuration)
+                // The track is the whole video, like the seek bar, with a dot
+                // where the seek started. Spoiler-free VODs center the start
+                // instead, so the track never shows where the video is or how
+                // long it runs.
+                val (fraction, startFraction) = if (hideSeekProgress) {
+                    val relative = PlayerScrubPolicy.relativeFraction(travel, callback.playerWidth)
+                    pinnedSeekFraction = PlayerScrubPolicy.pinFraction(
+                        pinned = pinnedSeekFraction,
+                        fraction = relative,
+                        atLimit = newPosition <= 0L || newPosition >= duration,
+                    )
+                    (pinnedSeekFraction ?: relative) to 0.5f
+                } else {
+                    newPosition.toFloat() / duration to startPosition.toFloat() / duration
+                }
+                // Dragging back to the start undoes the seek; say so rather
+                // than showing an unsigned 0:00.
+                val backAtStart = seekMoved && seekAmount == 0L
+                val cancel = context.getString(android.R.string.cancel)
                 presentFeedback(
                     kind = PlayerGestureFeedbackKind.SEEK,
-                    iconRes = if (seekAmount > 0) R.drawable.baseline_add_black_24 else R.drawable.baseline_remove_black_24,
+                    iconRes = when {
+                        backAtStart -> R.drawable.ic_gesture_undo
+                        seekForward -> R.drawable.ic_gesture_seek_forward
+                        else -> R.drawable.ic_gesture_seek_back
+                    },
                     level = null,
-                    visibleText = labeledText(PlayerGestureFeedbackKind.SEEK, valueText),
-                    a11yText = labeledA11y(PlayerGestureFeedbackKind.SEEK, valueText),
+                    visibleText = labeledText(PlayerGestureFeedbackKind.SEEK, target),
+                    a11yText = labeledA11y(PlayerGestureFeedbackKind.SEEK, if (backAtStart) "$cancel · $target" else "$change · $target"),
+                    // The change is the value; the centered number adds the
+                    // target time underneath.
+                    reading = if (backAtStart) {
+                        PlayerGestureReading(fraction, value = null, startFraction = startFraction, detail = cancel, valueIcon = true)
+                    } else {
+                        PlayerGestureReading(fraction, value = change, startFraction = startFraction, detail = targetTime)
+                    },
                 )
             }
             return true
@@ -328,22 +444,28 @@ class PlayerGestureListener(
         if (isSpeed) {
             // Speed logic: 0.05x increments
             // Swipe full width = 1.0x change, adjusted by sensitivity
-            val speedChange = (percentX * 2.0f * sensitivity)
-            // Round to nearest 0.05
-            var newSpeed = startSpeed + speedChange
-            newSpeed = (Math.round(newSpeed * 20) / 20.0f).coerceIn(0.25f, 4.0f)
+            val travel = PlayerScrubPolicy.detentTravel(e2.x - scrubAnchorX, startDetentPx)
+            val speedChange = (travel / width) * 2.0f * sensitivity
+            val newSpeed = snapSpeed(startSpeed + speedChange)
 
             if (newSpeed != callback.getCurrentSpeed()) {
                 callback.setPlaybackSpeed(newSpeed)
             }
+            haptic(hapticTracker?.update(speedHundredths(newSpeed)), e2.eventTime)
 
-            val valueText = "%.2fx".format(newSpeed)
+            // Same format as the player's speed button and menu.
+            val valueText = String.format(Locale.US, "%.2fx", newSpeed)
             presentFeedback(
                 kind = PlayerGestureFeedbackKind.PLAYBACK_SPEED,
                 iconRes = R.drawable.baseline_speed_black_24,
                 level = null,
                 visibleText = labeledText(PlayerGestureFeedbackKind.PLAYBACK_SPEED, valueText),
                 a11yText = labeledA11y(PlayerGestureFeedbackKind.PLAYBACK_SPEED, valueText),
+                reading = PlayerGestureReading(
+                    fraction = PlayerScrubPolicy.speedFraction(newSpeed),
+                    value = valueText,
+                    startFraction = PlayerScrubPolicy.speedFraction(startSpeed),
+                ),
             )
             return true
         }
@@ -351,8 +473,16 @@ class PlayerGestureListener(
         return false
     }
 
+    /** Rounds to the nearest 0.05x within the gesture's speed range. */
+    private fun snapSpeed(speed: Float): Float {
+        return (Math.round(speed * 20) / 20.0f).coerceIn(PlayerScrubPolicy.SPEED_MIN, PlayerScrubPolicy.SPEED_MAX)
+    }
+
+    private fun speedHundredths(speed: Float): Long = Math.round(speed * 100).toLong()
+
+    /** Width class, deciding whether visible labels have room for the control name. */
     private fun surfaceClass(): PlayerSurfaceClass {
-        return PlayerSurfacePolicy.classify(callback.playerWidth, context.resources.displayMetrics.density)
+        return PlayerSurfacePolicy.classify(callback.playerWidth, density)
     }
 
     private fun labelRes(kind: PlayerGestureFeedbackKind): Int {
@@ -375,8 +505,8 @@ class PlayerGestureListener(
 
     /**
      * Accessibility text always carries the control name; visible text on
-     * large surfaces does too, while the vertical edge pill drops visible text
-     * entirely and relies on this description.
+     * large surfaces does too, while the edge slider shows only the short
+     * value and relies on this description for the name.
      */
     private fun labeledA11y(kind: PlayerGestureFeedbackKind, value: String): String {
         return context.getString(labelRes(kind)) + " \u00B7 " + value
@@ -388,6 +518,7 @@ class PlayerGestureListener(
         level: Int?,
         visibleText: String,
         a11yText: String,
+        reading: PlayerGestureReading? = null,
     ) {
         PlayerSurfacePolicy.presentFeedback(
             context = context,
@@ -395,12 +526,13 @@ class PlayerGestureListener(
             kind = kind,
             surfaceWidthPx = callback.playerWidth,
             surfaceHeightPx = callback.playerHeight,
-            insets = callback.playerGestureInsets,
             presentation = PlayerGestureFeedbackState.presentation(
                 kind = kind,
                 surfaceClass = surfaceClass(),
                 level = level,
                 text = visibleText,
+                reading = reading,
+                style = feedbackStyle,
             ),
             iconRes = iconRes,
             a11yText = a11yText,
@@ -450,7 +582,7 @@ class PlayerGestureListener(
         return if (doubleTapEnabled && !callback.isPortrait && callback.isMaximized) {
             if (callback.claimDoubleTapChat()) {
                 callback.cycleChatMode()
-                performHapticFeedback() // Feedback for double tap action
+                haptic(PlayerGestureHaptic.START)
             }
             true
         } else {
@@ -458,15 +590,21 @@ class PlayerGestureListener(
         }
     }
 
-    private fun performHapticFeedback() {
-        if (hapticEnabled) {
-            // Try to use the feedback view to perform haptic feedback
-            try {
-                val view = callback.getGestureFeedbackView()
-                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            } catch (e: Exception) {
-                // Ignore if view not available or haptics failed
-            }
+    /**
+     * Plays [haptic] when gesture haptics are on. Step ticks closer together
+     * than [PlayerScrubPolicy.STEP_TICK_MIN_INTERVAL_MS] are dropped so a fast
+     * drag does not buzz; detents and limits always play.
+     */
+    private fun haptic(haptic: PlayerGestureHaptic?, eventTime: Long = 0L) {
+        if (haptic == null || !hapticEnabled) return
+        if (haptic == PlayerGestureHaptic.STEP) {
+            if (eventTime - lastStepHapticAt < PlayerScrubPolicy.STEP_TICK_MIN_INTERVAL_MS) return
+            lastStepHapticAt = eventTime
+        }
+        try {
+            PlayerGestureHaptics.perform(callback.getGestureFeedbackView(), haptic)
+        } catch (e: Exception) {
+            // Ignore if view not available or haptics failed
         }
     }
 }

@@ -336,6 +336,70 @@ the exact signed 1.3.1 upgrade and release matrix remain pending.
 - [ ] Resize to short split-screen and narrow side-chat video; return to full
   screen. Compact feedback, seek/speed/pinch indicators and chat touches remain
   correct. Repeat with large fonts and RTL.
+
+### Expressive gesture feedback
+
+Run the gesture checks once with Settings > Player > Gestures > Gesture
+indicator on Sliders (the default) and once on Number in the center.
+
+- [ ] Landscape phone, side chat open: swipe the left and right halves vertically.
+  Sliders: brightness shows a vertical slider on the left and volume on the
+  right, with no number. Number: both show their icon over the percentage in
+  the middle of the video. Close the chat and repeat.
+- [ ] Phone with a camera cutout, in both landscape rotations, side chat closed:
+  the brightness and volume sliders sit the same distance from their screen
+  edges. Repeat with Settings > UI > draw behind cutouts on; neither slider
+  covers the camera.
+- [ ] Vertical slider over bright and dark video at 0, mid and 100: the icon
+  rides in the fill and moves above the handle when the fill is short; the dot
+  at the top disappears at 100. The volume icon changes at 0 and halfway, the
+  brightness icon at Auto, low, half and high. Volume steps glide.
+- [ ] Small split-screen or freeform landscape window: brightness and volume still
+  show the vertical sliders, shorter but not clipped.
+- [ ] VoD seek swipe in the lower half, Sliders: a slider at the top of the video
+  shows the seek icon and the signed change (`+1:25`), the dot where you started
+  and the handle where the seek lands in the VoD. Drag back past the start and
+  the handle crosses the dot. Return to the start: undo icon and "Cancel", and
+  the same frame as before. Push past the start or end of the video: the value
+  and the handle stop. Near the end of the track the value moves beside the
+  handle and stays readable.
+- [ ] Same seek, Number: the change is large in the middle with the target time
+  small under it; back at the start it shows the undo icon over "Cancel".
+- [ ] Seek distance on a multi-hour VoD: a short, careful drag moves a few
+  seconds; a medium drag a minute or two; a swipe across a landscape phone
+  about an hour. On a one-minute clip, a full-width drag reaches the end and no
+  further. Low and high gesture sensitivity scale it.
+- [ ] Both styles read at a glance on a phone held at arm's length, over bright and
+  dark video, and the value never clips (try a seek of over an hour on a long
+  VoD). In a short split-screen window or the portrait player both are smaller
+  and still placed right.
+- [ ] Accidental seeks: tap the video with a small slide, swipe diagonally, and
+  start a vertical swipe with a sideways wobble. None of them seek; the last one
+  changes brightness or volume. A clear sideways swipe still seeks right away.
+- [ ] Spoiler-free VoDs on: the seek slider's track starts in the middle and
+  follows the finger; nothing on it, or on the number, shows the video's
+  length.
+- [ ] Speed swipe in the upper half: the same top slider shows the speed icon and
+  `1.50x`, with 1x in the middle of the track and the dot at the starting
+  speed. Returning to the start restores it. Number: only `1.50x`.
+- [ ] Pinch on a landscape video: the top slider shows `Fill` or `Fit` with the
+  handle moving away from the middle toward the armed mode. With free zoom it
+  shows the zoom percent (`125%`), with the dot where the pinch began. The
+  slider does not change size between Fit, a zoom and Fill. Number: only the
+  value. The first-time pinch hint still shows as the top pill.
+- [ ] Gesture haptics on: one tick when a swipe starts; step ticks through volume
+  steps, every 10% brightness, quarter speeds and seek intervals, evenly spaced
+  under the finger as a long seek speeds up, without buzzing on a fast drag; a
+  distinct detent back at a scrub's start and when a pinch arms Fit or Fill; a
+  limit at auto or full brightness, mute or maximum volume, 0.25x or 4x and the
+  start or end of the video. With haptics off, nothing vibrates.
+- [ ] Each indicator springs in once per gesture, does not replay while dragging,
+  and fades after release. With animations off, it appears without motion.
+  Changing the style while the player is open applies to the next gesture.
+- [ ] Light, dark, AMOLED and blue app themes, plus dynamic color: the feedback
+  stays dark over video and the accent follows the theme.
+- [ ] RTL language: brightness stays on the left half and volume on the right;
+  the top slider still fills left to right.
 - [ ] Live/VoD playback, stream switching without old audio, minimize/restore,
   close/reopen, PiP/background, speed/quality, all gestures, floating-chat
   open/drag/resize, and Stats load/rotate/range smoke.

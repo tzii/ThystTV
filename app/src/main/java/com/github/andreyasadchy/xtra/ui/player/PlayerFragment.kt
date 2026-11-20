@@ -27,7 +27,6 @@ import android.text.format.DateFormat
 import android.text.format.DateUtils
 import android.util.TypedValue
 import android.view.GestureDetector
-import android.view.HapticFeedbackConstants
 import android.media.AudioManager
 import android.provider.Settings
 import android.view.WindowManager
@@ -266,6 +265,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     /** Last pinch feedback write, used to skip redundant per-touch updates. */
     private var pinchFeedbackLabel: String? = null
     private var pinchFeedbackLevel: Int? = null
+    /** Free-zoom track position where the current pinch began, for the slider's start dot. */
+    private var pinchFeedbackStart: Float? = null
     private var pinchFillEdgeAnimator: ViewPropertyAnimator? = null
 
     // Stream volume popup state (ThystTV playback volume, independent of device volume)
@@ -729,7 +730,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             kind = PlayerGestureFeedbackKind.PLAYBACK_SPEED,
             surfaceWidthPx = binding.playerLayout.width,
             surfaceHeightPx = binding.playerLayout.height,
-            insets = gestureInsets,
             presentation = PlayerGestureFeedbackState.presentation(
                 kind = PlayerGestureFeedbackKind.PLAYBACK_SPEED,
                 surfaceClass = PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density),
@@ -4474,6 +4474,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         pinchFillEdgeAnimator = null
         pinchFeedbackLabel = null
         pinchFeedbackLevel = null
+        pinchFeedbackStart = null
         _binding?.playerLayout?.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
             feedback.animate().cancel()
             feedback.removeCallbacks(hideGestureRunnable)
@@ -4881,7 +4882,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     override val isControlsVisible get() = binding.playerControls.root.isVisible
     override val playerWidth get() = binding.playerLayout.width
     override val playerHeight get() = binding.playerLayout.height
-    override val playerGestureInsets get() = gestureInsets
     override val windowAttributes: android.view.WindowManager.LayoutParams
         get() = android.view.WindowManager.LayoutParams().apply {
             copyFrom(requireActivity().window.attributes)
@@ -5063,6 +5063,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         pinchLastArmedTarget = null
         pinchFeedbackLabel = null
         pinchFeedbackLevel = null
+        pinchFeedbackStart = null
         isSwipeGestureInProgress = true
         val cancelEvent = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
         if (controlsVisibleAtGestureStart) {
@@ -5130,11 +5131,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
+    /** Arming Fit or Fill and snapping free zoom to an end are detents, like a scrub's start. */
     private fun performPinchHaptic() {
         if (prefs.getBoolean(C.PLAYER_GESTURES_HAPTIC, false)) {
             try {
-                binding.playerLayout.findViewById<View>(R.id.gestureFeedback)
-                    ?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                PlayerGestureHaptics.perform(
+                    binding.playerLayout.findViewById(R.id.gestureFeedback),
+                    PlayerGestureHaptic.DETENT,
+                )
             } catch (e: Exception) {
                 // Haptic failure must not block gesture completion.
             }
@@ -5376,23 +5380,29 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 PlayerDisplayMode.STRETCH -> R.string.display_mode_stretch
             }
         )
-        presentPinchFeedback(targetLabel) { surfaceClass ->
+        presentPinchFeedback(targetLabel) { surfaceClass, style ->
             PlayerGestureFeedbackState.pinchPresentation(
                 surfaceClass = surfaceClass,
                 progress = progress,
                 toward = target,
                 targetLabel = targetLabel,
+                style = style,
             )
         }
     }
 
     private fun showPinchZoomFeedback(target: PinchZoomController.Target, zoom: Float, fraction: Float, reachedEnd: Boolean = false) {
-        val label = when (target) {
-            PinchZoomController.Target.FIT -> getString(R.string.display_mode_fit)
-            PinchZoomController.Target.FILL -> getString(R.string.display_mode_fill)
-            PinchZoomController.Target.ZOOM, PinchZoomController.Target.MAGNIFIED ->
-                getString(R.string.display_mode_zoom, PlayerGestureFeedbackState.zoomPercent(zoom))
+        // The slider or number shows just the percent between Fit and Fill;
+        // the description keeps the "Zoom" name.
+        val (label, description) = when (target) {
+            PinchZoomController.Target.FIT -> getString(R.string.display_mode_fit).let { it to it }
+            PinchZoomController.Target.FILL -> getString(R.string.display_mode_fill).let { it to it }
+            PinchZoomController.Target.ZOOM, PinchZoomController.Target.MAGNIFIED -> {
+                val percent = PlayerGestureFeedbackState.zoomPercent(zoom)
+                "%d%%".format(percent) to getString(R.string.display_mode_zoom, percent)
+            }
         }
+        val start = pinchFeedbackStart ?: fraction.also { pinchFeedbackStart = it }
         val level = (fraction.coerceIn(0f, 1f) * 100).roundToInt()
         val shouldWrite = reachedEnd || PlayerGestureFeedbackState.shouldUpdatePinchFeedback(
             lastLabel = pinchFeedbackLabel,
@@ -5412,8 +5422,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
         pinchFeedbackLabel = label
         pinchFeedbackLevel = level
-        presentPinchFeedback(label) { surfaceClass ->
-            PlayerGestureFeedbackState.pinchZoomPresentation(surfaceClass, fraction, label)
+        presentPinchFeedback(description) { surfaceClass, style ->
+            PlayerGestureFeedbackState.pinchZoomPresentation(surfaceClass, fraction, label, start, style)
         }
     }
 
@@ -5459,7 +5469,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     private fun presentPinchFeedback(
         label: String,
-        presentation: (PlayerSurfaceClass) -> PlayerGestureFeedbackPresentation,
+        presentation: (PlayerSurfaceClass, PlayerGestureFeedbackStyle) -> PlayerGestureFeedbackPresentation,
     ) {
         val feedback = binding.playerLayout.findViewById<View>(R.id.gestureFeedback) ?: return
         PlayerSurfacePolicy.presentFeedback(
@@ -5468,8 +5478,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             kind = PlayerGestureFeedbackKind.PINCH,
             surfaceWidthPx = binding.playerLayout.width,
             surfaceHeightPx = binding.playerLayout.height,
-            insets = gestureInsets,
-            presentation = presentation(PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density)),
+            presentation = presentation(
+                PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density),
+                PlayerGestureFeedbackStyle.fromPref(prefs.getString(C.PLAYER_GESTURE_FEEDBACK_STYLE, null)),
+            ),
             iconRes = R.drawable.baseline_aspect_ratio_black_24,
             a11yText = getString(R.string.gesture_feedback_pinch) + " \u00B7 " + label,
             hideRunnable = hideGestureRunnable,
@@ -5480,6 +5492,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         // Reset the skip state so the next pinch starts with a fresh write.
         pinchFeedbackLabel = null
         pinchFeedbackLevel = null
+        pinchFeedbackStart = null
         binding.playerLayout.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
             feedback.removeCallbacks(hideGestureRunnable)
             feedback.postDelayed(hideGestureRunnable, PINCH_FEEDBACK_LINGER_MS)
@@ -5545,7 +5558,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             kind = PlayerGestureFeedbackKind.PINCH,
             surfaceWidthPx = binding.playerLayout.width,
             surfaceHeightPx = binding.playerLayout.height,
-            insets = gestureInsets,
             presentation = PlayerGestureFeedbackState.presentation(
                 kind = PlayerGestureFeedbackKind.PINCH,
                 surfaceClass = PlayerSurfacePolicy.classify(binding.playerLayout.width, resources.displayMetrics.density),

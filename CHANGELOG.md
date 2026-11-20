@@ -4,7 +4,19 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Changed
+- Gesture feedback has a Material 3 Expressive look with no extra text. Brightness and volume show a vertical slider at the edge you swipe, in small windows too. Seek, speed and zoom show a slider at the top of the video with the change (`+1:25`, `1.50x`, `Fill`) and a dot where you started; a seek's handle shows where in the VoD it lands, and returning to the start reads "Cancel". Icons follow the level, the feedback springs in, and the colors follow the app accent while staying dark over video in every theme.
+- New setting, Gesture indicator: "Number in the center" shows every gesture as one clean number in the middle of the video instead, with the target time under a seek and the icon above brightness and volume.
+- Seek swipes are precise for small corrections and speed up the further you drag: a short drag moves a few seconds, a swipe across a landscape phone about an hour, the same on every long VoD. A short video spreads over the full width.
+- Seek and speed swipes need a clearly sideways drag before they start. A tap that slides, a diagonal swipe or a vertical swipe that starts with a wobble no longer seeks. Dragging back to where you started returns exactly to the starting position or speed.
+- With gesture haptics on, the player ticks through volume steps, brightness, speed quarters and seek intervals that stay evenly spaced as a seek speeds up. It clicks when you return to a seek's start or a pinch snaps, and bumps at the end of each range.
+- Settings has a Spoilers screen under Watching that holds Spoiler Shield (moved from UI) and Spoiler-free VODs (moved from Player > Videos). The local rewind buffer moved to a new Live section in Player settings. Saved values and backups are unchanged.
+- Settings search also matches the section a setting sits in, so "spoiler" finds Spoiler Shield's options, and results show that section next to the screen name.
+
 ### Fixed
+- With the side chat open on a landscape phone, brightness and volume show their side sliders instead of a bar at the top of the video.
+- A camera cutout no longer puts the brightness and volume sliders at different distances from their screen edges. With "draw behind cutouts" on, the brightness slider stays clear of the camera.
+- In right-to-left languages, brightness and volume feedback appears on the half of the screen you swipe instead of the opposite side.
 - Portrait live-player controls use one bottom row with compact uptime/viewer indicators and centered play/pause. Extra enabled buttons and large text use horizontal overflow instead of lifting the controls into a second row.
 - `clips.twitch.tv` links open the clip with its channel name, chat replay and Watch full video again; the app passed that link's request headers in the wrong order. `clips.twitch.tv/embed?clip=` player links open their clip too.
 - Chat reconnects after a long stretch of bad signal. Chat, channel points, polls and 7TV updates used to stop for good after about 20 seconds of failed attempts when Android still reported the network as working, until you reopened the player. They now keep retrying, waiting longer each time up to 30 seconds. Each attempt times out after 10 seconds to connect and 15 to complete the handshake, instead of waiting for minutes, and an outage shows one disconnect line instead of one per attempt.
@@ -17,10 +29,6 @@ All notable changes to ThystTV should be documented here.
 - Stop an existing Cast session from the top of Settings, including after closing the player. The VoD “Stop casting and play here” offer remains available.
 - Clip downloads keep their known duration from channel/category lists and the player. Unknown lengths are hidden instead of shown as 00:00, and missing source offsets no longer show negative Start/End labels.
 - Downloading a clip with "Download chat" on no longer fails when Twitch hasn't yet reported where the clip sits in its VoD, as for a clip made moments ago. The clip downloads without replay chat. A clip with no VoD at all now finishes as Downloaded instead of staying Pending.
-
-### Changed
-- Settings has a Spoilers screen under Watching that holds Spoiler Shield (moved from UI) and Spoiler-free VODs (moved from Player > Videos). The local rewind buffer moved to a new Live section in Player settings. Saved values and backups are unchanged.
-- Settings search also matches the section a setting sits in, so "spoiler" finds Spoiler Shield's options, and results show that section next to the screen name.
 
 ## [1.6.0] - 2026-11-13
 

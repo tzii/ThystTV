@@ -854,6 +854,9 @@
     <string name="player_gestures_haptic_summary" tools:ignore="MissingTranslation">Vibrate when changing volume or brightness</string>
     <string name="player_gestures_sensitivity" tools:ignore="MissingTranslation">Sensitivity</string>
     <string name="player_gestures_zone_split" tools:ignore="MissingTranslation">Zone split</string>
+    <string name="player_gesture_feedback_style" tools:ignore="MissingTranslation">Gesture indicator</string>
+    <string name="player_gesture_feedback_style_sliders" tools:ignore="MissingTranslation">Sliders</string>
+    <string name="player_gesture_feedback_style_number" tools:ignore="MissingTranslation">Number in the center</string>
     <string name="player_gestures_swipe_chat" tools:ignore="MissingTranslation">Swipe to show or hide chat</string>
     <string name="player_gestures_swipe_chat_summary" tools:ignore="MissingTranslation">In full screen, swipe sideways to show or hide chat. On VODs and clips, start at the edge of the video on the chat side</string>
     <string name="player_extended_zoom" tools:ignore="MissingTranslation">Extended zoom</string>

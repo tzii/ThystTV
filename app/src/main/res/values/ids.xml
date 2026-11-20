@@ -4,6 +4,8 @@
     <item name="playerSystemUiListener" type="id" />
     <!-- Keyed tag on the gesture-feedback view holding its last applied placement. -->
     <item name="feedbackPlacement" type="id" />
+    <!-- Keyed tag on the gesture-feedback view caching its resolved overlay colors. -->
+    <item name="feedbackColors" type="id" />
     <!-- Whole-panel scroll viewport inside the shared player popup host. -->
     <item name="playerPopupViewport" type="id" />
 </resources>
