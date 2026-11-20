@@ -334,7 +334,11 @@ indicator on Sliders (the default) and once on Number in the center.
 - [ ] Vertical slider over bright and dark video at 0, mid and 100: the icon
   rides in the fill and moves above the handle when the fill is short; the dot
   at the top disappears at 100. The volume icon changes at 0 and halfway, the
-  brightness icon at Auto, low, half and high. Volume steps glide.
+  brightness icon at Auto, low, half and high.
+- [ ] Brightness and volume, both styles: the slider handle stays under a slow
+  and a fast drag with no stutter or delay at the start, and the number
+  changes by 1. Volume changes audibly at the device's own steps, and the next
+  swipe starts where the last one stopped. Only 0% mutes.
 - [ ] Small split-screen or freeform landscape window: brightness and volume still
   show the vertical sliders, shorter but not clipped.
 - [ ] VoD seek swipe in the lower half, Sliders: a slider at the top of the video

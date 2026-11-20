@@ -69,7 +69,7 @@ class PlayerSurfacePolicyTest {
 
     @Test
     fun `top slider sits at the top center at a fixed width`() {
-        // Density 2: the 300 dp slider is 600 px, plus 8 px of shadow room on
+        // Density 2: the 300 dp slider is 600 px, plus 8 px of pad on
         // each side; the 16 dp top gap is measured to the drawn track.
         val wide = PlayerSurfacePolicy.placementFor(
             PlayerGestureFeedbackKind.SEEK, PlayerGestureFeedbackLayout.TOP_SLIDER, 2f,
@@ -135,7 +135,7 @@ class PlayerSurfacePolicyTest {
 
     @Test
     fun `brightness is a left-edge slider`() {
-        // Density 2: the 44 dp handle and 176 dp track plus 8 px of shadow
+        // Density 2: the 44 dp handle and 176 dp track plus 8 px of pad
         // room on each side; the 16 dp margin is measured to the drawn track.
         val placement = PlayerSurfacePolicy.placementFor(
             PlayerGestureFeedbackKind.BRIGHTNESS, PlayerGestureFeedbackLayout.EDGE_VERTICAL, 2f,
@@ -179,7 +179,7 @@ class PlayerSurfacePolicyTest {
         assertEquals(92 to 92, PlayerSurfacePolicy.edgeMargins(edges, 32))
         val brightness = PlayerSurfacePolicy.placementFor(PlayerGestureFeedbackKind.BRIGHTNESS, PlayerGestureFeedbackLayout.EDGE_VERTICAL, 2f, edges)
         val volume = PlayerSurfacePolicy.placementFor(PlayerGestureFeedbackKind.DEVICE_VOLUME, PlayerGestureFeedbackLayout.EDGE_VERTICAL, 2f, edges)
-        // The view's 8 px shadow room sits inside the margin, so the drawn
+        // The view's 8 px pad sits inside the margin, so the drawn
         // track still starts 92 px in.
         assertEquals(84, brightness.marginLeftPx)
         assertEquals(84, volume.marginRightPx)
@@ -269,7 +269,7 @@ class PlayerSurfacePolicyTest {
             PlayerGestureFeedbackKind.BRIGHTNESS, PlayerGestureFeedbackLayout.EDGE_VERTICAL, 1f,
             surfaceHeightPx = 160,
         )
-        // 176 dp, or 60% of a 160 px player, plus 4 px of shadow room each side.
+        // 176 dp, or 60% of a 160 px player, plus 4 px of pad each side.
         assertEquals(184, fullTablet.fixedContainerHeightPx)
         assertEquals(104, shortVideo.fixedContainerHeightPx)
         assertTrue(PlayerSurfacePolicy.requiresCleanReposition(fullTablet, shortVideo, isVisible = true))

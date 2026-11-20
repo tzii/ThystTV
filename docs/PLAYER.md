@@ -431,8 +431,16 @@ the start of the track to the handle; the dark part is the rest.
   to 60% of the player. It has no number. The icon sits in the accent fill and
   moves above the handle when the fill is too short; a slider too short for either
   drops the icon. A stop dot marks the top until the handle reaches it. The icon
-  follows the level (auto/low/half/high brightness; off/low/high volume), and the
-  handle glides between volume's coarse steps.
+  follows the level (auto/low/half/high brightness; off/low/high volume).
+- Both follow the finger directly (`PlayerLevelGesturePolicy`): a drag over the
+  full player height covers the whole range, measured from where the swipe
+  locks, so the first update shows the starting value. The handle moves
+  between whole percents with no animation, and the shown value changes one
+  percent at a time. Brightness applies whole percents from 5% up, and Auto
+  below 5%. Device volume has only a few steps (often 15 or 25), so the device
+  takes the nearest step while the shown level stays smooth, as the system
+  volume slider does; only 0% mutes. The next volume swipe continues from the
+  shown level while the device is still on the step the last swipe set.
 - Seek, speed and pinch zoom (horizontal gestures) show a horizontal slider at
   the top of the video (`PlayerGestureSliderView`), 300dp wide, or 220dp on
   players shorter or narrower than 320dp, and narrower still in a tiny window.
@@ -473,9 +481,17 @@ Plain messages (the pinch hint, live-rewind caught up) use the fully rounded
 top pill in both styles: an accent icon badge, a 6dp bar with a track gap and
 end stop where a level applies, and a tabular-digit label.
 
-Sliders draw a soft shadow on API 28 and later. Their views include 4dp of
-shadow room on each side, and placement measures margins and the top gap to
-the drawn track.
+Sliders draw only plain shapes, with no shadow: a blurred shadow under shapes
+that change on every touch update costs offscreen passes each frame and made
+them stutter. Their views include a 4dp pad on each side, so the entrance
+spring's overshoot is never clipped, and placement measures margins and the
+top gap to the drawn track.
+
+Touch updates are cheap by design. A gesture writes the overlay's layout
+params only when its placement changes, so an update redraws the indicator
+without laying out the player window. Brightness touches the window and
+volume calls the audio service only when the applied percent or step
+changes.
 
 A freshly shown indicator springs in with the "fast spatial" spring
 (`PlayerSpringInterpolator`, damping 0.6, stiffness 800):
@@ -503,7 +519,9 @@ the root display-cutout and back-gesture insets.
 `app/build/ui-previews` with native Android layout and checks:
 
 - side-chat and cutout placement;
-- the edge slider's icon placement, stop dot and level glide;
+- the edge slider's icon placement and stop dot, and that it follows each
+  update at once;
+- that updates at the same placement request no layout;
 - the top slider's handle, start dot, icon and value placement at every
   position, in compact and narrow sizes;
 - the centered number's size, centering and text fitting in both sizes;

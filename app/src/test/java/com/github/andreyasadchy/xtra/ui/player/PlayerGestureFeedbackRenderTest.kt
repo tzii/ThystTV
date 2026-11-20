@@ -60,11 +60,10 @@ class PlayerGestureFeedbackRenderTest {
             present(surface, feedback, kind, 1280, 720, edges)
             val slider = feedback.findViewById<PlayerGestureLevelView>(R.id.feedbackLevel)
             assertOnlyShown(feedback, R.id.feedbackLevel)
-            // 44 x 176 dp plus 4 px of shadow room on each side.
+            // 44 x 176 dp plus 4 px of pad on each side.
             assertEquals(52, slider.width)
             assertEquals(184, slider.height)
-            assertEquals(65, slider.level)
-            assertEquals(65f, slider.displayedLevel, 0f)
+            assertEquals(65f, slider.level, 0f)
             assertEquals(PlayerGestureLevelView.IconPlace.IN_FILL, slider.iconPlace())
             assertTrue(slider.stopDotVisible())
             assertEquals("${kind.name} 65%", feedback.contentDescription)
@@ -147,7 +146,6 @@ class PlayerGestureFeedbackRenderTest {
         )) {
             present(surface, feedback, PlayerGestureFeedbackKind.DEVICE_VOLUME, 1280, 720, level = level, text = "$level%")
             val slider = feedback.findViewById<PlayerGestureLevelView>(R.id.feedbackLevel)
-            slider.jumpDrawablesToCurrentState()
             val track = slider.trackBounds()
             assertEquals("icon at $level%", place, slider.iconPlace())
             // The stop dot marks the top until the handle reaches it.
@@ -158,23 +156,56 @@ class PlayerGestureFeedbackRenderTest {
         }
     }
 
-    @Test fun `a visible slider glides to the next level and a fresh one jumps`() {
+    @Test fun `a visible slider follows each update at once without a layout pass`() {
         val (surface, feedback) = createSurface()
         present(surface, feedback, PlayerGestureFeedbackKind.DEVICE_VOLUME, 1280, 720, level = 20, text = "20")
         val slider = feedback.findViewById<PlayerGestureLevelView>(R.id.feedbackLevel)
-        assertEquals(20f, slider.displayedLevel, 0f)
+        assertEquals(20f, slider.level, 0f)
+        assertFalse(surface.isLayoutRequested)
+        // A swipe update between whole percents: the handle follows the
+        // reading's fraction, not the rounded level.
         PlayerSurfacePolicy.presentFeedback(
             context, feedback, PlayerGestureFeedbackKind.DEVICE_VOLUME, 1280, 720,
-            PlayerGestureFeedbackState.presentation(PlayerGestureFeedbackKind.DEVICE_VOLUME, PlayerSurfaceClass.LARGE, 80, "80"),
+            PlayerGestureFeedbackState.presentation(
+                PlayerGestureFeedbackKind.DEVICE_VOLUME, PlayerSurfaceClass.LARGE, 80, "80%",
+                reading = PlayerGestureReading(0.803f, "80%", valueIcon = true),
+            ),
             R.drawable.baseline_volume_up_black_24, "volume 80", hide,
             edges = PlayerFeedbackEdges.NONE,
         )
-        assertEquals(80, slider.level)
-        assertTrue("animates from the shown level", slider.displayedLevel < 80f)
-        settle()
-        assertEquals(80f, slider.displayedLevel, 0f)
+        assertEquals(80.3f, slider.level, 0.001f)
+        // Same placement while visible: only the drawing changes, so the
+        // player window is not laid out again on every touch update.
+        assertFalse("an update requests no layout", surface.isLayoutRequested)
         // The entrance does not replay for an update while visible.
         assertEquals(1f, slider.alpha, 0f)
+        // Another kind moves the overlay, which does lay it out.
+        PlayerSurfacePolicy.presentFeedback(
+            context, feedback, PlayerGestureFeedbackKind.BRIGHTNESS, 1280, 720,
+            PlayerGestureFeedbackState.presentation(PlayerGestureFeedbackKind.BRIGHTNESS, PlayerSurfaceClass.LARGE, 40, "40%"),
+            R.drawable.ic_gesture_brightness_half, "brightness 40", hide,
+            edges = PlayerFeedbackEdges.NONE,
+        )
+        assertTrue(surface.isLayoutRequested)
+    }
+
+    @Test fun `seek updates at the same place redraw without a layout pass`() {
+        val (surface, feedback) = createSurface()
+        presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 1280, 720, seekForward)
+        assertFalse(surface.isLayoutRequested)
+        PlayerSurfacePolicy.presentFeedback(
+            context, feedback, PlayerGestureFeedbackKind.SEEK, 1280, 720,
+            PlayerGestureFeedbackState.presentation(
+                PlayerGestureFeedbackKind.SEEK, PlayerSurfaceClass.LARGE,
+                reading = PlayerGestureReading(0.7f, "+12:00", startFraction = 0.5f, detail = "27:00"),
+            ),
+            R.drawable.ic_gesture_seek_forward, "seek +12:00", hide,
+            edges = PlayerFeedbackEdges.NONE,
+        )
+        val slider = feedback.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)
+        assertEquals(0.7f, slider.fraction, 0f)
+        assertEquals("+12:00", slider.label)
+        assertFalse("an update requests no layout", surface.isLayoutRequested)
     }
 
     @Test fun `fresh edge slider springs out of its side and lands on its final state`() {
@@ -305,7 +336,7 @@ class PlayerGestureFeedbackRenderTest {
         presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 1280, 720, seekForward)
         val slider = feedback.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)
         assertOnlyShown(feedback, R.id.feedbackSlider)
-        // 300 x 44 dp plus 4 px of shadow room; the track starts 16 px below the top.
+        // 300 x 44 dp plus 4 px of pad; the track starts 16 px below the top.
         assertEquals(308, slider.width)
         assertEquals(52, slider.height)
         assertEquals(16f, feedback.top + slider.top + 4f, 0f)

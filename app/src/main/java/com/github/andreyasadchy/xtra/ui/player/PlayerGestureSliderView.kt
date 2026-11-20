@@ -7,7 +7,6 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.text.TextPaint
 import android.util.AttributeSet
 import android.util.TypedValue
@@ -30,6 +29,10 @@ import kotlin.math.min
  * dot marks where the gesture started. The track draws in physical
  * left-to-right order, matching the drag: right is always later, faster or
  * closer to Fill.
+ *
+ * It redraws on every touch update, so it draws only plain shapes: a blurred
+ * shadow under shapes that change each frame costs offscreen passes per frame
+ * and made the sliders stutter. The near-opaque dark track keeps it readable.
  */
 class PlayerGestureSliderView @JvmOverloads constructor(
     context: Context,
@@ -40,7 +43,7 @@ class PlayerGestureSliderView @JvmOverloads constructor(
     enum class Side { NONE, ACTIVE, INACTIVE }
 
     private val density = resources.displayMetrics.density
-    private val pad = SHADOW_PAD_DP * density
+    private val pad = PAD_DP * density
     private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -68,16 +71,6 @@ class PlayerGestureSliderView @JvmOverloads constructor(
 
     var label: String? = null
         private set
-
-    init {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            // Shapes cast shadows on hardware layers from API 28; earlier
-            // versions draw the same slider without them.
-            for (paint in listOf(activePaint, inactivePaint, handlePaint)) {
-                paint.setShadowLayer(SHADOW_RADIUS_DP * density, 0f, SHADOW_DY_DP * density, SHADOW_COLOR)
-            }
-        }
-    }
 
     fun setColors(colors: PlayerGestureFeedbackColors) {
         if (colors == this.colors) return
@@ -304,11 +297,11 @@ class PlayerGestureSliderView @JvmOverloads constructor(
         const val LABEL_SP = 16f
         const val LABEL_MIN_SP = 11f
 
-        /** Room around the slider for its shadow, included in the view's size. */
-        const val SHADOW_PAD_DP = 4f
-        const val SHADOW_RADIUS_DP = 3f
-        const val SHADOW_DY_DP = 1f
-        const val SHADOW_COLOR = 0x40000000
+        /**
+         * Room around the drawn slider, included in the view's size, so the
+         * entrance spring's slight overshoot is never clipped.
+         */
+        const val PAD_DP = 4f
     }
 }
 
