@@ -470,12 +470,14 @@ class PlayerGestureListener(
                     level = null,
                     visibleText = labeledText(PlayerGestureFeedbackKind.SEEK, target),
                     a11yText = labeledA11y(PlayerGestureFeedbackKind.SEEK, if (backAtStart) "$cancel · $target" else "$change · $target"),
-                    // The change is the value; the centered number adds the
-                    // target time underneath.
+                    // The change is the value. Under it, both styles show the
+                    // target time and the video's length (only the target time
+                    // when spoiler-free VODs hide the length): a caption under
+                    // the slider, the small line under the centered number.
                     reading = if (backAtStart) {
-                        PlayerGestureReading(fraction, value = null, startFraction = startFraction, detail = cancel, valueIcon = true)
+                        PlayerGestureReading(fraction, value = null, startFraction = startFraction, detail = cancel, valueIcon = true, caption = target)
                     } else {
-                        PlayerGestureReading(fraction, value = change, startFraction = startFraction, detail = targetTime)
+                        PlayerGestureReading(fraction, value = change, startFraction = startFraction, detail = target, caption = target)
                     },
                 )
             }

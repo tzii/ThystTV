@@ -366,9 +366,13 @@ indicator on Sliders (the default) and once on Number in the center.
   the handle crosses the dot. Return to the start: undo icon and "Cancel", and
   the same frame as before. Push past the start or end of the video: the value
   and the handle stop. Near the end of the track the value moves beside the
-  handle and stays readable.
+  handle and stays readable. A small caption under the slider shows the target
+  time and the VoD's length (`24:00 / 3:12:45`), stays centered while the handle
+  moves, and still shows the position at "Cancel". Speed and pinch have no
+  caption, and their slider sits exactly where the seek track does.
 - [ ] Same seek, Number: the change is large in the middle with the target time
-  small under it; back at the start it shows the undo icon over "Cancel".
+  and the VoD's length small under it (`24:00 / 3:12:45`); back at the start it
+  shows the undo icon over "Cancel".
 - [ ] Seek distance on a multi-hour VoD: a short, careful drag moves a few
   seconds; a medium drag a minute or two; a swipe across a landscape phone
   about an hour. On a one-minute clip, a full-width drag reaches the end and no
@@ -381,8 +385,8 @@ indicator on Sliders (the default) and once on Number in the center.
   start a vertical swipe with a sideways wobble. None of them seek; the last one
   changes brightness or volume. A clear sideways swipe still seeks right away.
 - [ ] Spoiler-free VoDs on: the seek slider's track starts in the middle and
-  follows the finger; nothing on it, or on the number, shows the video's
-  length.
+  follows the finger; its caption and the number's small line show the target
+  time only. Nothing in either style shows the video's length.
 - [ ] Speed swipe in the upper half: the same top slider shows the speed icon and
   `1.50x`, with 1x in the middle of the track and the dot at the starting
   speed. Returning to the start restores it. Number: only `1.50x`.

@@ -70,7 +70,8 @@ class PlayerSurfacePolicyTest {
     @Test
     fun `top slider sits at the top center at a fixed width`() {
         // Density 2: the 300 dp slider is 600 px, plus 8 px of pad on
-        // each side; the 16 dp top gap is measured to the drawn track.
+        // each side; the 16 dp top gap is measured to the drawn track. A
+        // seek adds its 30 dp caption band under the track.
         val wide = PlayerSurfacePolicy.placementFor(
             PlayerGestureFeedbackKind.SEEK, PlayerGestureFeedbackLayout.TOP_SLIDER, 2f,
             surfaceHeightPx = 1350, surfaceWidthPx = 2400,
@@ -78,13 +79,13 @@ class PlayerSurfacePolicyTest {
         assertEquals(Gravity.TOP or Gravity.CENTER_HORIZONTAL, wide.gravity)
         assertEquals(PlayerFeedbackIndicator.TOP_SLIDER, wide.indicator)
         assertEquals(616, wide.fixedContainerWidthPx)
-        assertEquals(104, wide.fixedContainerHeightPx)
+        assertEquals(164, wide.fixedContainerHeightPx)
         assertEquals(24, wide.topPaddingPx)
         assertFalse(wide.verticalPill)
-        // Speed and pinch share the same slider and place.
+        // Speed and pinch share the same slider and place, without the caption band.
         for (kind in listOf(PlayerGestureFeedbackKind.PLAYBACK_SPEED, PlayerGestureFeedbackKind.PINCH)) {
             assertEquals(
-                wide,
+                wide.copy(fixedContainerHeightPx = 104),
                 PlayerSurfacePolicy.placementFor(kind, PlayerGestureFeedbackLayout.TOP_SLIDER, 2f, surfaceHeightPx = 1350, surfaceWidthPx = 2400),
             )
         }
