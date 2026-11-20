@@ -1,16 +1,13 @@
 package com.github.andreyasadchy.xtra.ui.player
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.util.AttributeSet
 import android.view.View
-import android.view.animation.DecelerateInterpolator
 import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.graphics.drawable.DrawableCompat
@@ -23,7 +20,9 @@ import androidx.core.graphics.drawable.DrawableCompat
  * grows from the bottom, a 4 dp handle with 6 dp gaps marks the level, and a
  * stop dot marks the top of the range. There is no number. The icon sits
  * inside the bottom of the accent part; when that part gets too short, the
- * icon moves above the handle.
+ * icon moves above the handle. The handle follows the finger directly, with
+ * no animation, and nothing it draws needs a blur, so each touch update is
+ * one cheap redraw.
  */
 class PlayerGestureLevelView @JvmOverloads constructor(
     context: Context,
@@ -31,7 +30,7 @@ class PlayerGestureLevelView @JvmOverloads constructor(
 ) : View(context, attrs) {
 
     private val density = resources.displayMetrics.density
-    private val pad = PlayerGestureSliderView.SHADOW_PAD_DP * density
+    private val pad = PlayerGestureSliderView.PAD_DP * density
     private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val inactivePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -42,31 +41,13 @@ class PlayerGestureLevelView @JvmOverloads constructor(
     private var icon: Drawable? = null
     @DrawableRes
     private var iconRes = 0
-    private var levelAnimator: ValueAnimator? = null
 
     /** Where the icon sits for the drawn level. */
     enum class IconPlace { NONE, IN_FILL, ABOVE_HANDLE }
 
-    /** Target level, 0-100. */
-    var level = 0
+    /** Level drawn, 0-100. Fractional, so the handle moves with the finger rather than in whole steps. */
+    var level = 0f
         private set
-
-    /** Level currently drawn; trails [level] while a step animates. */
-    var displayedLevel = 0f
-        private set
-
-    init {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            for (paint in listOf(activePaint, inactivePaint, handlePaint)) {
-                paint.setShadowLayer(
-                    PlayerGestureSliderView.SHADOW_RADIUS_DP * density,
-                    0f,
-                    PlayerGestureSliderView.SHADOW_DY_DP * density,
-                    PlayerGestureSliderView.SHADOW_COLOR,
-                )
-            }
-        }
-    }
 
     fun setColors(colors: PlayerGestureFeedbackColors) {
         if (colors == this.colors) return
@@ -86,44 +67,15 @@ class PlayerGestureLevelView @JvmOverloads constructor(
     }
 
     /**
-     * Moves the handle to [target]. A visible slider glides between steps so
-     * volume's coarse steps read as motion; a freshly shown one jumps, so it
-     * never sweeps from the previous gesture's level.
+     * Moves the handle to [level], 0-100, at once. The finger is the motion:
+     * an animation toward each touch update would restart every frame and
+     * leave the handle behind the finger.
      */
-    fun setLevel(target: Int, animate: Boolean) {
-        val clamped = target.coerceIn(0, 100)
-        level = clamped
-        levelAnimator?.cancel()
-        levelAnimator = null
-        if (!animate || !isAttachedToWindow || displayedLevel == clamped.toFloat()) {
-            displayedLevel = clamped.toFloat()
-            invalidate()
-            return
-        }
-        levelAnimator = ValueAnimator.ofFloat(displayedLevel, clamped.toFloat()).apply {
-            duration = LEVEL_STEP_MS
-            interpolator = DecelerateInterpolator()
-            addUpdateListener {
-                displayedLevel = it.animatedValue as Float
-                invalidate()
-            }
-            start()
-        }
-    }
-
-    override fun jumpDrawablesToCurrentState() {
-        super.jumpDrawablesToCurrentState()
-        levelAnimator?.cancel()
-        levelAnimator = null
-        displayedLevel = level.toFloat()
+    fun setLevel(level: Float) {
+        val clamped = level.coerceIn(0f, 100f)
+        if (clamped == this.level) return
+        this.level = clamped
         invalidate()
-    }
-
-    override fun onDetachedFromWindow() {
-        levelAnimator?.cancel()
-        levelAnimator = null
-        displayedLevel = level.toFloat()
-        super.onDetachedFromWindow()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -132,10 +84,10 @@ class PlayerGestureLevelView @JvmOverloads constructor(
         setMeasuredDimension(resolveSize(desiredWidth, widthMeasureSpec), resolveSize(desiredHeight, heightMeasureSpec))
     }
 
-    /** The slider's extent inside the shadow room, in view pixels. */
+    /** The slider's extent inside its pad, in view pixels. */
     internal fun trackBounds(): RectF = RectF(pad, pad, width - pad, height - pad)
 
-    /** Y of the handle's center for the drawn level, in view pixels. */
+    /** Y of the handle's center for the level, in view pixels. */
     internal fun handleCenterY(): Float = handleBottom() - PlayerGestureSliderView.HANDLE_WIDTH_DP * density / 2f
 
     /** Height of the accent part below the handle. */
@@ -169,11 +121,11 @@ class PlayerGestureLevelView @JvmOverloads constructor(
         return restHeight() >= dotBottom + clearance && iconTop >= dotBottom + clearance
     }
 
-    /** Bottom edge of the handle for the drawn level, in view pixels. */
+    /** Bottom edge of the handle for the level, in view pixels. */
     private fun handleBottom(): Float {
         val handleWidth = PlayerGestureSliderView.HANDLE_WIDTH_DP * density
         val usable = (height - 2f * pad - handleWidth).coerceAtLeast(0f)
-        return height - pad - usable * (displayedLevel.coerceIn(0f, 100f) / 100f)
+        return height - pad - usable * (level / 100f)
     }
 
     private fun iconTop(): Float {
@@ -231,6 +183,5 @@ class PlayerGestureLevelView @JvmOverloads constructor(
 
         /** The stop dot's center, measured from the top of the track. */
         const val STOP_DOT_CENTER_DP = 10f
-        const val LEVEL_STEP_MS = 120L
     }
 }

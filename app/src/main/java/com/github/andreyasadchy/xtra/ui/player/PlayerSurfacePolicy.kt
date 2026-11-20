@@ -90,7 +90,7 @@ object PlayerSurfacePolicy {
     const val LARGE_SURFACE_MIN_WIDTH_DP = 600
     const val CENTER_FEEDBACK_MAX_WIDTH_DP = 360
 
-    /** Length of the vertical slider, not counting its shadow room. */
+    /** Length of the vertical slider, not counting its pad. */
     const val EDGE_SLIDER_HEIGHT_DP = 176
     const val FEEDBACK_HOLD_MS = 800L
     const val FEEDBACK_FADE_MS = 150L
@@ -134,8 +134,8 @@ object PlayerSurfacePolicy {
      * brightness on the physical left and volume on the physical right,
      * matching the screen halves that drive them; the top slider and the
      * message pill sit at the top center and the centered value in the middle
-     * of the video. Slider sizes include their shadow room, so margins and the
-     * top gap are measured from the drawn slider.
+     * of the video. Slider sizes include their pad, so margins and the top
+     * gap are measured from the drawn slider.
      */
     // Physical LEFT/RIGHT on purpose: the gesture halves do not mirror in RTL.
     @SuppressLint("RtlHardcoded")
@@ -149,34 +149,34 @@ object PlayerSurfacePolicy {
     ): PlayerFeedbackPlacement {
         val margin = (FEEDBACK_MARGIN_DP * density).toInt()
         val topPadding = (COMPACT_TOP_PADDING_DP * density).toInt()
-        val shadowPad = shadowPadPx(density)
+        val pad = sliderPadPx(density)
         when (layout) {
             PlayerGestureFeedbackLayout.EDGE_VERTICAL -> {
-                val width = (PlayerGestureSliderView.HANDLE_LENGTH_DP * density).toInt() + 2 * shadowPad
+                val width = (PlayerGestureSliderView.HANDLE_LENGTH_DP * density).toInt() + 2 * pad
                 val (marginLeft, marginRight) = edgeMargins(edges, margin)
                 return PlayerFeedbackPlacement(
                     gravity = Gravity.CENTER_VERTICAL or
                         if (kind == PlayerGestureFeedbackKind.BRIGHTNESS) Gravity.LEFT else Gravity.RIGHT,
                     maxWidthPx = width,
-                    marginLeftPx = (marginLeft - shadowPad).coerceAtLeast(0),
-                    marginRightPx = (marginRight - shadowPad).coerceAtLeast(0),
+                    marginLeftPx = (marginLeft - pad).coerceAtLeast(0),
+                    marginRightPx = (marginRight - pad).coerceAtLeast(0),
                     topPaddingPx = 0,
                     fixedContainerWidthPx = width,
-                    fixedContainerHeightPx = edgeSliderHeightPx(density, surfaceHeightPx) + 2 * shadowPad,
+                    fixedContainerHeightPx = edgeSliderHeightPx(density, surfaceHeightPx) + 2 * pad,
                     indicator = PlayerFeedbackIndicator.EDGE_SLIDER,
                 )
             }
             PlayerGestureFeedbackLayout.TOP_SLIDER -> {
                 val compact = compactFeedback(density, surfaceWidthPx, surfaceHeightPx)
-                val width = topSliderWidthPx(density, surfaceWidthPx, margin, compact) + 2 * shadowPad
+                val width = topSliderWidthPx(density, surfaceWidthPx, margin, compact) + 2 * pad
                 return PlayerFeedbackPlacement(
                     gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL,
                     maxWidthPx = width,
                     marginLeftPx = 0,
                     marginRightPx = 0,
-                    topPaddingPx = (TOP_SLIDER_TOP_DP * density).toInt() - shadowPad,
+                    topPaddingPx = (TOP_SLIDER_TOP_DP * density).toInt() - pad,
                     fixedContainerWidthPx = width,
-                    fixedContainerHeightPx = (PlayerGestureSliderView.HANDLE_LENGTH_DP * density).toInt() + 2 * shadowPad,
+                    fixedContainerHeightPx = (PlayerGestureSliderView.HANDLE_LENGTH_DP * density).toInt() + 2 * pad,
                     indicator = PlayerFeedbackIndicator.TOP_SLIDER,
                 )
             }
@@ -208,8 +208,8 @@ object PlayerSurfacePolicy {
         }
     }
 
-    /** Room around a slider for its shadow, on each side. */
-    fun shadowPadPx(density: Float): Int = (PlayerGestureSliderView.SHADOW_PAD_DP * density).toInt()
+    /** Room around a drawn slider, on each side. */
+    fun sliderPadPx(density: Float): Int = (PlayerGestureSliderView.PAD_DP * density).toInt()
 
     /**
      * The top slider's drawn width, narrowed to leave the side margins on a
@@ -425,23 +425,29 @@ object PlayerSurfacePolicy {
             feedbackRoot.alpha = 1f
         }
         val freshlyShown = !feedbackRoot.isVisible
-        applyPlacement(
-            feedbackRoot,
-            mapOf(
-                PlayerFeedbackIndicator.PILL to pill,
-                PlayerFeedbackIndicator.EDGE_SLIDER to edgeSlider,
-                PlayerFeedbackIndicator.TOP_SLIDER to topSlider,
-                PlayerFeedbackIndicator.CENTER_VALUE to value,
-            ),
-            placement,
-        )
-        feedbackRoot.setTag(R.id.feedbackPlacement, placement)
+        // Writing layout params requests a layout of the whole player window.
+        // Touch updates arrive every frame with the same placement, so only a
+        // new or changed placement is written; the drawn value updates alone.
+        if (freshlyShown || lastPlacement != placement) {
+            applyPlacement(
+                feedbackRoot,
+                mapOf(
+                    PlayerFeedbackIndicator.PILL to pill,
+                    PlayerFeedbackIndicator.EDGE_SLIDER to edgeSlider,
+                    PlayerFeedbackIndicator.TOP_SLIDER to topSlider,
+                    PlayerFeedbackIndicator.CENTER_VALUE to value,
+                ),
+                placement,
+            )
+            feedbackRoot.setTag(R.id.feedbackPlacement, placement)
+        }
 
         val shown: View = when (placement.indicator) {
             PlayerFeedbackIndicator.EDGE_SLIDER -> {
                 edgeSlider.setColors(colors)
                 edgeSlider.setIcon(iconRes)
-                edgeSlider.setLevel(presentation.level, animate = !freshlyShown)
+                // A reading's fraction places the handle between whole percents.
+                edgeSlider.setLevel(reading?.fraction?.let { it * 100f } ?: presentation.level.toFloat())
                 edgeSlider
             }
             PlayerFeedbackIndicator.TOP_SLIDER -> {
@@ -600,7 +606,7 @@ object PlayerSurfacePolicy {
      */
     fun resetFeedback(feedbackRoot: View) {
         feedbackRoot.findViewById<LinearProgressIndicator>(R.id.feedbackProgress)?.progress = 0
-        feedbackRoot.findViewById<PlayerGestureLevelView>(R.id.feedbackLevel)?.setLevel(0, animate = false)
+        feedbackRoot.findViewById<PlayerGestureLevelView>(R.id.feedbackLevel)?.setLevel(0f)
         feedbackRoot.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)?.clear()
         feedbackRoot.findViewById<PlayerGestureValueView>(R.id.feedbackValue)?.clear()
         feedbackRoot.findViewById<TextView>(R.id.feedbackText)?.text = ""

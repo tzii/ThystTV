@@ -50,6 +50,7 @@ The `PlayerGestureListener` uses a set of boolean flags to track the current ges
 *   **Vertical Swipes:**
     *   Left 50%: Brightness
     *   Right 50%: Volume
+    *   Both follow the finger from where the swipe locks: the full player height covers the whole range, and the shown value changes one percent at a time (`PlayerLevelGesturePolicy`). Brightness applies whole percents from 5% up and Auto below. Device volume takes the nearest of the device's few steps, and only 0% mutes. The window and the audio service are only called when the applied percent or step changes.
 *   **Horizontal Swipes (seekable media only):**
     *   Top X%: Playback Speed (Configurable via `zoneSplit`)
     *   Bottom Y%: Seek
@@ -78,9 +79,10 @@ The `PlayerGestureListener` uses a set of boolean flags to track the current ges
 
 *   **`PlayerGestureHelperTest`**: Unit tests for the math and logic (pure functions). Mocks `Context` for `AudioManager`.
 *   **`PlayerGestureZonePolicyTest`**: Unit tests for horizontal zone selection, including the split-line boundary.
-*   **`PlayerGestureFeedbackStateTest` / `PlayerSurfacePolicyTest`**: Unit tests for feedback presentation and placement (both indicator styles: edge sliders for brightness and volume on every surface, the top slider for seek, speed and pinch, the centered number for every gesture, their compact sizes and shadow room, the top pill for messages, cutout-symmetric margins on physical sides, level-following icons, pinch start and handle positions).
+*   **`PlayerGestureFeedbackStateTest` / `PlayerSurfacePolicyTest`**: Unit tests for feedback presentation and placement (both indicator styles: edge sliders for brightness and volume on every surface, the top slider for seek, speed and pinch, the centered number for every gesture, their compact sizes and pad, the top pill for messages, cutout-symmetric margins on physical sides, level-following icons, pinch start and handle positions).
+*   **`PlayerLevelGesturePolicyTest`**: One-percent brightness and volume levels, the brightness floor and Auto, volume steps (nearest step, only 0% mutes) and a volume swipe continuing from the last one.
 *   **`PlayerScrubPolicyTest`**: Horizontal lock distance and angle, the start detent, the seek distance curve and its full-width cap, the spoiler-free relative seek track, the handle pinned at the ends of the video, logarithmic speed track positions, the signed change label, pace-following seek tick steps and the haptic tracker (steps, start detent, limits).
-*   **`PlayerGestureFeedbackRenderTest` / `PlayerSpringInterpolatorTest`**: Native renders of the Material 3 Expressive vertical and top sliders, the centered number and the pill, side-chat and cutout placement, entrance springs and overlay contrast.
+*   **`PlayerGestureFeedbackRenderTest` / `PlayerSpringInterpolatorTest`**: Native renders of the Material 3 Expressive vertical and top sliders, the centered number and the pill, side-chat and cutout placement, entrance springs and overlay contrast, and that touch updates at the same placement redraw without a layout pass.
 *   **`PinchDisplayModeControllerTest` / `PlayerDisplayModePreviewerTest`**: Unit tests for the pinch state machine (arm/hysteresis, responsive elastic deformation, neutral-crossing continuity) and renderer-relative preview/elastic scales.
 *   **`PinchZoomControllerTest` / `PlayerPinchZoomTest`**: Free-zoom detents, elastic ends, kept and clamped zoom, cancel; and the real fragment path for saving, renderer swaps, re-clamping on resize and clearing from More.
 *   **Integration**: Remaining `PlayerGestureListener` wiring is verified via manual testing due to `MotionEvent` mocking complexities in unit tests.

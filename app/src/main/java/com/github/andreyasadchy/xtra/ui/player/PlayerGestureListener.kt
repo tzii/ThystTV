@@ -89,13 +89,18 @@ class PlayerGestureListener(
     private var isScrolling = false 
     
     // Initial values captured at the start of the gesture (ACTION_DOWN)
-    private var startVolume = 0
+    private var startVolumeLevel = 0f
     private var startBrightness = 0f
     private var startPosition = 0L
     private var startSpeed = 1f
     private var gestureStartY = 0f
     private var gestureStartX = 0f
     private var duration = 0L
+
+    // Brightness and volume measure travel from where the swipe locked, so
+    // the first update shows the starting value instead of jumping by the
+    // touch slop.
+    private var levelAnchorY = 0f
 
     // Horizontal scrubs (seek, speed) measure travel from this anchor, the
     // near edge of the start detent, rather than from touch-down.
@@ -113,6 +118,21 @@ class PlayerGestureListener(
     private var hapticTracker: PlayerScrubHapticTracker? = null
     private var lastStepHapticAt = 0L
     private var feedbackStyle = PlayerGestureFeedbackStyle.DEFAULT
+
+    // What a brightness or volume swipe last applied. The window and the audio
+    // service are only called when the value changes: each call is a system
+    // round trip (a window relayout for brightness) that would otherwise run
+    // on every touch update.
+    private var appliedBrightnessPercent: Int? = null
+    private var brightnessApplied = false
+    private var appliedVolumeIndex = 0
+    private var maxVolume = 0
+    private val audioManager by lazy { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+
+    // Where the last volume swipe left the slider and the step it set, so
+    // the next swipe continues from the same spot (see PlayerLevelGesturePolicy.volumeStart).
+    private var lastVolumeLevel: Float? = null
+    private var lastVolumeIndex = -1
 
     private val density get() = context.resources.displayMetrics.density
     private val horizontalLockPx get() = PlayerScrubPolicy.HORIZONTAL_LOCK_DP * density
@@ -174,23 +194,28 @@ class PlayerGestureListener(
              } else if (direction == PlayerScrubPolicy.Direction.VERTICAL) {
                  // Vertical Swipes (Volume / Brightness)
                  // Split left/right halves
+                 levelAnchorY = e2.y
                  if (e1.x < width / 2) {
                      isBrightness = true
                      startBrightness = helper.getCurrentBrightness(callback.windowAttributes)
+                     brightnessApplied = false
                      hapticTracker = PlayerScrubHapticTracker(
-                         start = (startBrightness * 100).toLong(),
+                         start = PlayerLevelGesturePolicy.percent(startBrightness).toLong(),
                          min = 0L,
                          max = 100L,
                          step = PlayerScrubPolicy.BRIGHTNESS_TICK_PERCENT,
                      )
                  } else {
                      isVolume = true
-                     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                     startVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                     maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                     val startIndex = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                     appliedVolumeIndex = startIndex
+                     startVolumeLevel = PlayerLevelGesturePolicy.volumeStart(startIndex, maxVolume, lastVolumeLevel, lastVolumeIndex)
+                     // Ticks on each real device step, not on the shown percent.
                      hapticTracker = PlayerScrubHapticTracker(
-                         start = startVolume.toLong(),
+                         start = startIndex.toLong(),
                          min = 0L,
-                         max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toLong(),
+                         max = maxVolume.toLong(),
                          step = 1L,
                      )
                  }
@@ -311,18 +336,22 @@ class PlayerGestureListener(
             return true
         }
 
-        val percentY = (gestureStartY - e2.y) / height
+        val percentY = (levelAnchorY - e2.y) / height
 
         if (isBrightness) {
-            val rawBrightness = startBrightness + percentY
-            val isAuto = rawBrightness < 0.05f
-            val newBrightness = if (isAuto) -1f else rawBrightness.coerceIn(0.05f, 1.0f)
+            val level = PlayerLevelGesturePolicy.level(startBrightness, percentY)
+            val brightness = PlayerLevelGesturePolicy.brightnessPercent(level)
+            val isAuto = brightness == null
+            // Whole percents, applied only when the percent changes.
+            if (!brightnessApplied || brightness != appliedBrightnessPercent) {
+                val lp = callback.windowAttributes
+                lp.screenBrightness = brightness?.let { it / 100f } ?: -1f
+                callback.setWindowAttributes(lp)
+                appliedBrightnessPercent = brightness
+                brightnessApplied = true
+            }
 
-            val lp = callback.windowAttributes
-            lp.screenBrightness = newBrightness
-            callback.setWindowAttributes(lp)
-
-            val percent = if (isAuto) 0 else (newBrightness * 100).toInt()
+            val percent = brightness ?: 0
             haptic(hapticTracker?.update(percent.toLong()), e2.eventTime)
             val valueText = if (isAuto) "Auto" else "%d%%".format(percent)
             presentFeedback(
@@ -335,21 +364,33 @@ class PlayerGestureListener(
                 } else {
                     labeledA11y(PlayerGestureFeedbackKind.BRIGHTNESS, valueText)
                 },
-                // The slider shows no number; the centered value keeps its
-                // icon so it cannot be mistaken for volume.
-                reading = PlayerGestureReading(fraction = percent / 100f, value = valueText, valueIcon = true),
+                // The slider shows no number and follows the finger between
+                // percents; the centered value keeps its icon so it cannot be
+                // mistaken for volume.
+                reading = PlayerGestureReading(
+                    fraction = if (isAuto) 0f else level.coerceAtLeast(PlayerLevelGesturePolicy.BRIGHTNESS_MIN_PERCENT / 100f),
+                    value = valueText,
+                    valueIcon = true,
+                ),
             )
             return true
         }
 
         if (isVolume) {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val newVolume = (startVolume + (percentY * maxVolume)).toInt().coerceIn(0, maxVolume)
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+            // The shown level moves one percent at a time with the finger;
+            // the device follows at its own step size, and only when its
+            // step changes.
+            val level = PlayerLevelGesturePolicy.level(startVolumeLevel, percentY)
+            val newVolume = PlayerLevelGesturePolicy.volumeIndex(level, maxVolume)
+            if (newVolume != appliedVolumeIndex) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+                appliedVolumeIndex = newVolume
+            }
+            lastVolumeLevel = level
+            lastVolumeIndex = newVolume
             haptic(hapticTracker?.update(newVolume.toLong()), e2.eventTime)
 
-            val percent = ((newVolume.toFloat() / maxVolume.toFloat()) * 100).toInt()
+            val percent = PlayerLevelGesturePolicy.percent(level)
             val valueText = "%d%%".format(percent)
             presentFeedback(
                 kind = PlayerGestureFeedbackKind.DEVICE_VOLUME,
@@ -360,7 +401,7 @@ class PlayerGestureListener(
                     PlayerGestureFeedbackKind.DEVICE_VOLUME,
                     if (newVolume == 0) context.getString(R.string.gesture_feedback_muted) else valueText,
                 ),
-                reading = PlayerGestureReading(fraction = percent / 100f, value = valueText, valueIcon = true),
+                reading = PlayerGestureReading(fraction = level, value = valueText, valueIcon = true),
             )
             return true
         }
