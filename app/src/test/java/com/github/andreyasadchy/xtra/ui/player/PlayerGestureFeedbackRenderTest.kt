@@ -197,7 +197,9 @@ class PlayerGestureFeedbackRenderTest {
             context, feedback, PlayerGestureFeedbackKind.SEEK, 1280, 720,
             PlayerGestureFeedbackState.presentation(
                 PlayerGestureFeedbackKind.SEEK, PlayerSurfaceClass.LARGE,
-                reading = PlayerGestureReading(0.7f, "+12:00", startFraction = 0.5f, detail = "27:00"),
+                reading = PlayerGestureReading(
+                    0.7f, "+12:00", startFraction = 0.5f, detail = "27:00 / 3:12:45", caption = "27:00 / 3:12:45",
+                ),
             ),
             R.drawable.ic_gesture_seek_forward, "seek +12:00", hide,
             edges = PlayerFeedbackEdges.NONE,
@@ -205,7 +207,27 @@ class PlayerGestureFeedbackRenderTest {
         val slider = feedback.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)
         assertEquals(0.7f, slider.fraction, 0f)
         assertEquals("+12:00", slider.label)
+        // A new caption text redraws; only a caption appearing or going lays out.
+        assertEquals("27:00 / 3:12:45", slider.caption)
         assertFalse("an update requests no layout", surface.isLayoutRequested)
+    }
+
+    @Test fun `a caption appearing or going lays the slider out again`() {
+        val slider = PlayerGestureSliderView(context)
+        slider.setReading(0.5f, 0.5f, "1.00x")
+        slider.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        slider.layout(0, 0, slider.measuredWidth, slider.measuredHeight)
+        val plain = slider.measuredHeight
+        assertFalse(slider.isLayoutRequested)
+        slider.setReading(0.5f, 0.5f, "+0:00", "15:00 / 3:12:45")
+        assertTrue("caption appears", slider.isLayoutRequested)
+        slider.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        slider.layout(0, 0, slider.measuredWidth, slider.measuredHeight)
+        assertEquals(plain + PlayerGestureSliderView.CAPTION_BAND_DP.toInt(), slider.measuredHeight)
+        slider.setReading(0.6f, 0.5f, "+1:00", "16:00 / 3:12:45")
+        assertFalse("new caption text", slider.isLayoutRequested)
+        slider.setReading(0.6f, 0.5f, "1.25x")
+        assertTrue("caption goes", slider.isLayoutRequested)
     }
 
     @Test fun `fresh edge slider springs out of its side and lands on its final state`() {
@@ -336,10 +358,19 @@ class PlayerGestureFeedbackRenderTest {
         presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 1280, 720, seekForward)
         val slider = feedback.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)
         assertOnlyShown(feedback, R.id.feedbackSlider)
-        // 300 x 44 dp plus 4 px of pad; the track starts 16 px below the top.
+        // 300 x 44 dp plus 4 px of pad, and the 30 dp caption band; the
+        // track starts 16 px below the top.
         assertEquals(308, slider.width)
-        assertEquals(52, slider.height)
+        assertEquals(82, slider.height)
         assertEquals(16f, feedback.top + slider.top + 4f, 0f)
+        assertEquals(26f, slider.trackCenterY(), 0f)
+        // The target time and the length, in a pill centered under the track.
+        assertEquals("24:00 / 3:12:45", slider.caption)
+        val caption = slider.captionBounds()!!
+        assertEquals((slider.trackLeft() + slider.trackRight()) / 2f, caption.centerX(), 0.5f)
+        assertEquals(4f + 44f + 6f, caption.top, 0.5f)
+        assertTrue("caption inside the view", caption.bottom <= slider.height - 4f + 0.5f)
+        assertTrue("caption within the track's width", caption.left >= slider.trackLeft() && caption.right <= slider.trackRight())
         assertEquals(640f, feedback.left + slider.left + slider.width / 2f, 0.5f)
         assertEquals("+9:00", slider.label)
         val track = slider.trackRight() - slider.trackLeft()
@@ -362,11 +393,14 @@ class PlayerGestureFeedbackRenderTest {
         assertEquals(308, slider.width)
         UiTestRender.save(surface, "gesture-seek-slider-back")
 
-        // Back at the start: the handle covers the dot and the slider says Cancel.
+        // Back at the start: the handle covers the dot and the slider says
+        // Cancel; the caption still shows where that is.
         presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 1280, 720,
-            PlayerGestureReading(0.5f, null, startFraction = 0.5f, detail = "Cancel", valueIcon = true), icon = R.drawable.ic_gesture_undo)
+            PlayerGestureReading(0.5f, null, startFraction = 0.5f, detail = "Cancel", valueIcon = true, caption = "15:00 / 3:12:45"),
+            icon = R.drawable.ic_gesture_undo)
         assertEquals(null, slider.startDotX())
         assertEquals("Cancel", slider.label)
+        assertEquals("15:00 / 3:12:45", slider.caption)
         UiTestRender.save(surface, "gesture-seek-slider-cancel")
     }
 
@@ -395,12 +429,15 @@ class PlayerGestureFeedbackRenderTest {
         val (surface, feedback) = createSurface()
         val slider = feedback.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)
         presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 1280, 720, seekForward)
-        val seekBounds = listOf(slider.left, slider.top, slider.width, slider.height)
+        // Seek is taller only by its caption: the track stays in one place.
+        val seekBounds = listOf(slider.left, slider.top, slider.width, slider.height - 30)
         presentReading(surface, feedback, PlayerGestureFeedbackKind.PLAYBACK_SPEED, 1280, 720,
             PlayerGestureReading(PlayerScrubPolicy.speedFraction(1.5f), "1.50x", startFraction = PlayerScrubPolicy.speedFraction(1f)),
             icon = R.drawable.baseline_speed_black_24)
         assertOnlyShown(feedback, R.id.feedbackSlider)
         assertEquals("1.50x", slider.label)
+        assertEquals(null, slider.caption)
+        assertEquals(null, slider.captionBounds())
         assertTrue(slider.handleCenterX() > slider.startDotX()!!)
         assertEquals(seekBounds, listOf(slider.left, slider.top, slider.width, slider.height))
         UiTestRender.save(surface, "gesture-speed-slider")
@@ -428,17 +465,23 @@ class PlayerGestureFeedbackRenderTest {
         // A short split-screen player.
         presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 720, 240, seekForward)
         assertEquals(PlayerGestureSliderView.COMPACT_WIDTH_DP.toInt() + 8, slider.width)
+        val compactCaption = slider.captionBounds()!!
+        assertTrue(compactCaption.left >= slider.trackLeft() && compactCaption.right <= slider.trackRight())
+        assertTrue("caption above the player's bottom", feedback.top + slider.top + compactCaption.bottom <= 240f)
         UiTestRender.save(surface, "gesture-seek-slider-compact")
 
         // A window narrower than the slider plus its margins narrows it further,
         // and a long value shrinks to fit its part.
         presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 160, 200,
-            PlayerGestureReading(0.7f, "+10:02:10", startFraction = 0.5f, detail = "10:12:10"))
+            PlayerGestureReading(0.7f, "+10:02:10", startFraction = 0.5f, detail = "10:12:10 / 12:00:00", caption = "10:12:10 / 12:00:00"))
         assertEquals(160 - 32f, slider.trackRight() - slider.trackLeft(), 0f)
         assertTrue(slider.left + slider.trackLeft() >= 16f)
         assertTrue(slider.left + slider.trackRight() <= 160f - 16f)
         val label = slider.labelBounds()!!
         assertTrue(label.first >= slider.trackLeft() && label.second <= slider.trackRight())
+        // A caption wider than the track shrinks to fit it.
+        val narrowCaption = slider.captionBounds()!!
+        assertTrue(narrowCaption.left >= slider.trackLeft() - 0.5f && narrowCaption.right <= slider.trackRight() + 0.5f)
         UiTestRender.save(surface, "gesture-seek-slider-narrow")
 
         // A large player again restores the regular slider.
@@ -471,6 +514,7 @@ class PlayerGestureFeedbackRenderTest {
         PlayerSurfacePolicy.resetFeedback(feedback)
         assertEquals(null, slider.label)
         assertEquals(null, slider.startFraction)
+        assertEquals(null, slider.caption)
     }
 
     @Test fun `the number style centers the seek change with the target below it`() {
@@ -483,7 +527,7 @@ class PlayerGestureFeedbackRenderTest {
         assertEquals(180, value.height)
         assertCentered(value, feedback, 1280, 720)
         assertEquals("+9:00", value.value)
-        assertEquals("24:00", value.detail)
+        assertEquals("24:00 / 3:12:45", value.detail)
         assertFalse("seek shows no icon", value.hasIcon)
         assertContentInside(value)
         assertSettled(value)
@@ -561,7 +605,9 @@ class PlayerGestureFeedbackRenderTest {
         assertFalse(value.hasIcon)
     }
 
-    private val seekForward = PlayerGestureReading(0.62f, "+9:00", startFraction = 0.5f, detail = "24:00")
+    private val seekForward = PlayerGestureReading(
+        0.62f, "+9:00", startFraction = 0.5f, detail = "24:00 / 3:12:45", caption = "24:00 / 3:12:45",
+    )
 
     private fun presentReading(
         surface: FrameLayout,

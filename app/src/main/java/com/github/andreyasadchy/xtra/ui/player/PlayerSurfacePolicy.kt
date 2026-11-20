@@ -176,7 +176,10 @@ object PlayerSurfacePolicy {
                     marginRightPx = 0,
                     topPaddingPx = (TOP_SLIDER_TOP_DP * density).toInt() - pad,
                     fixedContainerWidthPx = width,
-                    fixedContainerHeightPx = (PlayerGestureSliderView.HANDLE_LENGTH_DP * density).toInt() + 2 * pad,
+                    // A seek adds its caption under the track; the track
+                    // itself stays where speed and pinch draw theirs.
+                    fixedContainerHeightPx = (PlayerGestureSliderView.HANDLE_LENGTH_DP * density).toInt() + 2 * pad +
+                        if (kind == PlayerGestureFeedbackKind.SEEK) captionBandPx(density) else 0,
                     indicator = PlayerFeedbackIndicator.TOP_SLIDER,
                 )
             }
@@ -210,6 +213,9 @@ object PlayerSurfacePolicy {
 
     /** Room around a drawn slider, on each side. */
     fun sliderPadPx(density: Float): Int = (PlayerGestureSliderView.PAD_DP * density).toInt()
+
+    /** Height a caption adds under the top slider, its gap included. */
+    fun captionBandPx(density: Float): Int = (PlayerGestureSliderView.CAPTION_BAND_DP * density).toInt()
 
     /**
      * The top slider's drawn width, narrowed to leave the side margins on a
@@ -454,7 +460,12 @@ object PlayerSurfacePolicy {
                 val shownReading = reading ?: return
                 topSlider.setColors(colors)
                 topSlider.setIcon(iconRes)
-                topSlider.setReading(shownReading.fraction, shownReading.startFraction, shownReading.value ?: shownReading.detail)
+                topSlider.setReading(
+                    shownReading.fraction,
+                    shownReading.startFraction,
+                    shownReading.value ?: shownReading.detail,
+                    shownReading.caption,
+                )
                 topSlider
             }
             PlayerFeedbackIndicator.CENTER_VALUE -> {

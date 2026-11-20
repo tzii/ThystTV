@@ -58,10 +58,12 @@ enum class PlayerGestureFeedbackLayout {
  *
  * [fraction] places the slider's handle, 0 at the left or bottom end and 1 at
  * the right or top. [startFraction], when present, is where the gesture
- * started, drawn as a dot on the track. [value] is the slider's only text and
- * the centered number; [detail] is a small line under the centered number
- * only. With [valueIcon] the centered number shows the gesture's icon above
- * it, for readings whose number alone could be another gesture's.
+ * started, drawn as a dot on the track. [value] is the text in the slider's
+ * track and the centered number; [detail] is a small line under the centered
+ * number. [caption] is a small fixed line under the slider (a seek's target
+ * time and the video's length). With [valueIcon] the centered number shows
+ * the gesture's icon above it, for readings whose number alone could be
+ * another gesture's.
  */
 data class PlayerGestureReading(
     val fraction: Float,
@@ -69,6 +71,7 @@ data class PlayerGestureReading(
     val startFraction: Float? = null,
     val detail: String? = null,
     val valueIcon: Boolean = false,
+    val caption: String? = null,
 )
 
 data class PlayerGestureFeedbackPresentation(

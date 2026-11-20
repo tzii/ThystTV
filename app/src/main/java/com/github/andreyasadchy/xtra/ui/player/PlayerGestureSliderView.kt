@@ -26,7 +26,9 @@ import kotlin.math.min
  * The icon sits inside the start of the active part and the value, the only
  * text, at the end of the other part. When a part gets too short, its icon or
  * value moves across the handle, as Expressive sliders do with their icons. A
- * dot marks where the gesture started. The track draws in physical
+ * dot marks where the gesture started. An optional caption, a small dark
+ * pill centered under the track, holds a seek's target time and the video's
+ * length; it stays put while the handle moves. The track draws in physical
  * left-to-right order, matching the drag: right is always later, faster or
  * closer to Fill.
  *
@@ -54,6 +56,13 @@ class PlayerGestureSliderView @JvmOverloads constructor(
         // Tabular digits keep the changing value from shimmering.
         fontFeatureSettings = "tnum"
     }
+    private val captionPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+        fontFeatureSettings = "tnum"
+    }
+    private val captionBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val captionRect = RectF()
     private val path = Path()
     private val rect = RectF()
     private var colors: PlayerGestureFeedbackColors? = null
@@ -72,12 +81,18 @@ class PlayerGestureSliderView @JvmOverloads constructor(
     var label: String? = null
         private set
 
+    /** Small fixed line under the track, or null for none. */
+    var caption: String? = null
+        private set
+
     fun setColors(colors: PlayerGestureFeedbackColors) {
         if (colors == this.colors) return
         this.colors = colors
         activePaint.color = colors.accent
         inactivePaint.color = colors.container
         handlePaint.color = colors.accent
+        captionBackgroundPaint.color = colors.container
+        captionPaint.color = colors.content
         invalidate()
     }
 
@@ -90,13 +105,18 @@ class PlayerGestureSliderView @JvmOverloads constructor(
     }
 
     /** Updates the slider in place; its size never changes, so no layout pass. */
-    fun setReading(fraction: Float, startFraction: Float?, label: String?) {
+    fun setReading(fraction: Float, startFraction: Float?, label: String?, caption: String? = null) {
         val clamped = fraction.coerceIn(0f, 1f)
         val start = startFraction?.coerceIn(0f, 1f)
-        if (clamped == this.fraction && start == this.startFraction && label == this.label) return
+        if (clamped == this.fraction && start == this.startFraction && label == this.label && caption == this.caption) return
+        // The caption band is part of the measured height: lay out again only
+        // when a caption appears or goes, never for a new caption text.
+        val bandChanged = caption.isNullOrEmpty() != this.caption.isNullOrEmpty()
         this.fraction = clamped
         this.startFraction = start
         this.label = label
+        this.caption = caption
+        if (bandChanged) requestLayout()
         invalidate()
     }
 
@@ -104,12 +124,14 @@ class PlayerGestureSliderView @JvmOverloads constructor(
         fraction = 0f
         startFraction = null
         label = null
+        caption = null
         invalidate()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val desiredWidth = (WIDTH_DP * density + 2f * pad).toInt()
-        val desiredHeight = (HANDLE_LENGTH_DP * density + 2f * pad).toInt()
+        val captionBand = if (caption.isNullOrEmpty()) 0f else CAPTION_BAND_DP * density
+        val desiredHeight = (HANDLE_LENGTH_DP * density + captionBand + 2f * pad).toInt()
         setMeasuredDimension(resolveSize(desiredWidth, widthMeasureSpec), resolveSize(desiredHeight, heightMeasureSpec))
     }
 
@@ -133,6 +155,32 @@ class PlayerGestureSliderView @JvmOverloads constructor(
 
     /** Left and right of the drawn icon, in view pixels. */
     internal fun iconBounds(): Pair<Float, Float>? = layout().iconBounds
+
+    /** Y of the track's center, in view pixels: the top of the view, below the pad. */
+    internal fun trackCenterY(): Float = pad + HANDLE_LENGTH_DP * density / 2f
+
+    /**
+     * The caption's pill, in view pixels, or null when there is no caption or
+     * no room under the track for it. The text shrinks to fit the track's width.
+     */
+    internal fun captionBounds(): RectF? {
+        val text = caption
+        if (text.isNullOrEmpty()) return null
+        val top = pad + HANDLE_LENGTH_DP * density + CAPTION_GAP_DP * density
+        val boxHeight = CAPTION_HEIGHT_DP * density
+        if (top + boxHeight > height - pad + 0.5f) return null
+        val padH = CAPTION_PAD_DP * density
+        val room = trackRight() - trackLeft()
+        captionPaint.textSize = sp(CAPTION_SP)
+        val measured = captionPaint.measureText(text)
+        if (measured + 2f * padH > room && measured > 0f) {
+            captionPaint.textSize *= ((room - 2f * padH).coerceAtLeast(0f) / measured)
+        }
+        val boxWidth = (captionPaint.measureText(text) + 2f * padH).coerceAtMost(room)
+        val centerX = (trackLeft() + trackRight()) / 2f
+        captionRect.set(centerX - boxWidth / 2f, top, centerX + boxWidth / 2f, top + boxHeight)
+        return captionRect
+    }
 
     private fun handleLeft(): Float {
         val usable = (trackRight() - trackLeft() - HANDLE_WIDTH_DP * density).coerceAtLeast(0f)
@@ -230,7 +278,7 @@ class PlayerGestureSliderView @JvmOverloads constructor(
         val layout = layout()
         val left = trackLeft()
         val right = trackRight()
-        val centerY = height / 2f
+        val centerY = trackCenterY()
         val trackHalf = TRACK_DP * density / 2f
         val outer = OUTER_CORNER_DP * density
         val inner = INNER_CORNER_DP * density
@@ -269,6 +317,14 @@ class PlayerGestureSliderView @JvmOverloads constructor(
             val baseline = centerY - (labelPaint.descent() + labelPaint.ascent()) / 2f
             canvas.drawText(text, labelBounds.second, baseline, labelPaint)
         }
+
+        val captionText = caption
+        val box = captionBounds()
+        if (!captionText.isNullOrEmpty() && box != null) {
+            canvas.drawRoundRect(box, box.height() / 2f, box.height() / 2f, captionBackgroundPaint)
+            val baseline = box.centerY() - (captionPaint.descent() + captionPaint.ascent()) / 2f
+            canvas.drawText(captionText, box.centerX(), baseline, captionPaint)
+        }
     }
 
     private fun sp(value: Float): Float {
@@ -296,6 +352,13 @@ class PlayerGestureSliderView @JvmOverloads constructor(
         const val LABEL_INSET_DP = 12f
         const val LABEL_SP = 16f
         const val LABEL_MIN_SP = 11f
+
+        /** The caption's pill under the track: gap below the handle, height, side padding and type. */
+        const val CAPTION_GAP_DP = 6f
+        const val CAPTION_HEIGHT_DP = 24f
+        const val CAPTION_PAD_DP = 10f
+        const val CAPTION_SP = 13f
+        const val CAPTION_BAND_DP = CAPTION_GAP_DP + CAPTION_HEIGHT_DP
 
         /**
          * Room around the drawn slider, included in the view's size, so the

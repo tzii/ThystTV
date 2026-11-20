@@ -454,10 +454,14 @@ the start of the track to the handle; the dark part is the rest.
     dot sit on the whole VoD, so the track shows where in the video the seek
     lands. Back at the start, the icon turns into undo and the value reads
     "Cancel". When the seek reaches the start or end of the video, the handle
-    stops there. With spoiler-free VoDs the track is relative instead: the
-    start sits in the middle and the handle follows the finger, reaching an
-    end after half the player width, so it never reveals the position or the
-    length.
+    stops there. A small dark caption centered under the track shows the
+    target time and the VoD's length (`24:00 / 3:12:45`); it stays in place
+    while the handle moves, keeps showing the position at "Cancel", and
+    shrinks to the track's width when it is longer. With spoiler-free VoDs the
+    track is relative instead: the start sits in the middle and the handle
+    follows the finger, reaching an end after half the player width, and the
+    caption shows the target time only, so nothing reveals the position on
+    the track or the length.
   - Speed shows the speed (`1.50x`, the speed button's format) on a
     logarithmic 0.25x–4x track with 1x in the middle.
   - Pinch shows the mode or zoom it points to (`Fit`, `Fill`, `125%`). To Fit
@@ -471,9 +475,9 @@ container. The glow is 60% black behind the value, so white text stays
 readable over white video. The number is 48sp (36sp on small players) and
 shrinks to fit.
 
-- Seek shows the change, with the target time small under it (`24:00`).
-  Spoiler-free VoDs show the position but never the length, as before. Back
-  at the start it shows the undo icon over "Cancel".
+- Seek shows the change, with the target time and the VoD's length small
+  under it (`24:00 / 3:12:45`). Spoiler-free VoDs show the target time only,
+  never the length. Back at the start it shows the undo icon over "Cancel".
 - Brightness and volume show their icon above the percentage.
 - Speed and pinch show only the value.
 
