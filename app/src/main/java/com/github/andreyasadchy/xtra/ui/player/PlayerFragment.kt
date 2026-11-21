@@ -4205,6 +4205,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         createdAt = requireArguments().getString(KEY_CREATED_AT),
                         videoId = requireArguments().getString(KEY_VIDEO_ID),
                         videoOffsetSeconds = requireArguments().getInt(KEY_VIDEO_OFFSET_SECONDS),
+                        durationSeconds = getDuration().takeIf { it > 0 }?.div(1000L)?.toInt()
+                            ?: requireArguments().getInt(KEY_DURATION_SECONDS, -1).takeIf { it > 0 },
                         qualityNames = qualities?.map { it.name.toString() }?.toTypedArray(),
                         qualityCodecs = qualities?.map { it.codecs.toString() }?.toTypedArray(),
                         qualityUrls = qualities?.map { it.url.toString() }?.toTypedArray(),
