@@ -48,9 +48,11 @@ class SettingsSearchAdapter(
                             fragment.findNavController().navigate(item.navDirections)
                         }
                     }
-                    if (item.location != null) {
+                    // The section shows why a result matched when only its section name did.
+                    val location = listOfNotNull(item.location, item.section).joinToString(" · ")
+                    if (location.isNotEmpty()) {
                         preferenceLocation.visibility = View.VISIBLE
-                        preferenceLocation.text = item.location
+                        preferenceLocation.text = location
                     } else {
                         preferenceLocation.visibility = View.GONE
                     }
