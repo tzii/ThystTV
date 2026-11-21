@@ -25,6 +25,7 @@ import com.github.andreyasadchy.xtra.model.chat.StvBadge
 import com.github.andreyasadchy.xtra.model.chat.StvUser
 import com.github.andreyasadchy.xtra.model.chat.TwitchBadge
 import com.github.andreyasadchy.xtra.model.chat.TwitchEmote
+import com.github.andreyasadchy.xtra.ui.view.ChatMessageTextView
 import com.github.andreyasadchy.xtra.ui.view.NamePaintImageSpan
 import com.github.andreyasadchy.xtra.util.chat.ChatAdapterUtils
 import java.util.Random
@@ -70,7 +71,6 @@ class ChatAdapter(
     private val translateMessage: (ChatMessage, String?) -> Unit,
     private val showLanguageDownloadDialog: (ChatMessage, String) -> Unit,
     private val channelId: String?,
-    var useHighVisibility: Boolean = false,
     private val loggedInUser: String?,
     private val messageClickListener: ((String?) -> Unit)?,
     private val replyClickListener: (() -> Unit)?,
@@ -78,7 +78,12 @@ class ChatAdapter(
 ) : RecyclerView.Adapter<ChatAdapter.ViewHolder>() {
 
     var translateAllMessages = false
-    var useDarkOverlay = false
+    /** Set while the list floats over video; null on an app surface. */
+    var overlayStyle: ChatOverlayStyle? = null
+    /** Animated emotes stay still while the floating chat is hidden or tucked away. */
+    var animationsPaused = false
+        private set
+    private val useDarkOverlay get() = overlayStyle != null
     private var selectedMessage: ChatMessage? = null
     private val random = Random()
     private val userColors = HashMap<String, Int>()
@@ -98,7 +103,7 @@ class ChatAdapter(
         } ?: return
         val result = ChatAdapterUtils.prepareChatMessage(
             chatMessage, holder.textView, enableTimestamps, timestampFormat, firstMsgVisibility, firstChatMsg, redeemedChatMsg, redeemedNoMsg,
-            rewardChatMsg, replyMessage, null, useRandomColors, random, useReadableColors, effectiveIsLightTheme(), nameDisplay, useBoldNames, showNamePaints,
+            rewardChatMsg, replyMessage, null, useRandomColors, random, useReadableColors, effectiveIsLightTheme(), nameDisplay, useBoldNames || useDarkOverlay, showNamePaints,
             namePaints, showStvBadges, stvBadges, showPersonalEmotes, personalEmoteSets, stvUsers, enableOverlayEmotes, showSystemMessageEmotes,
             loggedInUser, chatUrl, getEmoteBytes, userColors, savedColors, translateAllMessages, translateMessage, showLanguageDownloadDialog,
             true, localTwitchEmotes, thirdPartyEmotes, globalBadges, channelBadges, cheerEmotes, savedLocalTwitchEmotes, savedLocalBadges,
@@ -168,71 +173,49 @@ class ChatAdapter(
 
     override fun onViewAttachedToWindow(holder: ViewHolder) {
         super.onViewAttachedToWindow(holder)
-        if (animateGifs) {
-            (holder.textView.text as? Spannable)?.let { view ->
-                view.getSpans<ImageSpan>().forEach {
-                    (it.drawable as? Animatable)?.start() ?:
-                    (it.drawable as? LayerDrawable)?.let {
-                        val lastIndex = it.numberOfLayers - 1
-                        if (lastIndex > -1) {
-                            for (i in 0..lastIndex) {
-                                (it.getDrawable(i) as? Animatable)?.start()
-                            }
-                        }
-                    }
-                }
-                view.getSpans<NamePaintImageSpan>().forEach {
-                    (it.drawable as? Animatable)?.start()
-                }
-            }
-        }
+        if (animateGifs && !animationsPaused) setRowAnimating(holder.textView, true)
     }
 
     override fun onViewDetachedFromWindow(holder: ViewHolder) {
         super.onViewDetachedFromWindow(holder)
-        if (animateGifs) {
-            (holder.textView.text as? Spannable)?.let { view ->
-                view.getSpans<ImageSpan>().forEach {
-                    (it.drawable as? Animatable)?.stop() ?:
-                    (it.drawable as? LayerDrawable)?.let {
-                        val lastIndex = it.numberOfLayers - 1
-                        if (lastIndex > -1) {
-                            for (i in 0..lastIndex) {
-                                (it.getDrawable(i) as? Animatable)?.stop()
-                            }
-                        }
-                    }
-                }
-                view.getSpans<NamePaintImageSpan>().forEach {
-                    (it.drawable as? Animatable)?.stop()
-                }
-            }
-        }
+        if (animateGifs) setRowAnimating(holder.textView, false)
     }
 
     override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
-        val childCount = recyclerView.childCount
         if (animateGifs) {
-            for (i in 0 until childCount) {
-                ((recyclerView.getChildAt(i) as TextView).text as? Spannable)?.let { view ->
-                    view.getSpans<ImageSpan>().forEach {
-                        (it.drawable as? Animatable)?.stop() ?:
-                        (it.drawable as? LayerDrawable)?.let {
-                            val lastIndex = it.numberOfLayers - 1
-                            if (lastIndex > -1) {
-                                for (i in 0..lastIndex) {
-                                    (it.getDrawable(i) as? Animatable)?.stop()
-                                }
-                            }
-                        }
-                    }
-                    view.getSpans<NamePaintImageSpan>().forEach {
-                        (it.drawable as? Animatable)?.stop()
-                    }
-                }
+            for (i in 0 until recyclerView.childCount) {
+                (recyclerView.getChildAt(i) as? TextView)?.let { setRowAnimating(it, false) }
             }
         }
         super.onDetachedFromRecyclerView(recyclerView)
+    }
+
+    /** Stops or restarts animated emotes and name paints on the rows currently shown. */
+    fun setAnimationsPaused(recyclerView: RecyclerView, paused: Boolean) {
+        if (animationsPaused == paused) return
+        animationsPaused = paused
+        if (!animateGifs) return
+        for (i in 0 until recyclerView.childCount) {
+            (recyclerView.getChildAt(i) as? TextView)?.let { setRowAnimating(it, !paused) }
+        }
+    }
+
+    private fun setRowAnimating(textView: TextView, running: Boolean) {
+        val text = textView.text as? Spannable ?: return
+        fun Animatable.set() = if (running) start() else stop()
+        text.getSpans<ImageSpan>().forEach { span ->
+            val drawable = span.drawable
+            if (drawable is Animatable) {
+                drawable.set()
+            } else if (drawable is LayerDrawable) {
+                for (i in 0 until drawable.numberOfLayers) {
+                    (drawable.getDrawable(i) as? Animatable)?.set()
+                }
+            }
+        }
+        text.getSpans<NamePaintImageSpan>().forEach {
+            (it.drawable as? Animatable)?.set()
+        }
     }
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -242,27 +225,39 @@ class ChatAdapter(
         private val defaultTextColors = textView.textColors
         private val defaultLinkTextColors = textView.linkTextColors
         private val defaultHighlightColor = textView.highlightColor
+        private val defaultPadding = intArrayOf(textView.paddingLeft, textView.paddingTop, textView.paddingRight, textView.paddingBottom)
+        private val density = textView.resources.displayMetrics.density
 
         fun bind(chatMessage: ChatMessage, formattedMessage: SpannableStringBuilder) {
             textView.apply {
                 text = formattedMessage
-                textSize = messageTextSize
-                if (useDarkOverlay) {
+                val overlay = overlayStyle
+                textSize = messageTextSize * (overlay?.textScale ?: 1f)
+                if (overlay != null) {
                     setTextColor(FLOATING_CHAT_TEXT_COLOR)
                     setLinkTextColor(FLOATING_CHAT_LINK_COLOR)
                     highlightColor = FLOATING_CHAT_LINK_HIGHLIGHT_COLOR
+                    // Room for the halo and an even inset from the card's rounded edge.
+                    val horizontal = (OVERLAY_PADDING_H_DP * density).toInt()
+                    val vertical = (OVERLAY_PADDING_V_DP * density).toInt()
+                    if (paddingLeft != horizontal || paddingTop != vertical) setPadding(horizontal, vertical, horizontal, vertical)
                 } else {
                     setTextColor(defaultTextColors)
                     setLinkTextColor(defaultLinkTextColors)
                     highlightColor = defaultHighlightColor
+                    if (paddingLeft != defaultPadding[0] || paddingTop != defaultPadding[1]) {
+                        setPadding(defaultPadding[0], defaultPadding[1], defaultPadding[2], defaultPadding[3])
+                    }
                 }
-                if (useHighVisibility) {
-                    setShadowLayer(6f, 2f, 2f, android.graphics.Color.BLACK)
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                } else {
+                if (this is ChatMessageTextView) {
+                    setOverlayTreatment(overlay?.treatment)
+                } else if (overlay?.treatment == ChatOverlayStyle.Treatment.NONE || overlay == null) {
                     setShadowLayer(0f, 0f, 0f, 0)
-                    typeface = android.graphics.Typeface.DEFAULT
+                } else {
+                    setShadowLayer(2f * density, 0f, 0.5f * density, Color.BLACK)
                 }
+                val typeface = if (overlay?.boldText == true) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+                if (this.typeface != typeface) this.typeface = typeface
                 if (chatMessage.isReply) {
                     movementMethod = null
                     maxLines = 2
@@ -294,5 +289,7 @@ class ChatAdapter(
         val FLOATING_CHAT_TEXT_COLOR = Color.WHITE
         val FLOATING_CHAT_LINK_COLOR = 0xFF4FC3F7.toInt()
         val FLOATING_CHAT_LINK_HIGHLIGHT_COLOR = 0x334FC3F7
+        const val OVERLAY_PADDING_H_DP = 10f
+        const val OVERLAY_PADDING_V_DP = 2f
     }
 }

@@ -37,6 +37,7 @@ webkit = "1.15.0"
 window = "1.5.1"
 work = "2.11.2"
 detekt = "1.23.7"
+dynamicanimation = "1.1.0"
 
 [libraries]
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
@@ -51,6 +52,7 @@ conscrypt = { module = "org.conscrypt:conscrypt-android", version.ref = "conscry
 window = { module = "androidx.window:window", version.ref = "window" }
 constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
 coordinatorlayout = { module = "androidx.coordinatorlayout:coordinatorlayout", version.ref = "coordinatorlayout" }
+dynamicanimation = { module = "androidx.dynamicanimation:dynamicanimation", version.ref = "dynamicanimation" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "core" }
 coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 cronet-api = { module = "org.chromium.net:cronet-api", version.ref = "cronet" }

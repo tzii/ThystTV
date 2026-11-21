@@ -70,6 +70,7 @@ class PlayerChatSwipeTest {
         Mockito.doReturn(chatView).`when`(chat).view
         ReflectionHelpers.setField(fragment, "chatFragment", chat)
         binding.chatFragmentContainer.addView(chatView)
+        ReflectionHelpers.callInstanceMethod<Unit>(fragment, "setupFloatingChat")
         fragment.hideChat()
         listener = PlayerGestureListener(context, fragment, doubleTapEnabled = true)
         setVideoType(PlayerFragment.STREAM)

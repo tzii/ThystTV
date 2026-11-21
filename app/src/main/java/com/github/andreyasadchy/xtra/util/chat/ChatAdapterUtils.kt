@@ -6,6 +6,7 @@ import android.graphics.drawable.Animatable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
+import android.os.SystemClock
 import android.text.SpannableStringBuilder
 import android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
 import android.text.TextPaint
@@ -703,7 +704,7 @@ object ChatAdapterUtils {
                                         }
 
                                         override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                                            itemView.postDelayed(what, `when`)
+                                            itemView.postDelayed(what, (`when` - SystemClock.uptimeMillis()).coerceAtLeast(0L))
                                         }
                                     }
                                     (result as Animatable).start()
@@ -758,7 +759,7 @@ object ChatAdapterUtils {
                         }
 
                         override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                            itemView.postDelayed(what, `when`)
+                            itemView.postDelayed(what, (`when` - SystemClock.uptimeMillis()).coerceAtLeast(0L))
                         }
                     }
                     (result as Animatable).start()
@@ -797,7 +798,7 @@ object ChatAdapterUtils {
                     }
 
                     override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                        itemView.postDelayed(what, `when`)
+                        itemView.postDelayed(what, (`when` - SystemClock.uptimeMillis()).coerceAtLeast(0L))
                     }
                 }
                 (result as Animatable).start()
