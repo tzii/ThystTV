@@ -547,7 +547,9 @@ Seek and speed share one set of rules (`PlayerScrubPolicy`):
   travel within about 27° of horizontal (|dx| ≥ 2|dy|). Until then the drag stays
   undecided, so a tap that slides, a diagonal swipe, or the first finger of a pinch
   does not seek. A vertical swipe that starts with a sideways wobble still becomes
-  brightness or volume. Chat swipes keep their own trigger.
+  brightness or volume, including on live streams and in the VoD chat-swipe strip:
+  chat swipes wait for the same horizontal lock (capped at the strip's trigger near
+  a narrow edge) before claiming the drag, while keeping their own trigger distance.
 - **Start detent.** Travel is measured from the near edge of a 10dp band at the
   lock point, so the value starts changing straight away. Dragging back into the
   band returns exactly to the starting value, so a seek can be undone by feel.

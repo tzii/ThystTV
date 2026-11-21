@@ -178,8 +178,90 @@ class PlayerChatSwipeTest {
         assertHidden()
     }
 
+    @Test fun `live vertical swipe with an early sideways wobble stays volume instead of locking chat`() {
+        drag(
+            startX = 900f,
+            startY = 400f,
+            points = listOf(
+                885f to 395f, // 15dp sideways, 5dp up: undecided, must not lock chat
+                885f to 370f, // turns vertical: claims volume
+                885f to 260f,
+            ),
+        )
+        assertEquals(PlayerGestureArbiter.Owner.DEVICE_VOLUME, arbiter.owner)
+        assertHidden()
+    }
+
+    @Test fun `live diagonal start that turns vertical stays volume instead of locking chat`() {
+        drag(
+            startX = 900f,
+            startY = 400f,
+            points = listOf(
+                870f to 380f, // 30dp sideways, 20dp up: diagonal, stays undecided
+                870f to 320f, // turns vertical: claims volume
+                870f to 240f,
+            ),
+        )
+        assertEquals(PlayerGestureArbiter.Owner.DEVICE_VOLUME, arbiter.owner)
+        assertHidden()
+    }
+
+    @Test fun `vod vertical swipe in the chat strip with an early sideways wobble stays volume`() {
+        setVideoType(PlayerFragment.VIDEO)
+        drag(
+            startX = 950f,
+            startY = 400f,
+            points = listOf(
+                935f to 395f, // inside 56dp strip, 15dp sideways: stays undecided
+                935f to 370f, // turns vertical: claims volume
+                935f to 260f,
+            ),
+        )
+        assertEquals(PlayerGestureArbiter.Owner.DEVICE_VOLUME, arbiter.owner)
+        assertHidden()
+    }
+
+    @Test fun `vod hide swipe near a narrow edge exclusion still locks and hides chat`() {
+        setVideoType(PlayerFragment.VIDEO)
+        ReflectionHelpers.setField(fragment, "gestureInsets", androidx.core.graphics.Insets.of(0, 0, 15, 0))
+        fragment.showChat()
+        fragment.cycleChatMode()
+        idle()
+        assertSame(binding.floatingChatContainer, chatView.parent)
+
+        // 25px from the right edge leaves 20px trigger (< 24dp horizontal lock).
+        swipe(fromX = 975f, toX = 997f, y = 400f)
+        assertEquals(PlayerGestureArbiter.Owner.CHAT_SWIPE, arbiter.owner)
+        assertHidden()
+        assertEquals(View.GONE, binding.floatingChatRoot.visibility)
+    }
+
     private fun setVideoType(type: String) {
         ReflectionHelpers.setField(fragment, "videoType", type)
+    }
+
+    /** Multi-point pointer sequence through the detector callbacks. */
+    private fun drag(startX: Float, startY: Float, points: List<Pair<Float, Float>>) {
+        arbiter.onSequenceStarted()
+        val down = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, startX, startY, 0)
+        try {
+            listener.onDown(down)
+            var lastX = startX
+            var lastY = startY
+            points.forEachIndexed { index, (x, y) ->
+                val move = MotionEvent.obtain(0, (index + 1) * 16L, MotionEvent.ACTION_MOVE, x, y, 0)
+                try {
+                    listener.onScroll(down, move, lastX - x, lastY - y)
+                } finally {
+                    move.recycle()
+                }
+                lastX = x
+                lastY = y
+            }
+        } finally {
+            down.recycle()
+        }
+        idle()
     }
 
     /** One pointer sequence through the detector callbacks the touch listener feeds. */
