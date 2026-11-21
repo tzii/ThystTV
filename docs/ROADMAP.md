@@ -1,6 +1,26 @@
 # Roadmap
 
-## 1.6.0 / code 18
+## 1.7.0 / code 19
+
+- Material 3 Expressive gesture sliders and optional "Number in the center"
+  indicator style, with smooth 1% brightness/volume, accelerating VoD seek with
+  length caption (spoiler-free aware), pace-adjusted haptics and cutout edge fixes.
+- Resilient chat reconnection over weak connections with bounded connect/handshake
+  timeouts, 1-minute silent-drop detection, 10s hold backoff reset and clean
+  live-download chat socket teardown.
+- Sign-in preserved across 2FA app switches (`LaunchActivity`), folding and resize;
+  dedicated Spoilers settings screen, category-aware search and two-pane selection.
+- Single-row portrait live controls, Settings "Stop casting" row, fixed
+  `clips.twitch.tv` header order and embed links, and clip download duration/chat
+  window fixes.
+
+The source is prepared for 1.7.0; database version remains 36. Publication requires
+the signed candidate, upgrade from official 1.6.0, exact-APK device approval and
+independent release reviews. See `release-notes/1.7.0.md`, `MANUAL_QA.md` and
+`RELEASE_PROCESS.md`; candidate evidence belongs in the release PR/workflow record
+so recording QA does not change the frozen source SHA.
+
+## Upgrade baseline: 1.6.0 / code 18 (published November 13, 2026)
 
 - Spoiler Shield for channels and categories across lists, the player,
   notifications, bookmarks and downloads.
@@ -11,13 +31,9 @@
 - Sign-in keeps the current account until a new grant is confirmed; chat timers
   and cards survive sleep and screen rebuilds.
 
-The source is prepared for 1.6.0; database version remains 36. Publication requires
-the signed candidate, upgrade from official 1.5.2, exact-APK device approval and
-independent release reviews. See `release-notes/1.6.0.md`, `MANUAL_QA.md` and
-`RELEASE_PROCESS.md`; candidate evidence belongs in the release PR/workflow record
-so recording QA does not change the frozen source SHA.
+See `release-notes/1.6.0.md` for the previous release's scope and limitations.
 
-## Upgrade baseline: 1.5.2 / code 17 (published November 2, 2026)
+## Previous release: 1.5.2 / code 17 (published November 2, 2026)
 
 - Landscape swipe to show/hide chat, with a chat-side strip on seekable media.
 - Optional extended zoom past Fill and one-finger dragging while magnified.

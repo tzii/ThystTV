@@ -15,6 +15,33 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### 1.7.0 signed release candidate
+
+On November 21 the maintainer tested the combined debug build (`debug-cutoutedge-a90fc3dc9`)
+on a physical phone and confirmed gestures (both styles and camera-cutout volume with Draw
+behind cutouts on), live/VoD playback and the post-1.6 fixes working. Debug builds do not
+certify the signed release APK. Record exact candidate SHA, run ID, APK hash, device and
+results in the release PR/RC evidence; adding evidence must not change the frozen source tree.
+
+- [ ] Upgrade official 1.6.0 with the exact signed 1.7.0/code19 APK; preserve accounts,
+  settings (including Spoiler Shield, Spoiler-free VODs, local rewind buffer and Gesture
+  indicator defaults), Stats, bookmarks and downloads. Signed-in offline cold start:
+  Saved/Bookmarks/Downloads remain usable; restore networking and retry.
+- [ ] Live/VoD/download playback and resume, stream switching, minimize/restore,
+  close/reopen, PiP/background, speed/quality and audio-only labels, floating chat.
+- [ ] Gesture feedback in both **Sliders** and **Number in the center** styles: smooth 1%
+  brightness/volume, camera-cutout vertical volume/brightness with Draw behind cutouts on
+  and off, side-chat open edge placement, accelerating VoD seek with length caption (and
+  target-only on spoiler-free VoDs), horizontal-lock chat swipe guard, and System Back/bars.
+- [ ] Portrait live controls stay in one bottom row with centered play/pause and overflow.
+- [ ] Weak-signal chat reconnection, live-download chat socket stop, `clips.twitch.tv` and
+  `/embed?clip=` deep links, and clip download durations/fresh-clip replay chat.
+- [ ] Sign-in return via the ThystTV app icon after switching to an authenticator/SMS app
+  (and verify existing 1.6.0 launcher icon still opens ThystTV after upgrade).
+- [ ] Settings: Spoilers screen, Player > Live section, category-aware search and wide
+  two-pane selection; Stop casting from Settings on real Cast hardware when available.
+- [ ] Updater discovery, install permission and installer handover.
+
 ### 1.6.0 signed release candidate
 
 On November 13 the maintainer reported the combined #87–#94 debug build working.
