@@ -16,7 +16,7 @@ All notable changes to ThystTV should be documented here.
 
 ### Fixed
 - With the side chat open on a landscape phone, brightness and volume show their side sliders instead of a bar at the top of the video.
-- A camera cutout no longer puts the brightness and volume sliders at different distances from their screen edges. With "draw behind cutouts" on, the brightness slider stays clear of the camera.
+- A camera cutout no longer puts the brightness and volume sliders at different distances from their screen edges. With "draw behind cutouts" on, the brightness slider stays clear of the camera, and vertical brightness/volume swipes near a camera cutout no longer hit a wide deadzone.
 - In right-to-left languages, brightness and volume feedback appears on the half of the screen you swipe instead of the opposite side.
 - Portrait live-player controls use one bottom row with compact uptime/viewer indicators and centered play/pause. Extra enabled buttons and large text use horizontal overflow instead of lifting the controls into a second row.
 - `clips.twitch.tv` links open the clip with its channel name, chat replay and Watch full video again; the app passed that link's request headers in the wrong order. `clips.twitch.tv/embed?clip=` player links open their clip too.

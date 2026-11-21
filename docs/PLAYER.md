@@ -550,6 +550,14 @@ Seek and speed share one set of rules (`PlayerScrubPolicy`):
   brightness or volume, including on live streams and in the VoD chat-swipe strip:
   chat swipes wait for the same horizontal lock (capped at the strip's trigger near
   a narrow edge) before claiming the drag, while keeping their own trigger distance.
+- **System gesture edges (`PlayerEdgeZonePolicy`).** Window-edge system gesture
+  insets are mapped into `playerLayout` coordinates so cutout padding and an open
+  side chat never stack a second deadzone inside the video. Top and bottom edges
+  block all swipes (notification shade and home bar). Left and right edges still
+  block horizontal swipes (chat swipe, seek, speed) and magnified pan for Android's
+  Back gesture, while allowing clearly vertical brightness and volume swipes
+  (`|dy| ≥ 2|dx|`) so camera-cutout sides do not create a deadzone when drawing
+  behind cutouts.
 - **Start detent.** Travel is measured from the near edge of a 10dp band at the
   lock point, so the value starts changing straight away. Dragging back into the
   band returns exactly to the starting value, so a seek can be undone by feel.

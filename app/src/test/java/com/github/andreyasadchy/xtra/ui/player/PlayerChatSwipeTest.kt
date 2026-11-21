@@ -236,6 +236,51 @@ class PlayerChatSwipeTest {
         assertEquals(View.GONE, binding.floatingChatRoot.visibility)
     }
 
+    @Test fun `volume swipe inside the right camera-cutout side edge works without a deadzone`() {
+        fragment.isSideEdgeSwipe = true
+        try {
+            drag(
+                startX = 970f,
+                startY = 400f,
+                points = listOf(
+                    966f to 380f, // clearly vertical inside the right system-back/cutout band
+                    966f to 260f,
+                ),
+            )
+            assertEquals(PlayerGestureArbiter.Owner.DEVICE_VOLUME, arbiter.owner)
+            assertHidden()
+        } finally {
+            fragment.isSideEdgeSwipe = false
+        }
+    }
+
+    @Test fun `horizontal swipe inside the side edge stays blocked for system back`() {
+        fragment.isSideEdgeSwipe = true
+        try {
+            swipe(fromX = 970f, toX = 800f, y = 250f)
+            assertEquals(PlayerGestureArbiter.Owner.IDLE, arbiter.owner)
+            assertHidden()
+
+            setVideoType(PlayerFragment.VIDEO)
+            swipe(fromX = 970f, toX = 800f, y = 400f)
+            assertEquals(PlayerGestureArbiter.Owner.IDLE, arbiter.owner)
+            assertHidden()
+        } finally {
+            fragment.isSideEdgeSwipe = false
+        }
+    }
+
+    @Test fun `vertical swipe inside top or bottom edge stays blocked for system bars`() {
+        fragment.isEdgeSwipe = true
+        try {
+            swipe(fromX = 900f, toX = 900f, y = 10f, toY = 200f)
+            assertEquals(PlayerGestureArbiter.Owner.IDLE, arbiter.owner)
+            assertHidden()
+        } finally {
+            fragment.isEdgeSwipe = false
+        }
+    }
+
     private fun setVideoType(type: String) {
         ReflectionHelpers.setField(fragment, "videoType", type)
     }
