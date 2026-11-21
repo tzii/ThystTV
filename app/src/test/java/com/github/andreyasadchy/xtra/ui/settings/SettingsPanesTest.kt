@@ -25,6 +25,7 @@ class SettingsPanesTest {
         R.id.playerButtonSettingsFragment,
         R.id.playerMenuSettingsFragment,
         R.id.chatSettingsFragment,
+        R.id.spoilerSettingsFragment,
         R.id.downloadSettingsFragment,
         R.id.apiTokenSettingsFragment,
         R.id.playbackSettingsFragment,

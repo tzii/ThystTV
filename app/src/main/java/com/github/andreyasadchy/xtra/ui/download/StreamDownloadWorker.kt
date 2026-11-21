@@ -50,6 +50,7 @@ import dagger.Lazy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,6 +119,8 @@ class StreamDownloadWorker @AssistedInject constructor(
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private lateinit var offlineVideo: OfflineVideo
     private var chatReadWebSocket: ChatReadWebSocket? = null
+    /** The chat socket's reconnect loop. Without it, disconnecting closed one connection and the loop opened another. */
+    private var chatReadJob: Job? = null
     private var chatFileWriter: BufferedWriter? = null
     private var chatPosition: Long = 0
 
@@ -295,8 +298,13 @@ class StreamDownloadWorker @AssistedInject constructor(
                     val done = try {
                         download(channelLogin, selectedQuality.url!!, path)
                     } finally {
+                        // Taken now, as the next stream in this worker can replace both before the launch runs.
+                        val chat = chatReadWebSocket
+                        val chatJob = chatReadJob
+                        chatReadWebSocket = null
+                        chatReadJob = null
                         MainScope().launch(Dispatchers.IO) {
-                            chatReadWebSocket?.disconnect(null)
+                            chat?.disconnect(chatJob)
                         }
                         chatFileWriter?.close()
                     }
@@ -1171,7 +1179,7 @@ class StreamDownloadWorker @AssistedInject constructor(
                     }
                 }
             )
-            chatReadWebSocket?.connect(MainScope())
+            chatReadJob = chatReadWebSocket?.connect(MainScope())
         }
     }
 

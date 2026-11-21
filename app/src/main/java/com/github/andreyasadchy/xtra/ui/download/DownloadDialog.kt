@@ -131,11 +131,12 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
             }
         }
 
-        fun newClipInstance(id: String?, channelId: String?, channelLogin: String?, channelName: String?, channelImage: String?, gameId: String?, gameSlug: String?, gameName: String?, title: String?, thumbnail: String?, createdAt: String?, videoId: String?, videoOffsetSeconds: Int?, qualityNames: Array<String>? = null, qualityCodecs: Array<String>? = null, qualityUrls: Array<String>? = null, qualityBitrates: IntArray? = null): DownloadDialog {
+        fun newClipInstance(id: String?, channelId: String?, channelLogin: String?, channelName: String?, channelImage: String?, gameId: String?, gameSlug: String?, gameName: String?, title: String?, thumbnail: String?, createdAt: String?, videoId: String?, videoOffsetSeconds: Int?, durationSeconds: Int? = null, qualityNames: Array<String>? = null, qualityCodecs: Array<String>? = null, qualityUrls: Array<String>? = null, qualityBitrates: IntArray? = null): DownloadDialog {
             return DownloadDialog().apply {
                 arguments = Bundle().apply {
                     putString(KEY_TYPE, CLIP)
                     putString(KEY_CLIP_ID, id)
+                    putInt(KEY_DURATION_SECONDS, durationSeconds?.takeIf { it > 0 } ?: -1)
                     putString(KEY_CHANNEL_ID, channelId)
                     putString(KEY_CHANNEL_LOGIN, channelLogin)
                     putString(KEY_CHANNEL_NAME, channelName)
@@ -560,9 +561,10 @@ class DownloadDialog : DialogFragment(), IntegrityDialog.CallbackListener {
                                 clipId = requireArguments().getString(KEY_CLIP_ID),
                                 title = requireArguments().getString(KEY_TITLE),
                                 createdAt = requireArguments().getString(KEY_CREATED_AT),
-                                durationSeconds = requireArguments().getInt(KEY_DURATION_SECONDS),
+                                // The download worker uses zero for an unknown clip length.
+                                durationSeconds = requireArguments().getInt(KEY_DURATION_SECONDS, 0).coerceAtLeast(0),
                                 videoId = requireArguments().getString(KEY_VIDEO_ID),
-                                videoOffsetSeconds = requireArguments().getInt(KEY_VIDEO_OFFSET_SECONDS),
+                                videoOffsetSeconds = requireArguments().getInt(KEY_VIDEO_OFFSET_SECONDS, -1).takeIf { it >= 0 },
                                 channelId = requireArguments().getString(KEY_CHANNEL_ID),
                                 channelLogin = requireArguments().getString(KEY_CHANNEL_LOGIN),
                                 channelName = requireArguments().getString(KEY_CHANNEL_NAME),

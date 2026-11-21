@@ -32,7 +32,7 @@ class ChatReadWebSocket(
         webSocket?.disconnect()
     }
 
-    /** PING after [PING_INTERVAL_MS] without a PONG, and reconnect if the PONG does not come. */
+    /** PING after [PING_INTERVAL_MS] without traffic, and reconnect if the PONG does not come. */
     private fun watch(webSocket: WebSocket) {
         val scope = webSocket.coroutineScope ?: return
         val connection = webSocket.connection
@@ -62,6 +62,8 @@ class ChatReadWebSocket(
         }
 
         override suspend fun onMessage(webSocket: WebSocket, message: String) {
+            // Any traffic proves the connection alive, so a busy chat never needs a PING.
+            keepalive.feed()
             message.removeSuffix("\r\n").split("\r\n").forEach {
                 it.run {
                     when {
@@ -75,7 +77,6 @@ class ChatReadWebSocket(
                         startsWith("PING") -> {
                             webSocket.write("PONG")
                         }
-                        startsWith("PONG") -> keepalive.feed()
                         startsWith("RECONNECT") -> {
                             keepalive.stop()
                             webSocket.disconnect()
@@ -91,8 +92,12 @@ class ChatReadWebSocket(
     }
 
     internal companion object {
-        /** Time after connecting or the last PONG before the next PING. */
-        const val PING_INTERVAL_MS = 270_000L
+        /**
+         * Quiet time after connecting or the last message before a PING. It was 270 seconds,
+         * so a connection that died without closing, as on a weak signal, looked like a quiet
+         * chat for up to four and a half minutes before it was replaced.
+         */
+        const val PING_INTERVAL_MS = 60_000L
         const val PONG_TIMEOUT_MS = 10_000L
     }
 }

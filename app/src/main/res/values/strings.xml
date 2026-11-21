@@ -613,6 +613,8 @@
     <string name="settings_player_summary" tools:ignore="MissingTranslation">Picture-in-picture, gestures, quality and layout</string>
     <string name="settings_player_buttons_summary" tools:ignore="MissingTranslation">Controls, speeds and the player menu</string>
     <string name="settings_chat_summary" tools:ignore="MissingTranslation">Floating chat, emotes, translation and events</string>
+    <string name="spoiler_settings" tools:ignore="MissingTranslation">Spoilers</string>
+    <string name="settings_spoilers_summary" tools:ignore="MissingTranslation">Protected channels, hidden titles and spoiler-free VODs</string>
     <string name="settings_live_notifications_summary" tools:ignore="MissingTranslation">Alert me when followed channels go live</string>
     <string name="settings_download_summary" tools:ignore="MissingTranslation">Storage, Wi-Fi only and stream recording</string>
     <string name="settings_api_token_summary" tools:ignore="MissingTranslation">Login, client IDs and tokens</string>
@@ -852,6 +854,9 @@
     <string name="player_gestures_haptic_summary" tools:ignore="MissingTranslation">Vibrate when changing volume or brightness</string>
     <string name="player_gestures_sensitivity" tools:ignore="MissingTranslation">Sensitivity</string>
     <string name="player_gestures_zone_split" tools:ignore="MissingTranslation">Zone split</string>
+    <string name="player_gesture_feedback_style" tools:ignore="MissingTranslation">Gesture indicator</string>
+    <string name="player_gesture_feedback_style_sliders" tools:ignore="MissingTranslation">Sliders</string>
+    <string name="player_gesture_feedback_style_number" tools:ignore="MissingTranslation">Number in the center</string>
     <string name="player_gestures_swipe_chat" tools:ignore="MissingTranslation">Swipe to show or hide chat</string>
     <string name="player_gestures_swipe_chat_summary" tools:ignore="MissingTranslation">In full screen, swipe sideways to show or hide chat. On VODs and clips, start at the edge of the video on the chat side</string>
     <string name="player_extended_zoom" tools:ignore="MissingTranslation">Extended zoom</string>
@@ -980,4 +985,6 @@
     <string name="cast_quality_managed" tools:ignore="MissingTranslation">Quality can’t be changed while casting. Choose it before you start casting.</string>
     <string name="cast_auto_quality" tools:ignore="MissingTranslation">Cast</string>
     <string name="cast_playing_remotely" tools:ignore="MissingTranslation">Playing on your Cast device</string>
+    <string name="cast_stop" tools:ignore="MissingTranslation">Stop casting</string>
+    <string name="cast_stop_summary" tools:ignore="MissingTranslation">Disconnect and stop playback on the Cast device</string>
 </resources>

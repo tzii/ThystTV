@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fully rounded video-overlay pill; colors are re-applied in code from the theme accent. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#B3000000" />
-    <corners android:radius="24dp" />
+    <solid android:color="#D6121116" />
+    <stroke
+        android:width="1dp"
+        android:color="#1FFFFFFF" />
+    <corners android:radius="999dp" />
 </shape>

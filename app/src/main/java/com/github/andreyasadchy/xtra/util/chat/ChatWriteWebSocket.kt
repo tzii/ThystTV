@@ -33,7 +33,7 @@ class ChatWriteWebSocket(
         webSocket?.disconnect()
     }
 
-    /** PING after [ChatReadWebSocket.PING_INTERVAL_MS] without a PONG, and reconnect if the PONG does not come. */
+    /** PING after [ChatReadWebSocket.PING_INTERVAL_MS] without traffic, and reconnect if the PONG does not come. */
     private fun watch(webSocket: WebSocket) {
         val scope = webSocket.coroutineScope ?: return
         val connection = webSocket.connection
@@ -59,6 +59,8 @@ class ChatWriteWebSocket(
         }
 
         override suspend fun onMessage(webSocket: WebSocket, message: String) {
+            // Any traffic proves the connection alive, so a busy connection never needs a PING.
+            keepalive.feed()
             message.removeSuffix("\r\n").split("\r\n").forEach {
                 it.run {
                     when {
@@ -72,7 +74,6 @@ class ChatWriteWebSocket(
                         startsWith("PING") -> {
                             webSocket.write("PONG")
                         }
-                        startsWith("PONG") -> keepalive.feed()
                         startsWith("RECONNECT") -> {
                             keepalive.stop()
                             webSocket.disconnect()

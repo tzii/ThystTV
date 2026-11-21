@@ -47,12 +47,17 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
 - App module: `app/`
 - Build config: `app/build.gradle.kts`
 - Main activity / app-level player entry point: `app/src/main/java/com/github/andreyasadchy/xtra/ui/main/MainActivity.kt`
+- Launcher entry: `ui/main/LaunchActivity.kt` opens `MainActivity` and finishes. Keep the
+  launcher filters there: `MainActivity` is singleTask, so a launcher intent sent to it
+  closes the screens above it (sign-in, Settings).
 - TV focus routing: `ui/main/TvNavigationFocus.kt`, `ui/player/PlayerTvFocus.kt` and `util/TvUi.kt` under the app's Kotlin package.
 - Device-code sign-in: `ui/login/LoginActivity.kt`, `DeviceCodeLoginController.kt`,
   `DeviceCodeContentLayout.kt` and `DeviceCodeQr.kt`; adaptive
   `view_device_code_login.xml`, existing `AuthRepository` and token validation/storage.
 - Player area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/player/`
 - Chat/floating chat area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/chat/`
+- Settings: `ui/settings/SettingsActivity.kt`, `SettingsSearch.kt` and `SettingsPanes.kt`;
+  dedicated Spoilers screen, Player Live category, category-aware search and wide section selection.
 - Stats area: `app/src/main/java/com/github/andreyasadchy/xtra/ui/stats/`
 - Android resources: `app/src/main/res/`
 - In-app updater/changelog UI: search under `app/src/main/java/com/github/andreyasadchy/xtra/ui/common/`, `app/src/main/java/com/github/andreyasadchy/xtra/ui/settings/`, and `app/src/main/res/layout/`
@@ -75,7 +80,8 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
 ### Visual And Repo Presentation
 
 - README: `README.md`
-- Screenshots: `docs/images/screenshots/`
+- Current screenshots and recording: `docs/images/features-1.6/` (capture provenance in its README).
+- Earlier control/Stats previews: `docs/images/review-1.3/`; legacy footage: `docs/images/readme/`
 - Icon / branding assets: inspect `docs/images/` and launcher resources under `app/src/main/res/`
 - Website/docs site: inspect `docs/index.html` before editing
 

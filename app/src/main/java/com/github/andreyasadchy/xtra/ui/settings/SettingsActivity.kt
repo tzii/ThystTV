@@ -59,7 +59,6 @@ import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
-import androidx.preference.PreferenceManager
 import androidx.preference.SeekBarPreference
 import androidx.preference.SwitchPreferenceCompat
 import androidx.preference.forEach
@@ -370,6 +369,7 @@ class SettingsActivity : AppCompatActivity() {
         private val viewModel: SettingsViewModel by activityViewModels()
         private var selectedSection: String? = null
         private var sectionDecoration: SelectedSectionDecoration? = null
+        private var castSessionPreference: CastSessionPreference? = null
         private var backupResultLauncher: ActivityResultLauncher<Intent>? = null
         private var restoreResultLauncher: ActivityResultLauncher<Intent>? = null
 
@@ -385,13 +385,25 @@ class SettingsActivity : AppCompatActivity() {
             selectedSection = key
             sectionDecoration?.let {
                 it.selectedKey = key
-                listView?.invalidateItemDecorations()
+                // The mark is drawn by the list itself. Rows opened from search or Back are not
+                // touched, so without a redraw the previous section stayed marked.
+                listView?.invalidate()
             }
         }
 
         override fun onSaveInstanceState(outState: Bundle) {
             super.onSaveInstanceState(outState)
             outState.putString(KEY_SELECTED_SECTION, selectedSection)
+        }
+
+        override fun onStart() {
+            super.onStart()
+            castSessionPreference?.start()
+        }
+
+        override fun onStop() {
+            castSessionPreference?.stop()
+            super.onStop()
         }
 
         override fun onCreate(savedInstanceState: Bundle?) {
@@ -453,6 +465,10 @@ class SettingsActivity : AppCompatActivity() {
             }
             findPreference<Preference>("chat_settings")?.setOnPreferenceClickListener {
                 openSection(SettingsNavGraphDirections.actionGlobalChatSettingsFragment())
+                true
+            }
+            findPreference<Preference>("spoiler_settings")?.setOnPreferenceClickListener {
+                openSection(SettingsNavGraphDirections.actionGlobalSpoilerSettingsFragment())
                 true
             }
             findPreference<Preference>("player_settings")?.setOnPreferenceClickListener {
@@ -591,6 +607,7 @@ class SettingsActivity : AppCompatActivity() {
                     }
                 }
             }
+            castSessionPreference = CastSessionPreference.attach(preferenceScreen)
             viewModel.loadLatestRelease(
                 requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
                 UpdateUtils.resolveReleaseApiUrl(requireContext().prefs().getString(C.UPDATE_URL, null))
@@ -598,6 +615,8 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         override fun onDestroyView() {
+            castSessionPreference?.stop()
+            castSessionPreference = null
             sectionDecoration = null
             super.onDestroyView()
         }
@@ -725,36 +744,9 @@ class SettingsActivity : AppCompatActivity() {
 
     class UiSettingsFragment : MaterialPreferenceFragment() {
         private val viewModel: SettingsViewModel by activityViewModels()
-        private val spoilerRulesListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == C.SPOILER_SHIELD_RULES || key == null) {
-                findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
-            }
-        }
-
-        override fun onResume() {
-            super.onResume()
-            requireContext().prefs().registerOnSharedPreferenceChangeListener(spoilerRulesListener)
-            findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
-        }
-
-        override fun onPause() {
-            requireContext().prefs().unregisterOnSharedPreferenceChangeListener(spoilerRulesListener)
-            super.onPause()
-        }
-
-        private fun bindSpoilerShield(preference: Preference) {
-            val rules = SpoilerShield.rules(requireContext().prefs())
-            val count = rules.channels.size + rules.categories.size
-            preference.summary = if (rules.isEmpty) getString(R.string.spoiler_shield_manage_empty) else getString(R.string.spoiler_shield_manage_summary, count)
-            preference.setOnPreferenceClickListener {
-                showSpoilerShieldManager(viewModel) { bindSpoilerShield(preference) }
-                true
-            }
-        }
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.ui_preferences, rootKey)
-            findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
             findPreference<ListPreference>(C.UI_LANGUAGE)?.apply {
                 val lang = AppCompatDelegate.getApplicationLocales()
                 if (lang.isEmpty) {
@@ -1025,6 +1017,71 @@ class SettingsActivity : AppCompatActivity() {
                     .show()
                 true
             }
+        }
+
+        override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+            super.onViewCreated(view, savedInstanceState)
+            ViewCompat.setOnApplyWindowInsetsListener(view) { _, windowInsets ->
+                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+                listView.updatePadding(bottom = insets.bottom)
+                WindowInsetsCompat.CONSUMED
+            }
+            requireActivity().findViewById<AppBarLayout>(R.id.appBar)?.let { appBar ->
+                if (requireContext().prefs().getBoolean(C.UI_THEME_APPBAR_LIFT, true)) {
+                    listView.let {
+                        appBar.setLiftOnScrollTargetView(it)
+                        it.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                                super.onScrolled(recyclerView, dx, dy)
+                                appBar.isLifted = recyclerView.canScrollVertically(-1)
+                            }
+                        })
+                        it.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                            appBar.isLifted = it.canScrollVertically(-1)
+                        }
+                    }
+                } else {
+                    appBar.setLiftable(false)
+                    appBar.background = null
+                }
+            }
+            (requireActivity() as? SettingsActivity)?.getSelectedSearchItem()?.let { scrollToPreference(it) }
+        }
+    }
+
+    /** Spoiler Shield and spoiler-free VODs, which used to sit on the UI and Player screens. */
+    class SpoilerSettingsFragment : MaterialPreferenceFragment() {
+        private val viewModel: SettingsViewModel by activityViewModels()
+        private val spoilerRulesListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == C.SPOILER_SHIELD_RULES || key == null) {
+                findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
+            }
+        }
+
+        override fun onResume() {
+            super.onResume()
+            requireContext().prefs().registerOnSharedPreferenceChangeListener(spoilerRulesListener)
+            findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
+        }
+
+        override fun onPause() {
+            requireContext().prefs().unregisterOnSharedPreferenceChangeListener(spoilerRulesListener)
+            super.onPause()
+        }
+
+        private fun bindSpoilerShield(preference: Preference) {
+            val rules = SpoilerShield.rules(requireContext().prefs())
+            val count = rules.channels.size + rules.categories.size
+            preference.summary = if (rules.isEmpty) getString(R.string.spoiler_shield_manage_empty) else getString(R.string.spoiler_shield_manage_summary, count)
+            preference.setOnPreferenceClickListener {
+                showSpoilerShieldManager(viewModel) { bindSpoilerShield(preference) }
+                true
+            }
+        }
+
+        override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+            setPreferencesFromResource(R.xml.spoiler_preferences, rootKey)
+            findPreference<Preference>(C.SPOILER_SHIELD_MANAGE)?.let(::bindSpoilerShield)
         }
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -2049,64 +2106,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             (view as RecyclerView).adapter = adapter
             if (preferences == null) {
-                val list = mutableListOf<SettingsSearchItem>()
-                val preferenceManager = PreferenceManager(requireContext())
-                listOf(
-                    Triple(R.xml.api_token_preferences, SettingsNavGraphDirections.actionGlobalApiTokenSettingsFragment(), getString(R.string.api_token_settings)),
-                    Triple(R.xml.buffer_preferences, SettingsNavGraphDirections.actionGlobalBufferSettingsFragment(), getString(R.string.buffer_settings)),
-                    Triple(R.xml.chat_preferences, SettingsNavGraphDirections.actionGlobalChatSettingsFragment(), getString(R.string.chat_settings)),
-                    Triple(R.xml.debug_preferences, SettingsNavGraphDirections.actionGlobalDebugSettingsFragment(), getString(R.string.debug_settings)),
-                    Triple(R.xml.download_preferences, SettingsNavGraphDirections.actionGlobalDownloadSettingsFragment(), getString(R.string.download_settings)),
-                    Triple(R.xml.playback_preferences, SettingsNavGraphDirections.actionGlobalPlaybackSettingsFragment(), getString(R.string.playback_settings)),
-                    Triple(R.xml.player_button_preferences, SettingsNavGraphDirections.actionGlobalPlayerButtonSettingsFragment(), getString(R.string.player_buttons)),
-                    Triple(R.xml.player_menu_preferences, SettingsNavGraphDirections.actionGlobalPlayerMenuSettingsFragment(), getString(R.string.player_menu_settings)),
-                    Triple(R.xml.player_preferences, SettingsNavGraphDirections.actionGlobalPlayerSettingsFragment(), getString(R.string.player_settings)),
-                    Triple(R.xml.proxy_preferences, SettingsNavGraphDirections.actionGlobalProxySettingsFragment(), getString(R.string.proxy_settings)),
-                    Triple(R.xml.root_preferences, SettingsNavGraphDirections.actionGlobalSettingsFragment(), null),
-                    Triple(R.xml.theme_preferences, SettingsNavGraphDirections.actionGlobalThemeSettingsFragment(), getString(R.string.theme)),
-                    Triple(R.xml.ui_preferences, SettingsNavGraphDirections.actionGlobalUiSettingsFragment(), getString(R.string.ui_settings)),
-                    Triple(R.xml.update_preferences, SettingsNavGraphDirections.actionGlobalUpdateSettingsFragment(), getString(R.string.update_settings)),
-                ).forEach { item ->
-                    preferenceManager.inflateFromResource(requireContext(), item.first, null).leafPreferences().forEach {
-                        when (it) {
-                            is SwitchPreferenceCompat -> {
-                                list.add(SettingsSearchItem(
-                                    navDirections = item.second,
-                                    location = item.third,
-                                    key = it.key,
-                                    title = it.title,
-                                    summary = it.summary,
-                                    value = if (it.isChecked) {
-                                        getString(R.string.enabled_setting)
-                                    } else {
-                                        getString(R.string.disabled_setting)
-                                    }
-                                ))
-                            }
-                            is SeekBarPreference -> {
-                                list.add(SettingsSearchItem(
-                                    navDirections = item.second,
-                                    location = item.third,
-                                    key = it.key,
-                                    title = it.title,
-                                    summary = it.summary,
-                                    value = it.value.toString()
-                                ))
-                            }
-                            is PreferenceCategory -> {}
-                            else -> {
-                                list.add(SettingsSearchItem(
-                                    navDirections = item.second,
-                                    location = item.third,
-                                    key = it.key,
-                                    title = it.title,
-                                    summary = it.summary,
-                                ))
-                            }
-                        }
-                    }
-                }
-                preferences = list
+                preferences = settingsSearchItems(requireContext(), settingsSearchScreens(requireContext()))
             }
             requireActivity().findViewById<SearchView>(R.id.searchView)?.let {
                 savedQuery?.let { query -> it.setQuery(query, true) }
@@ -2118,7 +2118,7 @@ class SettingsActivity : AppCompatActivity() {
         fun search(query: String) {
             savedQuery = query
             if (query.isNotBlank()) {
-                preferences?.filter { it.title?.contains(query, true) == true || it.summary?.contains(query, true) == true }?.let { list ->
+                preferences?.filter { it.matches(query) }?.let { list ->
                     adapter?.submitList(list)
                 }
             } else {

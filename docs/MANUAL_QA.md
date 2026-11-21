@@ -47,10 +47,29 @@ Required for the deadline-based chat keepalive and chat card change
 (`.agent/plans/active/2026-11-07-implicit-state-machines.md`).
 
 - [ ] Signed out, keep a quiet live channel's chat open for 15+ minutes (the IRC
-  ping runs after 4.5 idle minutes). Messages keep arriving without reconnect
+  ping runs after one quiet minute). Messages keep arriving without reconnect
   notices. Signed in, send a message after 15 idle minutes.
 - [ ] Airplane mode for 30 s and back: chat reconnects once. A manual disconnect
   stays disconnected.
+- [ ] Weak signal without a network loss: keep the player open where the signal
+  drops out for a minute or more while Android still shows the network (a lift,
+  a basement, or on an emulator `adb root` then
+  `adb shell iptables -I OUTPUT -p tcp -d <irc-ws.chat.twitch.tv address> -j REJECT --reject-with tcp-reset`
+  for 2 minutes, then `-D` the same rule). Chat shows at most one disconnect line,
+  then joins again within about 30 s of the signal returning, without leaving the
+  player. Repeat with `-j DROP`: a silent dead connection is replaced within about
+  70 s. Channel points, polls and 7TV updates come back too.
+- [ ] Live download with Download chat on (emulator, `adb root`): let a stream
+  download finish, or cancel it. Within about 10 s `adb shell netstat -tn` lists no
+  connection to the address of `irc-ws.chat.twitch.tv` (look it up with `nslookup`),
+  and none comes back a minute later. With the end wait on, the next stream's
+  download still saves its own chat.
+- [ ] Signed in with a revoked token (disconnect ThystTV at
+  twitch.tv/settings/connections without signing out in the app), open a live
+  channel on an emulator with `adb root`. Chat reading keeps working. Polling
+  `adb shell netstat -tn` shows the rejected chat sign-in reconnecting at growing
+  intervals up to about 30 s, not every second. The weak-signal and airplane-mode
+  checks above still rejoin quickly once a connection has held for 10 s.
 - [ ] Signed in for 15+ minutes: channel points accrue and the claim appears.
 - [ ] Poll and prediction cards count down. On a channel that is not playing, turn
   the screen off for 30 s and back on: the countdown shows the real time left.
@@ -317,6 +336,78 @@ the exact signed 1.3.1 upgrade and release matrix remain pending.
 - [ ] Resize to short split-screen and narrow side-chat video; return to full
   screen. Compact feedback, seek/speed/pinch indicators and chat touches remain
   correct. Repeat with large fonts and RTL.
+
+### Expressive gesture feedback
+
+Run the gesture checks once with Settings > Player > Gestures > Gesture
+indicator on Sliders (the default) and once on Number in the center.
+
+- [ ] Landscape phone, side chat open: swipe the left and right halves vertically.
+  Sliders: brightness shows a vertical slider on the left and volume on the
+  right, with no number. Number: both show their icon over the percentage in
+  the middle of the video. Close the chat and repeat.
+- [ ] Phone with a camera cutout, in both landscape rotations, side chat closed:
+  the brightness and volume sliders sit the same distance from their screen
+  edges. Repeat with Settings > UI > draw behind cutouts on; neither slider
+  covers the camera.
+- [ ] Vertical slider over bright and dark video at 0, mid and 100: the icon
+  rides in the fill and moves above the handle when the fill is short; the dot
+  at the top disappears at 100. The volume icon changes at 0 and halfway, the
+  brightness icon at Auto, low, half and high.
+- [ ] Brightness and volume, both styles: the slider handle stays under a slow
+  and a fast drag with no stutter or delay at the start, and the number
+  changes by 1. Volume changes audibly at the device's own steps, and the next
+  swipe starts where the last one stopped. Only 0% mutes.
+- [ ] Small split-screen or freeform landscape window: brightness and volume still
+  show the vertical sliders, shorter but not clipped.
+- [ ] VoD seek swipe in the lower half, Sliders: a slider at the top of the video
+  shows the seek icon and the signed change (`+1:25`), the dot where you started
+  and the handle where the seek lands in the VoD. Drag back past the start and
+  the handle crosses the dot. Return to the start: undo icon and "Cancel", and
+  the same frame as before. Push past the start or end of the video: the value
+  and the handle stop. Near the end of the track the value moves beside the
+  handle and stays readable. A small caption under the slider shows the target
+  time and the VoD's length (`24:00 / 3:12:45`), stays centered while the handle
+  moves, and still shows the position at "Cancel". Speed and pinch have no
+  caption, and their slider sits exactly where the seek track does.
+- [ ] Same seek, Number: the change is large in the middle with the target time
+  and the VoD's length small under it (`24:00 / 3:12:45`); back at the start it
+  shows the undo icon over "Cancel".
+- [ ] Seek distance on a multi-hour VoD: a short, careful drag moves a few
+  seconds; a medium drag a minute or two; a swipe across a landscape phone
+  about an hour. On a one-minute clip, a full-width drag reaches the end and no
+  further. Low and high gesture sensitivity scale it.
+- [ ] Both styles read at a glance on a phone held at arm's length, over bright and
+  dark video, and the value never clips (try a seek of over an hour on a long
+  VoD). In a short split-screen window or the portrait player both are smaller
+  and still placed right.
+- [ ] Accidental seeks: tap the video with a small slide, swipe diagonally, and
+  start a vertical swipe with a sideways wobble. None of them seek; the last one
+  changes brightness or volume. A clear sideways swipe still seeks right away.
+- [ ] Spoiler-free VoDs on: the seek slider's track starts in the middle and
+  follows the finger; its caption and the number's small line show the target
+  time only. Nothing in either style shows the video's length.
+- [ ] Speed swipe in the upper half: the same top slider shows the speed icon and
+  `1.50x`, with 1x in the middle of the track and the dot at the starting
+  speed. Returning to the start restores it. Number: only `1.50x`.
+- [ ] Pinch on a landscape video: the top slider shows `Fill` or `Fit` with the
+  handle moving away from the middle toward the armed mode. With free zoom it
+  shows the zoom percent (`125%`), with the dot where the pinch began. The
+  slider does not change size between Fit, a zoom and Fill. Number: only the
+  value. The first-time pinch hint still shows as the top pill.
+- [ ] Gesture haptics on: one tick when a swipe starts; step ticks through volume
+  steps, every 10% brightness, quarter speeds and seek intervals, evenly spaced
+  under the finger as a long seek speeds up, without buzzing on a fast drag; a
+  distinct detent back at a scrub's start and when a pinch arms Fit or Fill; a
+  limit at auto or full brightness, mute or maximum volume, 0.25x or 4x and the
+  start or end of the video. With haptics off, nothing vibrates.
+- [ ] Each indicator springs in once per gesture, does not replay while dragging,
+  and fades after release. With animations off, it appears without motion.
+  Changing the style while the player is open applies to the next gesture.
+- [ ] Light, dark, AMOLED and blue app themes, plus dynamic color: the feedback
+  stays dark over video and the accent follows the theme.
+- [ ] RTL language: brightness stays on the left half and volume on the right;
+  the top slider still fills left to right.
 - [ ] Live/VoD playback, stream switching without old audio, minimize/restore,
   close/reopen, PiP/background, speed/quality, all gestures, floating-chat
   open/drag/resize, and Stats load/rotate/range smoke.
@@ -381,9 +472,10 @@ behavior remain unverified; emulator results are recorded separately in
 - [ ] Back and the toolbar arrow: from a section's sub-screen they return to the
   section; from a section they leave Settings. Hold, cancel and finish a predictive back
   swipe on both.
-- [ ] Search on a wide window: a result opens its section on the right and scrolls to
-  the row; a result from the main list (Backup, Check for updates) closes search and
-  scrolls the left list to it.
+- [ ] Search on a wide window: a result opens its section on the right, scrolls to
+  the row and marks that section in the left list at once, without touching the list;
+  a result from the main list (Backup, Check for updates) closes search and scrolls the
+  left list to it.
 - [ ] Rotate or fold/unfold between wide and narrow while a section is open: the same
   section stays open, no blank pane, and Back still works. Open search from the narrow
   main list, then widen the window: Back closes search instead of leaving Settings,
@@ -391,6 +483,25 @@ behavior remain unverified; emulator results are recorded separately in
 - [ ] Toggle Live notifications, Backup and Restore from the left list. The app bar lifts
   with the right pane's scrolling.
 - [ ] Android TV: D-pad moves between the list and the open section and back.
+
+### Spoilers screen and Live section
+
+Upgrade from 1.6.0 with Spoiler Shield rules, Hide previews off, Spoiler-free VODs on
+and the local rewind buffer on at 1 GB.
+
+- [ ] Settings > Watching has a Spoilers row (eye icon) below Chat. It opens Spoiler
+  Shield (Protected channels and categories, Hide titles, Hide previews) and Videos
+  (Spoiler-free VODs). The upgraded values are kept and the rule count is right.
+- [ ] UI settings no longer show Spoiler Shield, and Player settings no longer show
+  Spoiler-free VODs. Player settings has a Live section with Local rewind buffer and
+  Buffer size (greyed out while the buffer is off), above Videos.
+- [ ] Changing each spoiler setting on the new screen still takes effect in lists, the
+  player and downloads, and a backup made before the update restores them.
+- [ ] Search "spoiler": all four spoiler settings appear, each labelled "Spoilers ·"
+  with its section. Search "live": Local rewind buffer and Buffer size appear as
+  "Player · Live".
+- [ ] Two-pane window: the Spoilers row is marked while its screen is open, including
+  when opened from search.
 
 ### Swipe to show or hide chat
 
@@ -582,7 +693,7 @@ Turn on Player settings → Gestures → Extended zoom.
 
 ### Local rewind buffer
 
-Turn on Player settings > Videos > Local rewind buffer, then open a stream. Check
+Turn on Player settings > Live > Local rewind buffer, then open a stream. Check
 live and replay on the default player at both a high and low quality.
 
 - [ ] Off (default): live and recording rewinds behave as before. A channel without a
@@ -655,7 +766,7 @@ live and replay on the default player at both a high and low quality.
 - [ ] Expiring rules: adding a rule asks how long. The list shows "until" with a date,
   "Until I remove it" shows none. Move the device clock past the date: the card shows
   again at its next bind, and the rule is gone from Settings.
-- [ ] Settings > UI > Protected channels and categories: Add a channel and Add a
+- [ ] Settings > Spoilers > Protected channels and categories: Add a channel and Add a
   category search Twitch; pick a match or use the name exactly as typed. Cancel while
   a search is running closes immediately. Offline, the typed name is still offered,
   and a channel typed by its display name is protected too. Pick that channel from search with
@@ -684,6 +795,30 @@ live and replay on the default player at both a high and low quality.
 - [ ] Network cancellation: airplane mode or a stalled connection during sign-in shows
   an error within about 20 seconds, on OkHttp, Cronet and HttpEngine. Leaving the
   screen cancels at once, and a later sign-in works normally.
+
+### Leaving sign-in for another app
+
+Launcher entry `ui/main/LaunchActivity.kt`
+(`.agent/plans/active/2026-11-15-sign-in-app-switch.md`).
+
+- [ ] Start Log in, enter the password, and when Twitch asks for a code, open an
+  authenticator, SMS or email app. Return with the ThystTV home-screen icon: the
+  code page is still there and the sign-in completes. Repeat returning from Recents.
+- [ ] Same from Settings: press Home, tap the icon, Settings is still open; Back
+  returns to the main screen.
+- [ ] Rotate, fold/unfold, resize in split screen and switch dark mode during
+  sign-in: the page and anything typed stay.
+- [ ] Cold start from the icon after a reboot or force stop: the main screen opens
+  once (no extra screen in Back), with the same splash and timing as before.
+- [ ] With a stream playing in PiP, tap the icon: the player returns to full screen
+  without restarting or doubling audio. With it minimized, the icon returns to the
+  same screen with the mini-player. Notification taps and twitch.tv links open as before.
+- [ ] Android TV: the launcher row opens ThystTV and returns to the open screen.
+- [ ] After an update from 1.6.0, the home-screen icon still opens ThystTV (some
+  launchers re-link the icon to the new entry; none should drop it).
+- [ ] Optional: start sign-in, open another app, run `adb shell am kill com.tzii.thysttv`
+  and return from Recents. The screen restarts at the first step; a Twitch web
+  session that was already signed in continues without the password again.
 
 ### Create clip
 
@@ -722,6 +857,9 @@ live and replay on the default player at both a high and low quality.
   stream before the clip starts: the clip does not open over it, also if you change the
   system font size or dark mode while it loads. Two quick Watch taps on different clips
   play only the second.
+- [ ] Clip links: open a `clips.twitch.tv/<slug>` link, a `twitch.tv/<channel>/clip/<slug>`
+  link and a `clips.twitch.tv/embed?clip=<slug>` link from another app. Each plays the clip
+  with its channel name, chat replay and Watch full video (when the VoD still exists).
 - [ ] Recording replay, local replay, VoDs, clips and downloads do not show Create clip;
   hiding it in Player menu settings works. Check OkHttp, Cronet and HttpEngine network
   libraries, and that a stalled connection gives up instead of waiting indefinitely.
@@ -821,3 +959,28 @@ Screenshots, videos, logs, or APK links:
 - Test an exact signed 1.3 APK upgrading official 1.2.1, retaining data and migrating
   landscape display mode. Repeat the player, gestures, floating chat, Stats and launcher
   matrix on that same candidate. See RELEASE_1_3_REVIEW.md and RELEASE_PROCESS.md.
+
+### Stop casting outside the player
+
+- [ ] Start Cast on real hardware. Open Settings: Stop casting is at the top. Tap it: receiver stops, the row disappears, and local playback follows the existing handoff.
+- [ ] Repeat after closing the player with Keep casting after closing the app on, and after reopening ThystTV with retained receiver playback. Repeat in wide Settings and with a TV remote.
+- [ ] Disconnect/reconnect externally while Settings is open; the row tracks the session. Return after background and rotation; no duplicate callbacks.
+- [ ] VoD opened during Cast still offers Stop casting and play here; cancel preserves the receiver, accept resumes the VoD locally.
+- [ ] Cast off or unavailable: no row, initialization, crash or change to local live/VoD playback. Check switching, minimize/restore, close/reopen, PiP/background, quality/speed, gestures and floating chat.
+
+### Clip download duration
+
+- [ ] Download a clip from a channel, category and the player. Its Downloads length matches the clip; play it offline and check replay chat.
+- [ ] A clip with no known length hides its duration instead of showing 00:00. Existing zero-length metadata is hidden; re-download to populate it.
+- [ ] VoD segment download lengths, source offsets, watched bars and spoiler hiding remain correct.
+- [ ] Player download entry smoke: live and VoD playback, stream switching, minimize/restore, close/reopen, PiP/background, speed/quality, gestures and floating chat remain usable.
+- [ ] A clip with no source VoD offset shows no Start/End labels; a known zero offset still shows 00:00. Legacy negative offsets are hidden.
+- [ ] With Download chat on, create a clip on a live channel, tap Watch clip and download it at once. The download finishes as Downloaded without replay chat instead of failing or staying in Downloading. Once Twitch reports the clip's VoD offset, downloading it again from the channel's Clips tab saves replay chat.
+- [ ] With Download chat on, download a clip whose VoD was deleted: it finishes as Downloaded, not Pending.
+
+### Portrait live controls at the video edge
+
+- [ ] Force stop and open a fresh live stream in portrait: rewind/volume/fullscreen actions stay at the video bottom, uptime/viewers share the same bottom row, and play/pause stays centered.
+- [ ] Enable optional buttons and use enlarged text/long stats; the bar can scroll horizontally, but never creates a second row; all actions and full stats remain reachable, with fullscreen pinned. Check RTL and compact/wide windows.
+- [ ] Let uptime/viewer count update, switch streams, hide/show controls, rotate, minimize/restore, close/reopen and enter/exit PiP/background. No stale row or displaced play/pause.
+- [ ] Live and VoD playback, speed/quality, gestures and floating chat remain usable. Check TV remote focus; no phone geometry is imposed on landscape TV.

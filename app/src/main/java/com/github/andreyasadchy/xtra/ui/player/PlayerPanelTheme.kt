@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.util.TypedValue
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import com.google.android.material.color.MaterialColors
 
 /**
  * Shared palette for the player's control panels (Quality, Speed, Stream
@@ -25,7 +26,47 @@ data class PlayerPanelColors(
     val sliderInactive: Int,
 )
 
+/**
+ * Colors for the brightness, volume, seek, speed and pinch feedback that
+ * floats over video. Unlike the panels, these never follow the light app
+ * surface: video under them can be any brightness, so they always use a dark
+ * translucent container and the dark-scheme roles of the theme accent.
+ */
+data class PlayerGestureFeedbackColors(
+    val container: Int,
+    val outline: Int,
+    val track: Int,
+    val accent: Int,
+    val onAccent: Int,
+    val content: Int,
+)
+
 object PlayerPanelTheme {
+
+    /** Near-black base of the gesture-feedback container before the accent tint. */
+    private const val FEEDBACK_BASE = 0xFF121116.toInt()
+    private const val FEEDBACK_ACCENT_TINT = 0.08f
+    private const val FEEDBACK_CONTAINER_ALPHA = 0xD6
+    private const val FEEDBACK_OUTLINE = 0x1FFFFFFF
+    private const val FEEDBACK_TRACK = 0x33FFFFFF
+
+    fun gestureFeedback(context: Context): PlayerGestureFeedbackColors {
+        val primary = themeColor(context, androidx.appcompat.R.attr.colorPrimary, Color.rgb(0, 125, 202))
+        // Dark-scheme roles: a light accent tone with a dark on-accent color,
+        // derived from the light or dark theme's primary alike.
+        val roles = MaterialColors.getColorRoles(primary, false)
+        return PlayerGestureFeedbackColors(
+            container = ColorUtils.setAlphaComponent(
+                ColorUtils.blendARGB(FEEDBACK_BASE, roles.accent, FEEDBACK_ACCENT_TINT),
+                FEEDBACK_CONTAINER_ALPHA,
+            ),
+            outline = FEEDBACK_OUTLINE,
+            track = FEEDBACK_TRACK,
+            accent = roles.accent,
+            onAccent = roles.onAccent,
+            content = Color.WHITE,
+        )
+    }
 
     fun resolve(context: Context): PlayerPanelColors {
         val fallbackSurface = if (isLightTheme(context)) Color.WHITE else Color.rgb(18, 18, 18)
