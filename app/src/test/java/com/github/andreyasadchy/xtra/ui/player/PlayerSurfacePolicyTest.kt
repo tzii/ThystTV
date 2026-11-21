@@ -92,6 +92,34 @@ class PlayerSurfacePolicyTest {
     }
 
     @Test
+    fun `seek slider leaves room for its caption at every density`() {
+        // The slider draws its caption only when the pill fits above the bottom
+        // pad (PlayerGestureSliderView.captionBounds). Rounding each part of the
+        // height down left it a pixel or two short at 420 dpi and most other
+        // densities that are not a whole multiple of mdpi, which hid the caption.
+        for (dpi in 120..640) {
+            val density = dpi / 160f
+            for ((width, height) in listOf(2400 to 1080, 1080 to 608)) {
+                val placement = PlayerSurfacePolicy.placementFor(
+                    PlayerGestureFeedbackKind.SEEK, PlayerGestureFeedbackLayout.TOP_SLIDER, density,
+                    surfaceHeightPx = height, surfaceWidthPx = width,
+                )
+                val containerHeight = placement.fixedContainerHeightPx!!
+                assertEquals("$dpi dpi", PlayerGestureSliderView.heightPx(density, withCaption = true), containerHeight)
+                val pad = PlayerGestureSliderView.PAD_DP * density
+                val captionTop = pad + PlayerGestureSliderView.HANDLE_LENGTH_DP * density +
+                    PlayerGestureSliderView.CAPTION_GAP_DP * density
+                val captionBottom = captionTop + PlayerGestureSliderView.CAPTION_HEIGHT_DP * density
+                assertTrue("$dpi dpi: $captionBottom in $containerHeight", captionBottom <= containerHeight - pad + 0.5f)
+                // Rounded up by less than a pixel, not padded out.
+                val exact = (PlayerGestureSliderView.HANDLE_LENGTH_DP + 2f * PlayerGestureSliderView.PAD_DP +
+                    PlayerGestureSliderView.CAPTION_BAND_DP) * density
+                assertTrue("$dpi dpi: $containerHeight for $exact", containerHeight < exact + 1f)
+            }
+        }
+    }
+
+    @Test
     fun `small players get the compact slider and keep the side margins`() {
         // Portrait player: 412 x 232 dp is short, so the slider shrinks.
         assertTrue(PlayerSurfacePolicy.compactFeedback(2.625f, 1080, 608))

@@ -404,6 +404,24 @@ class PlayerGestureFeedbackRenderTest {
         UiTestRender.save(surface, "gesture-seek-slider-cancel")
     }
 
+    @Config(qualifiers = "w914dp-h411dp-land-420dpi")
+    @Test fun `the seek caption shows on a 420 dpi phone`() {
+        // 420 dpi is 2.625 px per dp. The slider used to get 213 px, short of
+        // the 214.75 px its caption needs, and silently dropped the caption.
+        val (surface, feedback) = createSurface()
+        assertEquals(2.625f, context.resources.displayMetrics.density, 0f)
+        presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 2400, 1080, seekForward)
+        val slider = feedback.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)
+        assertOnlyShown(feedback, R.id.feedbackSlider)
+        assertEquals(216, slider.height)
+        assertEquals("24:00 / 3:12:45", slider.caption)
+        val caption = slider.captionBounds()!!
+        assertTrue("caption inside the view", caption.bottom <= slider.height - 4f * 2.625f + 0.5f)
+        // The view asks for the height it is given.
+        slider.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        assertEquals(216, slider.measuredHeight)
+    }
+
     @Test fun `the value moves into the fill near the end and never meets the icon`() {
         val (surface, feedback) = createSurface()
         val slider = feedback.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)

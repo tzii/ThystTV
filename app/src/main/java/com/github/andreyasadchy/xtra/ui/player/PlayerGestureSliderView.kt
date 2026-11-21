@@ -15,6 +15,7 @@ import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.graphics.drawable.DrawableCompat
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.min
 
 /**
@@ -130,8 +131,7 @@ class PlayerGestureSliderView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val desiredWidth = (WIDTH_DP * density + 2f * pad).toInt()
-        val captionBand = if (caption.isNullOrEmpty()) 0f else CAPTION_BAND_DP * density
-        val desiredHeight = (HANDLE_LENGTH_DP * density + captionBand + 2f * pad).toInt()
+        val desiredHeight = heightPx(density, withCaption = !caption.isNullOrEmpty())
         setMeasuredDimension(resolveSize(desiredWidth, widthMeasureSpec), resolveSize(desiredHeight, heightMeasureSpec))
     }
 
@@ -365,6 +365,17 @@ class PlayerGestureSliderView @JvmOverloads constructor(
          * entrance spring's slight overshoot is never clipped.
          */
         const val PAD_DP = 4f
+
+        /**
+         * Height of the view: the handle, the pad above and below and, with a
+         * caption, its band. Rounded up, never down: the caption only draws when
+         * its pill fits above the bottom pad, and a height rounded down part by
+         * part left it a pixel or two short at densities such as 420 dpi.
+         */
+        fun heightPx(density: Float, withCaption: Boolean): Int {
+            val band = if (withCaption) CAPTION_BAND_DP else 0f
+            return ceil((HANDLE_LENGTH_DP + 2f * PAD_DP + band) * density).toInt()
+        }
     }
 }
 
