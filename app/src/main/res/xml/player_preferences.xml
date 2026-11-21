@@ -123,6 +123,16 @@
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
 
+        <ListPreference
+            android:defaultValue="sliders"
+            android:entries="@array/playerGestureFeedbackStyleEntries"
+            android:entryValues="@array/playerGestureFeedbackStyleValues"
+            android:key="player_gesture_feedback_style"
+            android:title="@string/player_gesture_feedback_style"
+            android:summary="%s"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
         <SwitchPreferenceCompat
             android:defaultValue="true"
             android:key="player_gestures_swipe_chat"

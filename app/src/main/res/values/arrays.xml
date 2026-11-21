@@ -373,6 +373,16 @@
         <item>0.5</item>
         <item>0.6</item>
     </string-array>
+
+    <string-array name="playerGestureFeedbackStyleEntries">
+        <item>@string/player_gesture_feedback_style_sliders</item>
+        <item>@string/player_gesture_feedback_style_number</item>
+    </string-array>
+
+    <string-array name="playerGestureFeedbackStyleValues" translatable="false">
+        <item>sliders</item>
+        <item>number</item>
+    </string-array>
     <string-array name="playerMeteredWifiQualityEntries">
         <item>@string/settings_metered_wifi_quality_use_mobile</item>
         <item>@string/saved_value</item>

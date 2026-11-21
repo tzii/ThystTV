@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Gesture feedback over video. Only one child shows at a time:
+     the top pill (plain messages), the top slider (seek, speed and pinch),
+     the edge slider (brightness on the left, volume on the right) or, in the
+     "number in the center" style, the centered value for every gesture.
+     Colors are applied in code from PlayerPanelTheme.gestureFeedback. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -12,38 +17,38 @@
         android:layout_gravity="top|center_horizontal"
         android:background="@drawable/bg_gesture_feedback"
         android:gravity="center_vertical"
+        android:minHeight="48dp"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp">
+        android:paddingStart="8dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="8dp">
 
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/feedbackIcon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/baseline_volume_up_black_24"
-            app:tint="@android:color/white"
-            tools:ignore="ContentDescription" />
+        <FrameLayout
+            android:id="@+id/feedbackIconBadge"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_gesture_feedback_badge">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/feedbackIcon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/baseline_volume_up_black_24"
+                tools:ignore="ContentDescription" />
+
+        </FrameLayout>
 
         <com.google.android.material.progressindicator.LinearProgressIndicator
             android:id="@+id/feedbackProgress"
-            android:layout_width="88dp"
+            android:layout_width="96dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            app:indicatorColor="@android:color/white"
-            app:trackColor="#4DFFFFFF"
-            app:trackCornerRadius="2dp"
-            app:trackThickness="4dp" />
-
-        <ProgressBar
-            android:id="@+id/feedbackVerticalLevel"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="4dp"
-            android:layout_height="0dp"
-            android:layout_gravity="center_horizontal"
-            android:layout_weight="1"
-            android:max="100"
-            android:progressDrawable="@drawable/vertical_feedback_level"
-            android:visibility="gone" />
+            android:layout_marginStart="12dp"
+            app:indicatorTrackGapSize="4dp"
+            app:trackCornerRadius="3dp"
+            app:trackStopIndicatorSize="4dp"
+            app:trackThickness="6dp" />
 
         <TextView
             android:id="@+id/feedbackText"
@@ -51,16 +56,38 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
             android:gravity="end"
             android:maxLines="1"
-            android:shadowColor="#80000000"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2"
             android:textColor="@android:color/white"
-            android:textSize="14sp"
-            android:textStyle="bold"
+            android:textSize="16sp"
             tools:text="100%" />
 
     </LinearLayout>
+
+    <com.github.andreyasadchy.xtra.ui.player.PlayerGestureLevelView
+        android:id="@+id/feedbackLevel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|left"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        tools:ignore="RtlHardcoded" />
+
+    <com.github.andreyasadchy.xtra.ui.player.PlayerGestureSliderView
+        android:id="@+id/feedbackSlider"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <com.github.andreyasadchy.xtra.ui.player.PlayerGestureValueView
+        android:id="@+id/feedbackValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
 </FrameLayout>
