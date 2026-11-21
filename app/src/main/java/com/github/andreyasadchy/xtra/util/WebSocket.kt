@@ -11,19 +11,24 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.ByteArrayOutputStream
+import java.io.EOFException
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.io.OutputStreamWriter
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.security.MessageDigest
+import java.security.cert.CertPathValidatorException
+import java.security.cert.CertificateException
 import java.util.zip.Deflater
 import java.util.zip.DeflaterOutputStream
 import java.util.zip.Inflater
 import java.util.zip.InflaterOutputStream
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.X509TrustManager
 import kotlin.coroutines.cancellation.CancellationException
@@ -41,54 +46,75 @@ class WebSocket(
     private var messageByteArray: ByteArray? = null
     private var useCompression = false
     private var nextFrameCompressed = false
-    private var connectionAttempt = 0
-    private var delayReconnect = false
+    private val reconnect = ReconnectPolicy()
+
+    /** Whether the current outage was already reported, so retries add no message each. */
+    private var failureReported = false
     var coroutineScope: CoroutineScope? = null
 
+    /** Connects, reads until the connection ends, and reconnects until cancelled or refused. */
     suspend fun start() = withContext(Dispatchers.IO) {
         while (isActive) {
+            var rateLimited = false
             try {
-                connectionAttempt += 1
-                val error = connect()
-                if (error) {
-                    close()
-                    return@withContext
-                }
-                connectionAttempt = 0
-                var end = false
-                while (!end) {
-                    end = readNextFrame()
+                when (connect()) {
+                    Handshake.OPEN -> {
+                        reconnect.connected()
+                        failureReported = false
+                        var end = false
+                        while (!end) {
+                            end = readNextFrame()
+                        }
+                    }
+                    Handshake.RETRY -> {}
+                    Handshake.RATE_LIMITED -> rateLimited = true
+                    Handshake.REFUSED -> {
+                        close()
+                        return@withContext
+                    }
                 }
             } catch (e: CancellationException) {
                 ensureActive()
             } catch (e: SSLHandshakeException) {
-                listener.onDisconnect(this@WebSocket, e.toString(), e.stackTraceToString())
-                close()
-                return@withContext
-            } catch (e: Exception) {
-                if (socket?.isClosed != true) {
+                if (e.isCertificateFailure()) {
+                    // Retrying cannot fix a certificate this device does not trust.
                     listener.onDisconnect(this@WebSocket, e.toString(), e.stackTraceToString())
+                    close()
+                    return@withContext
                 }
+                // A handshake cut short by a bad connection is retried like any other failure.
+                reportFailure(e)
+            } catch (e: Exception) {
+                reportFailure(e)
             }
             close()
-            if (connectionAttempt >= 20) {
-                return@withContext
-            }
-            if (delayReconnect) {
-                delayReconnect = false
-                delay(60000)
-            } else {
-                delay(1000)
-            }
+            delay(reconnect.nextDelayMs(rateLimited))
         }
     }
 
-    suspend fun connect(): Boolean = withContext(Dispatchers.IO) {
+    /** Reports a failure unless this socket closed it itself or the outage was already reported. */
+    private suspend fun reportFailure(e: Exception) {
+        if (socket?.isClosed != true && !failureReported) {
+            failureReported = true
+            listener.onDisconnect(this@WebSocket, e.toString(), e.stackTraceToString())
+        }
+    }
+
+    private suspend fun reportFailure(message: String) {
+        if (!failureReported) {
+            failureReported = true
+            listener.onDisconnect(this@WebSocket, message)
+        }
+    }
+
+    private enum class Handshake { OPEN, RETRY, RATE_LIMITED, REFUSED }
+
+    private suspend fun connect(): Handshake = withContext(Dispatchers.IO) {
         val urlWithoutScheme = url.substringAfter("://")
         val host = urlWithoutScheme.substringBefore("/")
         val path = urlWithoutScheme.substringAfter('/', "")
         val socketFactory = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> SSLSocketFactory.getDefault()
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> SSLSocketFactory.getDefault() as SSLSocketFactory
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.N -> SSLContext.getDefault().socketFactory
             else -> {
                 val sslContext = SSLContext.getInstance("TLSv1.3")
@@ -96,9 +122,17 @@ class WebSocket(
                 sslContext.socketFactory
             }
         }
-        socket = socketFactory.createSocket(host, 443)
-        inputStream = socket?.inputStream
-        outputStream = socket?.outputStream
+        // Connect and handshake under timeouts: on a weak signal a plain createSocket could
+        // wait minutes for each attempt. Held in [socket] first so a disconnect can abort it.
+        val tcp = Socket()
+        socket = tcp
+        tcp.connect(InetSocketAddress(host, 443), CONNECT_TIMEOUT_MS)
+        val tls = socketFactory.createSocket(tcp, host, 443, true) as SSLSocket
+        socket = tls
+        tls.soTimeout = HANDSHAKE_TIMEOUT_MS
+        tls.startHandshake()
+        inputStream = tls.inputStream
+        outputStream = tls.outputStream
         val reader = BufferedReader(InputStreamReader(inputStream))
         val writer = BufferedWriter(OutputStreamWriter(outputStream))
         val key = Base64.encodeToString(Random.nextBytes(16), Base64.NO_WRAP)
@@ -117,17 +151,26 @@ class WebSocket(
         useCompression = false
         messageByteArray = null
         var validated = false
-        var line = reader.readLine()
-        if (!line.startsWith("HTTP/1.1 101", true)) {
-            listener.onDisconnect(this@WebSocket, line)
-            if (line.startsWith("HTTP/1.1 429", true)) {
-                delayReconnect = true
-                return@withContext false
-            } else {
-                return@withContext true
+        val status = reader.readLine() ?: throw EOFException("Connection closed before the handshake response")
+        if (!status.startsWith("HTTP/1.1 101", true)) {
+            val code = status.substringAfter(' ').take(3)
+            return@withContext when {
+                code == "429" -> {
+                    reportFailure(status)
+                    Handshake.RATE_LIMITED
+                }
+                // A gateway or server error passes; any other answer will not change on retry.
+                code.startsWith("5") -> {
+                    reportFailure(status)
+                    Handshake.RETRY
+                }
+                else -> {
+                    listener.onDisconnect(this@WebSocket, status)
+                    Handshake.REFUSED
+                }
             }
         }
-        line = reader.readLine()
+        var line = reader.readLine()
         while (!line.isNullOrBlank()) {
             when {
                 line.startsWith("Sec-WebSocket-Accept", true) -> {
@@ -148,10 +191,12 @@ class WebSocket(
         }
         if (!validated) {
             listener.onDisconnect(this@WebSocket, "")
-            return@withContext true
+            return@withContext Handshake.REFUSED
         }
+        // Open connections stay quiet for long stretches; keepalives detect a dead one instead.
+        tls.soTimeout = 0
         listener.onConnect(this@WebSocket)
-        return@withContext false
+        return@withContext Handshake.OPEN
     }
 
     suspend fun readNextFrame(): Boolean = withContext(Dispatchers.IO) {
@@ -368,15 +413,23 @@ class WebSocket(
         (connection as? Socket)?.let { closeGracefully(it) }
     }
 
-    /** Sends a close frame on [target] and closes it five seconds later. */
+    /**
+     * Sends a close frame on [target] and closes it five seconds later. It closes at once if
+     * the frame cannot be written, as while a connection is still being made, or if cancelled.
+     */
     private suspend fun closeGracefully(target: Socket) {
         if (!target.isClosed) {
             try {
                 writeControlFrame(OPCODE_CLOSE, ByteBuffer.allocate(2).putShort(1000).array(), target)
                 delay(5000)
-                target.close()
             } catch (e: Exception) {
 
+            } finally {
+                try {
+                    target.close()
+                } catch (e: Exception) {
+
+                }
             }
         }
     }
@@ -396,6 +449,13 @@ class WebSocket(
     }
 
     companion object {
+        internal const val CONNECT_TIMEOUT_MS = 10_000
+        internal const val HANDSHAKE_TIMEOUT_MS = 15_000
+
+        /** Whether the handshake failed on the certificate rather than on the connection. */
+        internal fun SSLHandshakeException.isCertificateFailure(): Boolean =
+            generateSequence<Throwable>(this) { it.cause }.take(10).any { it is CertificateException || it is CertPathValidatorException }
+
         /** Client frames are XOR-masked with a 4-byte key (RFC 6455 5.3), in one pass without a List<Byte>. */
         internal fun mask(data: ByteArray, key: ByteArray): ByteArray {
             val masked = ByteArray(data.size)
