@@ -178,8 +178,9 @@ object PlayerSurfacePolicy {
                     fixedContainerWidthPx = width,
                     // A seek adds its caption under the track; the track
                     // itself stays where speed and pinch draw theirs.
-                    fixedContainerHeightPx = (PlayerGestureSliderView.HANDLE_LENGTH_DP * density).toInt() + 2 * pad +
-                        if (kind == PlayerGestureFeedbackKind.SEEK) captionBandPx(density) else 0,
+                    fixedContainerHeightPx = PlayerGestureSliderView.heightPx(
+                        density, withCaption = kind == PlayerGestureFeedbackKind.SEEK,
+                    ),
                     indicator = PlayerFeedbackIndicator.TOP_SLIDER,
                 )
             }
@@ -213,9 +214,6 @@ object PlayerSurfacePolicy {
 
     /** Room around a drawn slider, on each side. */
     fun sliderPadPx(density: Float): Int = (PlayerGestureSliderView.PAD_DP * density).toInt()
-
-    /** Height a caption adds under the top slider, its gap included. */
-    fun captionBandPx(density: Float): Int = (PlayerGestureSliderView.CAPTION_BAND_DP * density).toInt()
 
     /**
      * The top slider's drawn width, narrowed to leave the side margins on a
