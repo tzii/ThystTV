@@ -21,7 +21,14 @@ class ClipLinkTest {
     @Test fun embedLinkUsesTheClipParameter() {
         assertEquals("FunnySlug", clipLinkId("https://clips.twitch.tv/embed?clip=FunnySlug&parent=example.com"))
         assertEquals("FunnySlug", clipLinkId("https://clips.twitch.tv/embed?parent=example.com&clip=FunnySlug"))
+        assertEquals("FunnySlug", clipLinkId("https://clips.twitch.tv/embed/?clip=FunnySlug"))
         assertNull(clipLinkId("https://clips.twitch.tv/embed?parent=example.com"))
+        assertNull(clipLinkId("https://clips.twitch.tv/embed"))
+    }
+
+    @Test fun slugsStartingWithEmbedAreNotTreatedAsEmbedPlayer() {
+        assertEquals("embeddedClipName-AbCdEf", clipLinkId("https://clips.twitch.tv/embeddedClipName-AbCdEf"))
+        assertEquals("embededSlug", clipLinkId("https://clips.twitch.tv/embededSlug?tt_medium=share"))
     }
 
     @Test fun linksWithoutASlug() {

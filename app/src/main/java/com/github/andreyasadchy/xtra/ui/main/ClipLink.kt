@@ -10,7 +10,12 @@ internal fun clipLinkId(url: String): String? {
     val path = when {
         url.contains("/clip/") -> url.substringAfter("/clip/")
         url.contains("clips.twitch.tv/") -> url.substringAfter("clips.twitch.tv/").let { path ->
-            if (path.startsWith("embed")) embedClipParameter.find(path)?.groupValues?.get(1) ?: return null else path
+            val segment = path.substringBefore('?').substringBefore('/').substringBefore('#')
+            if (segment.equals("embed", ignoreCase = true)) {
+                embedClipParameter.find(path)?.groupValues?.get(1) ?: return null
+            } else {
+                path
+            }
         }
         else -> return null
     }
