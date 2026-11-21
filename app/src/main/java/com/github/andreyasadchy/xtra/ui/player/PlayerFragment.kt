@@ -216,6 +216,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var startTranslationY = 0f
     private var statusBarSwipe = false
     override var isEdgeSwipe = false
+    override var isSideEdgeSwipe = false
     private var gestureInsets: androidx.core.graphics.Insets? = null
     private var chatStatusBarSwipe = false
     private var isAnimating = false
@@ -1245,26 +1246,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 scaleClaimDeadzone = PINCH_SCALE_CLAIM_DEADZONE,
             )
 
-            // Edge zone detection for system gesture areas
-            val defaultEdgeThreshold = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, EDGE_ZONE_FALLBACK_DP, resources.displayMetrics
-            ).toInt()
-            
-            fun isInEdgeZone(x: Float, y: Float): Boolean {
-                val width = playerLayout.width
-                val height = playerLayout.height
-                val insets = gestureInsets
-                
-                // Use system gesture insets if available, otherwise use fallback
-                val leftEdge = insets?.left?.takeIf { it > 0 } ?: defaultEdgeThreshold
-                val rightEdge = insets?.right?.takeIf { it > 0 } ?: defaultEdgeThreshold
-                val topEdge = insets?.top?.takeIf { it > 0 } ?: defaultEdgeThreshold
-                val bottomEdge = insets?.bottom?.takeIf { it > 0 } ?: defaultEdgeThreshold
-                
-                return x <= leftEdge || 
-                       x >= (width - rightEdge) || 
-                       y <= topEdge || 
-                       y >= (height - bottomEdge)
+            // Edge zone detection for system gesture areas (surface-local).
+            fun updateEdgeSwipe(x: Float, y: Float) {
+                if (isPortrait) {
+                    isEdgeSwipe = false
+                    isSideEdgeSwipe = false
+                    return
+                }
+                val exclusion = edgeExclusion()
+                isEdgeSwipe = exclusion.isTopOrBottomEdge(y, playerLayout.height)
+                isSideEdgeSwipe = exclusion.isSideEdge(x, playerLayout.width)
             }
 
             fun downAction(event: MotionEvent) {
@@ -1399,7 +1390,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             lastX = x * slidingLayout.scaleX
                             lastY = y * slidingLayout.scaleY
                             statusBarSwipe = !isPortrait && y <= 100
-                            isEdgeSwipe = !isPortrait && isInEdgeZone(x, y)
+                            updateEdgeSwipe(x, y)
                             downAction(event)
                         }
                         MotionEvent.ACTION_POINTER_DOWN -> {
@@ -1418,7 +1409,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                     lastX = x * slidingLayout.scaleX
                                     lastY = y * slidingLayout.scaleY
                                     statusBarSwipe = !isPortrait && y <= 100
-                                    isEdgeSwipe = !isPortrait && isInEdgeZone(x, y)
+                                    updateEdgeSwipe(x, y)
                                     downAction(event)
                                 }
                             }
@@ -4908,15 +4899,21 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         return gestureArbiter.tryClaimSingleFinger(owner)
     }
 
+    private fun edgeExclusion(): PlayerEdgeExclusion {
+        val fallback = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, EDGE_ZONE_FALLBACK_DP, resources.displayMetrics
+        ).toInt()
+        return PlayerEdgeZonePolicy.measure(binding.playerLayout, gestureInsets, fallback)
+    }
+
     override fun startsChatSwipe(startX: Float): Boolean {
         if (!prefs.getBoolean(C.PLAYER_GESTURES_SWIPE_CHAT, true) || prefs.getBoolean(C.CHAT_DISABLE, false)) return false
         val layout = binding.playerLayout
         val rtl = layout.layoutDirection == View.LAYOUT_DIRECTION_RTL
         val density = resources.displayMetrics.density
-        // Matches isInEdgeZone on the chat side, so the strip starts where the
-        // ignored edge zone ends.
-        val exclusion = gestureInsets?.let { if (rtl) it.left else it.right }?.takeIf { it > 0 }?.toFloat()
-            ?: (EDGE_ZONE_FALLBACK_DP * density)
+        // Matches the side-edge exclusion on the chat side, so the strip starts
+        // where Android's back-gesture zone ends inside the player surface.
+        val exclusion = edgeExclusion().chatSideExclusionPx(rtl)
         return PlayerChatSwipePolicy.startsChatSwipe(
             isLive = videoType == STREAM,
             startX = startX,

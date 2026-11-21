@@ -19,6 +19,8 @@ interface PlayerGestureCallback {
     val playerHeight: Int
     val windowAttributes: android.view.WindowManager.LayoutParams
     val isEdgeSwipe: Boolean
+    /** True when touch-down landed inside the left/right system-back edge zone. */
+    val isSideEdgeSwipe: Boolean get() = false
     fun setWindowAttributes(params: android.view.WindowManager.LayoutParams)
     fun showController()
     fun hideController()
@@ -189,10 +191,13 @@ class PlayerGestureListener(
              val dx = e2.x - gestureStartX
              val dy = e2.y - gestureStartY
              val direction = PlayerScrubPolicy.classify(dx, dy, horizontalLockPx)
-             if (callback.canPanMagnified()) {
+             val sideEdge = callback.isSideEdgeSwipe
+             val isVerticalClaim = direction == PlayerScrubPolicy.Direction.VERTICAL &&
+                 (!sideEdge || PlayerEdgeZonePolicy.allowsVerticalFromSideEdge(dx, dy))
+             if (callback.canPanMagnified() && !sideEdge) {
                  // A magnified picture moves with the finger in every direction.
                  isPan = true
-             } else if (direction == PlayerScrubPolicy.Direction.VERTICAL) {
+             } else if (isVerticalClaim) {
                  // Vertical Swipes (Volume / Brightness)
                  // Split left/right halves
                  levelAnchorY = e2.y
@@ -220,7 +225,7 @@ class PlayerGestureListener(
                          step = 1L,
                      )
                  }
-             } else if (callback.startsChatSwipe(e1.x)) {
+             } else if (!sideEdge && callback.startsChatSwipe(e1.x)) {
                  // Wait for a horizontal lock, matching seek/speed, so a vertical
                  // swipe with an early sideways wobble stays undecided and can still
                  // become brightness or volume. A VoD strip swipe near a narrow edge
@@ -230,7 +235,7 @@ class PlayerGestureListener(
                  if (PlayerScrubPolicy.classify(dx, dy, chatLockPx) == PlayerScrubPolicy.Direction.HORIZONTAL) {
                      isChatSwipe = true
                  }
-             } else if (direction == PlayerScrubPolicy.Direction.HORIZONTAL && callback.getPlayerVideoType() != PlayerFragment.STREAM) {
+             } else if (!sideEdge && direction == PlayerScrubPolicy.Direction.HORIZONTAL && callback.getPlayerVideoType() != PlayerFragment.STREAM) {
                  // Seekable media only, once the drag is clearly sideways:
                  // split top/bottom using the configured zone split ratio.
                  scrubAnchorX = PlayerScrubPolicy.anchorX(e2.x, dx, startDetentPx)
