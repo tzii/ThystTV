@@ -4,6 +4,8 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-21
+
 ### Changed
 - Gesture feedback has a Material 3 Expressive look with no extra text. Brightness and volume show a vertical slider at the edge you swipe, in small windows too. Seek, speed and zoom show a slider at the top of the video with the change (`+1:25`, `1.50x`, `Fill`) and a dot where you started; a seek's handle shows where in the VoD it lands, a small caption under it shows the target time and the VoD's length (`24:00 / 3:12:45`), and returning to the start reads "Cancel". Icons follow the level, the feedback springs in, and the colors follow the app accent while staying dark over video in every theme.
 - New setting, Gesture indicator: "Number in the center" shows every gesture as one clean number in the middle of the video instead, with the target time and the VoD's length under a seek and the icon above brightness and volume. Spoiler-free VoDs show the target time only, in both styles.
@@ -30,6 +32,9 @@ All notable changes to ThystTV should be documented here.
 - Stop an existing Cast session from the top of Settings, including after closing the player. The VoD “Stop casting and play here” offer remains available.
 - Clip downloads keep their known duration from channel/category lists and the player. Unknown lengths are hidden instead of shown as 00:00, and missing source offsets no longer show negative Start/End labels.
 - Downloading a clip with "Download chat" on no longer fails when Twitch hasn't yet reported where the clip sits in its VoD, as for a clip made moments ago. The clip downloads without replay chat. A clip with no VoD at all now finishes as Downloaded instead of staying Pending.
+
+### Release metadata
+- Version 1.7.0 uses version code 19 and retains database version 36. Scope, residual limitations and upgrade guidance: `docs/release-notes/1.7.0.md`.
 
 ## [1.6.0] - 2026-11-13
 

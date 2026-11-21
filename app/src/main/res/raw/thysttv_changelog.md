@@ -1,3 +1,44 @@
+# ThystTV 1.7.0
+
+ThystTV 1.7.0 redesigns player gesture feedback with Material 3 Expressive sliders and an optional centered-number style, smooths brightness, volume and accelerating VoD seek gestures, keeps chat reconnecting over weak connections, keeps sign-in open when returning from an authenticator app, and refines Settings, portrait live controls, Cast stop controls and clip links/downloads.
+
+## Gesture feedback and controls
+
+- Gesture feedback uses Material 3 Expressive sliders with no extra clutter: brightness and volume show a vertical slider at the edge you swipe (including in small windows and with side chat open), while seek, speed and pinch zoom show a top slider with the change (`+1:25`, `1.50x`, `Fill`) and a start dot.
+- A seek shows the target time and the VoD's length under the slider (`24:00 / 3:12:45`) and reads "Cancel" when you drag back to where you started. Spoiler-free VoDs show the target time only, in both styles.
+- New setting, **Gesture indicator**: choose **Number in the center** to display every gesture as one clean centered number instead of sliders.
+- Seek swipes use an accelerating curve (precise for short corrections, about an hour across a landscape phone on long VoDs, scaled to full width on short videos) and require a clearly sideways drag before claiming, so wobbling vertical swipes stay brightness or volume on both live streams and VoDs.
+- Brightness and volume follow your finger smoothly in 1% steps, stay clear of camera cutouts and RTL edges, and no longer hit a wide deadzone on the camera-cutout side when drawing behind cutouts.
+- Gesture haptics tick evenly through volume steps, brightness, speed quarters and pace-adjusted seek intervals, with detents at the start and bumps at range limits.
+
+## Settings and portrait controls
+
+- Settings adds a **Spoilers** screen under Watching holding **Spoiler Shield** and **Spoiler-free VODs**, and groups the local rewind buffer under **Player > Live**. Saved preferences and backups are unchanged.
+- Settings search matches section titles as well as setting titles, displays the section beside the screen name, and updates the highlighted section immediately on two-pane wide screens.
+- Portrait live-player controls stay on one bottom row with compact uptime/viewer indicators, centered play/pause, and horizontal overflow for extra buttons or large text.
+
+## Chat reconnection and downloads
+
+- Chat, channel points, polls and 7TV sockets keep retrying with capped backoff up to 30 seconds instead of giving up after ~20 seconds of weak signal, bound connect/handshake timeouts, detect silent chat drops after one quiet minute instead of four and a half, and only reset backoff after a connection holds for 10 seconds.
+- Live downloads with **Download chat** now close their chat socket and reconnect loop when the download finishes.
+- Clip downloads retain known durations from channel/category lists and the player, hide unknown lengths and negative source offsets, and finish as Downloaded even when a fresh clip has no VoD offset yet or its VoD was deleted.
+
+## Sign-in, clip links and Cast
+
+- Leaving Twitch sign-in to fetch a 2FA code from an authenticator, SMS or email app and returning via the ThystTV app icon keeps sign-in (or Settings) open instead of closing it, and sign-in survives folding, split-screen resizing and dark-mode changes.
+- `clips.twitch.tv/<slug>` and `clips.twitch.tv/embed?clip=<slug>` links open with their channel name, replay chat and Watch full video again.
+- An active Cast session can now be ended with **Stop casting** at the top of Settings, even after closing the player.
+
+## Scope and limitations
+
+Google Cast remains experimental and off by default. On Android, home-screen icons pinned directly to the older `MainActivity` component by some launchers before 1.7.0 may continue using the old launch path until re-linked. Silent NAT drops on the 7TV event socket remain a pre-existing limitation tracked for a follow-up. New strings fall back to English where not yet translated.
+
+## Upgrading
+
+Version 1.7.0 uses version code 19 and database version 36, unchanged from 1.6.0. Install the official signed APK over official 1.6.0 to retain accounts, settings, Stats, bookmarks and downloads. Debug builds use a separate application ID.
+
+See the [APK verification guide](https://github.com/tzii/ThystTV/blob/master/docs/APK_VERIFICATION.md) for checksum and official signing-certificate verification.
+
 # ThystTV 1.6.0
 
 ThystTV 1.6.0 adds Spoiler Shield, live clip creation, a three-minute rewind

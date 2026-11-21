@@ -13,17 +13,21 @@ ThystTV is viewer-first. Protect stable playback, fast VoD controls, floating ch
 Read:
 
 - `docs/ROADMAP.md`
+- `docs/release-notes/1.7.0.md`
 - `docs/release-notes/1.6.0.md`
 - `docs/release-notes/1.5.2.md`
 - `docs/release-notes/1.5.1.md`
 - `docs/release-notes/1.5.0.md`
 - `CHANGELOG.md`
 
-This source targets 1.6.0/code 18, based on published 1.5.2/code 17. It adds
-Spoiler Shield, live clip creation with in-app watching, a three-minute rewind
-preset, an opt-in local rewind buffer, two-pane Settings on wide windows and a
-compact download progress card, with safer sign-in and chat timer fixes.
-Database version remains 36. Version 1.5.2 is the upgrade baseline for the exact
+This source targets 1.7.0/code 19, based on published 1.6.0/code 18. It redesigns
+player gesture feedback (Material 3 Expressive sliders and centered-number style,
+accelerating VoD seek with length caption, smooth 1% brightness/volume, surface-local
+camera-cutout edge policy), hardens weak-signal chat reconnection and live-download
+chat teardown, preserves sign-in across 2FA app switches, groups Spoilers/Live
+settings, keeps portrait live controls on one row, adds Settings Cast stop, and
+fixes `clips.twitch.tv` links and clip download durations/replay chat.
+Database version remains 36. Version 1.6.0 is the upgrade baseline for the exact
 signed-candidate QA; debug acceptance does not certify a signed release APK.
 Cast stays experimental and off by default. Authenticated TV sign-in and physical
 Cast/TV coverage retain their documented limitations. Keep player lifecycle and
