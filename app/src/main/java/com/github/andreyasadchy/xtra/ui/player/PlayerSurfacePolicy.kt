@@ -392,7 +392,7 @@ object PlayerSurfacePolicy {
         a11yText: String?,
         hideRunnable: Runnable,
         holdMs: Long = FEEDBACK_HOLD_MS,
-        edges: PlayerFeedbackEdges = measureEdges(feedbackRoot.parent as? View),
+        edges: PlayerFeedbackEdges? = null,
     ) {
         val pill = feedbackRoot.findViewById<LinearLayout>(R.id.feedbackContainer) ?: return
         val edgeSlider = feedbackRoot.findViewById<PlayerGestureLevelView>(R.id.feedbackLevel) ?: return
@@ -414,11 +414,16 @@ object PlayerSurfacePolicy {
             PlayerGestureFeedbackLayout.CENTER_VALUE -> if (reading == null) PlayerGestureFeedbackLayout.CENTERED_HORIZONTAL else presentation.layout
             else -> presentation.layout
         }
+        val resolvedEdges = edges ?: if (layout == PlayerGestureFeedbackLayout.EDGE_VERTICAL) {
+            measureEdges(feedbackRoot.parent as? View)
+        } else {
+            PlayerFeedbackEdges.NONE
+        }
         val placement = placementFor(
             kind = kind,
             layout = layout,
             density = density,
-            edges = edges,
+            edges = resolvedEdges,
             surfaceHeightPx = surfaceHeightPx,
             surfaceWidthPx = surfaceWidthPx,
         )

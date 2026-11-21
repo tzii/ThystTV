@@ -187,7 +187,8 @@ class PlayerGestureListener(
              // Measured from touch-down, so an early sideways wobble cannot
              // decide a swipe that then turns vertical.
              val dx = e2.x - gestureStartX
-             val direction = PlayerScrubPolicy.classify(dx, e2.y - gestureStartY, horizontalLockPx)
+             val dy = e2.y - gestureStartY
+             val direction = PlayerScrubPolicy.classify(dx, dy, horizontalLockPx)
              if (callback.canPanMagnified()) {
                  // A magnified picture moves with the finger in every direction.
                  isPan = true
@@ -220,8 +221,15 @@ class PlayerGestureListener(
                      )
                  }
              } else if (callback.startsChatSwipe(e1.x)) {
-                 // Horizontal-leaning swipes: chat where the policy allows it
-                 isChatSwipe = true
+                 // Wait for a horizontal lock, matching seek/speed, so a vertical
+                 // swipe with an early sideways wobble stays undecided and can still
+                 // become brightness or volume. A VoD strip swipe near a narrow edge
+                 // caps the lock at its shorter trigger so hiding toward the edge
+                 // remains reachable.
+                 val chatLockPx = minOf(horizontalLockPx, callback.chatSwipeTriggerPx(e1.x))
+                 if (PlayerScrubPolicy.classify(dx, dy, chatLockPx) == PlayerScrubPolicy.Direction.HORIZONTAL) {
+                     isChatSwipe = true
+                 }
              } else if (direction == PlayerScrubPolicy.Direction.HORIZONTAL && callback.getPlayerVideoType() != PlayerFragment.STREAM) {
                  // Seekable media only, once the drag is clearly sideways:
                  // split top/bottom using the configured zone split ratio.
