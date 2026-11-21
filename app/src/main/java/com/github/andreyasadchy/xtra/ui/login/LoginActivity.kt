@@ -192,7 +192,9 @@ class LoginActivity : AppCompatActivity() {
                 havingTrouble.isClickable = true
                 deviceCodeLogin.requestFocus()
             }
-            if (!preservesSignIn) {
+            // A rebuilt screen, as after Android closed the app in the background, keeps the
+            // cookies of the sign-in begun here, so a Twitch session already open continues it.
+            if (!preservesSignIn && savedInstanceState == null) {
                 CookieManager.getInstance().removeAllCookies(null)
             }
             val isLightTheme = obtainStyledAttributes(intArrayOf(androidx.appcompat.R.attr.isLightTheme)).use {

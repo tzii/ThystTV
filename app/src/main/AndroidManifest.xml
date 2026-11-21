@@ -42,17 +42,24 @@
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="androidx.media3.cast.DefaultCastOptionsProvider" />
+        <!-- The launcher entry is a separate standard activity: a launch into the running
+             task must not reach the singleTask MainActivity, which would close the screens
+             above it, such as sign-in. -->
         <activity
-            android:name=".ui.main.MainActivity"
-            android:launchMode="singleTask"
-            android:supportsPictureInPicture="true"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:name=".ui.main.LaunchActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+        </activity>
+        <activity
+            android:name=".ui.main.MainActivity"
+            android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -66,7 +73,7 @@
         <activity android:name=".ui.settings.SettingsActivity" />
         <activity
             android:name=".ui.login.LoginActivity"
-            android:configChanges="orientation|screenSize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode|keyboard|keyboardHidden|navigation"
             android:windowSoftInputMode="adjustResize" />
 
         <service
