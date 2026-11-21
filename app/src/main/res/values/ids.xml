@@ -8,4 +8,6 @@
     <item name="feedbackColors" type="id" />
     <!-- Whole-panel scroll viewport inside the shared player popup host. -->
     <item name="playerPopupViewport" type="id" />
+    <!-- Keyed tag on a floating chat row holding the alpha its age fade is heading to. -->
+    <item name="chatRowFadeTarget" type="id" />
 </resources>

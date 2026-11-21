@@ -1,6 +1,8 @@
 package com.github.andreyasadchy.xtra.ui.chat
 
+import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -29,7 +31,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import coil3.imageLoader
@@ -89,6 +90,21 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     private val hideChatStatus = Runnable { _binding?.chatStatus?.visibility = View.GONE }
     private var hasRecentEmotes = false
     private var messagingEnabled = false
+    /** A composer exists here: messaging, or a reward-only bar. */
+    private var composerAvailable = false
+    private var rewardsButtonAvailable = false
+    private var inPlayerSidebar = false
+    /** Set while the chat floats over video. */
+    private var overlayStyle: ChatOverlayStyle? = null
+    private var floatingReplyBar = false
+    /** The composer was opened for one message while the Reply bar option is off. */
+    private var floatingReplyActive = false
+    private var floatingReveal = false
+    private var rowsPaused = false
+    private var followGlide: ChatFollowGlide? = null
+    private var ageFader: ChatAgeFader? = null
+    /** New live messages, so a tucked floating chat can count them. */
+    var onMessagesAppended: ((Int) -> Unit)? = null
 
     private var autoCompleteAdapter: AutoCompleteAdapter<Any>? = null
 
@@ -157,8 +173,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                 !TwitchApiHelper.getHelixHeaders(requireContext())[C.HEADER_TOKEN].isNullOrBlank())
                 val chatUrl = args.getString(KEY_CHAT_URL)
                 if (isLive || (args.getString(KEY_VIDEO_ID) != null && args.getInt(KEY_START_TIME) != -1) || chatUrl != null) {
-                    val isFloatingMode = args.getBoolean("isFloatingMode", false)
-                    val useHighVisibility = isFloatingMode && requireContext().prefs().getBoolean(C.FLOATING_CHAT_HIGH_VISIBILITY, true)
+                    inPlayerSidebar = (view.parent?.parent?.parent?.parent as? View)?.id == R.id.slidingLayout
                     val enableMessaging = isLive && isLoggedIn
                     val sizeModifier = (requireContext().prefs().getInt(C.CHAT_SIZE_MODIFIER, 100).toFloat() / 100f)
                     adapter = ChatAdapter(
@@ -211,7 +226,6 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         translateMessage = this@ChatFragment::onTranslateMessageClicked,
                         showLanguageDownloadDialog = this@ChatFragment::showLanguageDownloadDialog,
                         channelId = channelId,
-                        useHighVisibility = useHighVisibility,
                         loggedInUser = if (enableMessaging) accountLogin else null,
                         messageClickListener = { channelId ->
                             (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(editText.windowToken, 0)
@@ -228,17 +242,19 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                             editText.clearFocus()
                             ImageClickedDialog.newInstance(url, name, format, isAnimated, source, thirdParty, emoteId).show(this@ChatFragment.childFragmentManager, "imageDialog")
                         },
-                    ).apply {
-                        useDarkOverlay = isFloatingMode
-                    }
+                    )
                     recyclerView.let {
                         it.adapter = adapter
                         it.itemAnimator = null
-                        it.layoutManager = LinearLayoutManager(context).apply { stackFromEnd = true }
+                        val layoutManager = ChatLayoutManager(requireContext()).apply { stackFromEnd = true }
+                        it.layoutManager = layoutManager
+                        followGlide = ChatFollowGlide(it, layoutManager)
+                        ageFader = ChatAgeFader(it).apply { sync(adapter?.itemCount ?: 0) }
                         it.addOnScrollListener(object : RecyclerView.OnScrollListener() {
                             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                                 super.onScrollStateChanged(recyclerView, newState)
                                 isChatTouched = newState == RecyclerView.SCROLL_STATE_DRAGGING
+                                if (isChatTouched) followGlide?.cancel()
                                 val offset = recyclerView.computeVerticalScrollOffset()
                                 if (offset < 0) {
                                     btnDown.isVisible = false
@@ -248,6 +264,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                     val percentage = (100f * offset / (range - extent).toFloat())
                                     btnDown.isVisible = percentage < 100f
                                 }
+                                updateFadeReveal()
                                 if (showChatStatus && chatStatus.isGone) {
                                     showChatStatusBriefly()
                                 }
@@ -261,16 +278,18 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                             }
                             recyclerView.scrollToPosition(lastIndex)
                             it.visibility = View.GONE
+                            updateFadeReveal()
                         }
                     }
                     val rewardAccess = isLive && rewardSessions.current(channelId, channelLogin).canRedeem
-                    channelRewards.isVisible = isLive && (enableMessaging || rewardAccess) && !channelId.isNullOrBlank() && !channelLogin.isNullOrBlank()
+                    rewardsButtonAvailable = isLive && (enableMessaging || rewardAccess) && !channelId.isNullOrBlank() && !channelLogin.isNullOrBlank()
+                    channelRewards.isVisible = rewardsButtonAvailable
                     // A web-only account can redeem even when the existing TV/Helix chat composer cannot send.
                     if (!enableMessaging && rewardAccess) {
                         editText.isVisible = false
                         emotes.isVisible = false
-                        messageView.isVisible = !isFloatingMode &&
-                                ((view.parent?.parent?.parent?.parent as? View)?.id != R.id.slidingLayout || requireContext().prefs().getBoolean(C.KEY_CHAT_BAR_VISIBLE, true))
+                        composerAvailable = true
+                        updateComposerVisibility()
                     }
                     channelRewards.setOnClickListener {
                         if (!channelId.isNullOrBlank() && !channelLogin.isNullOrBlank() &&
@@ -305,6 +324,11 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                     notifyDataSetChanged()
                                 }
                                 setNotifyOnChange(hasFocus)
+                                // A composer opened for one message closes again when left empty.
+                                if (!hasFocus && floatingReplyActive && editText.text.isBlank() && replyView.isGone && emoteMenu.isGone) {
+                                    floatingReplyActive = false
+                                    updateComposerVisibility()
+                                }
                             }
                         }
                         editText.addTextChangedListener(onTextChanged = { text, _, _, _ ->
@@ -335,12 +359,8 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         }
                         replyView.visibility = View.GONE
                         send.setOnClickListener { sendMessage() }
-                        if (isFloatingMode ||
-                            ((view.parent?.parent?.parent?.parent as? View)?.id == R.id.slidingLayout && !requireContext().prefs().getBoolean(C.KEY_CHAT_BAR_VISIBLE, true))) {
-                            messageView.visibility = View.GONE
-                        } else {
-                            messageView.visibility = View.VISIBLE
-                        }
+                        composerAvailable = true
+                        updateComposerVisibility()
                         viewPager.adapter = object : FragmentStateAdapter(this@ChatFragment) {
                             override fun getItemCount(): Int = 3
 
@@ -615,6 +635,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                     }
                     // Set until onDestroyView, so the adapter also hears about changes made while stopped.
                     viewModel.messageListener = ::onChatMessagesChanged
+                    applyOverlayStyle(rebind = false)
                     viewLifecycleOwner.lifecycleScope.launch {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             viewModel.updateUserMessages.collectLatest { userId ->
@@ -702,7 +723,13 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         val adapter = adapter ?: return
         val messageDialog = messageDialog
         val replyDialog = replyDialog
+        val glide = followGlide
+        // The newest row before the change; the glide measures how far it moves.
+        val anchor = glide?.capture()
+        var anchorShift = 0
+        var anchorValid = anchor != null
         var added = false
+        var appended = 0
         changes.forEach { change ->
             when (change) {
                 is ChatMessageStore.Change.Appended -> {
@@ -710,6 +737,9 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         adapter.notifyItemRangeRemoved(0, change.removedFromHead)
                     }
                     adapter.notifyItemRangeInserted(change.insertedAt, change.messages.size)
+                    ageFader?.onAppended(change.removedFromHead, change.messages.size)
+                    anchorShift -= change.removedFromHead
+                    appended += change.messages.size
                     change.messages.forEach { message ->
                         messageDialog?.newMessage(message)
                         replyDialog?.newMessage(message)
@@ -718,14 +748,27 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                 }
                 is ChatMessageStore.Change.Prepended -> {
                     adapter.notifyItemRangeInserted(0, change.messages.size)
+                    ageFader?.onPrepended(change.messages.size)
+                    anchorValid = false
                     messageDialog?.addMessages(change.messages)
                     replyDialog?.addMessages(change.messages)
                     added = true
                 }
-                is ChatMessageStore.Change.Cleared -> adapter.notifyItemRangeRemoved(0, change.count)
+                is ChatMessageStore.Change.Cleared -> {
+                    adapter.notifyItemRangeRemoved(0, change.count)
+                    ageFader?.onCleared(change.count)
+                    anchorValid = false
+                }
             }
         }
+        ageFader?.sync(adapter.itemCount)
+        if (appended > 0) onMessagesAppended?.invoke(appended)
         if (added && (pipMode || (!isChatTouched && binding.btnDown.isGone)) && adapter.itemCount > 0) {
+            if (anchor != null && anchorValid && anchor.first + anchorShift >= 0) {
+                glide.expect(anchor.first + anchorShift, anchor.second)
+            } else {
+                glide?.cancel()
+            }
             binding.recyclerView.scrollToPosition(adapter.itemCount - 1)
         }
     }
@@ -757,6 +800,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         if (pipMode == enabled) return
         pipMode = enabled
         applyPipChrome()
+        updateGlideEnabled()
         if (enabled) {
             _binding?.let {
                 it.root.clearFocus()
@@ -833,6 +877,16 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
 
     fun toggleEmoteMenu(enable: Boolean) {
         if (enable) {
+            // A floating card is short; the emote grid takes about half of it.
+            val density = resources.displayMetrics.density
+            val gridHeight = if (overlayStyle != null && binding.root.height > 0) {
+                (binding.root.height * 0.45f).toInt().coerceIn((96 * density).toInt(), (300 * density).toInt())
+            } else {
+                (300 * density).toInt()
+            }
+            if (binding.viewPager.layoutParams.height != gridHeight) {
+                binding.viewPager.updateLayoutParams { height = gridHeight }
+            }
             binding.emoteMenu.visibility = View.VISIBLE
         } else {
             binding.emoteMenu.visibility = View.GONE
@@ -853,19 +907,123 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     }
 
     /**
-     * Update the high visibility mode for the chat adapter.
-     * Called when the chat is reparented between sidebar and floating modes.
-     * High visibility (bold text + shadow) should only apply to floating chat.
+     * Applies the floating chat's look, or puts the chat back on an app surface
+     * with null. Rows rebind in place; the connection and history stay.
      */
-    fun updateHighVisibility(isFloating: Boolean) {
-        adapter?.let { chatAdapter ->
-            val useHighVisibility = isFloating && requireContext().prefs().getBoolean(C.FLOATING_CHAT_HIGH_VISIBILITY, true)
-            val useDarkOverlay = isFloating
-            if (chatAdapter.useHighVisibility != useHighVisibility || chatAdapter.useDarkOverlay != useDarkOverlay) {
-                chatAdapter.useHighVisibility = useHighVisibility
-                chatAdapter.useDarkOverlay = useDarkOverlay
-                chatAdapter.notifyDataSetChanged()
+    fun setOverlayStyle(style: ChatOverlayStyle?) {
+        val previous = overlayStyle
+        if (previous == style) return
+        overlayStyle = style
+        val modeChanged = (previous == null) != (style == null)
+        if (modeChanged) floatingReplyActive = false
+        applyOverlayStyle(rebind = previous?.copy(fadeOldMessages = false) != style?.copy(fadeOldMessages = false))
+    }
+
+    /** Player controls are up: faded rows come back. */
+    fun setFloatingReveal(reveal: Boolean) {
+        floatingReveal = reveal
+        updateFadeReveal()
+    }
+
+    /** The floating chat's Reply bar option. */
+    fun setFloatingReplyBar(enabled: Boolean) {
+        if (floatingReplyBar == enabled) return
+        floatingReplyBar = enabled
+        updateComposerVisibility()
+    }
+
+    /** True when the viewer can type here (signed in, live chat). */
+    fun canCompose() = messagingEnabled
+
+    /** Opens the composer in the floating chat for one message and focuses it. */
+    fun openFloatingComposer() {
+        val binding = _binding ?: return
+        if (!messagingEnabled || overlayStyle == null) return
+        if (!floatingReplyBar) floatingReplyActive = true
+        updateComposerVisibility()
+        binding.editText.apply {
+            requestFocus()
+            WindowCompat.getInsetsController(requireActivity().window, this).show(WindowInsetsCompat.Type.ime())
+        }
+    }
+
+    /** Animated emotes and the message glide rest while the floating chat is hidden or tucked. */
+    fun setRowAnimationsPaused(paused: Boolean) {
+        rowsPaused = paused
+        val binding = _binding ?: return
+        adapter?.setAnimationsPaused(binding.recyclerView, paused)
+        updateGlideEnabled()
+    }
+
+    private fun applyOverlayStyle(rebind: Boolean) {
+        val binding = _binding ?: return
+        val style = overlayStyle
+        adapter?.let { adapter ->
+            if (adapter.overlayStyle != style) {
+                adapter.overlayStyle = style
+                if (rebind) adapter.notifyItemRangeChanged(0, adapter.itemCount)
             }
+        }
+        with(binding.recyclerView) {
+            // The oldest lines fade out at the top of the floating card.
+            isVerticalFadingEdgeEnabled = style != null
+            setFadingEdgeLength((OVERLAY_TOP_FADE_DP * resources.displayMetrics.density).toInt())
+        }
+        ageFader?.enabled = style?.fadeOldMessages == true
+        updateFadeReveal()
+        applyComposerSurface()
+        updateComposerVisibility()
+        updateGlideEnabled()
+    }
+
+    private fun updateGlideEnabled() {
+        val animatorsOn = Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled()
+        followGlide?.enabled = overlayStyle != null && !pipMode && !rowsPaused && animatorsOn
+    }
+
+    private fun updateFadeReveal() {
+        val binding = _binding ?: return
+        ageFader?.reveal = floatingReveal || isChatTouched || binding.btnDown.isVisible || binding.editText.hasFocus()
+    }
+
+    private fun composerShouldShow(): Boolean {
+        if (!composerAvailable) return false
+        return if (overlayStyle != null) {
+            floatingReplyBar || floatingReplyActive
+        } else {
+            !inPlayerSidebar || requireContext().prefs().getBoolean(C.KEY_CHAT_BAR_VISIBLE, true)
+        }
+    }
+
+    private fun updateComposerVisibility() {
+        val binding = _binding ?: return
+        val show = composerShouldShow()
+        if (!show && binding.messageView.isVisible) {
+            if (binding.editText.hasFocus()) {
+                (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(binding.editText.windowToken, 0)
+                binding.editText.clearFocus()
+            }
+            if (binding.emoteMenu.isVisible) toggleEmoteMenu(false)
+            binding.replyView.visibility = View.GONE
+        }
+        binding.messageView.isVisible = show
+        // A floating card is narrow: keep the text field wide when typing is possible.
+        binding.channelRewards.isVisible = rewardsButtonAvailable && (overlayStyle == null || !messagingEnabled)
+    }
+
+    /** Over video the composer sits on an opaque app surface so its themed text stays readable. */
+    private fun applyComposerSurface() {
+        val binding = _binding ?: return
+        val color = if (overlayStyle != null) {
+            val context = requireContext()
+            MaterialColors.getColor(
+                context,
+                com.google.android.material.R.attr.colorSurfaceContainerHigh,
+                MaterialColors.getColor(context, com.google.android.material.R.attr.colorSurface, Color.DKGRAY),
+            )
+        } else null
+        listOf(binding.replyView, binding.messageView, binding.emoteMenu).forEach { view ->
+            if (color != null) view.setBackgroundColor(color) else view.background = null
         }
     }
 
@@ -876,6 +1034,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
             toggleEmoteMenu(false)
             replyView.visibility = View.GONE
             send.setOnClickListener { sendMessage() }
+            if (floatingReplyActive) {
+                floatingReplyActive = false
+                updateComposerVisibility()
+            }
             editText.setOnKeyListener { _, keyCode, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
                     sendMessage()
@@ -922,6 +1084,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         with(binding) {
             if (!replyId.isNullOrBlank()) {
                 messageDialog?.dismiss()
+                if (overlayStyle != null && !floatingReplyBar) {
+                    floatingReplyActive = true
+                    updateComposerVisibility()
+                }
                 replyView.visibility = View.VISIBLE
                 replyText.text = message?.let {
                     val name = if (userName != null && userLogin != null && !userLogin.equals(userName, true)) {
@@ -937,6 +1103,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                 }
                 replyClose.setOnClickListener {
                     replyView.visibility = View.GONE
+                    if (floatingReplyActive && editText.text.isBlank()) {
+                        floatingReplyActive = false
+                        updateComposerVisibility()
+                    }
                     send.setOnClickListener { sendMessage() }
                     editText.setOnKeyListener { _, keyCode, event ->
                         if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -1169,6 +1339,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     override fun onDestroyView() {
         super.onDestroyView()
         viewModel.messageListener = null
+        followGlide?.cancel()
+        followGlide = null
+        ageFader?.dispose()
+        ageFader = null
         _binding = null
     }
 
@@ -1216,6 +1390,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     }
 
     companion object {
+        private const val OVERLAY_TOP_FADE_DP = 24f
         private const val KEY_IS_LIVE = "isLive"
         private const val KEY_CHANNEL_ID = "channel_id"
         private const val KEY_CHANNEL_LOGIN = "channel_login"

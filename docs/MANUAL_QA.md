@@ -656,7 +656,7 @@ Turn on Player settings → Gestures → Extended zoom.
 | Quality menu/selection | [ ] | [ ] | |
 | Chat-only/audio-only restore | [ ] | [ ] | |
 | Gestures: brightness/volume/seek | [ ] | [ ] | |
-| Floating chat: open/drag/resize | [ ] | [ ] | |
+| Floating chat: open/drag/resize/tuck | [ ] | [ ] | |
 | Floating chat readability over video | [ ] | [ ] | |
 | Portrait phone layout | [ ] | [ ] | |
 | Landscape phone layout | [ ] | [ ] | |
@@ -902,6 +902,56 @@ Launcher entry `ui/main/LaunchActivity.kt`
 - [ ] Minimize/restore, close/reopen, switch VoDs/live streams, rotate and enter/leave
   PiP/background during a drag. No old preview or image request survives.
 - [ ] Live/VoD playback, speed/quality, gestures and floating chat remain usable.
+
+### Floating chat redesign
+
+Landscape phone and tablet, live stream and VoD, dark and light app theme, on
+bright and dark video. Repeat the core rows with an RTL language.
+
+- [ ] Fresh install: the first floating chat opens top right on Shade. A chat
+  whose opacity was set before keeps that value (0 shows Clear).
+- [ ] Aa: Clear, Shade and Solid switch at once without reconnecting chat
+  (history stays). Clear shows only text; it stays readable on white and busy
+  video, emotes included. Text size and Bold apply to existing lines.
+- [ ] Settings → Chat: the opacity slider, text size and the new switches change
+  an open floating chat live after returning to the player.
+- [ ] Controls hidden: only the small top handle shows; dragging it moves the
+  card. Nothing invisible at the top of the card catches taps; the chat list
+  scrolls and opens message actions as before.
+- [ ] Controls shown: the header (Aa, tuck, close) and the corner grip appear;
+  the card moves below the top controls and above the seek bar, and returns when
+  the controls hide. The controls stay up while dragging, resizing or pinching.
+- [ ] Fling the card across: it lands on the other side, snaps to the top or
+  bottom edge near them, otherwise stays where dropped. Fling it sideways off
+  its edge, or drag most of it off, or tap tuck: a tab remains. New messages
+  count on the tab; tapping it brings the card back. Back gesture from that edge
+  still works away from the tab.
+- [ ] Resize from the grip on either side and by pinching; the outer edge stays
+  put, the size is kept after rotation and reopening.
+- [ ] Position memory: move the chat on channel A, open channel B (starts where
+  A left it), move it, return to A (A's place). Upgrading from 1.7.0 keeps a
+  channel's old position near where it was.
+- [ ] Camera cutout on either side, three-button navigation, and a short window
+  (split screen): the card stays clear and loses its oldest lines first.
+- [ ] Fade old messages on: lines fade after 10 seconds and return with the
+  controls, while scrolled back, touching or typing.
+- [ ] Pass touches to video on: with the controls hidden, taps and swipes on the
+  chat reach the player (controls, double tap, seek); with controls up, the
+  header still works.
+- [ ] Signed in on a live stream: the header keyboard button opens the message
+  box for one message and it closes after sending or leaving it empty. Reply bar
+  on: the box stays. The keyboard pushes the card up. Reply from a message's
+  actions opens the box too. Signed out or VoD: no keyboard button.
+- [ ] TalkBack: the card offers move left/right, larger/smaller and tuck; the
+  tab reads "Show chat" with the new-message count.
+- [ ] Enter and leave PiP, minimize and restore, rotate to portrait and back,
+  close and reopen, switch streams: the card hides and returns with its chat, no
+  empty card, no duplicate chat, no stale card over the mini player.
+- [ ] Sidebar ↔ floating ↔ hidden by double tap, chat button and swipe; pinch
+  during a double tap still restores the previous mode. Tabletop docks the chat
+  and floats it again after unfolding.
+- [ ] Live/VoD playback, stream switching, speed/quality, all gestures and
+  system animations off (animator duration scale 0) remain usable.
 
 ### Optional chat in picture-in-picture
 

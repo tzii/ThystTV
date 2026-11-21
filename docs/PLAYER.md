@@ -229,6 +229,56 @@ not relayout.
 drives the real fragment geometry and chat transitions with a simulated hinge.
 Hinge timing and real postures still need the device matrix in `MANUAL_QA.md`.
 
+## Floating chat
+
+`PlayerFragment` decides when floating chat is on (`isFloatingChatEnabled`) and
+moves the one `ChatFragment` view between `chatFragmentContainer` and
+`floating_chat_container` (`reparentChatView`), so the connection and history
+stay. `FloatingChatController` owns how the card looks and moves. Keep these:
+
+- One chat fragment, never recreated to change the look. `ChatFragment.setOverlayStyle`
+  rebinds rows in place; `null` puts the ordinary sidebar look back.
+- `FloatingChatHostLayout` is a full-screen sibling of `slidingLayout` that takes
+  no touches itself. It lays its children out locally on the next frame, so a
+  resize never re-measures the player.
+- Per-touch work only writes `x`/`y`. Grip resize is coalesced to one size change
+  per frame; release, keep-clear and tuck use `SpringAnimation`. Do not add
+  layout writes or new animators per `ACTION_MOVE`.
+- `FloatingChatPlacement` is pure: a side plus a TOP, BOTTOM or FREE anchor in dp,
+  inside bounds that keep clear of cutouts, the navigation bar or keyboard and,
+  while the controls show, the controls' top and bottom rows
+  (`floatingChatControlBands`). A short screen drops the card's oldest (top)
+  lines first. A release projects the fling 0.15 s ahead, snaps to the nearer
+  side, pulls to the top or bottom within 30dp, and tucks on a fast outward
+  sideways fling or when 30% of the card is past the edge.
+- Layouts are stored per channel plus a last-used fallback in the single JSON
+  preference `floating_chat_layouts` (`FloatingChatLayoutStore`, 50 channels).
+  1.7.0's `floating_chat_x/y/w/h_<channel>` keys migrate once and are removed.
+- The header (Aa, tuck, close, optional compose) and the resize grip show only
+  with the player controls and are `INVISIBLE` otherwise, never just transparent,
+  so they cannot take touches. While the viewer drags, resizes or pinches,
+  `holdControls` stops the controls from auto-hiding.
+- `FloatingChatAppearance` maps the existing opacity preference: under 20 is
+  Clear (no surface; `ChatMessageTextView` draws a halo around the text), under 80
+  Shade, otherwise Solid. Aa writes 0, 55 or 92; untouched installs read 55.
+  Pass-through makes the card ignore touches only while the controls are hidden.
+  Appearance changes from Aa or Settings apply live through the preference
+  listener.
+- The card hides in PiP, when minimized and in portrait; PiP exit and maximize
+  show it again. Tucking leaves an edge tab with an unread count. While the card
+  is hidden or tucked, animated emotes and the message glide pause.
+- `hideFloatingChat` fades the card with its lines and reparents in the hide
+  callback. The callback reads the current mode, so a show or hide in between
+  wins and the chat view always ends where the mode says.
+- New lines glide in (`ChatFollowGlide`) only over video, outside PiP and with
+  system animations on.
+
+`FloatingChatPlacementTest`, `FloatingChatLayoutStoreTest` and
+`FloatingChatAppearanceTest` cover the pure rules; `FloatingChatControllerTest`
+drives the real card, tab and springs. The chat transition suites
+(`PlayerChatSwipeTest`, `PlayerPinchChatTest`, `PlayerFoldLayoutTest`) run with
+the controller attached.
+
 ## Android TV remote input
 
 TV login exposes “Sign in with your phone”, explaining that some account features
@@ -305,7 +355,7 @@ Update this list as the code evolves.
 - Quality chip column counts are derived from measured bold label widths so labels such
   as "1080p60" never truncate; do not return to fixed 4-column grids with silent clipping.
 - VoD and live menus may legitimately differ. Do not add chat-only to VoD unless the data/model supports it.
-- Floating chat should use a dark translucent video-overlay palette in both app themes; background opacity remains user-controlled.
+- Floating chat should use a dark video-overlay palette in both app themes; background opacity remains user-controlled, and Clear (no surface) must stay readable through the text halo.
 - Stats/player overlay controls need compact and landscape checks because label clipping and stacked graph labels have happened before.
 - Any view adapter tied to fragments can leak destroyed views. Clear listeners/adapters in `onDestroyView()` when changing RecyclerView or fragment lifecycles.
 
@@ -887,6 +937,8 @@ At minimum, player work should request human verification for:
 - lifecycle callbacks apply to an old fragment
 - quality menu shows raw numeric HLS variants
 - floating chat is unreadable in light mode or on bright video
+- the floating chat header or grip catches touches while the controls are hidden
+- floating chat stays on screen in PiP or after minimize, or comes back empty
 
 ## PR Expectations For Player Changes
 

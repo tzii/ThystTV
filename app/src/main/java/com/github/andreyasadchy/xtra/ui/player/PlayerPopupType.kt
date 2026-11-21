@@ -5,4 +5,5 @@ internal enum class PlayerPopupType {
     QUALITY,
     VOLUME,
     MORE,
+    FLOATING_CHAT,
 }
