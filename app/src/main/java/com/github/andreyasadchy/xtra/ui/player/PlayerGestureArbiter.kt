@@ -72,20 +72,24 @@ class PlayerGestureArbiter(
 
     /**
      * Called on ACTION_POINTER_UP with the number of pointers that remain
-     * after the lift. A candidate dissolves back to a single-finger sequence;
+     * after the lift, and whether the lifted pointer was one of the two the
+     * pinch tracks. A candidate dissolves back to a single-finger sequence;
      * an owned pinch starts suppressing single-finger events. Returns true
      * exactly when the owned two-finger pinch has ended and its caller should
-     * commit or restore immediately.
+     * commit or restore immediately: when fewer than two fingers remain, or
+     * when one of its own two fingers lifts while a third finger stays down
+     * (the pinch can no longer measure its span).
      */
-    fun onPointerRemoved(remainingPointerCount: Int): Boolean {
-        val pinchEnded = owner == Owner.PINCH_DISPLAY_MODE && remainingPointerCount < 2
+    fun onPointerRemoved(remainingPointerCount: Int, liftedPinchPointer: Boolean = false): Boolean {
+        val pinchEnded = owner == Owner.PINCH_DISPLAY_MODE && !isSingleFingerSuppressed &&
+            (remainingPointerCount < 2 || liftedPinchPointer)
         if (remainingPointerCount < 2) {
             if (isPinchCandidate && (owner == Owner.IDLE || owner == Owner.MAGNIFIED_PAN)) {
                 isPinchCandidate = false
             }
-            if (owner == Owner.PINCH_DISPLAY_MODE) {
-                isSingleFingerSuppressed = true
-            }
+        }
+        if (pinchEnded) {
+            isSingleFingerSuppressed = true
         }
         return pinchEnded
     }
