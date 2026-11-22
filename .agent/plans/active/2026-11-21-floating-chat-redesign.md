@@ -106,8 +106,8 @@ asked for the build; work stays on an unpushed branch until they ask to commit.
 Automated checks:
 
 - [x] `./gradlew assembleDebug`
-- [x] `./gradlew test` (only `testDebugUnitTest` exists): 1593 passed when run
-      on its own; see the progress log for the earlier combined-run OOM.
+- [x] `./gradlew test` (only `testDebugUnitTest` exists): 1601 passed after the
+      review fixes; see the progress log for the earlier combined-run OOM.
 - [x] `./gradlew lintDebug`: no errors; no new warnings in changed lines.
 
 Human QA required:
@@ -165,6 +165,59 @@ Human QA completed:
   the same tests pass alone, so the likely cause is Windows commit memory being
   exhausted while lint ran alongside, not a leak. No heap dump was produced
   because the failure did not recur.
+- 2026-11-22: Rebased onto the v1.7.0 tag (d73e1db34) as 00efac3c4 with no
+  conflicts; the gate passed there.
+- 2026-11-22: Independent review by Gemini 4 Neon (Antigravity, thought level
+  xhigh) on a snapshot of 00efac3c4. It reported 19 findings and 8
+  improvements. Each was checked against the code before acting.
+  Fixed (verified):
+  - RTL: the card and tab used `TOP|START`, so in RTL a width change moved `x`.
+    Both are now `top|left`.
+  - Light app theme: the overlay used name colours made readable for a light
+    background. The overlay now has separate colour caches.
+  - Rows bound while the card was hidden or tucked started their animated
+    emotes. `loadImages` now asks `startAnimations` first.
+  - A hide fade could still be running when the sidebar, portrait or PiP
+    showed, leaving an empty sidebar. Those paths now end the fade at once.
+  - When a pinch started, its cancel ended the drag or resize under the first
+    finger and settled the card. A tap on the grip stored the cut-down height.
+  - A second finger made the drag jump; drag now tracks the pointer id.
+  - At the smallest width the header buttons swallowed drags
+    (`FloatingChatHeaderLayout`). The grip covered the open message box.
+  - The More menu's chat-bar label read the sidebar preference while floating,
+    and "Hide chat" left the floating card on screen (also in 1.7.0).
+  - The fade did not reveal on focus. Closing the keyboard kept focus in the
+    card. Copy opened no message box.
+  - Cutouts were ignored while video drew behind them; the status bar was not
+    kept clear; the tab was not re-placed while tucked.
+  - On short phones the keyboard pushed the card under the controls'
+    minimum-height floor. A window narrower than the card overflowed it, and
+    pinch kept that floor.
+  - Clear drew emotes twice, and an image name paint drew an opaque box.
+  - Migrating legacy positions retried on every open.
+  - The overlay style survived `onDestroyView`.
+  - With no vertical room, the release chose its anchor by a tie. A fast
+    sideways throw from the other half tucked the card.
+  - The fade ticked every 500 ms (now event-driven), and the tab was re-placed
+    on every message.
+  - Aa chips were under 48dp and had no radio semantics.
+  - The card jolted on settle after a resize; it now lays out synchronously.
+  - The message box was light in the light theme; it is now dark over video.
+  - Removed a dead field.
+  Improvements taken: header drag, dark message box, payload-only restyle,
+  event-driven fade, and halo layering for painted names.
+  Skipped: collapsing the emote menu with the composer; capping alpha that
+  compounds under the halo; tinting the edit-text underline (AppCompat owns that
+  tint).
+  Follow-ups: z-order over gesture feedback and the seek preview; TV D-pad
+  focus inside the card; drag to untuck and keeping the tucked state across PiP
+  and minimize; haptics and a custom opacity in Aa; ducking the card during
+  gestures; `ChatFollowGlide` extra top space; 40dp header buttons.
+  Tests added: keyboard and narrow-window placement, no-room anchor, the
+  cross-half throw, header drag from a button, and a grip tap.
+- 2026-11-22: Gate after the review fixes: `assembleDebug testDebugUnitTest`
+  passed (1601 tests, 0 failures). `lintDebug` then passed on its own: no
+  errors, no warnings on changed lines.
 
 ## Decisions
 
@@ -190,6 +243,13 @@ Human QA completed:
 - Decision: The player's chat-bar toggle switches the Reply bar while floating.
 - Decision: A recreated player view starts with sidebar chat (floating state
   resets in `onDestroyView`), instead of a floating flag with no card.
+- Decision: Clear marks its two draw passes in a global `ChatHaloPass` instead
+  of reading the paint's shadow.
+  Reason: `Paint.getShadowLayerRadius` needs API 29; minSdk is 23, and rows draw
+  on the main thread one at a time.
+- Decision: Overlay name colours get their own caches in the light app theme.
+  Trade-off: a user without a Twitch colour may get a different random colour
+  in floating and sidebar chat.
 
 ## Final PR summary draft
 
@@ -207,7 +267,8 @@ toggle recreating chat.
 Tests: new `FloatingChatPlacementTest`, `FloatingChatLayoutStoreTest`,
 `FloatingChatAppearanceTest`, `FloatingChatControllerTest`; the chat
 transition suites run with the controller attached. `assembleDebug`,
-`testDebugUnitTest` (1593) and `lintDebug` pass.
+`testDebugUnitTest` (1601) and `lintDebug` pass. An independent Gemini 4 Neon
+review's verified findings are fixed (see the progress log).
 Human QA: `docs/MANUAL_QA.md` → "Floating chat redesign", plus the player
 safety rows (live, VoD, stream switching, minimize/restore, close/reopen, PiP,
 speed/quality, gestures).

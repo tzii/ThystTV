@@ -12,7 +12,8 @@ import com.github.andreyasadchy.xtra.ui.chat.ChatOverlayStyle
  *
  * HALO draws the text twice: first with a soft drop shadow for depth, then with
  * a tight dark halo that outlines every glyph. One shadow layer alone either
- * blurs (wide) or disappears on snow and sky (tight).
+ * blurs (wide) or disappears on snow and sky (tight). [ChatHaloPass] tells the
+ * spans which pass is drawing, so emotes are drawn once.
  */
 class ChatMessageTextView @JvmOverloads constructor(
     context: Context,
@@ -28,8 +29,9 @@ class ChatMessageTextView @JvmOverloads constructor(
         treatment = value
         when (value) {
             ChatOverlayStyle.Treatment.SOFT_SHADOW -> setShadowLayer(1.2f * density, 0f, 0.5f * density, SOFT_SHADOW)
-            // HALO sets its layers per pass in onDraw.
-            ChatOverlayStyle.Treatment.HALO -> setShadowLayer(HALO_TIGHT_RADIUS_DP * density, 0f, 0f, HALO_TIGHT)
+            // HALO sets its layers per pass in onDraw. The widest one is set on the
+            // view too: TextView widens its clip around the text by that shadow only.
+            ChatOverlayStyle.Treatment.HALO -> setShadowLayer(HALO_SOFT_RADIUS_DP * density, 0f, HALO_SOFT_DY_DP * density, HALO_SOFT)
             else -> setShadowLayer(0f, 0f, 0f, 0)
         }
     }
@@ -46,10 +48,16 @@ class ChatMessageTextView @JvmOverloads constructor(
             return
         }
         // Paint-level changes only: setShadowLayer() would invalidate and redraw forever.
-        paint.setShadowLayer(HALO_SOFT_RADIUS_DP * density, 0f, HALO_SOFT_DY_DP * density, HALO_SOFT)
-        super.onDraw(canvas)
-        paint.setShadowLayer(HALO_TIGHT_RADIUS_DP * density, 0f, 0f, HALO_TIGHT)
-        super.onDraw(canvas)
+        try {
+            ChatHaloPass.current = ChatHaloPass.SOFT
+            paint.setShadowLayer(HALO_SOFT_RADIUS_DP * density, 0f, HALO_SOFT_DY_DP * density, HALO_SOFT)
+            super.onDraw(canvas)
+            ChatHaloPass.current = ChatHaloPass.TIGHT
+            paint.setShadowLayer(HALO_TIGHT_RADIUS_DP * density, 0f, 0f, HALO_TIGHT)
+            super.onDraw(canvas)
+        } finally {
+            ChatHaloPass.current = ChatHaloPass.NONE
+        }
     }
 
     private companion object {

@@ -927,12 +927,23 @@ bright and dark video. Repeat the core rows with an RTL language.
   count on the tab; tapping it brings the card back. Back gesture from that edge
   still works away from the tab.
 - [ ] Resize from the grip on either side and by pinching; the outer edge stays
-  put, the size is kept after rotation and reopening.
+  put, the size is kept after rotation and reopening. Tapping the grip on a
+  short window does not shrink the stored size.
+- [ ] At the smallest width, drag the card by its header starting on Aa, tuck or
+  close: it moves and the button does not fire; a plain tap still does.
+- [ ] Start a drag, put a second finger down and lift the first: the card follows
+  the second finger without jumping. Start a drag or grip resize, then pinch:
+  the pinch takes over smoothly and the controls stay up until both fingers lift.
+- [ ] Throw the card from the left half back toward the right edge: it lands on
+  the right side instead of tucking.
 - [ ] Position memory: move the chat on channel A, open channel B (starts where
   A left it), move it, return to A (A's place). Upgrading from 1.7.0 keeps a
   channel's old position near where it was.
 - [ ] Camera cutout on either side, three-button navigation, and a short window
-  (split screen): the card stays clear and loses its oldest lines first.
+  (split screen): the card stays clear and loses its oldest lines first. Repeat
+  the cutout check with video drawn behind the cutout: no chat text under it.
+- [ ] RTL language: the card, tab and grip land on the side they were dragged to
+  and do not jump when resized.
 - [ ] Fade old messages on: lines fade after 10 seconds and return with the
   controls, while scrolled back, touching or typing.
 - [ ] Pass touches to video on: with the controls hidden, taps and swipes on the
@@ -942,6 +953,21 @@ bright and dark video. Repeat the core rows with an RTL language.
   box for one message and it closes after sending or leaving it empty. Reply bar
   on: the box stays. The keyboard pushes the card up. Reply from a message's
   actions opens the box too. Signed out or VoD: no keyboard button.
+- [ ] On a short phone in landscape, open the keyboard: the card shrinks to the
+  room above it and stays usable; closing the keyboard drops focus and restores
+  the size. Copy a message from its actions: the box opens with the text.
+- [ ] Light app theme: the message box, its hint, icons and reply preview read as
+  white on the dark card; names keep readable colours on the card. The grip hides
+  while the box is open.
+- [ ] More menu while floating: the chat bar item shows and toggles the Reply
+  bar; "Hide chat" (if enabled in Settings) hides the floating card.
+- [ ] Hide the floating chat and, during its fade, switch to the sidebar, rotate
+  to portrait or enter PiP: the sidebar shows its chat, never an empty panel.
+- [ ] Tucked with animated emotes arriving: new lines' emotes stay still until
+  the card is back, then animate.
+- [ ] Clear: painted names (gradient and image paints) are outlined like the
+  other text and show no box; emotes draw once, without a dark double. Painted
+  names in the message and reply dialogs look as before.
 - [ ] TalkBack: the card offers move left/right, larger/smaller and tuck; the
   tab reads "Show chat" with the new-message count.
 - [ ] Enter and leave PiP, minimize and restore, rotate to portrait and back,

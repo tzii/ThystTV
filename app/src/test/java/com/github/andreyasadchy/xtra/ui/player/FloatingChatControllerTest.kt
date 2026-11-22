@@ -16,6 +16,7 @@ import com.github.andreyasadchy.xtra.util.prefs
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -40,6 +41,7 @@ class FloatingChatControllerTest {
     private val prefs get() = binding.root.context.prefs()
     private val holds = mutableListOf<Boolean>()
     private var channel = "c1"
+    private var closeRequests = 0
 
     @Before fun setup() {
         // DynamicAnimation keeps one frame handler per thread, and Robolectric reuses
@@ -196,6 +198,38 @@ class FloatingChatControllerTest {
         assertEquals(rightX(), binding.floatingChatRoot.x, 0.5f)
     }
 
+    @Test fun `a drag that starts on a header button moves the card instead of pressing it`() {
+        controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        val header = binding.floatingChatHeader
+        val close = binding.floatingChatClose
+        // On the close button, which fills the end of the header.
+        val startX = close.left + close.width / 2f
+        val startY = close.top + close.height / 2f
+        drag(header, dx = -600f, dy = 0f, startX = startX, startY = startY)
+        idle()
+        assertEquals(0, closeRequests)
+        assertEquals(listOf(true, false), holds)
+        assertEquals(MARGIN, binding.floatingChatRoot.x, 0.5f)
+
+        // A tap on the button still closes.
+        holds.clear()
+        close.performClick()
+        assertEquals(1, closeRequests)
+    }
+
+    @Test fun `a tap on the grip keeps the stored size`() {
+        controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        drag(binding.floatingChatGrip, dx = 0f, dy = 0f)
+        idle()
+        assertEquals(listOf(true, false), holds)
+        assertNull(prefs.getString(FloatingChatLayoutStore.PREF_KEY, null))
+        assertEquals(224, binding.floatingChatRoot.width)
+    }
+
     private fun createController() = FloatingChatController(
         host = binding.floatingChatHost,
         card = binding.floatingChatRoot,
@@ -218,20 +252,22 @@ class FloatingChatControllerTest {
             override fun canCompose() = false
             override fun onAppearanceRequested(trigger: View) = Unit
             override fun onComposeRequested() = Unit
-            override fun onCloseRequested() = Unit
+            override fun onCloseRequested() {
+                closeRequests++
+            }
             override fun onCardOnScreenChanged(onScreen: Boolean) = Unit
         },
     )
 
     /** Raw coordinates equal view coordinates here, which is all the handler reads. */
-    private fun drag(view: View, dx: Float, dy: Float) {
+    private fun drag(view: View, dx: Float, dy: Float, startX: Float = 10f, startY: Float = 10f) {
         val time = SystemClock.uptimeMillis()
         val events = buildList {
-            add(MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, 10f, 10f, 0))
+            add(MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, startX, startY, 0))
             for (step in 1..10) {
-                add(MotionEvent.obtain(time, time + step * 16L, MotionEvent.ACTION_MOVE, 10f + dx * step / 10, 10f + dy * step / 10, 0))
+                add(MotionEvent.obtain(time, time + step * 16L, MotionEvent.ACTION_MOVE, startX + dx * step / 10, startY + dy * step / 10, 0))
             }
-            add(MotionEvent.obtain(time, time + 400, MotionEvent.ACTION_UP, 10f + dx, 10f + dy, 0))
+            add(MotionEvent.obtain(time, time + 400, MotionEvent.ACTION_UP, startX + dx, startY + dy, 0))
         }
         try {
             events.forEach(view::dispatchTouchEvent)

@@ -74,7 +74,7 @@ internal class PlayerMorePopupBinder(
                     if (isLoggedIn && prefs.getBoolean(C.PLAYER_MENU_CHAT_BAR, true)) {
                         menuChatBar.visibility = View.VISIBLE
                         menuChatBar.text = context.getString(
-                            if (prefs.getBoolean(C.KEY_CHAT_BAR_VISIBLE, true)) R.string.hide_chat_bar
+                            if (fragment.isChatBarShown()) R.string.hide_chat_bar
                             else R.string.show_chat_bar,
                         )
                         menuChatBar.setOnClickListener { dismissThen(fragment::toggleChatBar) }

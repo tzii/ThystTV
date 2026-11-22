@@ -24,7 +24,7 @@ internal class ChatAgeFader(
             if (field == value) return
             field = value
             refresh()
-            if (value) schedule() else recyclerView.removeCallbacks(tick)
+            schedule()
         }
 
     var reveal = false
@@ -32,13 +32,16 @@ internal class ChatAgeFader(
             if (field == value) return
             field = value
             refresh()
-        }
-
-    private val tick = object : Runnable {
-        override fun run() {
-            refresh()
             schedule()
         }
+
+    /** Uptime the pending fade runs at, or [NONE]. */
+    private var tickAt = NONE
+
+    private val tick = Runnable {
+        tickAt = NONE
+        refresh()
+        schedule()
     }
 
     private val attachListener = object : RecyclerView.OnChildAttachStateChangeListener {
@@ -64,6 +67,8 @@ internal class ChatAgeFader(
         repeat(minOf(removedFromHead, arrivals.size)) { arrivals.removeFirst() }
         val now = clock()
         repeat(inserted) { arrivals.addLast(now) }
+        // A fade already waiting will schedule the next one; otherwise these rows start it.
+        if (inserted > 0 && tickAt == NONE) schedule()
     }
 
     fun onPrepended(count: Int) {
@@ -82,6 +87,7 @@ internal class ChatAgeFader(
 
     fun dispose() {
         recyclerView.removeCallbacks(tick)
+        tickAt = NONE
         recyclerView.removeOnChildAttachStateChangeListener(attachListener)
     }
 
@@ -103,17 +109,33 @@ internal class ChatAgeFader(
         }
     }
 
+    /**
+     * Wakes up when the oldest row still showing reaches [FADE_AFTER_MS], not
+     * on a fixed tick; nothing runs while the fade is off or rows are revealed.
+     */
     private fun schedule() {
         recyclerView.removeCallbacks(tick)
-        if (enabled) recyclerView.postDelayed(tick, TICK_MS)
+        tickAt = NONE
+        if (!enabled || reveal) return
+        val now = clock()
+        // Arrivals only grow toward the end, so the rows still to fade are the last ones.
+        var next = NONE
+        for (i in arrivals.indices.reversed()) {
+            val arrived = arrivals[i]
+            if (now - arrived >= FADE_AFTER_MS) break
+            next = arrived
+        }
+        if (next == NONE) return
+        tickAt = next + FADE_AFTER_MS
+        recyclerView.postDelayed(tick, tickAt - now)
     }
 
     companion object {
         const val FADE_AFTER_MS = 10_000L
         private const val FADE_OUT_MS = 900L
         private const val FADE_IN_MS = 200L
-        private const val TICK_MS = 500L
         private const val OLD = Long.MIN_VALUE / 2
+        private const val NONE = Long.MAX_VALUE
         private val TAG_KEY = com.github.andreyasadchy.xtra.R.id.chatRowFadeTarget
     }
 }

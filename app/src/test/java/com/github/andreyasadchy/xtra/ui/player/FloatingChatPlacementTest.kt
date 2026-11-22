@@ -50,6 +50,22 @@ class FloatingChatPlacementTest {
         assertEquals(112, FloatingChatPlacement.place(layout, 224, 240, tighter, tighter, density).height)
     }
 
+    @Test fun `above the keyboard the card fits the room left, below the usual floor`() {
+        val keyboard = FloatingChatPlacement.bounds(1000, 500, density, keepClearBottom = 400)
+        // 500 - 400 - 2 x 12 leaves 76 px, under the 112 px floor.
+        val placed = FloatingChatPlacement.place(layout, 224, 240, rest, keyboard, density, keyboard = true)
+        assertEquals(76, placed.height)
+        assertEquals(12f, placed.y, 0f)
+        assertEquals(112, FloatingChatPlacement.place(layout, 224, 240, rest, keyboard, density).height)
+    }
+
+    @Test fun `a window narrower than the card narrows it and keeps the margins`() {
+        val narrow = FloatingChatPlacement.bounds(150, 500, density)
+        val placed = FloatingChatPlacement.place(layout, 224, 240, narrow, narrow, density)
+        assertEquals(126, placed.width)
+        assertEquals(12f, placed.x, 0f)
+    }
+
     @Test fun `release picks the nearer side after projecting the fling`() {
         val left = release(x = 300f, vx = 0f)
         assertEquals(FloatingChatSide.LEFT, left.layout.side)
@@ -70,6 +86,19 @@ class FloatingChatPlacementTest {
         assertEquals(0.5f, free.layout.yFraction, 0.001f)
     }
 
+    @Test fun `with no room to move up or down the push decides and a sideways move keeps the anchor`() {
+        // 300 - 56 - 96 - 2 x 12 leaves 124 px for a 124 px card: no vertical travel.
+        val tight = FloatingChatPlacement.bounds(1000, 300, density, keepClearTop = 56, keepClearBottom = 96)
+        val bottom = layout.copy(anchor = FloatingChatAnchor.BOTTOM, yFraction = 1f)
+        assertEquals(FloatingChatAnchor.BOTTOM, release(x = 700f, y = 68f + 5f, current = tight, stored = bottom).layout.anchor)
+        assertEquals(FloatingChatAnchor.TOP, release(x = 700f, y = 68f - 40f, current = tight, stored = bottom).layout.anchor)
+        assertEquals(FloatingChatAnchor.BOTTOM, release(x = 700f, y = 68f + 40f, current = tight, stored = layout).layout.anchor)
+        val free = layout.copy(anchor = FloatingChatAnchor.FREE, yFraction = 0.4f)
+        val kept = release(x = 700f, y = 68f, current = tight, stored = free).layout
+        assertEquals(FloatingChatAnchor.FREE, kept.anchor)
+        assertEquals(0.4f, kept.yFraction, 0f)
+    }
+
     @Test fun `dragging a third of the card past an edge tucks it`() {
         assertEquals(FloatingChatSide.RIGHT, release(x = 988f - 224f + 80f).tuckedSide)
         assertNull(release(x = 988f - 224f + 60f).tuckedSide)
@@ -82,6 +111,13 @@ class FloatingChatPlacementTest {
         assertNull(release(x = 700f, vx = 1000f).tuckedSide)
         assertNull(release(x = 700f, vx = -1500f).tuckedSide)
         assertNull(release(x = 700f, vx = 1500f, vy = 1000f).tuckedSide)
+    }
+
+    @Test fun `a fast throw from the other half lands on the side instead of tucking`() {
+        // Started on the right, dragged to the left half (center 312), then thrown right.
+        val thrown = release(x = 200f, vx = 1500f)
+        assertNull(thrown.tuckedSide)
+        assertEquals(FloatingChatSide.RIGHT, thrown.layout.side)
     }
 
     @Test fun `a tucked card waits just past the screen edge`() {
@@ -105,6 +141,8 @@ class FloatingChatPlacementTest {
         vx: Float = 0f,
         vy: Float = 0f,
         startSide: FloatingChatSide = FloatingChatSide.RIGHT,
+        current: FloatingChatBounds = rest,
+        stored: FloatingChatLayout = layout,
     ) = FloatingChatPlacement.release(
         x = x,
         y = y,
@@ -114,8 +152,8 @@ class FloatingChatPlacementTest {
         heightPx = 240,
         startSide = startSide,
         rest = rest,
-        current = rest,
+        current = current,
         density = density,
-        stored = layout,
+        stored = stored,
     )
 }

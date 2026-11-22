@@ -29,16 +29,30 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
+ * What the floating chat keeps clear of, in pixels: cutout, rounded-corner or
+ * system bar insets on each side and at the top, and what covers the bottom of
+ * the window (navigation bar or keyboard). [ime] is set while the keyboard shows.
+ */
+internal data class FloatingChatInsets(
+    val left: Int = 0,
+    val right: Int = 0,
+    val top: Int = 0,
+    val bottom: Int = 0,
+    val ime: Boolean = false,
+)
+
+/**
  * Moves, sizes and styles the floating chat card. PlayerFragment decides
  * when floating chat is on; this class owns how the card looks and moves.
  *
- * Per touch event it only writes translation; size changes are coalesced to
- * one layout per frame inside [FloatingChatHostLayout].
+ * A drag only writes translation per touch event. A resize lays out just the
+ * card, at most once per frame, so its new size and position land together;
+ * [FloatingChatHostLayout] keeps such changes from re-laying out the player.
  */
 internal class FloatingChatController(
     private val host: FloatingChatHostLayout,
     private val card: FloatingChatCardView,
-    private val header: View,
+    private val header: FloatingChatHeaderLayout,
     private val pill: View,
     private val grip: View,
     private val tab: View,
@@ -84,14 +98,17 @@ internal class FloatingChatController(
     private var tuckedSide: FloatingChatSide? = null
     val isTucked get() = tuckedSide != null
     private var controlsVisible = false
-    private var safeLeft = 0
-    private var safeRight = 0
-    private var bottomInset = 0
+    private var insets = FloatingChatInsets()
     /** Control bands measured when the controls last showed or laid out; drags reuse them. */
     private var bands = 0 to 0
     private val location = IntArray(2)
     private var interacting = false
+    /** A two-finger pinch owns the card; the drag or resize it cancelled must not end the interaction. */
+    private var pinching = false
+    /** The message box is open at the bottom of the card; the grip would cover its buttons. */
+    private var composerOpen = false
     private var unread = 0
+    private var tabColor = 0
     private var appearance = FloatingChatAppearance.read(prefs)
     private var accessibilityActions = mutableListOf<Int>()
     private var exitFade: ValueAnimator? = null
@@ -99,7 +116,7 @@ internal class FloatingChatController(
 
     init {
         pill.setOnTouchListener(DragHandler(requireControls = false))
-        header.setOnTouchListener(DragHandler(requireControls = true))
+        header.dragListener = DragHandler(requireControls = true)
         grip.setOnTouchListener(ResizeHandler())
         appearanceButton.setOnClickListener { callbacks.onAppearanceRequested(it) }
         composeButton.setOnClickListener { callbacks.onComposeRequested() }
@@ -148,6 +165,7 @@ internal class FloatingChatController(
      * once when that fade is cut short by another show or hide.
      */
     fun hide(animate: Boolean, onHidden: (() -> Unit)? = null) {
+        pinching = false
         if (interacting) {
             interacting = false
             callbacks.holdControls(false)
@@ -196,16 +214,10 @@ internal class FloatingChatController(
         if (tuckedSide != null) placeTab(slideIn = false) else if (!interacting) settle(KEEP_CLEAR_STIFFNESS, KEEP_CLEAR_DAMPING)
     }
 
-    /**
-     * Cutout or rounded-corner insets on each side, and what covers the bottom
-     * of the window (keyboard or navigation bar), in pixels.
-     */
-    fun setInsets(left: Int, right: Int, bottom: Int) {
-        if (safeLeft == left && safeRight == right && bottomInset == bottom) return
-        safeLeft = left
-        safeRight = right
-        bottomInset = bottom
-        if (isShown && tuckedSide == null && !interacting) settle(KEEP_CLEAR_STIFFNESS, KEEP_CLEAR_DAMPING)
+    fun setInsets(value: FloatingChatInsets) {
+        if (insets == value) return
+        insets = value
+        onKeepClearChanged()
     }
 
     /** The controls laid out again (first show, rotation, a row of buttons appeared). */
@@ -214,7 +226,19 @@ internal class FloatingChatController(
         val measured = callbacks.controlBands()
         if (measured == bands) return
         bands = measured
-        if (isShown && tuckedSide == null && !interacting) settle(KEEP_CLEAR_STIFFNESS, KEEP_CLEAR_DAMPING)
+        onKeepClearChanged()
+    }
+
+    /** The message box opened or closed at the bottom of the card. */
+    fun setComposerOpen(open: Boolean) {
+        if (composerOpen == open) return
+        composerOpen = open
+        updateGripVisibility()
+    }
+
+    private fun onKeepClearChanged() {
+        if (!isShown || interacting) return
+        if (tuckedSide != null) placeTab(slideIn = false) else settle(KEEP_CLEAR_STIFFNESS, KEEP_CLEAR_DAMPING)
     }
 
     /** Re-reads background, text and behavior after Aa or Settings changed them. */
@@ -227,7 +251,8 @@ internal class FloatingChatController(
             outline = if (appearance.hasSurface) colors.outline else 0,
             elevated = appearance.background == FloatingChatBackground.SOLID,
         )
-        tab.background = tabBackground(base)
+        tabColor = base
+        updateTabBackground()
         tabCount.background = GradientDrawable().apply {
             cornerRadius = 10 * density
             setColor(colors.accent)
@@ -240,7 +265,7 @@ internal class FloatingChatController(
 
     /** New chat lines while tucked show as a count on the tab. */
     fun onMessagesAppended(count: Int) {
-        if (tuckedSide == null || count <= 0) return
+        if (tuckedSide == null || count <= 0 || unread >= MAX_UNREAD) return
         unread = (unread + count).coerceAtMost(MAX_UNREAD)
         updateTabCount()
     }
@@ -248,7 +273,8 @@ internal class FloatingChatController(
     private fun restoreLayout() {
         val channelId = callbacks.channelId()
         if (restored && restoredChannel == channelId) return
-        if (host.width == 0 || host.height == 0) {
+        val laidOut = host.width > 0 && host.height > 0
+        if (!laidOut) {
             // Legacy positions need the screen size; try again once laid out.
             host.post { if (isShown && !restored) { restoreLayout(); placeNow() } }
         }
@@ -262,8 +288,11 @@ internal class FloatingChatController(
         widthPx = dp(layout.widthDp)
         heightPx = dp(layout.heightDp)
         restoredChannel = channelId
-        restored = host.width > 0 && host.height > 0 || stored != null
+        // A last-used layout stands in until a legacy position can be converted.
+        restored = laidOut || stored != null && !hasLegacy(channelId)
     }
+
+    private fun hasLegacy(channelId: String?) = !channelId.isNullOrBlank() && prefs.contains("floating_chat_x_$channelId")
 
     /** 1.7.0 kept raw pixels per channel; convert them once and drop the old keys. */
     private fun migrateLegacy(channelId: String?): FloatingChatLayout? {
@@ -298,19 +327,38 @@ internal class FloatingChatController(
         prefs.edit { putString(FloatingChatLayoutStore.PREF_KEY, FloatingChatLayoutStore.write(document, channelId, layout)) }
     }
 
-    private fun restBounds() = FloatingChatPlacement.bounds(host.width, host.height, density, safeLeft, safeRight)
+    private fun restBounds() =
+        FloatingChatPlacement.bounds(host.width, host.height, density, insets.left, insets.right, topOverlap())
 
     private fun currentBounds(): FloatingChatBounds {
-        val (top, bottom) = if (controlsVisible) bands else 0 to 0
-        return FloatingChatPlacement.bounds(host.width, host.height, density, safeLeft, safeRight, top, max(bottom, bottomOverlap()))
+        // While typing, the room above the keyboard matters more than the controls.
+        val (top, bottom) = if (controlsVisible && !insets.ime) bands else 0 to 0
+        return FloatingChatPlacement.bounds(
+            host.width, host.height, density, insets.left, insets.right,
+            max(top, topOverlap()), max(bottom, bottomOverlap()),
+        )
+    }
+
+    /** How much of the host a status bar covers, when one shows. */
+    private fun topOverlap(): Int {
+        if (insets.top <= 0 || !host.isAttachedToWindow) return 0
+        host.getLocationInWindow(location)
+        return (insets.top - location[1]).coerceAtLeast(0)
     }
 
     /** How much of the host the keyboard or navigation bar covers, whether or not the window resized for it. */
     private fun bottomOverlap(): Int {
-        if (bottomInset <= 0 || !host.isAttachedToWindow) return 0
+        if (insets.bottom <= 0 || !host.isAttachedToWindow) return 0
         host.getLocationInWindow(location)
-        val coveredFrom = host.rootView.height - bottomInset
+        val coveredFrom = host.rootView.height - insets.bottom
         return (location[1] + host.height - coveredFrom).coerceAtLeast(0)
+    }
+
+    /** Height a card of [height] shows inside [bounds]; above the keyboard it may go below the usual floor. */
+    private fun fitHeight(height: Int, bounds: FloatingChatBounds): Int = if (insets.ime) {
+        min(height, bounds.height.toInt()).coerceAtLeast(1)
+    } else {
+        FloatingChatPlacement.visibleHeight(height, bounds, density)
     }
 
     private fun clampedSize(): Pair<Int, Int> =
@@ -318,7 +366,7 @@ internal class FloatingChatController(
 
     private fun target(): FloatingChatPlaced {
         val (width, height) = clampedSize()
-        return FloatingChatPlacement.place(layout, width, height, restBounds(), currentBounds(), density)
+        return FloatingChatPlacement.place(layout, width, height, restBounds(), currentBounds(), density, keyboard = insets.ime)
     }
 
     private fun placeNow() {
@@ -326,7 +374,7 @@ internal class FloatingChatController(
         springX.cancel()
         springY.cancel()
         val placed = target()
-        applySize(clampedSize().first, placed.height)
+        applySize(placed.width, placed.height)
         card.x = placed.x
         card.y = placed.y
         updateGrip()
@@ -336,13 +384,12 @@ internal class FloatingChatController(
     private fun settle(stiffness: Float, damping: Float, velocityX: Float = 0f, velocityY: Float = 0f) {
         if (host.width == 0 || host.height == 0) return
         val placed = target()
-        val width = clampedSize().first
         val oldHeight = card.layoutParams.height
         if (oldHeight > 0 && placed.height < oldHeight) {
             // Keep the bottom (newest lines) still while the top is cut.
             card.y += oldHeight - placed.height
         }
-        applySize(width, placed.height)
+        applySize(placed.width, placed.height)
         animate(placed.x, placed.y, stiffness, damping, velocityX, velocityY)
         updateGrip()
     }
@@ -362,6 +409,15 @@ internal class FloatingChatController(
         params.width = width
         params.height = height
         card.layoutParams = params
+        // Lay the card out now, so a new size lands in the same frame as the
+        // position written with it; the host's own pass then finds nothing to do.
+        if (card.isLaidOut && card.visibility != View.GONE) {
+            card.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+            )
+            card.layout(card.left, card.top, card.left + width, card.top + height)
+        }
     }
 
     private fun onHostResized() {
@@ -393,8 +449,12 @@ internal class FloatingChatController(
         card.passThrough = passThrough
         card.pinchEnabled = controlsVisible
         pill.visibility = if (controlsVisible || passThrough) View.INVISIBLE else View.VISIBLE
-        grip.visibility = if (controlsVisible) View.VISIBLE else View.INVISIBLE
+        updateGripVisibility()
         composeButton.isVisible = callbacks.canCompose() && !appearance.replyBar
+    }
+
+    private fun updateGripVisibility() {
+        grip.visibility = if (controlsVisible && !composerOpen) View.VISIBLE else View.INVISIBLE
     }
 
     // Card sides are physical (left or right of the screen), also in RTL.
@@ -416,6 +476,7 @@ internal class FloatingChatController(
         tuckedSide = side
         layout = layout.copy(side = side)
         unread = 0
+        updateTabBackground()
         updateTabCount()
         springX.spring.setStiffness(SNAP_STIFFNESS).setDampingRatio(SpringForce.DAMPING_RATIO_NO_BOUNCY)
         springX.setStartVelocity(velocityX)
@@ -448,7 +509,6 @@ internal class FloatingChatController(
         val wasVisible = tab.isVisible
         tab.isVisible = true
         val left = side == FloatingChatSide.LEFT
-        tab.background = tabBackground(ColorUtils.setAlphaComponent(PlayerPanelTheme.gestureFeedback(host.context).container, 255))
         // Measured here: a tab that was GONE has no width yet.
         tab.measure(
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -458,7 +518,7 @@ internal class FloatingChatController(
         val bounds = currentBounds()
         val targetY = (card.y + dp(16f)).coerceIn(bounds.top, max(bounds.top, bounds.bottom - dp(TAB_HEIGHT_DP)))
         // Flush with the screen edge, or with a cutout on that side.
-        val targetX = if (left) safeLeft.toFloat() else (host.width - safeRight - tabWidth).toFloat()
+        val targetX = if (left) insets.left.toFloat() else (host.width - insets.right - tabWidth).toFloat()
         tab.animate().cancel()
         if (slideIn || !wasVisible) {
             tab.y = targetY
@@ -483,26 +543,32 @@ internal class FloatingChatController(
         })
     }
 
-    private fun tabBackground(color: Int) = GradientDrawable().apply {
-        setColor(ColorUtils.setAlphaComponent(color, 0xEB))
-        val r = 22 * density
-        cornerRadii = if (tuckedSide == FloatingChatSide.LEFT) {
-            floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f)
-        } else {
-            floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r)
+    /** Rounded on the side that faces the video, flat against the screen edge. */
+    private fun updateTabBackground() {
+        tab.background = GradientDrawable().apply {
+            setColor(ColorUtils.setAlphaComponent(tabColor, 0xEB))
+            val r = 22 * density
+            cornerRadii = if (tuckedSide == FloatingChatSide.LEFT) {
+                floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f)
+            } else {
+                floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r)
+            }
         }
     }
 
     private fun updateTabCount() {
-        tabCount.isVisible = unread > 0
-        tabCount.text = if (unread >= MAX_UNREAD) "$MAX_UNREAD+" else unread.toString()
-        tab.contentDescription = if (unread > 0) {
+        val visible = unread > 0
+        val label = if (unread >= MAX_UNREAD) "$MAX_UNREAD+" else unread.toString()
+        val widthChanged = tabCount.isVisible != visible || visible && tabCount.text.length != label.length
+        tabCount.isVisible = visible
+        tabCount.text = label
+        tab.contentDescription = if (visible) {
             host.context.getString(R.string.floating_chat_show_unread, unread)
         } else {
             host.context.getString(R.string.floating_chat_show)
         }
-        // The count widens the tab; keep it flush with the screen edge.
-        if (tuckedSide != null && tab.isVisible) placeTab(slideIn = false)
+        // A wider count widens the tab; keep it flush with the screen edge.
+        if (widthChanged && tuckedSide != null && tab.isVisible) placeTab(slideIn = false)
     }
 
     private fun updateAccessibilityActions() {
@@ -560,9 +626,14 @@ internal class FloatingChatController(
         }
     }
 
-    /** Drag from the pill, or from the header while the controls are up. */
+    /**
+     * Drag from the pill, or from the header while the controls are up. One
+     * finger leads; when it lifts, another finger still down takes over from
+     * where the card is, so the card never jumps between fingers.
+     */
     private inner class DragHandler(private val requireControls: Boolean) : View.OnTouchListener {
         private var tracker: VelocityTracker? = null
+        private var pointerId = MotionEvent.INVALID_POINTER_ID
         private var downX = 0f
         private var downY = 0f
         private var startX = 0f
@@ -576,20 +647,34 @@ internal class FloatingChatController(
                 MotionEvent.ACTION_DOWN -> {
                     if (!isShown || tuckedSide != null || (requireControls && !controlsVisible)) return false
                     beginInteraction()
-                    downX = event.rawX
-                    downY = event.rawY
-                    startX = card.x
-                    startY = card.y
+                    pointerId = event.getPointerId(0)
+                    anchor(event, 0)
                     startSide = layout.side
                     dragging = !requireControls
                     tracker?.recycle()
                     tracker = VelocityTracker.obtain().also { track(it, event) }
                     return true
                 }
-                MotionEvent.ACTION_MOVE -> {
+                MotionEvent.ACTION_POINTER_UP -> {
                     tracker?.let { track(it, event) }
-                    val dx = event.rawX - downX
-                    val dy = event.rawY - downY
+                    if (event.getPointerId(event.actionIndex) == pointerId) {
+                        val next = if (event.actionIndex == 0) 1 else 0
+                        pointerId = event.getPointerId(next)
+                        anchor(event, next)
+                    }
+                    return true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val tracker = tracker ?: return true
+                    if (!isShown) {
+                        finish()
+                        return true
+                    }
+                    track(tracker, event)
+                    val index = event.findPointerIndex(pointerId)
+                    if (index < 0) return true
+                    val dx = rawX(event, index) - downX
+                    val dy = rawY(event, index) - downY
                     if (!dragging && hypot(dx, dy) > touchSlop) dragging = true
                     if (dragging) {
                         val bounds = currentBounds()
@@ -600,33 +685,54 @@ internal class FloatingChatController(
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
-                    val tracker = tracker
-                    var velocityX = 0f
-                    var velocityY = 0f
-                    if (tracker != null) {
-                        track(tracker, event)
-                        tracker.computeCurrentVelocity(1000, maxFling)
-                        velocityX = tracker.xVelocity
-                        velocityY = tracker.yVelocity
-                    }
+                    val tracker = tracker ?: return true
+                    track(tracker, event)
+                    tracker.computeCurrentVelocity(1000, maxFling)
+                    val velocityX = tracker.getXVelocity(pointerId)
+                    val velocityY = tracker.getYVelocity(pointerId)
                     finish()
+                    if (!isShown) return true
                     if (dragging) release(velocityX, velocityY, startSide) else settle(SNAP_STIFFNESS, SNAP_DAMPING)
                     return true
                 }
                 MotionEvent.ACTION_CANCEL -> {
+                    if (tracker == null) return true
+                    // A pinch that cancels the drag takes over the interaction and the card.
+                    if (pinching) {
+                        recycleTracker()
+                        return true
+                    }
                     finish()
-                    settle(SNAP_STIFFNESS, SNAP_DAMPING)
+                    if (isShown) settle(SNAP_STIFFNESS, SNAP_DAMPING)
                     return true
                 }
             }
             return true
         }
 
+        /** Measures the drag from pointer [index] and the card's current place. */
+        private fun anchor(event: MotionEvent, index: Int) {
+            downX = rawX(event, index)
+            downY = rawY(event, index)
+            startX = card.x
+            startY = card.y
+        }
+
         private fun finish() {
-            tracker?.recycle()
-            tracker = null
+            recycleTracker()
             endInteraction()
         }
+
+        private fun recycleTracker() {
+            tracker?.recycle()
+            tracker = null
+            pointerId = MotionEvent.INVALID_POINTER_ID
+        }
+
+        // getRawX(int) needs API 29; every pointer shares the view's screen offset.
+        private fun rawX(event: MotionEvent, index: Int) = event.getX(index) + event.rawX - event.x
+
+        private fun rawY(event: MotionEvent, index: Int) = event.getY(index) + event.rawY - event.y
 
         /** The handle moves with the card, so velocity uses screen coordinates. */
         private fun track(tracker: VelocityTracker, event: MotionEvent) {
@@ -671,12 +777,15 @@ internal class FloatingChatController(
 
     /** Resize from the grip; the outer edge and the top stay put. */
     private inner class ResizeHandler : View.OnTouchListener {
+        private var active = false
         private var downX = 0f
         private var downY = 0f
         private var startWidth = 0
         private var startHeight = 0
         private var pendingWidth = 0
         private var pendingHeight = 0
+        /** The size changed; a tap on the grip must not store the fitted height as the new size. */
+        private var resized = false
         private var framePosted = false
         private val applyFrame = Runnable {
             framePosted = false
@@ -689,6 +798,8 @@ internal class FloatingChatController(
                 MotionEvent.ACTION_DOWN -> {
                     if (!isShown || !controlsVisible) return false
                     beginInteraction()
+                    active = true
+                    resized = false
                     downX = event.rawX
                     downY = event.rawY
                     startWidth = card.width
@@ -696,12 +807,14 @@ internal class FloatingChatController(
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    if (!active) return true
                     val (width, height) = FloatingChatPlacement.resize(
                         startWidth, startHeight, event.rawX - downX, event.rawY - downY, layout.side, host.width, host.height, density,
                     )
                     val bounds = currentBounds()
                     pendingWidth = min(width, bounds.width.toInt())
                     pendingHeight = min(height, max(dp(FloatingChatPlacement.MIN_HEIGHT_DP), (bounds.bottom - card.y).toInt()))
+                    if (pendingWidth != startWidth || pendingHeight != startHeight) resized = true
                     if (!framePosted) {
                         framePosted = true
                         card.postOnAnimation(applyFrame)
@@ -709,13 +822,20 @@ internal class FloatingChatController(
                     return true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (!active) return true
+                    active = false
                     card.removeCallbacks(applyFrame)
+                    // A pinch that cancels the resize takes over the interaction and the size.
+                    if (pinching) {
+                        framePosted = false
+                        return true
+                    }
                     if (framePosted) {
                         framePosted = false
                         applyLive(pendingWidth, pendingHeight)
                     }
                     endInteraction()
-                    commitSize(card.layoutParams.width, card.layoutParams.height)
+                    if (isShown && resized) commitSize(card.layoutParams.width, card.layoutParams.height)
                     return true
                 }
             }
@@ -746,28 +866,49 @@ internal class FloatingChatController(
         settle(SNAP_STIFFNESS, SNAP_DAMPING)
     }
 
+    /**
+     * Pinch resize while the controls are up. It scales the stored size, not
+     * the height a short screen cut the card down to, and stores only a change.
+     */
     private inner class PinchHandler : FloatingChatCardView.PinchListener {
         private var startWidth = 0
         private var startHeight = 0
+        private var pinchWidth = 0
+        private var pinchHeight = 0
 
         override fun onPinchStart() {
+            // Set before the card cancels a drag or resize under the first finger.
+            pinching = true
             beginInteraction()
-            startWidth = card.width
-            startHeight = card.height
+            val (width, height) = clampedSize()
+            startWidth = width
+            startHeight = height
+            pinchWidth = width
+            pinchHeight = height
         }
 
         override fun onPinch(scale: Float) {
+            if (!pinching) return
             val (width, height) = FloatingChatPlacement.clampSize(startWidth * scale, startHeight * scale, host.width, host.height, density)
+            pinchWidth = width
+            pinchHeight = height
             val bounds = currentBounds()
             val fittedWidth = min(width, bounds.width.toInt())
-            val fittedHeight = min(height, bounds.height.toInt())
+            val fittedHeight = fitHeight(height, bounds)
             applyLive(fittedWidth, fittedHeight)
             card.y = card.y.coerceIn(bounds.top, max(bounds.top, bounds.bottom - fittedHeight))
         }
 
         override fun onPinchEnd() {
+            if (!pinching) return
+            pinching = false
             endInteraction()
-            commitSize(card.layoutParams.width, card.layoutParams.height)
+            if (!isShown) return
+            if (pinchWidth != startWidth || pinchHeight != startHeight) {
+                commitSize(pinchWidth, pinchHeight)
+            } else {
+                settle(SNAP_STIFFNESS, SNAP_DAMPING)
+            }
         }
     }
 

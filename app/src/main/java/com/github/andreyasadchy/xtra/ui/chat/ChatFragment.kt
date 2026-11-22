@@ -2,6 +2,7 @@ package com.github.andreyasadchy.xtra.ui.chat
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -18,12 +19,14 @@ import android.widget.MultiAutoCompleteTextView
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.res.use
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.core.widget.ImageViewCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -49,6 +52,7 @@ import com.github.andreyasadchy.xtra.ui.common.BaseNetworkFragment
 import com.github.andreyasadchy.xtra.ui.common.IntegrityDialog
 import com.github.andreyasadchy.xtra.ui.main.MainActivity
 import com.github.andreyasadchy.xtra.ui.player.PlayerFragment
+import com.github.andreyasadchy.xtra.ui.player.PlayerPanelTheme
 import com.github.andreyasadchy.xtra.ui.view.AutoCompleteAdapter
 import com.github.andreyasadchy.xtra.util.C
 import com.github.andreyasadchy.xtra.util.TwitchApiHelper
@@ -105,6 +109,10 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     private var ageFader: ChatAgeFader? = null
     /** New live messages, so a tucked floating chat can count them. */
     var onMessagesAppended: ((Int) -> Unit)? = null
+    /** The message box opened or closed while the chat floats. */
+    var onComposerVisibilityChanged: ((Boolean) -> Unit)? = null
+    /** The composer's theme colors, restored when the chat leaves the video. */
+    private var composerColors: ComposerColors? = null
 
     private var autoCompleteAdapter: AutoCompleteAdapter<Any>? = null
 
@@ -208,15 +216,6 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                         showSystemMessageEmotes = requireContext().prefs().getBoolean(C.CHAT_SYSTEM_MESSAGE_EMOTES, true),
                         chatUrl = chatUrl,
                         getEmoteBytes = viewModel::getEmoteBytes,
-                        backgroundColor = MaterialColors.getColor(requireView(), com.google.android.material.R.attr.colorSurface),
-                        dialogBackgroundColor = MaterialColors.getColor(
-                            requireView(),
-                            if (requireContext().prefs().getBoolean(C.UI_THEME_MATERIAL3, true)) {
-                                com.google.android.material.R.attr.colorSurfaceContainerLow
-                            } else {
-                                com.google.android.material.R.attr.colorSurface
-                            }
-                        ),
                         messageTextSize = (requireContext().prefs().getString(C.CHAT_TEXT_SIZE, "14")?.toFloatOrNull() ?: 14f) * sizeModifier,
                         emoteSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, (requireContext().prefs().getString(C.CHAT_EMOTE_SIZE, "29.5")?.toFloatOrNull() ?: 29.5f) * sizeModifier, resources.displayMetrics).toInt(),
                         badgeSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, (requireContext().prefs().getString(C.CHAT_BADGE_SIZE, "18.5")?.toFloatOrNull() ?: 18.5f) * sizeModifier, resources.displayMetrics).toInt(),
@@ -329,6 +328,8 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                                     floatingReplyActive = false
                                     updateComposerVisibility()
                                 }
+                                // Faded lines stay back while typing.
+                                updateFadeReveal()
                             }
                         }
                         editText.addTextChangedListener(onTextChanged = { text, _, _, _ ->
@@ -914,8 +915,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         val previous = overlayStyle
         if (previous == style) return
         overlayStyle = style
-        val modeChanged = (previous == null) != (style == null)
-        if (modeChanged) floatingReplyActive = false
+        if ((previous == null) != (style == null)) floatingReplyActive = false
         applyOverlayStyle(rebind = previous?.copy(fadeOldMessages = false) != style?.copy(fadeOldMessages = false))
     }
 
@@ -958,12 +958,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     private fun applyOverlayStyle(rebind: Boolean) {
         val binding = _binding ?: return
         val style = overlayStyle
-        adapter?.let { adapter ->
-            if (adapter.overlayStyle != style) {
-                adapter.overlayStyle = style
-                if (rebind) adapter.notifyItemRangeChanged(0, adapter.itemCount)
-            }
-        }
+        adapter?.setOverlayStyle(style, notifyRows = rebind)
         with(binding.recyclerView) {
             // The oldest lines fade out at the top of the floating card.
             isVerticalFadingEdgeEnabled = style != null
@@ -1009,23 +1004,55 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         binding.messageView.isVisible = show
         // A floating card is narrow: keep the text field wide when typing is possible.
         binding.channelRewards.isVisible = rewardsButtonAvailable && (overlayStyle == null || !messagingEnabled)
+        onComposerVisibilityChanged?.invoke(show && overlayStyle != null)
     }
 
-    /** Over video the composer sits on an opaque app surface so its themed text stays readable. */
+    /**
+     * Over video the message box takes the floating card's dark surface in
+     * every app theme, so typed text reads like the chat above it. The emote
+     * menu keeps an opaque app surface: its tabs and grids follow the app theme.
+     */
     private fun applyComposerSurface() {
         val binding = _binding ?: return
-        val color = if (overlayStyle != null) {
+        val icons = listOf(binding.replyClose, binding.channelRewards, binding.clear, binding.emotes, binding.send)
+        val defaults = composerColors ?: ComposerColors(
+            text = binding.editText.textColors,
+            hint = binding.editText.hintTextColors,
+            replyText = binding.replyText.textColors,
+            icons = ImageViewCompat.getImageTintList(binding.send),
+        ).also { composerColors = it }
+        if (overlayStyle != null) {
             val context = requireContext()
-            MaterialColors.getColor(
-                context,
-                com.google.android.material.R.attr.colorSurfaceContainerHigh,
-                MaterialColors.getColor(context, com.google.android.material.R.attr.colorSurface, Color.DKGRAY),
+            val surface = ColorUtils.setAlphaComponent(PlayerPanelTheme.gestureFeedback(context).container, 255)
+            val content = ColorStateList.valueOf(Color.WHITE)
+            binding.replyView.setBackgroundColor(surface)
+            binding.messageView.setBackgroundColor(surface)
+            binding.emoteMenu.setBackgroundColor(
+                MaterialColors.getColor(
+                    context,
+                    com.google.android.material.R.attr.colorSurfaceContainerHigh,
+                    MaterialColors.getColor(context, com.google.android.material.R.attr.colorSurface, Color.DKGRAY),
+                )
             )
-        } else null
-        listOf(binding.replyView, binding.messageView, binding.emoteMenu).forEach { view ->
-            if (color != null) view.setBackgroundColor(color) else view.background = null
+            binding.editText.setTextColor(content)
+            binding.editText.setHintTextColor(ColorUtils.setAlphaComponent(Color.WHITE, OVERLAY_HINT_ALPHA))
+            binding.replyText.setTextColor(content)
+            icons.forEach { ImageViewCompat.setImageTintList(it, content) }
+        } else {
+            listOf(binding.replyView, binding.messageView, binding.emoteMenu).forEach { it.background = null }
+            binding.editText.setTextColor(defaults.text)
+            binding.editText.setHintTextColor(defaults.hint)
+            binding.replyText.setTextColor(defaults.replyText)
+            icons.forEach { ImageViewCompat.setImageTintList(it, defaults.icons) }
         }
     }
+
+    private class ComposerColors(
+        val text: ColorStateList,
+        val hint: ColorStateList?,
+        val replyText: ColorStateList,
+        val icons: ColorStateList?,
+    )
 
     private fun sendMessage(replyId: String? = null): Boolean {
         with(binding) {
@@ -1134,6 +1161,8 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
 
     override fun onCopyMessageClicked(message: String) {
         binding.editText.setText(message)
+        // A floating chat's message box may be closed: open it for this message.
+        if (overlayStyle != null) openFloatingComposer()
     }
 
     override fun onViewProfileClicked(id: String?, login: String?, name: String?, channelImage: String?) {
@@ -1343,6 +1372,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         followGlide = null
         ageFader?.dispose()
         ageFader = null
+        composerColors = null
         _binding = null
     }
 
@@ -1391,6 +1421,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
 
     companion object {
         private const val OVERLAY_TOP_FADE_DP = 24f
+        private const val OVERLAY_HINT_ALPHA = 0x99
         private const val KEY_IS_LIVE = "isLive"
         private const val KEY_CHANNEL_ID = "channel_id"
         private const val KEY_CHANNEL_LOGIN = "channel_login"

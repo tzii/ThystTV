@@ -14,6 +14,7 @@ All notable changes to ThystTV should be documented here.
 - Floating chat no longer catches taps with an invisible drag bar along its top while the player controls are hidden.
 - Floating chat hides in picture-in-picture instead of covering the small video, and comes back afterwards.
 - Changing floating chat's look no longer reconnects chat or clears its history.
+- Hide chat in the player's More menu now hides floating chat too, instead of leaving the card on screen.
 
 ## [1.7.0] - 2026-11-21
 

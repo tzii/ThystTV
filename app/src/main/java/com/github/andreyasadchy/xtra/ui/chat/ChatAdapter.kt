@@ -60,8 +60,6 @@ class ChatAdapter(
     private val showSystemMessageEmotes: Boolean,
     private val chatUrl: String?,
     private val getEmoteBytes: ((String, Pair<Long, Int>) -> ByteArray?)?,
-    private val backgroundColor: Int,
-    private val dialogBackgroundColor: Int,
     private val messageTextSize: Float,
     private val emoteSize: Int,
     private val badgeSize: Int,
@@ -80,6 +78,7 @@ class ChatAdapter(
     var translateAllMessages = false
     /** Set while the list floats over video; null on an app surface. */
     var overlayStyle: ChatOverlayStyle? = null
+        private set
     /** Animated emotes stay still while the floating chat is hidden or tucked away. */
     var animationsPaused = false
         private set
@@ -88,6 +87,14 @@ class ChatAdapter(
     private val random = Random()
     private val userColors = HashMap<String, Int>()
     private val savedColors = HashMap<String, Int>()
+    /**
+     * Readable name colors are adapted to the background they sit on, so a
+     * light theme's chat keeps separate ones for the dark floating card.
+     */
+    private val overlayUserColors = HashMap<String, Int>()
+    private val overlaySavedColors = HashMap<String, Int>()
+    private val rowUserColors get() = if (effectiveIsLightTheme() == isLightTheme) userColors else overlayUserColors
+    private val rowSavedColors get() = if (effectiveIsLightTheme() == isLightTheme) savedColors else overlaySavedColors
     private val savedLocalTwitchEmotes = mutableMapOf<String, ByteArray>()
     private val savedLocalBadges = mutableMapOf<String, ByteArray>()
     private val savedLocalCheerEmotes = mutableMapOf<String, ByteArray>()
@@ -105,16 +112,42 @@ class ChatAdapter(
             chatMessage, holder.textView, enableTimestamps, timestampFormat, firstMsgVisibility, firstChatMsg, redeemedChatMsg, redeemedNoMsg,
             rewardChatMsg, replyMessage, null, useRandomColors, random, useReadableColors, effectiveIsLightTheme(), nameDisplay, useBoldNames || useDarkOverlay, showNamePaints,
             namePaints, showStvBadges, stvBadges, showPersonalEmotes, personalEmoteSets, stvUsers, enableOverlayEmotes, showSystemMessageEmotes,
-            loggedInUser, chatUrl, getEmoteBytes, userColors, savedColors, translateAllMessages, translateMessage, showLanguageDownloadDialog,
+            loggedInUser, chatUrl, getEmoteBytes, rowUserColors, rowSavedColors, translateAllMessages, translateMessage, showLanguageDownloadDialog,
             true, localTwitchEmotes, thirdPartyEmotes, globalBadges, channelBadges, cheerEmotes, savedLocalTwitchEmotes, savedLocalBadges,
             savedLocalCheerEmotes, savedLocalEmotes
         )
         holder.imageBinder.bind({ holder.bind(chatMessage, result.builder) }) { onImageLoaded ->
             ChatAdapterUtils.loadImages(
                 holder.textView, { onImageLoaded() }, result.images, result.imagePaint, result.userName, result.userNameStartIndex,
-                backgroundColor, result.builder, result.translated, emoteSize, badgeSize, emoteQuality, animateGifs, enableOverlayEmotes,
-                chatMessage, savedColors, useReadableColors, effectiveIsLightTheme(), showLanguageDownloadDialog, true
+                result.builder, result.translated, emoteSize, badgeSize, emoteQuality, animateGifs, enableOverlayEmotes,
+                chatMessage, rowSavedColors, useReadableColors, effectiveIsLightTheme(), showLanguageDownloadDialog, true,
+                startAnimations = { !animationsPaused },
             )
+        }
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isNotEmpty() && payloads.all { it == PAYLOAD_STYLE }) {
+            holder.applyStyle()
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
+    }
+
+    /**
+     * Applies the floating chat's look, or null for an app surface. Rows on
+     * screen restyle in place; moving between an app surface and the video
+     * also rebuilds their text, since name colors follow the background.
+     */
+    fun setOverlayStyle(style: ChatOverlayStyle?, notifyRows: Boolean) {
+        val previous = overlayStyle
+        if (previous == style) return
+        overlayStyle = style
+        if (!notifyRows || itemCount == 0) return
+        if ((previous == null) != (style == null)) {
+            notifyItemRangeChanged(0, itemCount)
+        } else {
+            notifyItemRangeChanged(0, itemCount, PAYLOAD_STYLE)
         }
     }
 
@@ -134,7 +167,7 @@ class ChatAdapter(
                 }
             )
             if (!chatMessage.translationFailed) {
-                ChatAdapterUtils.addTranslation(chatMessage, builder, builder.length, savedColors, useReadableColors, effectiveIsLightTheme(), showLanguageDownloadDialog, true)
+                ChatAdapterUtils.addTranslation(chatMessage, builder, builder.length, rowSavedColors, useReadableColors, effectiveIsLightTheme(), showLanguageDownloadDialog, true)
             }
             item.text = builder
         }
@@ -147,7 +180,7 @@ class ChatAdapter(
             { chatMessage -> selectedMessage = chatMessage; replyClickListener?.invoke() },
             { url, name, format, isAnimated, source, thirdParty, emoteId -> imageClickListener?.invoke(url, name, format, isAnimated, source, thirdParty, emoteId) },
             useRandomColors, useReadableColors, isLightTheme, nameDisplay, useBoldNames, showNamePaints, showStvBadges, showPersonalEmotes,
-            showSystemMessageEmotes, chatUrl, getEmoteBytes, dialogBackgroundColor, messageTextSize, emoteSize, badgeSize,
+            showSystemMessageEmotes, chatUrl, getEmoteBytes, messageTextSize, emoteSize, badgeSize,
             emoteQuality, animateGifs, enableOverlayEmotes, translateAllMessages, translateMessage, showLanguageDownloadDialog, random, userColors,
             savedColors, savedLocalTwitchEmotes, savedLocalBadges, savedLocalCheerEmotes, savedLocalEmotes, loggedInUser, selectedMessage
         )
@@ -159,7 +192,7 @@ class ChatAdapter(
             stvUsers, enableTimestamps, timestampFormat, firstMsgVisibility, firstChatMsg, redeemedChatMsg, redeemedNoMsg, rewardChatMsg, replyMessage,
             { url, name, format, isAnimated, source, thirdParty, emoteId -> imageClickListener?.invoke(url, name, format, isAnimated, source, thirdParty, emoteId) },
             useRandomColors, useReadableColors, isLightTheme, nameDisplay, useBoldNames, showNamePaints, showStvBadges, showPersonalEmotes,
-            showSystemMessageEmotes, chatUrl, getEmoteBytes, dialogBackgroundColor, messageTextSize, emoteSize, badgeSize,
+            showSystemMessageEmotes, chatUrl, getEmoteBytes, messageTextSize, emoteSize, badgeSize,
             emoteQuality, animateGifs, enableOverlayEmotes, translateAllMessages, translateMessage, showLanguageDownloadDialog, random, userColors,
             savedColors, savedLocalTwitchEmotes, savedLocalBadges, savedLocalCheerEmotes, savedLocalEmotes, loggedInUser, selectedMessage
         )
@@ -229,8 +262,38 @@ class ChatAdapter(
         private val density = textView.resources.displayMetrics.density
 
         fun bind(chatMessage: ChatMessage, formattedMessage: SpannableStringBuilder) {
+            textView.text = formattedMessage
+            applyStyle()
             textView.apply {
-                text = formattedMessage
+                if (chatMessage.isReply) {
+                    movementMethod = null
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                    TooltipCompat.setTooltipText(this, chatMessage.replyParent?.message ?: chatMessage.replyParent?.systemMsg)
+                    setOnClickListener {
+                        if (selectionStart == -1 && selectionEnd == -1) {
+                            selectedMessage = chatMessage.replyParent
+                            messageClickListener?.invoke(channelId)
+                        }
+                    }
+                } else {
+                    movementMethod = LinkMovementMethod.getInstance()
+                    maxLines = Int.MAX_VALUE
+                    ellipsize = null
+                    TooltipCompat.setTooltipText(this, chatMessage.message ?: chatMessage.systemMsg)
+                    setOnClickListener {
+                        if (selectionStart == -1 && selectionEnd == -1) {
+                            selectedMessage = chatMessage
+                            messageClickListener?.invoke(channelId)
+                        }
+                    }
+                }
+            }
+        }
+
+        /** Size, colors, outline and weight from [overlayStyle]; the text itself stays. */
+        fun applyStyle() {
+            textView.apply {
                 val overlay = overlayStyle
                 textSize = messageTextSize * (overlay?.textScale ?: 1f)
                 if (overlay != null) {
@@ -258,38 +321,18 @@ class ChatAdapter(
                 }
                 val typeface = if (overlay?.boldText == true) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
                 if (this.typeface != typeface) this.typeface = typeface
-                if (chatMessage.isReply) {
-                    movementMethod = null
-                    maxLines = 2
-                    ellipsize = TextUtils.TruncateAt.END
-                    TooltipCompat.setTooltipText(this, chatMessage.replyParent?.message ?: chatMessage.replyParent?.systemMsg)
-                    setOnClickListener {
-                        if (selectionStart == -1 && selectionEnd == -1) {
-                            selectedMessage = chatMessage.replyParent
-                            messageClickListener?.invoke(channelId)
-                        }
-                    }
-                } else {
-                    movementMethod = LinkMovementMethod.getInstance()
-                    maxLines = Int.MAX_VALUE
-                    ellipsize = null
-                    TooltipCompat.setTooltipText(this, chatMessage.message ?: chatMessage.systemMsg)
-                    setOnClickListener {
-                        if (selectionStart == -1 && selectionEnd == -1) {
-                            selectedMessage = chatMessage
-                            messageClickListener?.invoke(channelId)
-                        }
-                    }
-                }
             }
         }
     }
 
     private companion object {
+        /** Restyle rows in place: their text and images stay. */
+        const val PAYLOAD_STYLE = "style"
         val FLOATING_CHAT_TEXT_COLOR = Color.WHITE
         val FLOATING_CHAT_LINK_COLOR = 0xFF4FC3F7.toInt()
         val FLOATING_CHAT_LINK_HIGHLIGHT_COLOR = 0x334FC3F7
         const val OVERLAY_PADDING_H_DP = 10f
-        const val OVERLAY_PADDING_V_DP = 2f
+        // Room above and below each line for the Clear outline.
+        const val OVERLAY_PADDING_V_DP = 3f
     }
 }

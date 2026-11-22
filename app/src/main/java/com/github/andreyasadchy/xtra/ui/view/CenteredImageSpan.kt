@@ -26,6 +26,8 @@ class CenteredImageSpan(drawable: Drawable) : ImageSpan(drawable) {
     }
 
     override fun draw(canvas: Canvas, text: CharSequence, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
+        // A Clear row draws its text twice; images only need the second pass.
+        if (ChatHaloPass.current == ChatHaloPass.SOFT) return
         val drawable = drawable
         canvas.save()
         val fmPaint = paint.fontMetricsInt

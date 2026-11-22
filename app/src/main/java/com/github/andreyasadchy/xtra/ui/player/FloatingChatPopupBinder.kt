@@ -10,11 +10,16 @@ import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.RadioButton
 import android.widget.TextView
 import androidx.core.content.edit
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.AccessibilityDelegateCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.isEmpty
 import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.LayoutFloatingChatPopupBinding
@@ -35,7 +40,6 @@ internal class FloatingChatPopupBinder(
 ) {
     private val colors = PlayerPanelTheme.resolve(context)
     private val density = context.resources.displayMetrics.density
-    private val segments = mutableListOf<List<TextView>>()
 
     fun bind() {
         applyTheme()
@@ -81,7 +85,6 @@ internal class FloatingChatPopupBinder(
     fun dispose() {
         binding.floatingChatPopupClose.setOnClickListener(null)
         binding.floatingChatPopupRows.removeAllViews()
-        segments.clear()
     }
 
     private fun applyTheme() {
@@ -121,8 +124,11 @@ internal class FloatingChatPopupBinder(
                 isClickable = true
                 isFocusable = true
                 textSize = 14f
-                minHeight = dp(44f)
+                // Grows with large font sizes instead of clipping its label.
+                minHeight = dp(48f)
+                setPadding(dp(8f), dp(6f), dp(8f), dp(6f))
                 background = chipBackground()
+                ViewCompat.setAccessibilityDelegate(this, ChoiceAccessibility)
                 setTextColor(
                     ColorStateList(
                         arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
@@ -132,7 +138,7 @@ internal class FloatingChatPopupBinder(
                 isSelected = value == selected
                 row.addView(
                     this,
-                    LinearLayout.LayoutParams(0, dp(44f), 1f).apply { if (index > 0) marginStart = dp(6f) },
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { if (index > 0) marginStart = dp(6f) },
                 )
             }
         }
@@ -143,7 +149,6 @@ internal class FloatingChatPopupBinder(
                 onSelect(options[index].first)
             }
         }
-        segments += chips
         binding.floatingChatPopupRows.addView(
             row,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
@@ -184,4 +189,16 @@ internal class FloatingChatPopupBinder(
     }
 
     private fun dp(value: Float) = (value * density).toInt()
+
+    /** A segment reads as one choice of several, checked when selected. */
+    private object ChoiceAccessibility : AccessibilityDelegateCompat() {
+        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
+            super.onInitializeAccessibilityNodeInfo(host, info)
+            info.className = RadioButton::class.java.name
+            info.isCheckable = true
+            info.setChecked(
+                if (host.isSelected) AccessibilityNodeInfoCompat.CHECKED_STATE_TRUE else AccessibilityNodeInfoCompat.CHECKED_STATE_FALSE,
+            )
+        }
+    }
 }
