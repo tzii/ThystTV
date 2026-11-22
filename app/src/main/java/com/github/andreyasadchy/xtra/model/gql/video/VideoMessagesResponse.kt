@@ -11,7 +11,8 @@ class VideoMessagesResponse(
 ) {
     @Serializable
     class Data(
-        val video: Video,
+        /** Null when the VoD no longer exists. */
+        val video: Video? = null,
     )
 
     @Serializable
