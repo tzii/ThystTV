@@ -441,18 +441,15 @@ class SettingsViewModel @Inject constructor(
 
     fun restoreSettings(list: List<String>, networkLibrary: String?, gqlHeaders: Map<String, String>, helixHeaders: Map<String, String>) {
         viewModelScope.launch(Dispatchers.IO) {
-            list.take(2).forEach { url ->
+            // Settings first: restoring the database restarts the app, which would skip them.
+            list.take(2).sortedBy { !it.endsWith(".xml") }.forEach { url ->
                 if (url.endsWith(".xml")) {
-                    FileOutputStream("${applicationContext.applicationInfo.dataDir}/shared_prefs/${applicationContext.packageName}_preferences.xml").use { outputStream ->
-                        applicationContext.contentResolver.openInputStream(url.toUri())!!.use { inputStream ->
-                            inputStream.copyTo(outputStream)
-                        }
-                    }
-                    val prefs = applicationContext.contentResolver.openInputStream(url.toUri())!!.bufferedReader().use {
-                        it.readText()
-                    }
-                    toggleNotifications(prefs.contains("name=\"${C.LIVE_NOTIFICATIONS_ENABLED}\" value=\"true\""), networkLibrary, gqlHeaders, helixHeaders)
-                    val language = Regex("<string name=\"${C.UI_LANGUAGE}\">(.+?)</string>").find(prefs)?.groups?.get(1)?.value
+                    val values = applicationContext.contentResolver.openInputStream(url.toUri())!!.use { inputStream ->
+                        PreferencesBackup.read(inputStream)
+                    } ?: return@forEach
+                    PreferencesBackup.restore(applicationContext.prefs(), values)
+                    toggleNotifications(values[C.LIVE_NOTIFICATIONS_ENABLED] == true, networkLibrary, gqlHeaders, helixHeaders)
+                    val language = values[C.UI_LANGUAGE] as? String
                     AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language.takeIf { it != "auto" }))
                 } else {
                     val database = applicationContext.getDatabasePath("database")
