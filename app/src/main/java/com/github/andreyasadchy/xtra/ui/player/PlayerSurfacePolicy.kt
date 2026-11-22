@@ -169,18 +169,21 @@ object PlayerSurfacePolicy {
             PlayerGestureFeedbackLayout.TOP_SLIDER -> {
                 val compact = compactFeedback(density, surfaceWidthPx, surfaceHeightPx)
                 val width = topSliderWidthPx(density, surfaceWidthPx, margin, compact) + 2 * pad
+                val topPaddingPx = (TOP_SLIDER_TOP_DP * density).toInt() - pad
+                // A seek adds its caption under the track; the track itself
+                // stays where speed and pinch draw theirs. A player too short
+                // for the caption band, such as a tiny freeform or desktop
+                // window, shows the track alone rather than a clipped caption.
+                val withCaption = kind == PlayerGestureFeedbackKind.SEEK && (surfaceHeightPx <= 0 ||
+                    topPaddingPx + PlayerGestureSliderView.heightPx(density, withCaption = true) <= surfaceHeightPx)
                 return PlayerFeedbackPlacement(
                     gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL,
                     maxWidthPx = width,
                     marginLeftPx = 0,
                     marginRightPx = 0,
-                    topPaddingPx = (TOP_SLIDER_TOP_DP * density).toInt() - pad,
+                    topPaddingPx = topPaddingPx,
                     fixedContainerWidthPx = width,
-                    // A seek adds its caption under the track; the track
-                    // itself stays where speed and pinch draw theirs.
-                    fixedContainerHeightPx = PlayerGestureSliderView.heightPx(
-                        density, withCaption = kind == PlayerGestureFeedbackKind.SEEK,
-                    ),
+                    fixedContainerHeightPx = PlayerGestureSliderView.heightPx(density, withCaption),
                     indicator = PlayerFeedbackIndicator.TOP_SLIDER,
                 )
             }
