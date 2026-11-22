@@ -15,6 +15,33 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### 1.7.1 fixes
+
+Required for the integration debug build of the 1.7.1 fix branches. None of these has been
+checked on a device yet.
+
+- [ ] Chat `/timeout` while signed in with the Helix (API) login: `/timeout <user> 10m`,
+  `/timeout <user> 300`, `/timeout <user>` (10 minutes) and `/timeout <user> 1w` time the
+  user out for that long, not a ban; `/timeout <user> soon` and `/timeout <user> 3w` show
+  the invalid-duration notice and change nothing. Use a channel you moderate and a test
+  account; `/untimeout` afterwards.
+- [ ] Clip download with **Download chat** on finishes as Downloaded; a clip whose VoD is
+  gone downloads without replay chat. Turn networking off during the chat step: the
+  download ends as paused (Pending) and resumes, never stuck at Downloading.
+- [ ] Settings backup and restore: back up, change several settings, restore only the
+  settings `.xml`, then change any setting and reopen Settings; the restored values stay.
+  Restore settings and database together in either pick order: both are restored and
+  the app restarts once. Picking another `.xml` file (not a settings backup) changes nothing.
+- [ ] Landscape VoD: start a pinch while the controls show; they fade out and the Fit/Fill
+  slider reads clearly. Three-finger pinch: lift one of the first two fingers while the
+  third stays down; the pinch commits and nothing else starts until all fingers lift.
+- [ ] Seek in a very short freeform/desktop window (shorter than about 94 dp): the slider
+  shows without a clipped caption; a normal window still shows the caption.
+- [ ] German UI (Settings → Language → Deutsch): main tabs, sort/period dialog, downloads,
+  player and chat strings read naturally and none are cut off at 100% and 200% font size.
+- [ ] Regression pass: live/VoD playback, stream switching, minimize/restore, close/reopen,
+  PiP/background, speed/quality, gestures and floating chat.
+
 ### 1.7.0 signed release candidate
 
 On November 21 the maintainer tested the combined debug build (`debug-cutoutedge-a90fc3dc9`)

@@ -6,6 +6,43 @@ decisions lives in [`UPSTREAM_SYNC.md`](UPSTREAM_SYNC.md). The 1.2-cycle ledger
 ([`RELEASE_1_2_UPSTREAM_COMMITS.md`](RELEASE_1_2_UPSTREAM_COMMITS.md)) is frozen history;
 new audits go here.
 
+## November 22, 2026: 1.7.1 upstream and fork intake
+
+Audited from the 1.7.0 source (`d73e1db34`).
+
+**crackededed/Xtra** `96772030c..0ab697de0` (four commits):
+
+| Commit | Disposition |
+| --- | --- |
+| `0444de816` fix helix timeout command duration | Adapted (`fix/171-timeout-duration`). ThystTV had the same bug: Helix bans permanently when `duration` is missing, and `/timeout user 10m` sent none. Upstream falls back to 10 minutes for plain-second arguments; ThystTV reads plain seconds and `s`/`m`/`h`/`d`/`w`, stays within Helix's 1 s to 2 weeks and stops with a notice on an unreadable value. Upstream's dependency and wrapper bumps are not taken. |
+| `bce2c3746` German translation, further translation (#1077) | Taken (`l10n/171-german-upstream`): 261 of 291 changed strings whose English source matches ThystTV, plus the `followers` plural. Not taken: 25 keys ThystTV lacks, 5 with different English, and the Fastlane store texts. |
+| `47c8d6db0` fix download progress update causing errors | N/A: ThystTV downloads use WorkManager workers and Room-observed status, not upstream's bound `VideoDownloadService` listener. |
+| `0ab697de0` fix crash during stream downloads | N/A: ThystTV's `StreamDownloadWorker` already assigns `lastSegmentUrl` (no `+=` growth), so no database migration is needed. |
+
+Upstream issues checked against ThystTV: #1082 (timeout became a ban) is the bug above;
+#1097 (the live uptime keeps counting after a stream ends while paused in the background)
+also applies to ThystTV's uptime `Chronometer` and is left as a cosmetic follow-up; #1095
+(`startForeground` from `ExoPlayerService`) concerns upstream's default service, which
+ThystTV keeps only behind `DEBUG_USE_CUSTOM_PLAYBACK_SERVICE`.
+
+**ThystTV forks.** Ness945/ThystTV (`28c0b89b5`) adds proxy setting diagnostics and an
+app-only scope notice; left as an optional settings feature. JhthnR/XtraForTwitch
+(`97d68498f`) adds a swipe-to-chat gesture that ThystTV has shipped since 1.5.2.
+feli19honk-pixel/ThystTV has no commits of its own.
+
+**Xtra forks.** thiscallnet/Xtra (`81a9c8304`) merged about 60 PRs since the October
+audit, mostly on its own chat v2, VAFT proxy, HUD editor and diagnostics stacks. Not
+portable as-is; behavior worth a separate look later: VoD watch progress from Twitch (#617),
+cheers rendering (#620), cached emotes offline (#619), a channel emotes tab (#611), and
+network-change quality defaults (#568, player-risk). Its #610 (user history without replies
+to that user) is a product choice left open: ThystTV's message dialog, like upstream Xtra's,
+also lists replies to the selected user. ryankhart/Xtra (`c0c0e267b`) adds list space under the mini player and
+swipe-down to close it; a broad list-decoration change, deferred. prime385/Xtra5
+(`4c490be5f`) adds a VoD chapters dropdown and countdown; deferred as UI work.
+razeNFR/XtraATV (`42d691f74`), Adr1GR/XtraTVReforged and danigalaxy98/XtraTV are TV
+rewrites or TV-only layers; Mitchell0402/Xtra is a motion redesign; Kristijan1001/Xtra is
+a service/chat rewrite. Nothing was taken from them.
+
 ## October 22, 2026: TV device-code sign-in adaptation
 
 Audited razeNFR/XtraATV at `25b4a606f2768eb4ee2532f3570ce689bdd84d4c`, including
@@ -44,7 +81,8 @@ informs the early request updates and non-video resize behavior.
 
 ## Latest audit
 
-- **Date checked:** 2026-10-04; crackededed rechecked 2026-10-10 and 2026-10-20
+- **Date checked:** 2026-10-04; crackededed rechecked 2026-10-10, 2026-10-20 and
+  2026-11-22 (`0ab697de0`, [1.7.1 intake](#november-22-2026-171-upstream-and-fork-intake))
 - **Branches:** stacked `xtra-ports/1-notifications` → `2-rewards` → `3-quality` → `4-rewind`, based on `e8cbd77cb9f875ed2e4b777684065278bc766060`
 - **crackededed/Xtra:** `9f8043e8bdf45e8a2b2bf4cecfa74dc1de8ae0a3`; rechecked at
   `a3cbb0325f3330573a6738f7d36a2c5b785f4d1c` ([October 10 recheck](#october-10-2026-crackededed-recheck))
