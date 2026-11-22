@@ -135,6 +135,52 @@ class FloatingChatPlacementTest {
         assertEquals(274 to 290, FloatingChatPlacement.resize(224, 240, 50f, 50f, FloatingChatSide.LEFT, 1000, 500, density))
     }
 
+    // The ±10 buttons: 60dp, 50dp in from each edge, centred on the 500px player.
+    private val controlsUp = FloatingChatPlacement.bounds(1000, 500, density, keepClearTop = 56, keepClearBottom = 96)
+    private val rightButton = FloatingChatBounds(890f, 220f, 950f, 280f)
+    private val leftButton = FloatingChatBounds(50f, 220f, 110f, 280f)
+
+    @Test fun `a card over the seek button on its side steps inward past it`() {
+        val placed = FloatingChatPlacement.place(layout, 224, 240, rest, controlsUp, density)
+        val aside = FloatingChatPlacement.stepAside(placed, FloatingChatSide.RIGHT, controlsUp, rightButton, density)
+        assertEquals(890f - 12f - 224f, aside.x, 0f)
+        assertEquals(placed.y, aside.y, 0f)
+        assertEquals(224, aside.width)
+        assertEquals(240, aside.height)
+    }
+
+    @Test fun `on the left the card steps right of the button`() {
+        val left = layout.copy(side = FloatingChatSide.LEFT)
+        val placed = FloatingChatPlacement.place(left, 224, 240, rest, controlsUp, density)
+        assertEquals(12f, placed.x, 0f)
+        val aside = FloatingChatPlacement.stepAside(placed, FloatingChatSide.LEFT, controlsUp, leftButton, density)
+        assertEquals(110f + 12f, aside.x, 0f)
+        assertEquals(224, aside.width)
+    }
+
+    @Test fun `a card above or below the button, or with no button, stays at its edge`() {
+        val placed = FloatingChatPlacement.place(layout, 224, 120, rest, controlsUp, density)
+        // 68..188 ends above the button's 220.
+        assertEquals(placed, FloatingChatPlacement.stepAside(placed, FloatingChatSide.RIGHT, controlsUp, rightButton, density))
+        val below = FloatingChatBounds(890f, 330f, 950f, 390f)
+        val tall = FloatingChatPlacement.place(layout, 224, 240, rest, controlsUp, density)
+        assertEquals(tall, FloatingChatPlacement.stepAside(tall, FloatingChatSide.RIGHT, controlsUp, below, density))
+        assertEquals(tall, FloatingChatPlacement.stepAside(tall, FloatingChatSide.RIGHT, controlsUp, null, density))
+    }
+
+    @Test fun `a wide card gives up width to clear the button, a narrow window keeps it`() {
+        val wide = FloatingChatPlacement.place(layout, 900, 240, rest, controlsUp, density)
+        val aside = FloatingChatPlacement.stepAside(wide, FloatingChatSide.RIGHT, controlsUp, rightButton, density)
+        assertEquals(12f, aside.x, 0f)
+        assertEquals(878 - 12, aside.width)
+
+        val narrow = FloatingChatPlacement.bounds(300, 500, density, keepClearTop = 56, keepClearBottom = 96)
+        val placed = FloatingChatPlacement.place(layout, 224, 240, rest, narrow, density)
+        // Only 166px would be left, under the 170dp minimum card.
+        val button = FloatingChatBounds(190f, 220f, 250f, 280f)
+        assertEquals(placed, FloatingChatPlacement.stepAside(placed, FloatingChatSide.RIGHT, narrow, button, density))
+    }
+
     private fun release(
         x: Float,
         y: Float = 12f,

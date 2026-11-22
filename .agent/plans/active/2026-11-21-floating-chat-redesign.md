@@ -209,15 +209,28 @@ Human QA completed:
   Skipped: collapsing the emote menu with the composer; capping alpha that
   compounds under the halo; tinting the edit-text underline (AppCompat owns that
   tint).
-  Follow-ups: z-order over gesture feedback and the seek preview; TV D-pad
+  Follow-ups: z-order over gesture feedback and the seek preview (covered by
+  ducking since 2026-11-22; the seek preview never met the card in QA); TV D-pad
   focus inside the card; drag to untuck and keeping the tucked state across PiP
-  and minimize; haptics and a custom opacity in Aa; ducking the card during
-  gestures; `ChatFollowGlide` extra top space; 40dp header buttons.
+  and minimize; haptics and a custom opacity in Aa; `ChatFollowGlide` extra top
+  space; 40dp header buttons.
   Tests added: keyboard and narrow-window placement, no-room anchor, the
   cross-half throw, header drag from a button, and a grip tap.
 - 2026-11-22: Gate after the review fixes: `assembleDebug testDebugUnitTest`
   passed (1601 tests, 0 failures). `lintDebug` then passed on its own: no
   errors, no warnings on changed lines.
+- 2026-11-22: The maintainer added #122 to 1.7.1. Emulator QA (Grok 4.7, report
+  in `.private/qa/2026-11-22-171-emulator/`) found the card drawn above Quality,
+  Speed, More and Aa, over the +10 button, and over an edge slider on its side.
+  The menus: `android:elevation` on the popup host's `<include>` was ignored, so
+  the host sat at Z 0 under the 10dp floating chat host (also true in 1.7.0); it
+  now sits on the included root. By the maintainer's choice, the card steps aside
+  from the seek button on its side while the controls show, and fades to 25%
+  while a brightness, volume, seek or speed slider is up (the "ducking"
+  follow-up). Its other findings were checked and are not bugs: the book-posture
+  video is vertically centred in its pane, the unfolded inner screen is portrait
+  (docked chat by design), and the chat-button "second tap" came 23 s later, after
+  the controls had hidden, so it only showed them.
 
 ## Decisions
 
@@ -247,6 +260,12 @@ Human QA completed:
   of reading the paint's shadow.
   Reason: `Paint.getShadowLayerRadius` needs API 29; minSdk is 23, and rows draw
   on the main thread one at a time.
+- Decision: With the controls up, the card steps inward past the ±10 button on
+  its side; during brightness, volume, seek and speed swipes it fades to 25%.
+  Reason: the maintainer's choice after emulator QA (2026-11-22); every control
+  and slider stays visible and reachable without moving controls.
+  Alternatives considered: leaving both covered; moving the gesture feedback
+  above the card (crosses `PlayerLayout`'s fold and mini-player geometry).
 - Decision: Overlay name colours get their own caches in the light app theme.
   Trade-off: a user without a Twitch colour may get a different random colour
   in floating and sidebar chat.

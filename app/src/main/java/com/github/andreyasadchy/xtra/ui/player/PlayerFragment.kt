@@ -143,6 +143,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var _binding: FragmentPlayerBinding? = null
     private val systemUiListener = PlayerSystemUiListener()
     private val hideGestureRunnable = Runnable {
+        // Floating chat comes back while the slider fades out.
+        floatingChat?.setDucked(false)
         _binding?.playerLayout?.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
             feedback.animate().cancel()
             if (feedback.isVisible) {
@@ -1557,6 +1559,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 gestureArbiter.onSequenceFinished()
                                 resetPinchTracking()
                                 upAction(event)
+                            }
+                            // A slider brings floating chat back as it fades out
+                            // (hideGestureRunnable); a swipe that showed none does it here.
+                            if (playerLayout.findViewById<View>(R.id.gestureFeedback)?.isVisible != true) {
+                                floatingChat?.setDucked(false)
                             }
                         }
                     }
@@ -4567,6 +4574,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     companion object {
         private const val FLOATING_CHAT_TOP_BAND_DP = 56f
         private const val FLOATING_CHAT_BOTTOM_BAND_DP = 96f
+        /** Swipes whose slider floating chat fades back for. */
+        private val FLOATING_CHAT_DUCKING_OWNERS = setOf(
+            PlayerGestureArbiter.Owner.BRIGHTNESS,
+            PlayerGestureArbiter.Owner.DEVICE_VOLUME,
+            PlayerGestureArbiter.Owner.SEEK,
+            PlayerGestureArbiter.Owner.PLAYBACK_SPEED,
+        )
         private val FLOATING_CHAT_APPEARANCE_KEYS = setOf(
             C.FLOATING_CHAT_TRANSPARENCY,
             C.FLOATING_CHAT_TEXT_SIZE,
@@ -4742,11 +4756,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     /**
-     * Bottom of the controls' top row and height of their bottom rows, in
-     * floating chat host pixels. Rows not laid out yet use typical heights.
+     * Bottom of the controls' top row, height of their bottom rows and the
+     * seek buttons beside play/pause, in floating chat host pixels. Rows not
+     * laid out yet use typical heights.
      */
-    private fun floatingChatControlBands(): Pair<Int, Int> {
-        val binding = _binding ?: return 0 to 0
+    private fun floatingChatControlBands(): FloatingChatControls {
+        val binding = _binding ?: return FloatingChatControls()
         val host = binding.floatingChatHost
         val controls = binding.playerControls
         val density = resources.displayMetrics.density
@@ -4766,7 +4781,24 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
         if (top < 0) top = (FLOATING_CHAT_TOP_BAND_DP * density).toInt()
         if (bottom < 0) bottom = (FLOATING_CHAT_BOTTOM_BAND_DP * density).toInt()
-        return top.coerceIn(0, host.height) to bottom.coerceIn(0, host.height)
+        // The ±10 buttons sit by the edges (mirrored in RTL), so sort them by
+        // where they are on screen rather than by which one they are.
+        var leftButton: FloatingChatBounds? = null
+        var rightButton: FloatingChatBounds? = null
+        for (button in listOf(controls.rewind, controls.fastForward)) {
+            if (!button.isVisible || button.width == 0) continue
+            button.getLocationInWindow(location)
+            val buttonLeft = (location[0] - hostLocation[0]).toFloat()
+            val buttonTop = (location[1] - hostLocation[1]).toFloat()
+            val bounds = FloatingChatBounds(buttonLeft, buttonTop, buttonLeft + button.width, buttonTop + button.height)
+            if (buttonLeft + button.width / 2f < host.width / 2f) leftButton = bounds else rightButton = bounds
+        }
+        return FloatingChatControls(
+            top = top.coerceIn(0, host.height),
+            bottom = bottom.coerceIn(0, host.height),
+            leftButton = leftButton,
+            rightButton = rightButton,
+        )
     }
 
     /** Applies Aa or Settings changes to the card and the chat rows without reconnecting. */
@@ -4938,7 +4970,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun claimSingleFingerGesture(owner: PlayerGestureArbiter.Owner): Boolean {
-        return gestureArbiter.tryClaimSingleFinger(owner)
+        val claimed = gestureArbiter.tryClaimSingleFinger(owner)
+        // Floating chat fades back while a slider shows, so a card on that edge never hides it.
+        if (claimed && owner in FLOATING_CHAT_DUCKING_OWNERS) floatingChat?.setDucked(true)
+        return claimed
     }
 
     private fun edgeExclusion(): PlayerEdgeExclusion {

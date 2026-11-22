@@ -272,12 +272,13 @@
         </LinearLayout>
     </com.github.andreyasadchy.xtra.ui.player.FloatingChatHostLayout>
     <!-- Player-owned, but outside the 16:9 PlayerLayout so portrait menus can
-         use the space over chat. Above floating chat while a menu is open. -->
+         use the space over chat. Above floating chat while a menu is open: the
+         elevation that does that is on the included root, because <include>
+         ignores attributes other than id, visibility and layout_*. -->
     <include
         android:id="@+id/playerPopupHost"
         layout="@layout/layout_player_popup_host"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:elevation="24dp"
         android:visibility="gone" />
 </RelativeLayout>
