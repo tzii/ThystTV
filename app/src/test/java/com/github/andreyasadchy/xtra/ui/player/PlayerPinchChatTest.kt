@@ -120,6 +120,7 @@ class PlayerPinchChatTest {
             Mockito.doReturn(chatView).`when`(chat).view
             ReflectionHelpers.setField(fragment, "chatFragment", chat)
             binding.chatFragmentContainer.addView(chatView)
+            ReflectionHelpers.callInstanceMethod<Unit>(fragment, "setupFloatingChat")
             fragment.hideChat()
             if (initialMode != Mode.HIDDEN) fragment.showChat()
             if (initialMode == Mode.FLOATING) fragment.cycleChatMode()
@@ -155,12 +156,12 @@ class PlayerPinchChatTest {
             assertEquals(mode == Mode.FLOATING, ReflectionHelpers.getField<Boolean>(fragment, "isFloatingChatEnabled"))
             assertEquals(savedOpen != null, prefs.contains(C.KEY_CHAT_OPENED))
             if (savedOpen != null) assertEquals(savedOpen, prefs.getBoolean(C.KEY_CHAT_OPENED, !savedOpen))
-            assertSame(if (mode == Mode.FLOATING) binding.floatingChatContainer else binding.chatFragmentContainer, chatView.parent)
             assertEquals(if (mode == Mode.SIDEBAR) View.VISIBLE else View.GONE, binding.chatLayout.visibility)
             assertEquals(if (mode == Mode.SIDEBAR) 240 else 0, (binding.playerLayout.layoutParams as FrameLayout.LayoutParams).marginEnd)
-            assertEquals(if (mode == Mode.FLOATING) View.VISIBLE else View.GONE, binding.floatingChatRoot.visibility)
-            // Allow old animation callbacks to run too: they must not undo the restored state.
+            // A hidden floating card fades out with its lines before the chat view moves
+            // back. Old animation callbacks run here too: they must not undo the restored state.
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            assertSame(if (mode == Mode.FLOATING) binding.floatingChatContainer else binding.chatFragmentContainer, chatView.parent)
             assertEquals(if (mode == Mode.FLOATING) View.VISIBLE else View.GONE, binding.floatingChatRoot.visibility)
             if (mode == Mode.FLOATING) assertEquals(1f, binding.floatingChatRoot.alpha, 0.001f)
         }

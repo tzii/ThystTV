@@ -1,12 +1,10 @@
 package com.github.andreyasadchy.xtra.ui.chat
 
 import android.graphics.drawable.Animatable
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.LayerDrawable
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
-import android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
 import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.text.style.ImageSpan
@@ -63,7 +61,6 @@ class MessageClickedChatAdapter(
     private val showSystemMessageEmotes: Boolean,
     private val chatUrl: String?,
     private val getEmoteBytes: ((String, Pair<Long, Int>) -> ByteArray?)?,
-    private val backgroundColor: Int,
     private val messageTextSize: Float,
     private val emoteSize: Int,
     private val badgeSize: Int,
@@ -121,7 +118,7 @@ class MessageClickedChatAdapter(
         holder.imageBinder.bind({ holder.bind(chatMessage, result.builder) }) { onImageLoaded ->
             ChatAdapterUtils.loadImages(
                 holder.textView, { onImageLoaded() }, result.images, result.imagePaint, result.userName, result.userNameStartIndex,
-                backgroundColor, result.builder, result.translated, emoteSize, badgeSize, emoteQuality, animateGifs, enableOverlayEmotes,
+                result.builder, result.translated, emoteSize, badgeSize, emoteQuality, animateGifs, enableOverlayEmotes,
                 chatMessage, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, false
             )
         }
@@ -148,12 +145,6 @@ class MessageClickedChatAdapter(
                     } else false
                 } == true -> item.setBackgroundResource(R.color.chatMessageMention)
                 else -> item.setBackgroundResource(0)
-            }
-        }
-        (item.text as? Spannable)?.let { view ->
-            view.getSpans<NamePaintImageSpan>().forEach {
-                it.backgroundColor = (item.background as? ColorDrawable)?.color
-                view.setSpan(it, view.getSpanStart(it), view.getSpanEnd(it), SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
     }
@@ -273,12 +264,6 @@ class MessageClickedChatAdapter(
                             messageClickListener?.invoke(chatMessage, selectedMessage)
                             selectedMessage = chatMessage
                             setBackgroundResource(R.color.chatMessageSelected)
-                            (text as? Spannable)?.let { view ->
-                                view.getSpans<NamePaintImageSpan>().forEach {
-                                    it.backgroundColor = (background as? ColorDrawable)?.color
-                                    view.setSpan(it, view.getSpanStart(it), view.getSpanEnd(it), SPAN_EXCLUSIVE_EXCLUSIVE)
-                                }
-                            }
                         }
                     }
                 }

@@ -101,19 +101,54 @@
             app:singleLineTitle="false" />
 
         <SeekBarPreference
-            android:defaultValue="0"
+            android:defaultValue="55"
             android:key="floating_chat_transparency"
             android:max="100"
             android:min="0"
+            android:summary="@string/floating_chat_transparency_summary"
             android:title="@string/floating_chat_transparency"
             app:iconSpaceReserved="false"
             app:showSeekBarValue="true"
             app:singleLineTitle="false" />
 
+        <ListPreference
+            android:defaultValue="m"
+            android:entries="@array/floatingChatTextSizeEntries"
+            android:entryValues="@array/floatingChatTextSizeValues"
+            android:key="floating_chat_text_size"
+            android:title="@string/floating_chat_text_size"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false"
+            app:useSimpleSummaryProvider="true" />
+
         <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="floating_chat_high_visibility"
-            android:title="@string/floating_chat_high_visibility"
+            android:defaultValue="false"
+            android:key="floating_chat_bold_text"
+            android:title="@string/floating_chat_bold_text"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="floating_chat_fade_old"
+            android:summary="@string/floating_chat_fade_old_summary"
+            android:title="@string/floating_chat_fade_old"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="floating_chat_pass_through"
+            android:summary="@string/floating_chat_pass_through_summary"
+            android:title="@string/floating_chat_pass_through"
+            app:iconSpaceReserved="false"
+            app:singleLineTitle="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="floating_chat_reply_bar"
+            android:summary="@string/floating_chat_reply_bar_summary"
+            android:title="@string/floating_chat_reply_bar"
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
 

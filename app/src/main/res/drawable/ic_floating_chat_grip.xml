@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Rounded bottom-left corner bracket; mirrored for a card on the left side. -->
+    <path
+        android:pathData="M8,27V35A5,5 0,0 0,13 40H21"
+        android:strokeWidth="2.2"
+        android:strokeColor="#D9FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

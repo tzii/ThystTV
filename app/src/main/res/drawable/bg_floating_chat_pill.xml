@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A quiet 24 x 3dp handle centred in a 72 x 24dp touch area. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="24dp"
+        android:height="3dp"
+        android:gravity="center">
+        <shape android:shape="rectangle">
+            <corners android:radius="2dp" />
+            <solid android:color="#38FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

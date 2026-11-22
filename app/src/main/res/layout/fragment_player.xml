@@ -123,63 +123,154 @@
         </com.github.andreyasadchy.xtra.ui.view.ChatLayout>
 
     </FrameLayout>
-    <RelativeLayout
-        android:id="@+id/floating_chat_root"
-        android:layout_width="200dp"
-        android:layout_height="300dp"
-        android:visibility="gone"
-        android:elevation="10dp"
-        tools:visibility="visible">
+    <!-- Floating chat: a card over the video plus its tucked tab. The host is
+         full screen but takes no touches itself. -->
+    <com.github.andreyasadchy.xtra.ui.player.FloatingChatHostLayout
+        android:id="@+id/floatingChatHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:elevation="10dp">
 
-        <FrameLayout
-            android:id="@+id/floating_chat_container"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@android:color/transparent"
-            android:layout_above="@+id/drag_handle_zone" />
+        <com.github.andreyasadchy.xtra.ui.player.FloatingChatCardView
+            android:id="@+id/floating_chat_root"
+            android:layout_width="224dp"
+            android:layout_height="240dp"
+            android:layout_gravity="top|left"
+            android:contentDescription="@string/floating_chat"
+            android:visibility="gone"
+            tools:ignore="RtlHardcoded"
+            tools:visibility="visible">
 
+            <FrameLayout
+                android:id="@+id/floating_chat_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <!-- Shown with the player controls: move by dragging, also from a button, plus actions. -->
+            <com.github.andreyasadchy.xtra.ui.player.FloatingChatHeaderLayout
+                android:id="@+id/floatingChatHeader"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_gravity="top"
+                android:alpha="0"
+                android:background="@drawable/bg_floating_chat_header"
+                android:gravity="center_vertical|end"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingEnd="2dp"
+                android:visibility="invisible"
+                tools:alpha="1"
+                tools:visibility="visible">
+
+                <ImageButton
+                    android:id="@+id/floatingChatCompose"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/floating_chat_type"
+                    android:padding="9dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_floating_chat_keyboard"
+                    android:visibility="gone"
+                    app:tint="@android:color/white"
+                    tools:visibility="visible" />
+
+                <ImageButton
+                    android:id="@+id/floatingChatAppearance"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/floating_chat_appearance"
+                    android:padding="9dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_floating_chat_text"
+                    app:tint="@android:color/white" />
+
+                <ImageButton
+                    android:id="@+id/floatingChatTuck"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/floating_chat_tuck"
+                    android:padding="9dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_floating_chat_tuck"
+                    app:tint="@android:color/white" />
+
+                <ImageButton
+                    android:id="@+id/floatingChatClose"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/floating_chat_close"
+                    android:padding="9dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_floating_chat_close"
+                    app:tint="@android:color/white" />
+            </com.github.andreyasadchy.xtra.ui.player.FloatingChatHeaderLayout>
+
+            <!-- Quiet handle while the controls are hidden. -->
+            <View
+                android:id="@+id/floatingChatPill"
+                android:layout_width="72dp"
+                android:layout_height="24dp"
+                android:layout_gravity="top|center_horizontal"
+                android:background="@drawable/bg_floating_chat_pill"
+                android:contentDescription="@string/floating_chat_drag"
+                android:importantForAccessibility="no" />
+
+            <!-- Resize from the corner that faces the video; shown with the controls. -->
+            <ImageView
+                android:id="@+id/floatingChatGrip"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="bottom|left"
+                android:contentDescription="@string/floating_chat_resize"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_floating_chat_grip"
+                android:visibility="invisible"
+                tools:ignore="RtlHardcoded" />
+        </com.github.andreyasadchy.xtra.ui.player.FloatingChatCardView>
+
+        <!-- A tucked chat leaves this tab at the screen edge. -->
         <LinearLayout
-            android:id="@+id/drag_handle_zone"
-            android:layout_width="match_parent"
-            android:layout_height="32dp"
-            android:background="#CC000000"
+            android:id="@+id/floatingChatTab"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_gravity="top|left"
+            android:contentDescription="@string/floating_chat_show"
+            android:focusable="true"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:layout_alignParentBottom="true">
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:visibility="gone"
+            tools:ignore="RtlHardcoded,UseCompoundDrawables">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginStart="8dp"
-                android:src="@drawable/ic_drag_handle"
-                android:contentDescription="@string/floating_chat_drag"
-                app:tint="#FFFFFF" />
-            
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_ms_chat_24"
+                app:tint="@android:color/white" />
 
-            <ImageButton
-                android:id="@+id/highVisibilityToggle"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:background="?android:selectableItemBackgroundBorderless"
-                android:padding="4dp"
-                android:src="@drawable/ic_contrast"
-                android:contentDescription="@string/floating_chat_high_visibility"
-                app:tint="#FFFFFF" />
-
-            <ImageView
-                android:id="@+id/resize_handle_zone"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:padding="4dp"
-                android:src="@drawable/ic_resize_handle"
-                android:contentDescription="@string/floating_chat_resize"
-                app:tint="#FFFFFF" />
+            <TextView
+                android:id="@+id/floatingChatTabCount"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:layout_marginStart="6dp"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="20dp"
+                android:paddingStart="5dp"
+                android:paddingEnd="5dp"
+                android:textSize="11.5sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="12"
+                tools:visibility="visible" />
         </LinearLayout>
-    </RelativeLayout>
+    </com.github.andreyasadchy.xtra.ui.player.FloatingChatHostLayout>
     <!-- Player-owned, but outside the 16:9 PlayerLayout so portrait menus can
          use the space over chat. Above floating chat while a menu is open. -->
     <include
