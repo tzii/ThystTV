@@ -42,6 +42,7 @@ class FloatingChatControllerTest {
     private val holds = mutableListOf<Boolean>()
     private var channel = "c1"
     private var closeRequests = 0
+    private var controls = FloatingChatControls(TOP_BAND.toInt(), BOTTOM_BAND)
 
     @Before fun setup() {
         // DynamicAnimation keeps one frame handler per thread, and Robolectric reuses
@@ -119,6 +120,50 @@ class FloatingChatControllerTest {
         assertEquals(View.INVISIBLE, binding.floatingChatHeader.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatPill.visibility)
         assertEquals(MARGIN, binding.floatingChatRoot.y, 0.5f)
+    }
+
+    @Test fun `with the controls up the card steps aside from the seek button and comes back`() {
+        val hostWidth = binding.floatingChatHost.width.toFloat()
+        // The +10 button: 60dp, 50dp in from the right edge, centred.
+        val buttonLeft = hostWidth - 110f
+        val buttonTop = binding.floatingChatHost.height / 2f - 30f
+        controls = controls.copy(rightButton = FloatingChatBounds(buttonLeft, buttonTop, buttonLeft + 60f, buttonTop + 60f))
+        controller.show(animate = false)
+        idle()
+        assertEquals(rightX(), binding.floatingChatRoot.x, 0.5f)
+
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        assertEquals(buttonLeft - MARGIN - 224f, binding.floatingChatRoot.x, 0.5f)
+        assertEquals(TOP_BAND + MARGIN, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(224, binding.floatingChatRoot.width)
+
+        controller.onControlsVisibilityChanged(false)
+        idle()
+        assertEquals(rightX(), binding.floatingChatRoot.x, 0.5f)
+        assertEquals(MARGIN, binding.floatingChatRoot.y, 0.5f)
+        // Stepping aside is not a move: nothing is stored.
+        assertNull(prefs.getString(FloatingChatLayoutStore.PREF_KEY, null))
+    }
+
+    @Test fun `a gesture slider fades the card back until it goes`() {
+        controller.show(animate = false)
+        idle()
+        controller.setDucked(true)
+        idle()
+        assertEquals(0.25f, binding.floatingChatRoot.alpha, 0.01f)
+        controller.setDucked(false)
+        idle()
+        assertEquals(1f, binding.floatingChatRoot.alpha, 0.01f)
+
+        // Hiding while faded clears it, so the next show is fully visible.
+        controller.setDucked(true)
+        idle()
+        controller.hide(animate = true)
+        idle()
+        controller.show(animate = true)
+        idle()
+        assertEquals(1f, binding.floatingChatRoot.alpha, 0.01f)
     }
 
     @Test fun `pass through only applies while the controls are hidden`() {
@@ -248,7 +293,7 @@ class FloatingChatControllerTest {
             override fun holdControls(hold: Boolean) {
                 holds += hold
             }
-            override fun controlBands() = TOP_BAND.toInt() to BOTTOM_BAND
+            override fun controlBands() = controls
             override fun canCompose() = false
             override fun onAppearanceRequested(trigger: View) = Unit
             override fun onComposeRequested() = Unit

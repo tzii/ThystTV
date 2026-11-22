@@ -68,8 +68,8 @@ internal class FloatingChatController(
         fun channelId(): String?
         /** Keeps the player controls up while the viewer moves or styles the chat. */
         fun holdControls(hold: Boolean)
-        /** Bottom of the controls' top bar and height of their bottom bar, in host pixels. */
-        fun controlBands(): Pair<Int, Int>
+        /** Where the visible controls sit (top and bottom bars, side seek buttons), in host pixels. */
+        fun controlBands(): FloatingChatControls
         fun canCompose(): Boolean
         fun onAppearanceRequested(trigger: View)
         fun onComposeRequested()
@@ -99,8 +99,10 @@ internal class FloatingChatController(
     val isTucked get() = tuckedSide != null
     private var controlsVisible = false
     private var insets = FloatingChatInsets()
-    /** Control bands measured when the controls last showed or laid out; drags reuse them. */
-    private var bands = 0 to 0
+    /** Controls measured when they last showed or laid out; drags reuse them. */
+    private var bands = FloatingChatControls()
+    /** Faded back while a brightness, volume, seek or speed slider shows. */
+    private var ducked = false
     private val location = IntArray(2)
     private var interacting = false
     /** A two-finger pinch owns the card; the drag or resize it cancelled must not end the interaction. */
@@ -151,9 +153,9 @@ internal class FloatingChatController(
             card.alpha = 0f
             card.scaleX = ENTER_SCALE
             card.scaleY = ENTER_SCALE
-            card.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(FADE_MS).setInterpolator(EMPHASIZED).start()
+            card.animate().alpha(restingAlpha()).scaleX(1f).scaleY(1f).setDuration(FADE_MS).setInterpolator(EMPHASIZED).start()
         } else {
-            card.alpha = 1f
+            card.alpha = restingAlpha()
             card.scaleX = 1f
             card.scaleY = 1f
         }
@@ -166,6 +168,7 @@ internal class FloatingChatController(
      */
     fun hide(animate: Boolean, onHidden: (() -> Unit)? = null) {
         pinching = false
+        ducked = false
         if (interacting) {
             interacting = false
             callbacks.holdControls(false)
@@ -213,6 +216,20 @@ internal class FloatingChatController(
         if (!isShown) return
         if (tuckedSide != null) placeTab(slideIn = false) else if (!interacting) settle(KEEP_CLEAR_STIFFNESS, KEEP_CLEAR_DAMPING)
     }
+
+    /**
+     * Fades the card back while a gesture slider (brightness, volume, seek,
+     * speed) is on screen, so a card on that edge never hides the slider, and
+     * brings it back when the slider goes.
+     */
+    fun setDucked(value: Boolean) {
+        if (ducked == value) return
+        ducked = value
+        if (!isShown || exitFade != null) return
+        card.animate().alpha(restingAlpha()).setDuration(if (value) DUCK_IN_MS else FADE_MS).setInterpolator(EMPHASIZED).start()
+    }
+
+    private fun restingAlpha() = if (ducked) DUCKED_ALPHA else 1f
 
     fun setInsets(value: FloatingChatInsets) {
         if (insets == value) return
@@ -332,7 +349,7 @@ internal class FloatingChatController(
 
     private fun currentBounds(): FloatingChatBounds {
         // While typing, the room above the keyboard matters more than the controls.
-        val (top, bottom) = if (controlsVisible && !insets.ime) bands else 0 to 0
+        val (top, bottom) = if (controlsVisible && !insets.ime) bands.top to bands.bottom else 0 to 0
         return FloatingChatPlacement.bounds(
             host.width, host.height, density, insets.left, insets.right,
             max(top, topOverlap()), max(bottom, bottomOverlap()),
@@ -366,7 +383,15 @@ internal class FloatingChatController(
 
     private fun target(): FloatingChatPlaced {
         val (width, height) = clampedSize()
-        return FloatingChatPlacement.place(layout, width, height, restBounds(), currentBounds(), density, keyboard = insets.ime)
+        val current = currentBounds()
+        val placed = FloatingChatPlacement.place(layout, width, height, restBounds(), current, density, keyboard = insets.ime)
+        if (!controlsVisible || insets.ime) return placed
+        // The seek button beside play/pause on the card's side stays reachable.
+        val button = when (layout.side) {
+            FloatingChatSide.LEFT -> bands.leftButton
+            FloatingChatSide.RIGHT -> bands.rightButton
+        }
+        return FloatingChatPlacement.stepAside(placed, layout.side, current, button, density)
     }
 
     private fun placeNow() {
@@ -922,6 +947,9 @@ internal class FloatingChatController(
         /** dp per second the card comes back in with from its tab. */
         const val UNTUCK_VELOCITY = 900f
         const val FADE_MS = 200L
+        /** Quicker than the slider's own entrance, so the slider is never covered. */
+        const val DUCK_IN_MS = 120L
+        const val DUCKED_ALPHA = 0.25f
         const val ENTER_SCALE = 0.96f
         const val MAX_UNREAD = 99
         const val TAB_HEIGHT_DP = 44f

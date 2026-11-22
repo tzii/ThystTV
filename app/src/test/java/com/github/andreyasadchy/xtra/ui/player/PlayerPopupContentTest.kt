@@ -67,6 +67,18 @@ class PlayerPopupContentTest {
         assertSame(root, host.parent)
     }
 
+    @Test fun `open menus draw above the floating chat card`() {
+        // Quality, Speed, More and the chat Aa popover share the popup host; the
+        // floating chat host is elevated, so the popup host needs a higher Z or
+        // the card covers the menus' chips and close buttons.
+        val root = LayoutInflater.from(context).inflate(R.layout.fragment_player, null) as ViewGroup
+        val popups = root.findViewById<View>(R.id.playerPopupHost)
+        val floatingChat = root.findViewById<View>(R.id.floatingChatHost)
+        assertSame(root, floatingChat.parent)
+        assertTrue("floating chat ${floatingChat.z} must stay above the video", floatingChat.z > 0f)
+        assertTrue("menus ${popups.z} must draw above floating chat ${floatingChat.z}", popups.z > floatingChat.z)
+    }
+
     @Test fun `quality toolbar keeps one accessible gear through portrait wide portrait layouts`() {
         for (fontScale in listOf(1f, 2f)) {
             val scaled = ContextThemeWrapper(context.createConfigurationContext(

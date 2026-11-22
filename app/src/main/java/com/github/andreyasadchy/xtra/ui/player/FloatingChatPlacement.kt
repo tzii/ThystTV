@@ -38,6 +38,18 @@ internal data class FloatingChatPlaced(val x: Float, val y: Float, val width: In
 /** Result of releasing a dragged card. */
 internal data class FloatingChatRelease(val layout: FloatingChatLayout, val tuckedSide: FloatingChatSide?)
 
+/** Where the visible player controls sit, in host pixels; the card keeps clear of them. */
+internal data class FloatingChatControls(
+    /** Bottom of the top bar. */
+    val top: Int = 0,
+    /** Height of the bottom bar, measured up from the host's bottom edge. */
+    val bottom: Int = 0,
+    /** The seek button beside play/pause on the left half of the screen, if it shows. */
+    val leftButton: FloatingChatBounds? = null,
+    /** The seek button beside play/pause on the right half of the screen, if it shows. */
+    val rightButton: FloatingChatBounds? = null,
+)
+
 internal object FloatingChatPlacement {
     const val MARGIN_DP = 12f
     const val MAGNET_DP = 30f
@@ -128,6 +140,43 @@ internal object FloatingChatPlacement {
             }
         }
         return FloatingChatPlaced(x, y, width, height)
+    }
+
+    /**
+     * While the controls show, a card resting over the seek button on its own
+     * side ([button]) steps inward past it, so the button stays reachable. A
+     * card above or below the button stays at its edge. A card wider than the
+     * room left gives up width, but never below the minimum card; a window
+     * that narrow keeps the card where it was.
+     */
+    fun stepAside(
+        placed: FloatingChatPlaced,
+        side: FloatingChatSide,
+        bounds: FloatingChatBounds,
+        button: FloatingChatBounds?,
+        density: Float,
+    ): FloatingChatPlaced {
+        if (button == null) return placed
+        if (placed.y >= button.bottom || placed.y + placed.height <= button.top) return placed
+        val gap = MARGIN_DP * density
+        val minWidth = min(placed.width.toFloat(), MIN_WIDTH_DP * density)
+        return when (side) {
+            FloatingChatSide.LEFT -> {
+                val x = button.right + gap
+                if (placed.x >= x) return placed
+                val room = bounds.right - x
+                if (room < minWidth) return placed
+                placed.copy(x = x, width = min(placed.width.toFloat(), room).toInt())
+            }
+            FloatingChatSide.RIGHT -> {
+                val right = button.left - gap
+                if (placed.x + placed.width <= right) return placed
+                val room = right - bounds.left
+                if (room < minWidth) return placed
+                val width = min(placed.width.toFloat(), room).toInt()
+                placed.copy(x = right - width, width = width)
+            }
+        }
     }
 
     /** Off-screen x for a card tucked against [side]. */

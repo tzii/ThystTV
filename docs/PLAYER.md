@@ -102,6 +102,9 @@ and uses the normal default factory. This also covers local playback with Cast o
   as before.
 - Quality, Speed, Stream volume, and More share one player-owned popup host; only one
   can be attached at a time, and teardown/minimize/PiP must remove it with the player view.
+  The host's root carries `elevation="24dp"` so open menus draw above the floating chat
+  host (10dp). `<include>` ignores `android:elevation`, so it must stay on the included
+  root (`PlayerPopupContentTest` checks the order).
 
 ## Mini-player geometry
 
@@ -254,9 +257,15 @@ stay. `FloatingChatController` owns how the card looks and moves. Keep these:
   inside bounds that keep clear of cutouts (also while the video draws behind
   one), the status and navigation bars or keyboard and, while the controls show
   and the keyboard is down, the controls' top and bottom rows
-  (`floatingChatControlBands`). A short screen drops the card's oldest (top)
-  lines first; above the keyboard the card may go below its usual minimum
-  height, and a window narrower than the card narrows it. The card's
+  (`floatingChatControlBands`). With the controls up, a card that would cover
+  the ±10 seek button on its side steps inward past it and returns when they
+  hide (`FloatingChatPlacement.stepAside`; a card above or below the button stays
+  put, and a window too narrow for the minimum card keeps it where it was).
+  While a brightness, volume, seek or speed slider shows, the card fades to 25%
+  (`setDucked`): the arbiter claim starts it, and the feedback's hide runnable,
+  or the touch's end when no slider showed, brings it back. A short screen drops
+  the card's oldest (top) lines first; above the keyboard the card may go below
+  its usual minimum height, and a window narrower than the card narrows it. The card's
   `layout_gravity` is `top|left`, because `x` must mean the same in RTL.
 - A release projects the fling 0.15 s ahead, snaps to the nearer side, pulls to
   the top or bottom within 30dp, and tucks on a fast outward sideways fling
