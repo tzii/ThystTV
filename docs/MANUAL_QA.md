@@ -41,7 +41,11 @@ checked on a device yet.
   player and chat strings read naturally and none are cut off at 100% and 200% font size.
 - [ ] On a live stream with a recording, Rewind live stream → Watch from beginning: playback
   starts at 0:00 of the recording, not near its end. Watch last 3 minutes still starts
-  about three minutes before the edge.
+  about three minutes before the edge. With Settings → Player → "Save positions of watched videos" off,
+  background the app during that playback, simulate process death
+  (`adb shell am kill <package>`) and return to it: it resumes at the start, not the edge.
+- [ ] On a live stream with no recording and the local rewind buffer on (and enough free
+  storage), Watch from beginning starts at the oldest saved moment, not near live.
 - [ ] Player ⋮ → Display mode: the dialog's button reads Cancel and closes it unchanged.
 - [ ] VoD with the controls hidden: throttle or drop the network until it rebuffers and
   resumes; the controls stay hidden (the floating chat card stays put). Pause, the end of
