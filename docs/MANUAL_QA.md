@@ -39,6 +39,14 @@ checked on a device yet.
   shows without a clipped caption; a normal window still shows the caption.
 - [ ] German UI (Settings → Language → Deutsch): main tabs, sort/period dialog, downloads,
   player and chat strings read naturally and none are cut off at 100% and 200% font size.
+- [ ] On a live stream with a recording, Rewind live stream → Watch from beginning: playback
+  starts at 0:00 of the recording, not near its end. Watch last 3 minutes still starts
+  about three minutes before the edge.
+- [ ] Player ⋮ → Display mode: the dialog's button reads Cancel and closes it unchanged.
+- [ ] VoD with the controls hidden: throttle or drop the network until it rebuffers and
+  resumes; the controls stay hidden (the floating chat card stays put). Pause, the end of
+  the VoD and a playback error still bring the controls up. A tap during a stall still
+  shows them and they hide again after 3 s.
 - [ ] Regression pass: live/VoD playback, stream switching, minimize/restore, close/reopen,
   PiP/background, speed/quality, gestures and floating chat.
 
