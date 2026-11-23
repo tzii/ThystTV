@@ -51,6 +51,13 @@ class LiveRewindTest {
         assertEquals(0L, LiveRewind.targetPosition(600_000L, Long.MAX_VALUE))
     }
 
+    @Test fun `start position is never zero, which Media3 replaces with a live recording's edge`() {
+        assertEquals(1L, LiveRewind.startPosition(LiveRewind.targetPosition(600_000L, null)))
+        assertEquals(1L, LiveRewind.startPosition(LiveRewind.targetPosition(120_000L, 180_000L)))
+        assertEquals(1L, LiveRewind.startPosition(-5L))
+        assertEquals(570_000L, LiveRewind.startPosition(LiveRewind.targetPosition(609_999L, 30_000L)))
+    }
+
     @Test fun `preflight rejects permission failures empty playlists and non HLS documents`() {
         val master = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nhttps://example.test/video.m3u8"
         assertTrue(LiveRewind.isPlayablePlaylist(master, null))

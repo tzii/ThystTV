@@ -3828,7 +3828,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 requireArguments().remove(LiveRewind.PLAYLIST)
                 requireArguments().putBoolean(KEY_IGNORE_SAVED_POSITION, false)
                 requireArguments().putLong(KEY_OFFSET, -1L)
-                viewModel.playbackPosition = requireArguments().getLong(LiveRewind.POSITION)
+                viewModel.playbackPosition = LiveRewind.startPosition(requireArguments().getLong(LiveRewind.POSITION))
                 try {
                     startVideo(preparedUrl, viewModel.playbackPosition, true)
                 } catch (error: CancellationException) {
