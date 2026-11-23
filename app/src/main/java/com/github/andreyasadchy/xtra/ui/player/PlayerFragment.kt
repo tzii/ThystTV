@@ -2646,16 +2646,30 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         val insets = popupSurfaceInsets()
         val isRtl = surface.layoutDirection == View.LAYOUT_DIRECTION_RTL
         val anchor = popupAnchorRect ?: popupTriggerRect(trigger)?.also { popupAnchorRect = it }
+        val card = if (activePlayerPopup == PlayerPopupType.FLOATING_CHAT) floatingChatCardRect() else null
         // Measure the card at the final width, never the constrained viewport.
-        fun place(height: Int) = PlayerPopupPolicy.place(
-            surfaceWidthPx = surface.width,
-            surfaceHeightPx = surface.height,
-            measuredPanelHeightPx = height,
-            density = resources.displayMetrics.density,
-            insets = insets,
-            trigger = anchor,
-            isRtl = isRtl,
-        )
+        fun place(height: Int) = if (card != null) {
+            PlayerPopupPolicy.placeBeside(
+                surfaceWidthPx = surface.width,
+                surfaceHeightPx = surface.height,
+                measuredPanelHeightPx = height,
+                density = resources.displayMetrics.density,
+                card = card,
+                insets = insets,
+                trigger = anchor,
+                isRtl = isRtl,
+            )
+        } else {
+            PlayerPopupPolicy.place(
+                surfaceWidthPx = surface.width,
+                surfaceHeightPx = surface.height,
+                measuredPanelHeightPx = height,
+                density = resources.displayMetrics.density,
+                insets = insets,
+                trigger = anchor,
+                isRtl = isRtl,
+            )
+        }
         val content = container.getChildAt(0)
         content.measure(
             View.MeasureSpec.makeMeasureSpec(place(0).width, View.MeasureSpec.EXACTLY),
@@ -2704,6 +2718,23 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         params.topMargin = topMargin
         params.gravity = Gravity.TOP or Gravity.START
         container.layoutParams = params
+    }
+
+    /** Where the floating chat card rests, in popup-surface pixels, so its Aa popover can sit beside it. */
+    private fun floatingChatCardRect(): PlayerPopupPolicy.Rect? {
+        val bounds = floatingChat?.restingBounds() ?: return null
+        val surfaceLocation = IntArray(2)
+        val hostLocation = IntArray(2)
+        binding.playerPopupHost.root.getLocationInWindow(surfaceLocation)
+        binding.floatingChatHost.getLocationInWindow(hostLocation)
+        val dx = hostLocation[0] - surfaceLocation[0]
+        val dy = hostLocation[1] - surfaceLocation[1]
+        return PlayerPopupPolicy.Rect(
+            bounds.left.roundToInt() + dx,
+            bounds.top.roundToInt() + dy,
+            bounds.right.roundToInt() + dx,
+            bounds.bottom.roundToInt() + dy,
+        )
     }
 
     private fun popupTriggerRect(trigger: View): PlayerPopupPolicy.Rect? {
@@ -4694,6 +4725,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             host = binding.floatingChatHost,
             card = binding.floatingChatRoot,
             header = binding.floatingChatHeader,
+            content = binding.floatingChatContainer,
             pill = binding.floatingChatPill,
             grip = binding.floatingChatGrip,
             tab = binding.floatingChatTab,

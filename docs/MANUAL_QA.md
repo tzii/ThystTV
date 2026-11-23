@@ -956,12 +956,16 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Controls shown: the header (Aa, tuck, close) and the corner grip appear;
   the card moves below the top controls and above the seek bar, and returns when
   the controls hide. The controls stay up while dragging, resizing or pinching.
+  No chat line shows under the header's buttons; the newest lines do not jump
+  when the header comes or goes.
 - [ ] On a VoD with the card on the right, show the controls: the card also moves
   left of the +10 button, which can be tapped, and slides back when the controls
   hide. Same with −10 on the left. A small card at the top, above the buttons,
   stays at its edge.
 - [ ] With the card open, open Quality, Speed, More and Aa: each menu draws above
-  the card, and every chip and the close button can be tapped.
+  the card, and every chip and the close button can be tapped. In landscape Aa
+  opens beside the card, on the video side, so each change shows on the card;
+  with the card on the left it opens to its right.
 - [ ] Brightness swipe with the card on the left, volume swipe with it on the
   right, then seek and speed swipes: the card fades back while the slider shows
   and returns as the slider fades. A tap or a chat swipe does not fade it.
