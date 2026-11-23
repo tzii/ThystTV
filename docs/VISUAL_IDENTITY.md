@@ -65,6 +65,8 @@ Avoid:
 - Updater/changelog content needs rendered Markdown, not raw Markdown text.
 - Stats range controls must avoid clipped text and stray divider lines.
 - Floating chat is a video overlay, so it should prioritize readability over matching the light app surface.
+- The floating chat card may sit on letterbox bars in Fit, which is intended. For README/site captures, switch the player to Fill so the card sits over the picture, then restore the viewer's display mode.
+- Pick footage without streamer faces (animal cams work), and turn off third-party emotes for the capture if they show faces.
 
 ## README/Site Rules
 

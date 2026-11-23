@@ -84,7 +84,7 @@ If more code-style rules are needed later, add `docs/CONVENTIONS.md` in a separa
 ### Visual And Repo Presentation
 
 - README: `README.md`
-- Current screenshots and recording: `docs/images/features-1.6/` (capture provenance in its README).
+- Current player and floating-chat media: `docs/images/features-1.7/`; 1.6 screens and recording: `docs/images/features-1.6/` (capture provenance in each README).
 - Earlier control/Stats previews: `docs/images/review-1.3/`; legacy footage: `docs/images/readme/`
 - Icon / branding assets: inspect `docs/images/` and launcher resources under `app/src/main/res/`
 - Website/docs site: inspect `docs/index.html` before editing

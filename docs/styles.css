@@ -358,3 +358,8 @@ html[data-motion="paused"] *, html[data-motion="paused"] *::before, html[data-mo
   .release-wide { grid-column: 1 / -1; }
   .release-feature { padding-top: 48px; }
 }
+/* Landscape player captures: two per row, one per row on phones. */
+.release-gallery.landscape { grid-template-columns: 1fr 1fr; }
+@media (max-width: 560px) {
+  .release-gallery.landscape { grid-template-columns: 1fr; }
+}

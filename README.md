@@ -37,7 +37,20 @@ The **1.7.0 update** redesigns player gesture feedback with Material 3 Expressiv
 
 ## Screenshots
 
-Current 1.6 app captures on an Android 16 emulator. [Capture details and full-size media](docs/images/features-1.6/README.md).
+Native captures on an Android 16 emulator: the player from a 1.7.1 test build ([capture details](docs/images/features-1.7/README.md)) and 1.6 screens ([capture details](docs/images/features-1.6/README.md)).
+
+<table>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <strong>Seek slider</strong><br><br>
+      <img src="docs/images/features-1.7/gesture-seek.webp" alt="VoD seek slider with the change, target time and video length, while floating chat fades back" width="420">
+    </td>
+    <td width="50%" align="center" valign="top">
+      <strong>Brightness at the edge</strong><br><br>
+      <img src="docs/images/features-1.7/gesture-brightness.webp" alt="Brightness slider at the left edge while floating chat fades back on the right" width="420">
+    </td>
+  </tr>
+</table>
 
 <table>
   <tr>
@@ -61,16 +74,31 @@ Current 1.6 app captures on an Android 16 emulator. [Capture details and full-si
 
 ## Floating chat
 
-Floating chat keeps chat on screen during full-screen playback, so the video doesn't have to shrink into a split layout. The demo below is from a version before 1.3.
+Floating chat keeps chat on screen during full-screen playback, so the video doesn't have to shrink into a split layout. In 1.7.1 it is a rounded card: throw it to either side, drag it up or down, resize it, or tuck it into an edge tab that counts new messages. Each channel remembers its spot. Pick Clear, Shade or Solid from **Aa**; menus open above the card, it steps aside from the seek buttons and fades back during gesture sliders.
 
 <p align="center">
-  <img src="docs/images/readme/floating-chat.png" alt="Full-screen playback with floating chat overlay" width="760">
+  <a href="docs/images/features-1.7/floating-chat.mp4"><img src="docs/cropped/watch-player.webp" alt="Full-screen playback with the floating chat card on the right of the picture" width="760"></a>
 </p>
 
-https://github.com/user-attachments/assets/99d97579-3340-4200-8aa7-3cae0414560e
+<table>
+  <tr>
+    <td width="33%" align="center" valign="top">
+      <strong>Clear</strong><br><br>
+      <img src="docs/images/features-1.7/floating-chat-clear.webp" alt="Floating chat with the Clear background: text only over the video" width="280">
+    </td>
+    <td width="33%" align="center" valign="top">
+      <strong>Aa</strong><br><br>
+      <img src="docs/images/features-1.7/floating-chat-appearance.webp" alt="Chat appearance popover above the floating chat card" width="280">
+    </td>
+    <td width="33%" align="center" valign="top">
+      <strong>Solid</strong><br><br>
+      <img src="docs/images/features-1.7/floating-chat-solid.webp" alt="Floating chat with the Solid background" width="280">
+    </td>
+  </tr>
+</table>
 
 <p align="center">
-  <a href="docs/images/readme/floating-chat.mp4">Download the floating chat demo video</a>
+  <a href="docs/images/features-1.7/floating-chat.mp4">Watch the floating chat demo (MP4, silent)</a> · <a href="docs/images/features-1.7/README.md">Capture details</a>
 </p>
 
 ## What ThystTV adds
@@ -94,7 +122,7 @@ https://github.com/user-attachments/assets/99d97579-3340-4200-8aa7-3cae0414560e
 
 ### Chat and notifications
 
-- Move and resize floating chat over full-screen video; third-party emotes and chat replay remain available.
+- Floating chat over full-screen video in Clear, Shade or Solid: move, resize or tuck it to the edge, with a spot remembered per channel; third-party emotes and chat replay remain available.
 - Redeem custom Channel Points rewards after an explicit confirmation.
 - Live notifications respect per-channel settings and avoid repeat alerts.
 - Poll and prediction timers account for time spent asleep, and event cards survive chat screen rebuilds.
