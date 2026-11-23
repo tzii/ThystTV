@@ -281,7 +281,13 @@ stay. `FloatingChatController` owns how the card looks and moves. Keep these:
   `holdControls` stops the controls from auto-hiding.
   `FloatingChatHeaderLayout` takes over a touch that moves past the touch slop,
   so a drag that starts on a header button moves the card; a tap still presses
-  it. The grip hides while the message box is open.
+  it. The grip hides while the message box is open. While the header shows, the
+  chat container is padded by its height, so its buttons never sit on a chat
+  line; the padding goes once the header has faded out.
+- The Aa popover sits beside the card's resting (stepped-aside) bounds, on the
+  video side first and level with its top (`PlayerPopupPolicy.placeBeside`), so
+  the card stays in view while it is styled. Where the panel fits on neither
+  side, as in portrait, it anchors to the Aa button like the other menus.
 - `FloatingChatAppearance` maps the existing opacity preference: under 20 is
   Clear (no surface; `ChatMessageTextView` draws a halo around the text), under 80
   Shade, otherwise Solid. Aa writes 0, 55 or 92; untouched installs read 55.

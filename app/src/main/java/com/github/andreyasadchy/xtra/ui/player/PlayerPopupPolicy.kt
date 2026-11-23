@@ -127,5 +127,52 @@ object PlayerPopupPolicy {
         return Placement(left = left, top = top, width = width, maxHeight = maxHeight)
     }
 
+    /**
+     * The floating chat's Aa popover goes beside the card it styles, so the
+     * viewer sees each change land instead of covering the card with the
+     * panel. The video side of the card comes first, the panel's top level
+     * with the card's. Where the panel fits on neither side (a phone in
+     * portrait), it falls back to [place] around the trigger.
+     */
+    fun placeBeside(
+        surfaceWidthPx: Int,
+        surfaceHeightPx: Int,
+        measuredPanelHeightPx: Int,
+        density: Float,
+        card: Rect,
+        insets: Insets = Insets(),
+        trigger: Rect? = null,
+        isRtl: Boolean = false,
+    ): Placement {
+        val fallback = place(surfaceWidthPx, surfaceHeightPx, measuredPanelHeightPx, density, insets, trigger, isRtl)
+        if (!card.isValid || fallback.width <= 0) return fallback
+        val availableWidth = (surfaceWidthPx - insets.left - insets.right).coerceAtLeast(0)
+        val large = density > 0f &&
+            PlayerSurfacePolicy.classify(availableWidth, density) == PlayerSurfaceClass.LARGE
+        val edge = dp(if (large) LARGE_EDGE_INSET_DP else COMPACT_EDGE_INSET_DP, density)
+        val gap = dp(TRIGGER_GAP_DP, density)
+        val safeLeft = insets.left + edge
+        val safeTop = insets.top + edge
+        val safeRight = (surfaceWidthPx - insets.right - edge).coerceAtLeast(safeLeft)
+        val safeBottom = (surfaceHeightPx - insets.bottom - edge).coerceAtLeast(safeTop)
+        val width = fallback.width
+        val height = measuredPanelHeightPx.coerceIn(0, fallback.maxHeight)
+
+        val leftOfCard = card.left - gap - width
+        val rightOfCard = card.right + gap
+        val fitsLeft = leftOfCard >= safeLeft
+        val fitsRight = rightOfCard + width <= safeRight
+        val videoOnLeft = card.centerX > safeLeft + (safeRight - safeLeft) / 2
+        val left = when {
+            videoOnLeft && fitsLeft -> leftOfCard
+            !videoOnLeft && fitsRight -> rightOfCard
+            fitsLeft -> leftOfCard
+            fitsRight -> rightOfCard
+            else -> return fallback
+        }
+        val top = card.top.coerceIn(safeTop, (safeBottom - height).coerceAtLeast(safeTop))
+        return Placement(left = left, top = top, width = width, maxHeight = fallback.maxHeight)
+    }
+
     private fun dp(value: Int, density: Float): Int = (value * density).toInt()
 }

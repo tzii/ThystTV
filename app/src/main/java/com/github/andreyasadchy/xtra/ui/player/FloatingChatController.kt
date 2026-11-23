@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.view.MotionEvent
 import android.view.VelocityTracker
@@ -18,6 +19,7 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
@@ -53,6 +55,8 @@ internal class FloatingChatController(
     private val host: FloatingChatHostLayout,
     private val card: FloatingChatCardView,
     private val header: FloatingChatHeaderLayout,
+    /** Holds the chat; it starts below the header while the header shows. */
+    private val content: View,
     private val pill: View,
     private val grip: View,
     private val tab: View,
@@ -394,6 +398,17 @@ internal class FloatingChatController(
         return FloatingChatPlacement.stepAside(placed, layout.side, current, button, density)
     }
 
+    /**
+     * Where the card rests now, stepped aside while the controls show, in host
+     * pixels; null while it is off screen or tucked. A spring may still be on
+     * its way there.
+     */
+    fun restingBounds(): RectF? {
+        if (!isShown || tuckedSide != null || host.width == 0 || host.height == 0) return null
+        val placed = target()
+        return RectF(placed.x, placed.y, placed.x + placed.width, placed.y + placed.height)
+    }
+
     private fun placeNow() {
         if (host.width == 0 || host.height == 0) return
         springX.cancel()
@@ -460,15 +475,22 @@ internal class FloatingChatController(
         header.animate().cancel()
         if (showHeader) {
             header.visibility = View.VISIBLE
+            // The newest lines stay put; the oldest one leaves the header's room.
+            content.updatePadding(top = header.layoutParams.height)
             if (animate) header.animate().alpha(1f).setDuration(FADE_MS).start() else header.alpha = 1f
         } else if (animate && header.isVisible) {
             // INVISIBLE afterwards: an invisible header must not catch touches.
+            // The chat takes the room back once the header has faded.
             header.animate().alpha(0f).setDuration(FADE_MS).withEndAction {
-                if (!controlsVisible) header.visibility = View.INVISIBLE
+                if (!controlsVisible) {
+                    header.visibility = View.INVISIBLE
+                    content.updatePadding(top = 0)
+                }
             }.start()
         } else {
             header.alpha = 0f
             header.visibility = View.INVISIBLE
+            content.updatePadding(top = 0)
         }
         val passThrough = appearance.passThrough && !controlsVisible
         card.passThrough = passThrough

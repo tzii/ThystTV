@@ -113,6 +113,8 @@ class FloatingChatControllerTest {
         assertEquals(View.INVISIBLE, binding.floatingChatPill.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
         assertEquals(TOP_BAND + MARGIN, binding.floatingChatRoot.y, 0.5f)
+        // The header's buttons never sit on a chat line.
+        assertEquals(48, binding.floatingChatContainer.paddingTop)
 
         controller.onControlsVisibilityChanged(false)
         idle()
@@ -120,6 +122,23 @@ class FloatingChatControllerTest {
         assertEquals(View.INVISIBLE, binding.floatingChatHeader.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatPill.visibility)
         assertEquals(MARGIN, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(0, binding.floatingChatContainer.paddingTop)
+    }
+
+    @Test fun `resting bounds report the stepped aside card and nothing while tucked`() {
+        assertNull(controller.restingBounds())
+        controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
+        val bounds = controller.restingBounds()!!
+        idle()
+        assertEquals(binding.floatingChatRoot.x, bounds.left, 0.5f)
+        assertEquals(binding.floatingChatRoot.y, bounds.top, 0.5f)
+        assertEquals(binding.floatingChatRoot.width.toFloat(), bounds.width(), 0.5f)
+        assertEquals(binding.floatingChatRoot.height.toFloat(), bounds.height(), 0.5f)
+
+        binding.floatingChatTuck.performClick()
+        idle()
+        assertNull(controller.restingBounds())
     }
 
     @Test fun `with the controls up the card steps aside from the seek button and comes back`() {
@@ -279,6 +298,7 @@ class FloatingChatControllerTest {
         host = binding.floatingChatHost,
         card = binding.floatingChatRoot,
         header = binding.floatingChatHeader,
+        content = binding.floatingChatContainer,
         pill = binding.floatingChatPill,
         grip = binding.floatingChatGrip,
         tab = binding.floatingChatTab,

@@ -169,4 +169,43 @@ class PlayerPopupPolicyTest {
         assertEquals(72, placement.top)
         assertEquals(468, placement.left + placement.width)
     }
+
+    // Phone landscape at 1x: 914 wide is a large surface (24 edge, 384 panel).
+    private fun beside(card: PlayerPopupPolicy.Rect, width: Int = 914, height: Int = 411, panel: Int = 300) =
+        PlayerPopupPolicy.placeBeside(width, height, panel, 1f, card = card, trigger = PlayerPopupPolicy.Rect(card.right - 96, card.top, card.right - 56, card.top + 40))
+
+    @Test
+    fun `floating chat popover sits on the video side of a right card`() {
+        val placement = beside(PlayerPopupPolicy.Rect(650, 40, 874, 280))
+        assertEquals(650 - 8 - 384, placement.left)
+        assertEquals(40, placement.top)
+        assertEquals(384, placement.width)
+    }
+
+    @Test
+    fun `floating chat popover sits on the video side of a left card`() {
+        val placement = beside(PlayerPopupPolicy.Rect(40, 40, 264, 280))
+        assertEquals(264 + 8, placement.left)
+        assertEquals(40, placement.top)
+    }
+
+    @Test
+    fun `floating chat popover beside a low card stays inside the surface`() {
+        val placement = beside(PlayerPopupPolicy.Rect(650, 150, 874, 390))
+        assertEquals(411 - 24 - 300, placement.top)
+    }
+
+    @Test
+    fun `floating chat popover falls back to the trigger where neither side fits`() {
+        val card = PlayerPopupPolicy.Rect(171, 220, 395, 460)
+        val trigger = PlayerPopupPolicy.Rect(299, 220, 339, 260)
+        assertEquals(
+            PlayerPopupPolicy.place(411, 800, 300, 1f, trigger = trigger),
+            PlayerPopupPolicy.placeBeside(411, 800, 300, 1f, card = card, trigger = trigger),
+        )
+        assertEquals(
+            PlayerPopupPolicy.place(914, 411, 300, 1f, trigger = trigger),
+            PlayerPopupPolicy.placeBeside(914, 411, 300, 1f, card = PlayerPopupPolicy.Rect(0, 0, 0, 0), trigger = trigger),
+        )
+    }
 }
