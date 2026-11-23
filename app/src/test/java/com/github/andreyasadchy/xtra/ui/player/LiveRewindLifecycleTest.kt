@@ -54,6 +54,8 @@ class LiveRewindLifecycleTest {
             if (failSynchronously) throw IOException("fixture source failure")
         }
         fun begin() = startPlayer()
+        /** The ordinary VoD start a restart takes; the preview path hands its position straight to the player. */
+        fun play(position: Long?) = playVideo(skipAccessToken = true, playbackPosition = position)
         fun ready() = markLiveRewindReady()
         fun fail() = handleLiveRewindFailure()
     }
@@ -173,6 +175,30 @@ class LiveRewindLifecycleTest {
         f.vm.started = true
         assertFalse(f.vm.liveRewindPending)
         assertFalse(f.fragment.fail())
+        f.owner.lifecycle.currentState = Lifecycle.State.DESTROYED
+    }
+
+    private val previewUrl = "https://example.test/abc_channel_1_2/storyboards/123-strip-0.jpg"
+
+    @Test fun `a restarted rewind with no saved position still avoids Media3's live edge`() = runTest {
+        val f = Fixture()
+        // After process death or a lost source, the handoff is consumed and the VoD path passes 0.
+        f.arguments.remove(LiveRewind.PLAYLIST)
+        f.arguments.putString("videoAnimatedPreview", previewUrl)
+        f.fragment.play(0L)
+        assertEquals(LiveRewind.MIN_START_POSITION_MS, f.fragment.requestedPosition)
+        f.fragment.play(250_000L)
+        assertEquals(250_000L, f.fragment.requestedPosition)
+        f.owner.lifecycle.currentState = Lifecycle.State.DESTROYED
+    }
+
+    @Test fun `an ordinary VoD still starts at 0`() = runTest {
+        val f = Fixture()
+        f.arguments.remove(LiveRewind.PLAYLIST)
+        f.arguments.remove(LiveRewind.ORIGIN)
+        f.arguments.putString("videoAnimatedPreview", previewUrl)
+        f.fragment.play(0L)
+        assertEquals(0L, f.fragment.requestedPosition)
         f.owner.lifecycle.currentState = Lifecycle.State.DESTROYED
     }
 

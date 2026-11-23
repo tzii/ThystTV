@@ -712,7 +712,10 @@ A rewind never starts at exactly 0 ms (`LiveRewind.startPosition`). The recordin
 broadcast that is still going and the local buffer are growing EVENT playlists, which Media3
 plays as live, and its `MaskingMediaSource` replaces a start position of 0 with the live
 window's default position, the live edge. Before 1.7.1, "Watch from beginning" (and a preset
-longer than the recording) therefore started about 30 seconds before the end.
+longer than the recording) therefore started about 30 seconds before the end. The clamp is
+applied twice: on the handoff in `startPlayer()`, and in `playVideo()` for a rewind restarted
+after process death or a lost source, which no longer has its handoff and may resume at 0.
+Ordinary VoDs are not clamped.
 
 ## Local rewind buffer
 
