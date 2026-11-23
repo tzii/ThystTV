@@ -608,6 +608,12 @@ seeking within the live source cannot serve them, and larger Media3 buffers do n
 change that. With neither a recording nor saved video, the player stays live and shows the
 unavailable message.
 
+A rewind never starts at exactly 0 ms (`LiveRewind.startPosition`). The recording of a
+broadcast that is still going and the local buffer are growing EVENT playlists, which Media3
+plays as live, and its `MaskingMediaSource` replaces a start position of 0 with the live
+window's default position, the live edge. Before 1.7.1, "Watch from beginning" (and a preset
+longer than the recording) therefore started about 30 seconds before the end.
+
 ## Local rewind buffer
 
 Off by default (`C.PLAYER_LIVE_DVR`, `C.PLAYER_LIVE_DVR_SIZE`), and wired only to the
