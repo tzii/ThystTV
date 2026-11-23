@@ -1462,6 +1462,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                                 slidingLayout.translationY += translationY
                                                 lastY = y - translationY
                                             }
+                                            // Floating chat moves down with the video and fades toward the minimize point.
+                                            if (isFloatingChatEnabled) {
+                                                val minimizeThreshold = (slidingLayout.height / 5).coerceAtLeast(1)
+                                                floatingChat?.followPlayer(slidingLayout.translationY, slidingLayout.translationY / minimizeThreshold)
+                                            }
                                             if (slidingLayout.translationY < touchSlop) {
                                                 if (!backgroundVisible) {
                                                     enableBackground()
@@ -1555,6 +1560,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 resetPinchTracking()
                                 upAction(event)
                             }
+                            // Floating chat that followed a swipe down goes back up with
+                            // the video; after a minimize it is already riding along.
+                            floatingChat?.returnWithPlayer(250L)
                             // A slider brings floating chat back as it fades out
                             // (hideGestureRunnable); a swipe that showed none does it here.
                             if (playerLayout.findViewById<View>(R.id.gestureFeedback)?.isVisible != true) {
@@ -4126,8 +4134,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             // Restore original brightness when minimizing
             restoreBrightness()
             hidePlayerPopup(restoreFocus = false, animate = false)
-            // Floating chat only appears over the full-screen player.
-            if (isFloatingChatEnabled) floatingChat?.hide(animate = true)
+            // Floating chat only appears over the full-screen player. It holds
+            // still here, before the controls and status bar change, and then
+            // rides into the mini-player with the video.
+            val chatRides = isFloatingChatEnabled && floatingChat?.holdForPlayer() == true
             if (videoType == STREAM && chatFragment?.emoteMenuIsVisible() == true) {
                 chatFragment?.toggleBackPressedCallback(false)
             }
@@ -4148,9 +4158,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 val playerWidth = playerLayout.width
                 val newX = slidingLayout.width - (insets?.right ?: 0) - (playerWidth * minimizedScaleX) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20F, resources.displayMetrics) * minimizedScaleX)
                 val newY = slidingLayout.height - navBarHeight - (playerLayout.height * minimizedScaleY) - (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 30F, resources.displayMetrics) * minimizedScaleY)
+                val minimizedPose = FloatingChatHostPose(
+                    translationX = 0f - scaledXDiff - (playerLayout.left * minimizedScaleX) + newX,
+                    translationY = 0f - scaledYDiff - (playerLayout.top * minimizedScaleY) + newY,
+                    scaleX = minimizedScaleX,
+                    scaleY = minimizedScaleY,
+                )
+                if (chatRides) floatingChat?.hideWithPlayer(minimizedPose, 250L)
                 slidingLayout.animate().apply {
-                    translationX(0f - scaledXDiff - (playerLayout.left * minimizedScaleX) + newX)
-                    translationY(0f - scaledYDiff - (playerLayout.top * minimizedScaleY) + newY)
+                    translationX(minimizedPose.translationX)
+                    translationY(minimizedPose.translationY)
                     scaleX(minimizedScaleX)
                     scaleY(minimizedScaleY)
                     setDuration(250L)
@@ -4222,7 +4239,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 // Show floating chat again if it was enabled
                 if (isFloatingChatEnabled) {
                     // Already showing (a repeated maximize) keeps its place instead of fading in again.
-                    if (floatingChat?.isShown == false) floatingChat?.show(animate = true)
+                    // Otherwise it grows out of the video, from where the player is now.
+                    if (floatingChat?.isShown == false) {
+                        floatingChat?.showWithPlayer(FloatingChatHostPose.of(slidingLayout), 250L)
+                    }
                     chatLayout.visibility = View.GONE
                     playerLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                         marginEnd = 0
@@ -4598,8 +4618,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     companion object {
-        private const val FLOATING_CHAT_TOP_BAND_DP = 56f
-        private const val FLOATING_CHAT_BOTTOM_BAND_DP = 96f
         /** Swipes whose slider floating chat fades back for. */
         private val FLOATING_CHAT_DUCKING_OWNERS = setOf(
             PlayerGestureArbiter.Owner.BRIGHTNESS,
@@ -4733,6 +4751,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             callbacks = object : FloatingChatController.Callbacks {
                 override fun channelId() = arguments?.getString(KEY_CHANNEL_ID)
                 override fun holdControls(hold: Boolean) = holdControlsForFloatingChat(hold)
+                override fun dismissControls() = dismissControlsForFloatingChat()
                 override fun controlBands() = floatingChatControlBands()
                 override fun canCompose() = chatFragment?.canCompose() == true
                 override fun onAppearanceRequested(trigger: View) = showFloatingChatPopup(trigger)
@@ -4783,49 +4802,47 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     /**
-     * Bottom of the controls' top row, height of their bottom rows and the
-     * seek buttons beside play/pause, in floating chat host pixels. Rows not
-     * laid out yet use typical heights.
+     * The viewer started dragging, resizing or pinching the floating chat with
+     * the controls up: fade them out, so the card is placed on the clear
+     * picture. Controls that stay up on purpose (no video to watch) stay.
+     */
+    private fun dismissControlsForFloatingChat() {
+        val binding = _binding ?: return
+        val controls = binding.playerControls.root
+        if (!controllerHideOnTouch || !controls.isVisible) return
+        controls.removeCallbacks(controllerHideAction)
+        // A fade-in still running would make hideController() a no-op.
+        if (controllerIsAnimating) controllerAnimation?.cancel()
+        if (controls.isVisible) hideController()
+    }
+
+    /**
+     * Each visible group of controls (the top rows, the bottom rows and seek
+     * bar, play/pause and the ±10 buttons), in floating chat host pixels.
+     * Measured from the layout, not the screen, so it stays right while the
+     * player and the chat move or scale together.
      */
     private fun floatingChatControlBands(): FloatingChatControls {
         val binding = _binding ?: return FloatingChatControls()
-        val host = binding.floatingChatHost
         val controls = binding.playerControls
-        val density = resources.displayMetrics.density
-        val hostLocation = IntArray(2).also(host::getLocationInWindow)
-        val location = IntArray(2)
-        var top = -1
-        for (row in listOf(controls.topLeftLayout, controls.topRightLayout)) {
-            if (!row.isVisible || row.height == 0) continue
-            row.getLocationInWindow(location)
-            top = max(top, location[1] - hostLocation[1] + row.height)
-        }
-        var bottom = -1
-        for (row in listOf(controls.bottomLeftLayout, controls.bottomRightLayout, controls.streamInfoLayout, controls.bottomLayout)) {
-            if (!row.isVisible || row.height == 0) continue
-            row.getLocationInWindow(location)
-            bottom = max(bottom, hostLocation[1] + host.height - location[1])
-        }
-        if (top < 0) top = (FLOATING_CHAT_TOP_BAND_DP * density).toInt()
-        if (bottom < 0) bottom = (FLOATING_CHAT_BOTTOM_BAND_DP * density).toInt()
-        // The ±10 buttons sit by the edges (mirrored in RTL), so sort them by
-        // where they are on screen rather than by which one they are.
-        var leftButton: FloatingChatBounds? = null
-        var rightButton: FloatingChatBounds? = null
-        for (button in listOf(controls.rewind, controls.fastForward)) {
-            if (!button.isVisible || button.width == 0) continue
-            button.getLocationInWindow(location)
-            val buttonLeft = (location[0] - hostLocation[0]).toFloat()
-            val buttonTop = (location[1] - hostLocation[1]).toFloat()
-            val bounds = FloatingChatBounds(buttonLeft, buttonTop, buttonLeft + button.width, buttonTop + button.height)
-            if (buttonLeft + button.width / 2f < host.width / 2f) leftButton = bounds else rightButton = bounds
-        }
-        return FloatingChatControls(
-            top = top.coerceIn(0, host.height),
-            bottom = bottom.coerceIn(0, host.height),
-            leftButton = leftButton,
-            rightButton = rightButton,
+        val sliding = binding.slidingLayout
+        val host = binding.floatingChatHost
+        val offsetX = (sliding.left - host.left).toFloat()
+        val offsetY = (sliding.top - host.top).toFloat()
+        val rect = Rect()
+        val groups = listOf(
+            controls.topLeftLayout, controls.topRightLayout,
+            controls.bottomLeftLayout, controls.bottomRightLayout, controls.streamInfoLayout,
+            controls.position, controls.bottomLayout, controls.duration,
+            controls.playPause, controls.rewind, controls.fastForward,
         )
+        val obstacles = groups.mapNotNull { view ->
+            if (!view.isVisible || view.width == 0 || view.height == 0) return@mapNotNull null
+            rect.set(0, 0, view.width, view.height)
+            sliding.offsetDescendantRectToMyCoords(view, rect)
+            FloatingChatBounds(rect.left + offsetX, rect.top + offsetY, rect.right + offsetX, rect.bottom + offsetY)
+        }
+        return FloatingChatControls(obstacles)
     }
 
     /** Applies Aa or Settings changes to the card and the chat rows without reconnecting. */

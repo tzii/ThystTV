@@ -1,27 +1,31 @@
 package com.github.andreyasadchy.xtra.ui.player
 
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 internal enum class FloatingChatSide { LEFT, RIGHT }
 
-internal enum class FloatingChatAnchor { TOP, BOTTOM, FREE }
-
 /**
- * Where the floating chat card rests. Stored in dp and as an anchor rather than
- * pixels, so the card lands in the same place on rotation, other screens and
- * after the controls or keyboard move it.
+ * Where the floating chat card rests: anywhere the viewer dropped it. Stored as
+ * shares of the free travel inside the clear screen (0 = flush left or top,
+ * 1 = flush right or bottom) and a size in dp, so the card lands in the same
+ * place on rotation, other screens and after the keyboard moved it.
  */
 internal data class FloatingChatLayout(
-    val side: FloatingChatSide,
-    val anchor: FloatingChatAnchor,
-    /** Share of the free vertical travel above the card; only used when [anchor] is FREE. */
+    val xFraction: Float,
     val yFraction: Float,
     val widthDp: Float,
     val heightDp: Float,
-)
+) {
+    /**
+     * The half of the screen the card is on. The resize grip sits on the
+     * corner that faces the other half, and the card tucks to this side.
+     */
+    val side get() = if (xFraction < 0.5f) FloatingChatSide.LEFT else FloatingChatSide.RIGHT
+}
 
 /** Area the card may occupy, in host pixels. */
 internal data class FloatingChatBounds(val left: Float, val top: Float, val right: Float, val bottom: Float) {
@@ -38,27 +42,29 @@ internal data class FloatingChatPlaced(val x: Float, val y: Float, val width: In
 /** Result of releasing a dragged card. */
 internal data class FloatingChatRelease(val layout: FloatingChatLayout, val tuckedSide: FloatingChatSide?)
 
-/** Where the visible player controls sit, in host pixels; the card keeps clear of them. */
-internal data class FloatingChatControls(
-    /** Bottom of the top bar. */
-    val top: Int = 0,
-    /** Height of the bottom bar, measured up from the host's bottom edge. */
-    val bottom: Int = 0,
-    /** The seek button beside play/pause on the left half of the screen, if it shows. */
-    val leftButton: FloatingChatBounds? = null,
-    /** The seek button beside play/pause on the right half of the screen, if it shows. */
-    val rightButton: FloatingChatBounds? = null,
-)
+/**
+ * The visible player controls, in host pixels: each group of buttons or text
+ * (top rows, bottom rows, seek bar, play/pause, the ±10 buttons) as its own
+ * rectangle, so the card only gives way to what it actually covers.
+ */
+internal data class FloatingChatControls(val obstacles: List<FloatingChatBounds> = emptyList())
 
 internal object FloatingChatPlacement {
     const val MARGIN_DP = 12f
-    const val MAGNET_DP = 30f
-    /** How far a release velocity carries the card before the side is chosen. */
-    const val PROJECTION_S = 0.15f
-    const val TUCK_FLING_DP_S = 1200f
+    /** A card dropped this close to an edge of the clear screen lands flush with it. */
+    const val MAGNET_DP = 16f
+    /** How far a release velocity carries the card, as seconds of travel, before it stops. */
+    const val PROJECTION_S = 0.10f
+    /** The longest glide a fling adds. */
+    const val MAX_GLIDE_DP = 220f
+    const val TUCK_FLING_DP_S = 1800f
     const val TUCK_DIRECTION_RATIO = 1.8f
+    /** A flung card only tucks when the drag began this close to that edge (or it already overhangs it). */
+    const val TUCK_START_EDGE_DP = 24f
     /** Share of the card that must be dragged past a screen edge to tuck it. */
-    const val TUCK_OVERHANG = 0.3f
+    const val TUCK_OVERHANG = 0.35f
+    /** Room the card keeps from a control it gives way to. */
+    const val CONTROL_GAP_DP = 8f
     const val MIN_WIDTH_DP = 170f
     const val MIN_HEIGHT_DP = 140f
     const val MAX_WIDTH_SHARE = 0.55f
@@ -66,8 +72,7 @@ internal object FloatingChatPlacement {
     const val SHORT_SCREEN_MIN_SHARE = 0.8f
 
     fun defaultLayout(tablet: Boolean) = FloatingChatLayout(
-        side = FloatingChatSide.RIGHT,
-        anchor = FloatingChatAnchor.TOP,
+        xFraction = 1f,
         yFraction = 0f,
         widthDp = if (tablet) 300f else 224f,
         heightDp = if (tablet) 380f else 240f,
@@ -75,7 +80,7 @@ internal object FloatingChatPlacement {
 
     /**
      * The parent minus a margin, the cutout or rounded-corner insets on each side,
-     * and keep-clear bands at the top and bottom (player controls, keyboard).
+     * and keep-clear bands at the top and bottom (status bar, navigation bar, keyboard).
      */
     fun bounds(
         parentWidth: Int,
@@ -102,82 +107,141 @@ internal object FloatingChatPlacement {
     }
 
     /**
-     * Resting position of [layout]. A FREE card keeps the height it has on the
-     * clear screen ([rest]) and only moves when [current] keep-clear bands
-     * reach it; TOP and BOTTOM cards follow their edge.
-     *
-     * Above the [keyboard] the card fits whatever room is left, with no floor,
-     * so the message box at its bottom stays above the keys.
+     * Resting position of [layout]: its share of the travel inside [rest] (the
+     * clear screen), kept inside [free] (which also leaves out the keyboard or
+     * navigation bar). Above the [keyboard] the card fits whatever room is
+     * left, with no floor, so the message box at its bottom stays above the keys.
      */
     fun place(
         layout: FloatingChatLayout,
         widthPx: Int,
         heightPx: Int,
         rest: FloatingChatBounds,
-        current: FloatingChatBounds,
+        free: FloatingChatBounds,
         density: Float,
         keyboard: Boolean = false,
     ): FloatingChatPlaced {
         val height = if (keyboard) {
-            min(heightPx, current.height.toInt()).coerceAtLeast(1)
+            min(heightPx, free.height.toInt()).coerceAtLeast(1)
         } else {
-            visibleHeight(heightPx, current, density)
+            visibleHeight(heightPx, free, density)
         }
         // A split-screen window can be narrower than the minimum card.
-        val width = min(widthPx, current.width.toInt()).coerceAtLeast(1)
-        val x = when (layout.side) {
-            FloatingChatSide.LEFT -> current.left
-            FloatingChatSide.RIGHT -> current.right - width
-        }
-        val lowest = max(current.top, current.bottom - height)
-        val y = when (layout.anchor) {
-            FloatingChatAnchor.TOP -> current.top
-            FloatingChatAnchor.BOTTOM -> lowest
-            FloatingChatAnchor.FREE -> {
-                val restHeight = visibleHeight(heightPx, rest, density)
-                val travel = max(0f, rest.height - restHeight)
-                (rest.top + travel * layout.yFraction.coerceIn(0f, 1f)).coerceIn(current.top, lowest)
-            }
-        }
-        return FloatingChatPlaced(x, y, width, height)
+        val width = min(widthPx, free.width.toInt()).coerceAtLeast(1)
+        val restHeight = visibleHeight(heightPx, rest, density)
+        val x = rest.left + max(0f, rest.width - width) * layout.xFraction.coerceIn(0f, 1f)
+        val y = rest.top + max(0f, rest.height - restHeight) * layout.yFraction.coerceIn(0f, 1f)
+        return FloatingChatPlaced(
+            x = x.coerceIn(free.left, max(free.left, free.right - width)),
+            y = y.coerceIn(free.top, max(free.top, free.bottom - height)),
+            width = width,
+            height = height,
+        )
     }
 
     /**
-     * While the controls show, a card resting over the seek button on its own
-     * side ([button]) steps inward past it, so the button stays reachable. A
-     * card above or below the button stays at its edge. A card wider than the
-     * room left gives up width, but never below the minimum card; a window
-     * that narrow keeps the card where it was.
+     * While the controls show, a card covering any of [obstacles] moves the
+     * shortest way clear of them: up, down, left or right past one control, or
+     * past two in turn, staying inside [free]. A card that fits nowhere keeps
+     * its column and gives up its oldest (top) lines to fit between the
+     * controls above and below it, never below the short-screen floor; a card
+     * that still cannot clear them stays where it is. A card that covers
+     * nothing does not move.
      */
-    fun stepAside(
+    fun avoid(
         placed: FloatingChatPlaced,
-        side: FloatingChatSide,
-        bounds: FloatingChatBounds,
-        button: FloatingChatBounds?,
+        free: FloatingChatBounds,
+        obstacles: List<FloatingChatBounds>,
         density: Float,
     ): FloatingChatPlaced {
-        if (button == null) return placed
-        if (placed.y >= button.bottom || placed.y + placed.height <= button.top) return placed
-        val gap = MARGIN_DP * density
-        val minWidth = min(placed.width.toFloat(), MIN_WIDTH_DP * density)
-        return when (side) {
-            FloatingChatSide.LEFT -> {
-                val x = button.right + gap
-                if (placed.x >= x) return placed
-                val room = bounds.right - x
-                if (room < minWidth) return placed
-                placed.copy(x = x, width = min(placed.width.toFloat(), room).toInt())
-            }
-            FloatingChatSide.RIGHT -> {
-                val right = button.left - gap
-                if (placed.x + placed.width <= right) return placed
-                val room = right - bounds.left
-                if (room < minWidth) return placed
-                val width = min(placed.width.toFloat(), room).toInt()
-                placed.copy(x = right - width, width = width)
+        if (obstacles.isEmpty()) return placed
+        val gap = CONTROL_GAP_DP * density
+        val padded = obstacles.map { FloatingChatBounds(it.left - gap, it.top - gap, it.right + gap, it.bottom + gap) }
+        if (padded.none { overlaps(placed, it) }) return placed
+        shortestClear(placed, free, padded)?.let { return it }
+        val fitted = fitColumn(placed, free, padded, density) ?: return placed
+        if (padded.none { overlaps(fitted, it) }) return fitted
+        return shortestClear(fitted, free, padded) ?: placed
+    }
+
+    /** The nearest place, one or two moves away, where [placed] covers none of [obstacles]. */
+    private fun shortestClear(
+        placed: FloatingChatPlaced,
+        free: FloatingChatBounds,
+        obstacles: List<FloatingChatBounds>,
+    ): FloatingChatPlaced? {
+        var best: FloatingChatPlaced? = null
+        var bestCost = Float.MAX_VALUE
+        val first = moves(placed, free, obstacles)
+        for (candidate in first) {
+            val cost = distance(placed, candidate)
+            if (cost < bestCost && obstacles.none { overlaps(candidate, it) }) {
+                best = candidate
+                bestCost = cost
             }
         }
+        if (best != null) return best
+        for (step in first) {
+            val stepCost = distance(placed, step)
+            for (candidate in moves(step, free, obstacles)) {
+                val cost = stepCost + distance(step, candidate)
+                if (cost < bestCost && obstacles.none { overlaps(candidate, it) }) {
+                    best = candidate
+                    bestCost = cost
+                }
+            }
+        }
+        return best
     }
+
+    /** Positions just past each obstacle [placed] covers, in all four directions, that stay inside [free]. */
+    private fun moves(
+        placed: FloatingChatPlaced,
+        free: FloatingChatBounds,
+        obstacles: List<FloatingChatBounds>,
+    ): List<FloatingChatPlaced> = buildList {
+        for (obstacle in obstacles) {
+            if (!overlaps(placed, obstacle)) continue
+            add(placed.copy(y = obstacle.bottom))
+            add(placed.copy(y = obstacle.top - placed.height))
+            add(placed.copy(x = obstacle.right))
+            add(placed.copy(x = obstacle.left - placed.width))
+        }
+    }.filter { inside(it, free) }
+
+    /**
+     * [placed] cut down to the room between the controls above and below its
+     * column, keeping its bottom (newest lines) where it can. Null when that
+     * room is under the short-screen floor.
+     */
+    private fun fitColumn(
+        placed: FloatingChatPlaced,
+        free: FloatingChatBounds,
+        obstacles: List<FloatingChatBounds>,
+        density: Float,
+    ): FloatingChatPlaced? {
+        val centerY = placed.y + placed.height / 2f
+        val column = obstacles.filter { it.left < placed.x + placed.width && it.right > placed.x }
+        val top = max(free.top, column.filter { (it.top + it.bottom) / 2f < centerY }.maxOfOrNull { it.bottom } ?: free.top)
+        val bottom = min(free.bottom, column.filter { (it.top + it.bottom) / 2f >= centerY }.minOfOrNull { it.top } ?: free.bottom)
+        val floor = MIN_HEIGHT_DP * SHORT_SCREEN_MIN_SHARE * density
+        if (bottom - top < floor) return null
+        val height = min(placed.height.toFloat(), bottom - top).toInt()
+        val cardBottom = min(placed.y + placed.height, bottom)
+        return placed.copy(y = max(top, cardBottom - height), height = height)
+    }
+
+    private fun overlaps(placed: FloatingChatPlaced, obstacle: FloatingChatBounds) =
+        placed.x < obstacle.right && placed.x + placed.width > obstacle.left &&
+            placed.y < obstacle.bottom && placed.y + placed.height > obstacle.top
+
+    private fun inside(placed: FloatingChatPlaced, free: FloatingChatBounds): Boolean {
+        val slack = 0.5f
+        return placed.x >= free.left - slack && placed.x + placed.width <= free.right + slack &&
+            placed.y >= free.top - slack && placed.y + placed.height <= free.bottom + slack
+    }
+
+    private fun distance(from: FloatingChatPlaced, to: FloatingChatPlaced) = hypot(to.x - from.x, to.y - from.y)
 
     /** Off-screen x for a card tucked against [side]. */
     fun tuckedX(side: FloatingChatSide, widthPx: Int, parentWidth: Int, density: Float): Float {
@@ -189,15 +253,13 @@ internal object FloatingChatPlacement {
     }
 
     /**
-     * Where a released card goes. The release velocity is projected
-     * [PROJECTION_S] ahead; the nearer side wins and the top or bottom edge pulls
-     * the card in within [MAGNET_DP]. A fast sideways fling outward from
-     * [startSide], or dragging [TUCK_OVERHANG] of the card past the edge of
-     * [current], tucks it instead.
+     * Where a released card goes: where it was dropped, carried a little
+     * further by the release velocity ([PROJECTION_S], at most [MAX_GLIDE_DP]),
+     * kept inside [free] and pulled flush with any edge within [MAGNET_DP].
+     * Dragging [TUCK_OVERHANG] of the card past a side, or a fast sideways
+     * fling outward from a card that started at that edge, tucks it instead.
      *
-     * When the card has little or no room to move up and down (a phone with
-     * the controls up), both edges are within the magnet: the edge it was
-     * pushed toward wins, and a sideways move keeps the [stored] anchor.
+     * [heightPx] is the stored height; [startX] is where the card was when the drag began.
      */
     fun release(
         x: Float,
@@ -206,77 +268,70 @@ internal object FloatingChatPlacement {
         velocityY: Float,
         widthPx: Int,
         heightPx: Int,
-        startSide: FloatingChatSide,
+        startX: Float,
         rest: FloatingChatBounds,
-        current: FloatingChatBounds,
+        free: FloatingChatBounds,
         density: Float,
         stored: FloatingChatLayout,
     ): FloatingChatRelease {
-        val tuck = tuckSide(x, velocityX, velocityY, widthPx, current, startSide, density)
-        val centerX = x + widthPx / 2f + velocityX * PROJECTION_S
-        val side = tuck ?: if (centerX < (current.left + current.right) / 2f) FloatingChatSide.LEFT else FloatingChatSide.RIGHT
-        val height = visibleHeight(heightPx, current, density)
-        val lowest = max(current.top, current.bottom - height)
-        val projected = y + velocityY * PROJECTION_S
-        val projectedY = projected.coerceIn(current.top, lowest)
+        val height = visibleHeight(heightPx, free, density)
+        val glide = MAX_GLIDE_DP * density
+        val lowestX = max(free.left, free.right - widthPx)
+        val lowestY = max(free.top, free.bottom - height)
+        val tuck = tuckSide(x, velocityX, velocityY, widthPx, startX, free, density)
+        var dropX = when (tuck) {
+            FloatingChatSide.LEFT -> free.left
+            FloatingChatSide.RIGHT -> lowestX
+            null -> (x + (velocityX * PROJECTION_S).coerceIn(-glide, glide)).coerceIn(free.left, lowestX)
+        }
+        var dropY = (y + (velocityY * PROJECTION_S).coerceIn(-glide, glide)).coerceIn(free.top, lowestY)
         val magnet = MAGNET_DP * density
-        val roomToMove = lowest - current.top > 2 * magnet
-        val anchor = if (roomToMove) {
-            when {
-                projectedY - current.top <= magnet -> FloatingChatAnchor.TOP
-                lowest - projectedY <= magnet -> FloatingChatAnchor.BOTTOM
-                else -> FloatingChatAnchor.FREE
-            }
-        } else {
-            // Positive when the card was pushed nearer the top than the bottom.
-            val lean = current.top + lowest - 2 * projected
-            when {
-                lean > magnet -> FloatingChatAnchor.TOP
-                lean < -magnet -> FloatingChatAnchor.BOTTOM
-                else -> stored.anchor
-            }
-        }
-        val restHeight = visibleHeight(heightPx, rest, density)
-        val restTravel = rest.height - restHeight
-        val fraction = when {
-            anchor == FloatingChatAnchor.BOTTOM -> 1f
-            anchor == FloatingChatAnchor.TOP -> 0f
-            !roomToMove -> stored.yFraction
-            restTravel > 0f -> ((projectedY - rest.top) / restTravel).coerceIn(0f, 1f)
-            else -> 0f
-        }
-        return FloatingChatRelease(
-            layout = stored.copy(side = side, anchor = anchor, yFraction = fraction),
-            tuckedSide = tuck,
+        if (dropX - free.left <= magnet) dropX = free.left else if (lowestX - dropX <= magnet) dropX = lowestX
+        if (dropY - free.top <= magnet) dropY = free.top else if (lowestY - dropY <= magnet) dropY = lowestY
+        val layout = stored.copy(
+            xFraction = fraction(dropX, free.left, lowestX, rest.left, max(0f, rest.width - widthPx)),
+            yFraction = fraction(dropY, free.top, lowestY, rest.top, max(0f, rest.height - visibleHeight(heightPx, rest, density))),
         )
+        return FloatingChatRelease(layout, tuck)
     }
 
     /**
-     * A card dragged far enough past an edge tucks there. A fast sideways fling
-     * tucks it on [startSide] only while it is still on that half of the
-     * screen; a card thrown across from the other half lands on the far side.
+     * Share of the [restTravel] from [restStart] for [value]. A card flush with
+     * an edge of the free area stays flush with that edge of the clear screen.
+     */
+    private fun fraction(value: Float, freeStart: Float, freeEnd: Float, restStart: Float, restTravel: Float): Float = when {
+        value <= freeStart -> 0f
+        value >= freeEnd && freeEnd > freeStart -> 1f
+        restTravel <= 0f -> 0f
+        else -> ((value - restStart) / restTravel).coerceIn(0f, 1f)
+    }
+
+    /**
+     * A card dragged far enough past an edge tucks there. A fast sideways
+     * fling tucks it only toward an edge it started at, or already overhangs;
+     * a card tossed from the middle of the screen lands at the edge instead.
      */
     fun tuckSide(
         x: Float,
         velocityX: Float,
         velocityY: Float,
         widthPx: Int,
+        startX: Float,
         bounds: FloatingChatBounds,
-        startSide: FloatingChatSide,
         density: Float,
     ): FloatingChatSide? {
         val overhang = TUCK_OVERHANG * widthPx
         if (x < bounds.left - overhang) return FloatingChatSide.LEFT
         if (x + widthPx > bounds.right + overhang) return FloatingChatSide.RIGHT
-        val centerX = x + widthPx / 2f
-        val middle = (bounds.left + bounds.right) / 2f
-        val outward = when (startSide) {
-            FloatingChatSide.LEFT -> velocityX < 0f && centerX < middle
-            FloatingChatSide.RIGHT -> velocityX > 0f && centerX >= middle
-        }
         val fast = abs(velocityX) / density > TUCK_FLING_DP_S
         val sideways = abs(velocityX) > TUCK_DIRECTION_RATIO * abs(velocityY)
-        return if (outward && fast && sideways) startSide else null
+        if (!fast || !sideways) return null
+        val near = TUCK_START_EDGE_DP * density
+        return if (velocityX < 0f) {
+            FloatingChatSide.LEFT.takeIf { startX - bounds.left <= near || x < bounds.left }
+        } else {
+            FloatingChatSide.RIGHT.takeIf { bounds.right - (startX + widthPx) <= near || x + widthPx > bounds.right }
+        }
     }
 
     /** Width and height kept between the minimum size and what the screen allows. */

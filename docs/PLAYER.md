@@ -245,46 +245,56 @@ stay. `FloatingChatController` owns how the card looks and moves. Keep these:
   no touches itself. It lays its children out locally on the next frame, so a
   resize never re-measures the player.
 - Per-touch work only writes `x`/`y`. Grip resize is coalesced to one size change
-  per frame; release, keep-clear and tuck use `SpringAnimation`. Do not add
-  layout writes or new animators per `ACTION_MOVE`. A size change lays the card
+  per frame; release and tuck use `SpringAnimation`, and a keep-clear move glides
+  over the controls' own 250 ms fade (`glide`). Do not add layout writes or new
+  animators per `ACTION_MOVE`. A size change lays the card
   out at once, so a spring that starts in the same frame uses the new size.
 - A drag follows one finger; if it lifts while another is down, that finger takes
   over from where the card is. A pinch takes over a drag or grip resize under its
   first finger: the cancel it sends them does not end the interaction or settle
   the card. Grip and pinch store a size only when it changed, so a tap on the
   grip never stores a height a short screen cut the card down to.
-- `FloatingChatPlacement` is pure: a side plus a TOP, BOTTOM or FREE anchor in dp,
-  inside bounds that keep clear of cutouts (also while the video draws behind
-  one), the status and navigation bars or keyboard and, while the controls show
-  and the keyboard is down, the controls' top and bottom rows
-  (`floatingChatControlBands`). With the controls up, a card that would cover
-  the ±10 seek button on its side steps inward past it and returns when they
-  hide (`FloatingChatPlacement.stepAside`; a card above or below the button stays
-  put, and a window too narrow for the minimum card keeps it where it was).
-  While a brightness, volume, seek or speed slider shows, the card fades to 25%
+- `FloatingChatPlacement` is pure. The card rests anywhere: its place is a share
+  of the free travel across and down (`xFraction`/`yFraction`, 0 = flush left or
+  top, 1 = flush right or bottom) plus a size in dp, inside bounds that keep clear
+  of cutouts (also while the video draws behind one), the status bar and the
+  navigation bar or keyboard. The controls never shrink those bounds. While they
+  show and the keyboard is down, a card that covers a control group
+  (`floatingChatControlBands`: top rows, bottom rows and seek bar, play/pause,
+  ±10, each its own rectangle) moves the shortest way clear, 8dp past it, in one
+  or two moves (`FloatingChatPlacement.avoid`); a card too tall to clear them
+  keeps its column and gives up its oldest lines; a card that covers nothing
+  does not move. The side (for the grip, tuck and TalkBack) is the half the card
+  is on. While a brightness, volume, seek or speed slider shows, the card fades to 25%
   (`setDucked`): the arbiter claim starts it, and the feedback's hide runnable,
   or the touch's end when no slider showed, brings it back. A short screen drops
   the card's oldest (top) lines first; above the keyboard the card may go below
   its usual minimum height, and a window narrower than the card narrows it. The card's
   `layout_gravity` is `top|left`, because `x` must mean the same in RTL.
-- A release projects the fling 0.15 s ahead, snaps to the nearer side, pulls to
-  the top or bottom within 30dp, and tucks on a fast outward sideways fling
-  (only from that side's half) or when 30% of the card is past the edge. With
-  no room to move up or down, the vertical push picks the top or bottom and a
-  sideways move keeps the stored anchor.
+- A release stays where the card was let go: the fling adds at most 0.1 s of
+  travel (220dp cap), any edge within 16dp pulls it flush, and it is stored as
+  fractions of the clear screen. It tucks when 35% of the card is past a side,
+  or on a fast (1800 dp/s) outward sideways fling from a card that started
+  within 24dp of that edge; a card thrown from the middle lands flush instead.
+  Stored layouts still write the old side and anchor next to `x`, and entries
+  written before free placement read flush with their side and anchor.
 - Layouts are stored per channel plus a last-used fallback in the single JSON
   preference `floating_chat_layouts` (`FloatingChatLayoutStore`, 50 channels).
   1.7.0's `floating_chat_x/y/w/h_<channel>` keys migrate once and are removed.
 - The header (Aa, tuck, close, optional compose) and the resize grip show only
   with the player controls and are `INVISIBLE` otherwise, never just transparent,
   so they cannot take touches. While the viewer drags, resizes or pinches,
-  `holdControls` stops the controls from auto-hiding.
+  `holdControls` stops the controls from auto-hiding. Once a header drag passes
+  the touch slop, or the grip or a pinch changes the size, the controls fade out
+  (`dismissControls`) while the header and grip stay under the finger
+  (`chromeHeld`), so the card is placed on the clear picture and never jumps when
+  the controls go. A tap does not hide them.
   `FloatingChatHeaderLayout` takes over a touch that moves past the touch slop,
   so a drag that starts on a header button moves the card; a tap still presses
   it. The grip hides while the message box is open. While the header shows, the
   chat container is padded by its height, so its buttons never sit on a chat
   line; the padding goes once the header has faded out.
-- The Aa popover sits beside the card's resting (stepped-aside) bounds, on the
+- The Aa popover sits beside the card's resting bounds (clear of the controls), on the
   video side first and level with its top (`PlayerPopupPolicy.placeBeside`), so
   the card stays in view while it is styled. Where the panel fits on neither
   side, as in portrait, it anchors to the Aa button like the other menus.
@@ -304,7 +314,15 @@ stay. `FloatingChatController` owns how the card looks and moves. Keep these:
   box takes the card's dark surface with white text and icons in every theme;
   the emote menu keeps the app surface.
 - The card hides in PiP, when minimized and in portrait; PiP exit and maximize
-  show it again. Tucking leaves an edge tab with an unread count. While the card
+  show it again. The host shares `slidingLayout`'s size and centre pivot, so the
+  player's transform carries the card: a swipe down moves it with the video
+  (`followPlayer`, fading toward the minimize point) and a short swipe brings it
+  back (`returnWithPlayer`, on every touch end). Minimize freezes it before the
+  controls and status bar change (`holdForPlayer`), then it rides into the
+  mini-player on the player's own 250 ms curve and has faded by 60% of the way
+  (`hideWithPlayer`). Maximize grows it out of the video from the player's pose
+  (`showWithPlayer`). Keep-clear moves wait while the host moves with the player.
+  A minimize that starts after a quick maximize leaves the card alone. Tucking leaves an edge tab with an unread count. While the card
   is hidden or tucked, animated emotes and the message glide pause, including
   emotes on rows bound while paused. Fade old messages (`ChatAgeFader`) wakes
   when the next row reaches 10 seconds, not on a fixed tick.
