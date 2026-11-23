@@ -13,6 +13,11 @@ internal object FloatingChatLayoutStore {
     const val PREF_KEY = "floating_chat_layouts"
     const val MAX_CHANNELS = 50
 
+    /**
+     * [x] is new in 1.7.1's free placement. Entries written before it have
+     * only a [side] and an [anchor] (TOP, BOTTOM or FREE with [y]); both are
+     * still written, so a build that predates [x] reads a close position.
+     */
     @Serializable
     private data class Stored(
         val side: String,
@@ -20,6 +25,7 @@ internal object FloatingChatLayoutStore {
         val y: Float,
         val w: Float,
         val h: Float,
+        val x: Float? = null,
     )
 
     @Serializable
@@ -61,7 +67,7 @@ internal object FloatingChatLayoutStore {
     }
 
     /**
-     * Converts 1.7.0's per-channel pixel position into an anchored layout.
+     * Converts 1.7.0's per-channel pixel position into a layout.
      * Returns null when the old values are missing.
      */
     fun fromLegacy(
@@ -77,23 +83,23 @@ internal object FloatingChatLayoutStore {
         if (x < 0f || y < 0f || parentWidth <= 0 || parentHeight <= 0 || density <= 0f) return null
         val width = if (widthPx > 0) widthPx else (fallback.widthDp * density).toInt()
         val height = if (heightPx > 0) heightPx else (fallback.heightDp * density).toInt()
-        val side = if (x + width / 2f < parentWidth / 2f) FloatingChatSide.LEFT else FloatingChatSide.RIGHT
         val bounds = FloatingChatPlacement.bounds(parentWidth, parentHeight, density)
-        val travel = max(0f, bounds.height - height)
+        val travelX = max(0f, bounds.width - width)
+        val travelY = max(0f, bounds.height - height)
         val magnet = FloatingChatPlacement.MAGNET_DP * density
-        val top = y.coerceIn(bounds.top, bounds.top + travel)
-        val anchor = when {
-            top - bounds.top <= magnet -> FloatingChatAnchor.TOP
-            bounds.top + travel - top <= magnet -> FloatingChatAnchor.BOTTOM
-            else -> FloatingChatAnchor.FREE
-        }
         return FloatingChatLayout(
-            side = side,
-            anchor = anchor,
-            yFraction = if (travel > 0f) ((top - bounds.top) / travel).coerceIn(0f, 1f) else 0f,
+            xFraction = share(x - bounds.left, travelX, magnet),
+            yFraction = share(y - bounds.top, travelY, magnet),
             widthDp = width / density,
             heightDp = height / density,
         )
+    }
+
+    /** [offset] as a share of [travel], flush with either end within [magnet]. */
+    private fun share(offset: Float, travel: Float, magnet: Float): Float = when {
+        travel <= 0f || offset <= magnet -> 0f
+        travel - offset <= magnet -> 1f
+        else -> (offset / travel).coerceIn(0f, 1f)
     }
 
     private fun parse(document: String?): Document? {
@@ -101,12 +107,37 @@ internal object FloatingChatLayoutStore {
         return runCatching { json.decodeFromString(Document.serializer(), document) }.getOrNull()
     }
 
-    private fun FloatingChatLayout.toStored() = Stored(side.name, anchor.name, yFraction, widthDp, heightDp)
+    private fun FloatingChatLayout.toStored() = Stored(
+        side = side.name,
+        anchor = when {
+            yFraction <= 0f -> "TOP"
+            yFraction >= 1f -> "BOTTOM"
+            else -> "FREE"
+        },
+        y = yFraction,
+        w = widthDp,
+        h = heightDp,
+        x = xFraction,
+    )
 
     private fun Stored.toLayout(): FloatingChatLayout? {
-        val side = FloatingChatSide.entries.firstOrNull { it.name == side } ?: return null
-        val anchor = FloatingChatAnchor.entries.firstOrNull { it.name == anchor } ?: return null
         if (!w.isFinite() || !h.isFinite() || w <= 0f || h <= 0f) return null
-        return FloatingChatLayout(side, anchor, if (y.isFinite()) y.coerceIn(0f, 1f) else 0f, w, h)
+        val storedY = if (y.isFinite()) y.coerceIn(0f, 1f) else 0f
+        if (x != null) {
+            return FloatingChatLayout(if (x.isFinite()) x.coerceIn(0f, 1f) else 1f, storedY, w, h)
+        }
+        // Written before free placement: flush with its side, TOP and BOTTOM flush with that edge.
+        val xFraction = when (side) {
+            "LEFT" -> 0f
+            "RIGHT" -> 1f
+            else -> return null
+        }
+        val yFraction = when (anchor) {
+            "TOP" -> 0f
+            "BOTTOM" -> 1f
+            "FREE" -> storedY
+            else -> return null
+        }
+        return FloatingChatLayout(xFraction, yFraction, w, h)
     }
 }

@@ -957,15 +957,21 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Controls hidden: only the small top handle shows; dragging it moves the
   card. Nothing invisible at the top of the card catches taps; the chat list
   scrolls and opens message actions as before.
-- [ ] Controls shown: the header (Aa, tuck, close) and the corner grip appear;
-  the card moves below the top controls and above the seek bar, and returns when
-  the controls hide. The controls stay up while dragging, resizing or pinching.
+- [ ] Controls shown: the header (Aa, tuck, close) and the corner grip appear.
+  A card over a control moves the shortest way clear of it, in step with the
+  controls' fade, and returns when they hide; a card in the open does not move.
   No chat line shows under the header's buttons; the newest lines do not jump
   when the header comes or goes.
-- [ ] On a VoD with the card on the right, show the controls: the card also moves
-  left of the +10 button, which can be tapped, and slides back when the controls
-  hide. Same with −10 on the left. A small card at the top, above the buttons,
-  stays at its edge.
+- [ ] Card at the top: drag it by its header. The controls fade as the drag
+  starts, the header stays under the finger, and the card stays where it is let
+  go: it does not drop and then jump up. Same for a grip resize and a pinch. A
+  plain tap on the header or grip leaves the controls up.
+- [ ] Drop the card in the middle, near (not at) an edge and in each corner: it
+  stays where dropped, and only lands flush within about a finger's width of an
+  edge. The spot survives rotation, reopening and another channel.
+- [ ] On a VoD with the card on the right, middle height, show the controls: the
+  card moves left of the +10 button, which can be tapped, and slides back when
+  the controls hide. Same with −10 on the left.
 - [ ] With the card open, open Quality, Speed, More and Aa: each menu draws above
   the card, and every chip and the close button can be tapped. In landscape Aa
   opens beside the card, on the video side, so each change shows on the card;
@@ -973,9 +979,9 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Brightness swipe with the card on the left, volume swipe with it on the
   right, then seek and speed swipes: the card fades back while the slider shows
   and returns as the slider fades. A tap or a chat swipe does not fade it.
-- [ ] Fling the card across: it lands on the other side, snaps to the top or
-  bottom edge near them, otherwise stays where dropped. Fling it sideways off
-  its edge, or drag most of it off, or tap tuck: a tab remains. New messages
+- [ ] Fling the card: it glides a short way and stops, landing flush only near an
+  edge. From an edge, fling it sideways off that edge, or drag about a third of
+  it off, or tap tuck: a tab remains. New messages
   count on the tab; tapping it brings the card back. Back gesture from that edge
   still works away from the tab.
 - [ ] Resize from the grip on either side and by pinching; the outer edge stays
@@ -986,8 +992,8 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Start a drag, put a second finger down and lift the first: the card follows
   the second finger without jumping. Start a drag or grip resize, then pinch:
   the pinch takes over smoothly and the controls stay up until both fingers lift.
-- [ ] Throw the card from the left half back toward the right edge: it lands on
-  the right side instead of tucking.
+- [ ] Throw the card from the middle toward an edge: it lands flush with that
+  edge instead of tucking.
 - [ ] Position memory: move the chat on channel A, open channel B (starts where
   A left it), move it, return to A (A's place). Upgrading from 1.7.0 keeps a
   channel's old position near where it was.
@@ -1022,6 +1028,14 @@ bright and dark video. Repeat the core rows with an RTL language.
   names in the message and reply dialogs look as before.
 - [ ] TalkBack: the card offers move left/right, larger/smaller and tuck; the
   tab reads "Show chat" with the new-message count.
+- [ ] Swipe the player down slowly with the card shown: the card moves down with
+  the video and fades a little. Let go early: both go back up together. Swipe
+  past the minimize point: the card shrinks into the mini player with the video
+  and is gone before it lands; no jump, no flash of the card elsewhere when the
+  controls and status bar change. Tap the mini player: the card grows back out
+  of the video to its place. Repeat with the card tucked, with the controls up,
+  with a header drag just finished, and minimize by Back and the minimize
+  button. Maximize again during the minimize: the card comes back and stays.
 - [ ] Enter and leave PiP, minimize and restore, rotate to portrait and back,
   close and reopen, switch streams: the card hides and returns with its chat, no
   empty card, no duplicate chat, no stale card over the mini player.

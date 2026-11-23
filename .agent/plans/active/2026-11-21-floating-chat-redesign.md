@@ -231,6 +231,36 @@ Human QA completed:
   video is vertically centred in its pane, the unfolded inner screen is portrait
   (docked chat by design), and the chat-button "second tap" came 23 s later, after
   the controls had hidden, so it only showed them.
+- 2026-11-23: Maintainer feedback on prerelease `debug-patch171-615b41abb`: a
+  header drag at the top dropped the card below the controls' band and then
+  jumped it up when they hid; side and edge snapping stopped the viewer from
+  putting the card where they wanted; the card just faded on minimize while it
+  also sprang from the controls and status bar changing. Root cause of the
+  jump: holding the controls during a drag kept their ~70dp top band out of the
+  bounds, so the card rested low until they hid. Discussed with Gemini 4 Neon
+  (high) and agreed:
+  - Free placement: the layout is `xFraction`/`yFraction` of the clear screen
+    plus a size; release keeps the drop spot (0.1 s fling, 220dp cap, 16dp edge
+    magnets); tuck at 35% overhang, or a 1800 dp/s outward fling only from
+    within 24dp of that edge. The store still writes side and anchor for older
+    builds and reads legacy entries flush with their edges.
+  - A header drag (past slop), grip resize or pinch fades the controls out and
+    keeps the header and grip (`chromeHeld`), so the card is placed on the clear
+    picture. A tap leaves the controls.
+  - The controls no longer shrink the bounds. A card that covers a control
+    group moves the shortest way clear (one or two moves, 8dp gap; a too-tall
+    card fits its column), gliding over the controls' 250 ms fade.
+  - Minimize: the host shares `slidingLayout`'s geometry, so it follows the
+    swipe down (translation only, fading to 55% at the threshold), returns on a
+    short swipe, freezes before the controls and status bar change, rides the
+    player's pose on its own 250 ms AccelerateDecelerate curve and fades out by
+    60% of the way. Maximize grows it back from the player's pose and fades it
+    in over the last 65%. Keep-clear moves wait while the host moves.
+  Tests rewritten for the new API, plus chrome hold, drop-in-place, the swipe
+  follow and return, the minimize ride, maximize mid-ride and a late minimize
+  after a quick maximize. Robolectric runs a whole animation in one idle, so
+  only the ends of the ride are tested; its feel needs device QA. Gate:
+  `testDebugUnitTest` 1620/1620, `lintDebug` clean.
 
 ## Decisions
 
@@ -260,8 +290,16 @@ Human QA completed:
   of reading the paint's shadow.
   Reason: `Paint.getShadowLayerRadius` needs API 29; minSdk is 23, and rows draw
   on the main thread one at a time.
+- Decision (2026-11-23, replaces side snapping and anchors): the card rests
+  wherever it is dropped; the controls fade while it is moved; a card over a
+  control moves the shortest way clear; the card rides into the mini-player.
+  Reason: the maintainer's feedback on the 1.7.1 prerelease, design agreed with
+  Gemini 4 Neon. Alternatives considered: keeping anchors with a finer grid;
+  shrinking the bounds by the controls' bands (the cause of the jump); scaling
+  the card during the swipe (the video only translates there).
 - Decision: With the controls up, the card steps inward past the ±10 button on
   its side; during brightness, volume, seek and speed swipes it fades to 25%.
+  (2026-11-23: the step aside is now the general control avoidance above.)
   Reason: the maintainer's choice after emulator QA (2026-11-22); every control
   and slider stays visible and reachable without moving controls.
   Alternatives considered: leaving both covered; moving the gesture feedback
@@ -275,9 +313,10 @@ Human QA completed:
 Summary: Redesigns floating chat as a dark rounded card over video with Clear
 (text with a halo, no surface), Shade (default for untouched installs) and
 Solid looks, text size and bold options, all switched live from a new Aa
-popover without reconnecting chat. The card moves by a pill or the header,
-springs to the nearer side, snaps to the top or bottom, keeps clear of the
-controls, cutout, navigation bar and keyboard, tucks to an edge tab with an
+popover without reconnecting chat. The card moves by a pill or the header
+(the controls fade while it moves), stays where it is dropped, slides just off
+any control it covers, keeps clear of the cutout, navigation bar and keyboard,
+rides into the mini-player with the video, tucks to an edge tab with an
 unread count, resizes from the inner corner or by pinch, and remembers its
 place per channel with a last-used fallback (1.7.0 positions migrate). New
 options: Fade old messages, Pass touches to video, Reply bar. Fixes the
@@ -286,12 +325,12 @@ toggle recreating chat.
 Tests: new `FloatingChatPlacementTest`, `FloatingChatLayoutStoreTest`,
 `FloatingChatAppearanceTest`, `FloatingChatControllerTest`; the chat
 transition suites run with the controller attached. `assembleDebug`,
-`testDebugUnitTest` (1601) and `lintDebug` pass. An independent Gemini 4 Neon
+`testDebugUnitTest` (1620) and `lintDebug` pass. An independent Gemini 4 Neon
 review's verified findings are fixed (see the progress log).
 Human QA: `docs/MANUAL_QA.md` → "Floating chat redesign", plus the player
 safety rows (live, VoD, stream switching, minimize/restore, close/reopen, PiP,
 speed/quality, gestures).
-Risks: chat view reparenting now waits for the hide fade; keep-clear bands are
-measured from the controls' rows and fall back to fixed sizes; keyboard
+Risks: chat view reparenting now waits for the hide fade; control avoidance
+uses the measured control groups (none before the controls first lay out); keyboard
 avoidance relies on window insets; Robolectric cannot show real spring or
 fade feel, so motion needs device QA.

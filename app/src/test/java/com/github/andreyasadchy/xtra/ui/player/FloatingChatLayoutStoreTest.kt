@@ -7,8 +7,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FloatingChatLayoutStoreTest {
-    private val left = FloatingChatLayout(FloatingChatSide.LEFT, FloatingChatAnchor.BOTTOM, 1f, 200f, 260f)
-    private val right = FloatingChatLayout(FloatingChatSide.RIGHT, FloatingChatAnchor.FREE, 0.25f, 240f, 300f)
+    private val left = FloatingChatLayout(xFraction = 0f, yFraction = 1f, widthDp = 200f, heightDp = 260f)
+    private val right = FloatingChatLayout(xFraction = 0.7f, yFraction = 0.25f, widthDp = 240f, heightDp = 300f)
     private val fallback = FloatingChatPlacement.defaultLayout(tablet = false)
 
     @Test fun `a channel gets its own layout back`() {
@@ -53,24 +53,49 @@ class FloatingChatLayoutStoreTest {
         assertEquals(right, FloatingChatLayoutStore.read(document, null))
     }
 
-    @Test fun `stored values out of range are repaired or dropped`() {
-        val document = """{"last":{"side":"RIGHT","anchor":"FREE","y":4.0,"w":220.0,"h":250.0},""" +
-            """"channels":[{"id":"bad","layout":{"side":"UP","anchor":"TOP","y":0.0,"w":220.0,"h":250.0}}]}"""
-        assertEquals(1f, FloatingChatLayoutStore.read(document, null)!!.yFraction, 0f)
-        assertNull(FloatingChatLayoutStore.read(document, "bad"))
+    @Test fun `a free position is written so older builds read a close one`() {
+        val document = FloatingChatLayoutStore.write(null, "a", right)
+        assertTrue(document.contains(""""side":"RIGHT""""))
+        assertTrue(document.contains(""""anchor":"FREE""""))
+        assertTrue(document.contains(""""x":0.7"""))
+        val top = FloatingChatLayoutStore.write(null, "a", left.copy(yFraction = 0f))
+        assertTrue(top.contains(""""side":"LEFT""""))
+        assertTrue(top.contains(""""anchor":"TOP""""))
     }
 
-    @Test fun `a 1_7_0 pixel position converts to an anchored layout`() {
+    @Test fun `an anchored entry from before free placement lands flush with its edges`() {
+        val document = """{"last":{"side":"LEFT","anchor":"BOTTOM","y":0.0,"w":220.0,"h":250.0},""" +
+            """"channels":[{"id":"top","layout":{"side":"RIGHT","anchor":"TOP","y":0.0,"w":220.0,"h":250.0}},""" +
+            """{"id":"free","layout":{"side":"RIGHT","anchor":"FREE","y":0.4,"w":220.0,"h":250.0}}]}"""
+        assertEquals(FloatingChatLayout(0f, 1f, 220f, 250f), FloatingChatLayoutStore.read(document, null))
+        assertEquals(FloatingChatLayout(1f, 0f, 220f, 250f), FloatingChatLayoutStore.read(document, "top"))
+        assertEquals(FloatingChatLayout(1f, 0.4f, 220f, 250f), FloatingChatLayoutStore.read(document, "free"))
+    }
+
+    @Test fun `stored values out of range are repaired or dropped`() {
+        val document = """{"last":{"side":"RIGHT","anchor":"FREE","y":4.0,"w":220.0,"h":250.0},""" +
+            """"channels":[{"id":"bad","layout":{"side":"UP","anchor":"TOP","y":0.0,"w":220.0,"h":250.0}},""" +
+            """{"id":"wide","layout":{"side":"LEFT","anchor":"FREE","y":-2.0,"w":220.0,"h":250.0,"x":3.0}},""" +
+            """{"id":"empty","layout":{"side":"LEFT","anchor":"TOP","y":0.0,"w":0.0,"h":250.0,"x":0.0}}]}"""
+        assertEquals(1f, FloatingChatLayoutStore.read(document, null)!!.yFraction, 0f)
+        assertNull(FloatingChatLayoutStore.read(document, "bad"))
+        assertEquals(FloatingChatLayout(1f, 0f, 220f, 250f), FloatingChatLayoutStore.read(document, "wide"))
+        assertNull(FloatingChatLayoutStore.read(document, "empty"))
+    }
+
+    @Test fun `a 1_7_0 pixel position converts to the same spot`() {
         // 1000x500 px at density 2: the old card sat near the top right.
         val top = FloatingChatLayoutStore.fromLegacy(x = 600f, y = 30f, widthPx = 400, heightPx = 480, parentWidth = 1000, parentHeight = 500, density = 2f, fallback = fallback)!!
-        assertEquals(FloatingChatSide.RIGHT, top.side)
-        assertEquals(FloatingChatAnchor.TOP, top.anchor)
-        assertEquals(200f, top.widthDp, 0f)
-        assertEquals(240f, top.heightDp, 0f)
+        assertEquals(FloatingChatLayout(1f, 0f, 200f, 240f), top)
 
         val bottomLeft = FloatingChatLayoutStore.fromLegacy(x = 0f, y = 400f, widthPx = 300, heightPx = 100, parentWidth = 1000, parentHeight = 500, density = 1f, fallback = fallback)!!
-        assertEquals(FloatingChatSide.LEFT, bottomLeft.side)
-        assertEquals(FloatingChatAnchor.BOTTOM, bottomLeft.anchor)
+        assertEquals(0f, bottomLeft.xFraction, 0f)
+        assertEquals(1f, bottomLeft.yFraction, 0f)
+
+        // Mid-screen stays mid-screen: 388 of 752 px across, 138 of 236 px down.
+        val middle = FloatingChatLayoutStore.fromLegacy(x = 400f, y = 150f, widthPx = 224, heightPx = 240, parentWidth = 1000, parentHeight = 500, density = 1f, fallback = fallback)!!
+        assertEquals(388f / 752f, middle.xFraction, 0.0001f)
+        assertEquals(138f / 236f, middle.yFraction, 0.0001f)
     }
 
     @Test fun `a missing 1_7_0 position or size falls back`() {
