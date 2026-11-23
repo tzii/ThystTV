@@ -105,6 +105,10 @@ and uses the normal default factory. This also covers local playback with Cast o
   The host's root carries `elevation="24dp"` so open menus draw above the floating chat
   host (10dp). `<include>` ignores `android:elevation`, so it must stay on the included
   root (`PlayerPopupContentTest` checks the order).
+- VoD playback state changes open the controls only when the play button is
+  needed (paused, ended, idle). A rebuffer during playback only renews controls
+  that are already up (`PlayerControllerPolicy`), as Media3's PlayerView does;
+  before 1.7.1 every stall brought them up and stepped the floating chat aside.
 
 ## Mini-player geometry
 
@@ -976,6 +980,7 @@ At minimum, player work should request human verification for:
 - controls show stale speed/quality
 - more than one player popup is visible, or popup content survives minimize/PiP/rotation
 - controls auto-hide while a popup is open or fail to resume auto-hide after dismissal
+- controls appear by themselves during VoD playback (stall or rebuffer)
 - sleep timer closes the wrong player
 - PiP remains enabled after player close
 - orientation recreates UI with stale player state

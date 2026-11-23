@@ -98,7 +98,13 @@ class ExoPlayerFragment : PlayerFragment() {
                             setPipActions(!showPlayButton)
                             updateProgress()
                             controllerAutoHide = !showPlayButton
-                            if (videoType != STREAM && useController) {
+                            if (PlayerControllerPolicy.showOnPlaybackStateChange(
+                                    isStream = videoType == STREAM,
+                                    useController = useController,
+                                    showPlayButton = showPlayButton,
+                                    controlsVisible = binding.playerControls.root.isVisible,
+                                )
+                            ) {
                                 showController()
                             }
                         }
