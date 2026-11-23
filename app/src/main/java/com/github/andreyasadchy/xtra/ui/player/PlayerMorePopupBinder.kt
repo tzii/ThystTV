@@ -268,7 +268,7 @@ internal class PlayerMorePopupBinder(
                         }
                         dialog.dismiss()
                     }
-                    .setNegativeButton(context.getString(R.string.no), null)
+                    .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
         }
