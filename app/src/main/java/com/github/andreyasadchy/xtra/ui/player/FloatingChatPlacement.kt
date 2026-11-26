@@ -1,7 +1,6 @@
 package com.github.andreyasadchy.xtra.ui.player
 
 import kotlin.math.abs
-import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -45,26 +44,21 @@ internal data class FloatingChatRelease(val layout: FloatingChatLayout, val tuck
 /**
  * The visible player controls, in host pixels: each group of buttons or text
  * (top rows, bottom rows, seek bar, play/pause, the ±10 buttons) as its own
- * rectangle, so the card only gives way to what it actually covers.
+ * rectangle, so the card only fades for, and lets touches through to, what it
+ * actually covers.
  */
 internal data class FloatingChatControls(val obstacles: List<FloatingChatBounds> = emptyList())
 
 internal object FloatingChatPlacement {
     const val MARGIN_DP = 12f
     /** A card dropped this close to an edge of the clear screen lands flush with it. */
-    const val MAGNET_DP = 16f
-    /** How far a release velocity carries the card, as seconds of travel, before it stops. */
-    const val PROJECTION_S = 0.10f
-    /** The longest glide a fling adds. */
-    const val MAX_GLIDE_DP = 220f
+    const val MAGNET_DP = 8f
     const val TUCK_FLING_DP_S = 1800f
     const val TUCK_DIRECTION_RATIO = 1.8f
     /** A flung card only tucks when the drag began this close to that edge (or it already overhangs it). */
     const val TUCK_START_EDGE_DP = 24f
     /** Share of the card that must be dragged past a screen edge to tuck it. */
     const val TUCK_OVERHANG = 0.35f
-    /** Room the card keeps from a control it gives way to. */
-    const val CONTROL_GAP_DP = 8f
     const val MIN_WIDTH_DP = 170f
     const val MIN_HEIGHT_DP = 140f
     const val MAX_WIDTH_SHARE = 0.55f
@@ -140,108 +134,19 @@ internal object FloatingChatPlacement {
     }
 
     /**
-     * While the controls show, a card covering any of [obstacles] moves the
-     * shortest way clear of them: up, down, left or right past one control, or
-     * past two in turn, staying inside [free]. A card that fits nowhere keeps
-     * its column and gives up its oldest (top) lines to fit between the
-     * controls above and below it, never below the short-screen floor; a card
-     * that still cannot clear them stays where it is. A card that covers
-     * nothing does not move.
+     * The controls never move the card: while they show, a card over any of
+     * [obstacles] fades so they show through, and a touch on one goes to it.
      */
-    fun avoid(
-        placed: FloatingChatPlaced,
-        free: FloatingChatBounds,
-        obstacles: List<FloatingChatBounds>,
-        density: Float,
-    ): FloatingChatPlaced {
-        if (obstacles.isEmpty()) return placed
-        val gap = CONTROL_GAP_DP * density
-        val padded = obstacles.map { FloatingChatBounds(it.left - gap, it.top - gap, it.right + gap, it.bottom + gap) }
-        if (padded.none { overlaps(placed, it) }) return placed
-        shortestClear(placed, free, padded)?.let { return it }
-        val fitted = fitColumn(placed, free, padded, density) ?: return placed
-        if (padded.none { overlaps(fitted, it) }) return fitted
-        return shortestClear(fitted, free, padded) ?: placed
-    }
+    fun covers(placed: FloatingChatPlaced, obstacles: List<FloatingChatBounds>): Boolean =
+        obstacles.any { covers(placed.x, placed.y, placed.x + placed.width, placed.y + placed.height, it) }
 
-    /** The nearest place, one or two moves away, where [placed] covers none of [obstacles]. */
-    private fun shortestClear(
-        placed: FloatingChatPlaced,
-        free: FloatingChatBounds,
-        obstacles: List<FloatingChatBounds>,
-    ): FloatingChatPlaced? {
-        var best: FloatingChatPlaced? = null
-        var bestCost = Float.MAX_VALUE
-        val first = moves(placed, free, obstacles)
-        for (candidate in first) {
-            val cost = distance(placed, candidate)
-            if (cost < bestCost && obstacles.none { overlaps(candidate, it) }) {
-                best = candidate
-                bestCost = cost
-            }
-        }
-        if (best != null) return best
-        for (step in first) {
-            val stepCost = distance(placed, step)
-            for (candidate in moves(step, free, obstacles)) {
-                val cost = stepCost + distance(step, candidate)
-                if (cost < bestCost && obstacles.none { overlaps(candidate, it) }) {
-                    best = candidate
-                    bestCost = cost
-                }
-            }
-        }
-        return best
-    }
+    /** Whether the rectangle from ([left], [top]) to ([right], [bottom]) overlaps [obstacle]. */
+    fun covers(left: Float, top: Float, right: Float, bottom: Float, obstacle: FloatingChatBounds) =
+        left < obstacle.right && right > obstacle.left && top < obstacle.bottom && bottom > obstacle.top
 
-    /** Positions just past each obstacle [placed] covers, in all four directions, that stay inside [free]. */
-    private fun moves(
-        placed: FloatingChatPlaced,
-        free: FloatingChatBounds,
-        obstacles: List<FloatingChatBounds>,
-    ): List<FloatingChatPlaced> = buildList {
-        for (obstacle in obstacles) {
-            if (!overlaps(placed, obstacle)) continue
-            add(placed.copy(y = obstacle.bottom))
-            add(placed.copy(y = obstacle.top - placed.height))
-            add(placed.copy(x = obstacle.right))
-            add(placed.copy(x = obstacle.left - placed.width))
-        }
-    }.filter { inside(it, free) }
-
-    /**
-     * [placed] cut down to the room between the controls above and below its
-     * column, keeping its bottom (newest lines) where it can. Null when that
-     * room is under the short-screen floor.
-     */
-    private fun fitColumn(
-        placed: FloatingChatPlaced,
-        free: FloatingChatBounds,
-        obstacles: List<FloatingChatBounds>,
-        density: Float,
-    ): FloatingChatPlaced? {
-        val centerY = placed.y + placed.height / 2f
-        val column = obstacles.filter { it.left < placed.x + placed.width && it.right > placed.x }
-        val top = max(free.top, column.filter { (it.top + it.bottom) / 2f < centerY }.maxOfOrNull { it.bottom } ?: free.top)
-        val bottom = min(free.bottom, column.filter { (it.top + it.bottom) / 2f >= centerY }.minOfOrNull { it.top } ?: free.bottom)
-        val floor = MIN_HEIGHT_DP * SHORT_SCREEN_MIN_SHARE * density
-        if (bottom - top < floor) return null
-        val height = min(placed.height.toFloat(), bottom - top).toInt()
-        val cardBottom = min(placed.y + placed.height, bottom)
-        return placed.copy(y = max(top, cardBottom - height), height = height)
-    }
-
-    private fun overlaps(placed: FloatingChatPlaced, obstacle: FloatingChatBounds) =
-        placed.x < obstacle.right && placed.x + placed.width > obstacle.left &&
-            placed.y < obstacle.bottom && placed.y + placed.height > obstacle.top
-
-    private fun inside(placed: FloatingChatPlaced, free: FloatingChatBounds): Boolean {
-        val slack = 0.5f
-        return placed.x >= free.left - slack && placed.x + placed.width <= free.right + slack &&
-            placed.y >= free.top - slack && placed.y + placed.height <= free.bottom + slack
-    }
-
-    private fun distance(from: FloatingChatPlaced, to: FloatingChatPlaced) = hypot(to.x - from.x, to.y - from.y)
+    /** Whether the point ([x], [y]) is on any of [obstacles]. */
+    fun hits(x: Float, y: Float, obstacles: List<FloatingChatBounds>) =
+        obstacles.any { x >= it.left && x < it.right && y >= it.top && y < it.bottom }
 
     /** Off-screen x for a card tucked against [side]. */
     fun tuckedX(side: FloatingChatSide, widthPx: Int, parentWidth: Int, density: Float): Float {
@@ -253,11 +158,11 @@ internal object FloatingChatPlacement {
     }
 
     /**
-     * Where a released card goes: where it was dropped, carried a little
-     * further by the release velocity ([PROJECTION_S], at most [MAX_GLIDE_DP]),
-     * kept inside [free] and pulled flush with any edge within [MAGNET_DP].
-     * Dragging [TUCK_OVERHANG] of the card past a side, or a fast sideways
-     * fling outward from a card that started at that edge, tucks it instead.
+     * Where a released card goes: exactly where it was let go, kept inside
+     * [free] and pulled flush with any edge within [MAGNET_DP]. The release
+     * velocity never carries it further. Dragging [TUCK_OVERHANG] of the card
+     * past a side, or a fast sideways fling outward from a card that started
+     * at that edge, tucks it instead.
      *
      * [heightPx] is the stored height; [startX] is where the card was when the drag began.
      */
@@ -275,16 +180,15 @@ internal object FloatingChatPlacement {
         stored: FloatingChatLayout,
     ): FloatingChatRelease {
         val height = visibleHeight(heightPx, free, density)
-        val glide = MAX_GLIDE_DP * density
         val lowestX = max(free.left, free.right - widthPx)
         val lowestY = max(free.top, free.bottom - height)
         val tuck = tuckSide(x, velocityX, velocityY, widthPx, startX, free, density)
         var dropX = when (tuck) {
             FloatingChatSide.LEFT -> free.left
             FloatingChatSide.RIGHT -> lowestX
-            null -> (x + (velocityX * PROJECTION_S).coerceIn(-glide, glide)).coerceIn(free.left, lowestX)
+            null -> x.coerceIn(free.left, lowestX)
         }
-        var dropY = (y + (velocityY * PROJECTION_S).coerceIn(-glide, glide)).coerceIn(free.top, lowestY)
+        var dropY = y.coerceIn(free.top, lowestY)
         val magnet = MAGNET_DP * density
         if (dropX - free.left <= magnet) dropX = free.left else if (lowestX - dropX <= magnet) dropX = lowestX
         if (dropY - free.top <= magnet) dropY = free.top else if (lowestY - dropY <= magnet) dropY = lowestY

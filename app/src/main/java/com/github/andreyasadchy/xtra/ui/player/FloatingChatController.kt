@@ -8,6 +8,7 @@ import android.content.SharedPreferences
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
@@ -154,6 +155,15 @@ internal class FloatingChatController(
     private var keepClearMotion: ValueAnimator? = null
     /** Faded back while a brightness, volume, seek or speed slider shows. */
     private var ducked = false
+    /**
+     * The controls show over the card: it fades a little so they show
+     * through, and a touch on one of them goes to it.
+     */
+    private var covering = false
+    /** The header shows on the card's bottom edge: its top edge is under a control row. */
+    private var headerAtBottom = false
+    /** The grip would sit on a control, so it stays hidden. */
+    private var gripCovers = false
     private val location = IntArray(2)
     private var interacting = false
     /** A two-finger pinch owns the card; the drag or resize it cancelled must not end the interaction. */
@@ -186,6 +196,7 @@ internal class FloatingChatController(
         closeButton.setOnClickListener { callbacks.onCloseRequested() }
         tab.setOnClickListener { untuck() }
         card.pinchListener = PinchHandler()
+        card.passThroughAt = ::passesToControls
         host.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) onHostResized()
         }
@@ -422,6 +433,7 @@ internal class FloatingChatController(
         if (visible) bands = callbacks.controlBands()
         // A card riding into the mini-player keeps its look; show() syncs it again.
         if (leaving) return
+        refreshCovering(animate = true)
         syncChrome(animate = true)
         onKeepClearChanged()
     }
@@ -438,7 +450,91 @@ internal class FloatingChatController(
         card.animate().alpha(restingAlpha()).setDuration(if (value) DUCK_IN_MS else FADE_MS).setInterpolator(EMPHASIZED).start()
     }
 
-    private fun restingAlpha() = if (ducked) DUCKED_ALPHA else 1f
+    private fun restingAlpha() = when {
+        ducked -> DUCKED_ALPHA
+        covering -> COVER_ALPHA
+        else -> 1f
+    }
+
+    /**
+     * Works out whether the controls show over the card where it rests, and
+     * where its header and grip go so they stay off them. The controls never
+     * move the card: it fades a little instead, and comes back when they hide.
+     */
+    private fun refreshCovering(animate: Boolean) {
+        val placed = if (isShown && tuckedSide == null && host.width > 0 && host.height > 0) target() else null
+        val obstacles = bands.obstacles
+        val now = placed != null && controlsVisible && !insets.ime && FloatingChatPlacement.covers(placed, obstacles)
+        // Mid-drag or resize the header stays where the finger found it, and a
+        // header fading out with the controls fades where it is.
+        if (!chromeHeld && controlsVisible) {
+            var bottom = false
+            if (now && placed != null && !composerOpen) {
+                val left = placed.x
+                val right = placed.x + placed.width
+                val band = header.layoutParams.height.toFloat()
+                val top = placed.y
+                val end = placed.y + placed.height
+                val topCovered = obstacles.any { FloatingChatPlacement.covers(left, top, right, top + band, it) }
+                val bottomCovered = obstacles.any { FloatingChatPlacement.covers(left, end - band, right, end, it) }
+                bottom = topCovered && !bottomCovered
+            }
+            if (bottom != headerAtBottom) {
+                headerAtBottom = bottom
+                applyHeaderEdge()
+            }
+        }
+        var gripNow = false
+        if (now && placed != null) {
+            val size = grip.layoutParams.width.toFloat()
+            // The grip sits on the bottom corner that faces the video; it gives way to a header there.
+            val gripLeft = if (layout.side == FloatingChatSide.RIGHT) placed.x else placed.x + placed.width - size
+            val end = placed.y + placed.height
+            gripNow = headerAtBottom || obstacles.any { FloatingChatPlacement.covers(gripLeft, end - size, gripLeft + size, end, it) }
+        }
+        if (gripNow != gripCovers) {
+            gripCovers = gripNow
+            updateGripVisibility()
+        }
+        if (now == covering) return
+        covering = now
+        // A tucked card takes it too, so it comes back at the right alpha.
+        if (!isShown || exitFade != null) return
+        if (animate) {
+            card.animate().alpha(restingAlpha()).setDuration(FADE_MS).setInterpolator(EMPHASIZED).start()
+        } else {
+            card.alpha = restingAlpha()
+        }
+    }
+
+    /**
+     * While the controls show over the card, a touch that starts on one of
+     * them goes to it, except on the card's own header and grip, which draw on top.
+     */
+    private fun passesToControls(x: Float, y: Float): Boolean {
+        if (!covering || !controlsVisible) return false
+        if (header.isVisible && y >= header.top && y < header.bottom) return false
+        if (grip.isVisible && x >= grip.left && x < grip.right && y >= grip.top && y < grip.bottom) return false
+        return FloatingChatPlacement.hits(card.x + x, card.y + y, bands.obstacles)
+    }
+
+    /** Puts the header on the card's top or bottom edge, its shade fading toward the chat. */
+    private fun applyHeaderEdge() {
+        val params = header.layoutParams as FrameLayout.LayoutParams
+        val gravity = if (headerAtBottom) Gravity.BOTTOM else Gravity.TOP
+        if (params.gravity != gravity) {
+            params.gravity = gravity
+            header.layoutParams = params
+        }
+        (header.background?.mutate() as? GradientDrawable)?.orientation =
+            if (headerAtBottom) GradientDrawable.Orientation.BOTTOM_TOP else GradientDrawable.Orientation.TOP_BOTTOM
+        if (header.isVisible) padForHeader(header.layoutParams.height)
+    }
+
+    /** Keeps the chat lines out from under the header, on whichever edge it is. */
+    private fun padForHeader(room: Int) {
+        content.updatePadding(top = if (headerAtBottom) 0 else room, bottom = if (headerAtBottom) room else 0)
+    }
 
     fun setInsets(value: FloatingChatInsets) {
         if (insets == value) return
@@ -452,7 +548,7 @@ internal class FloatingChatController(
         val measured = callbacks.controlBands()
         if (measured == bands) return
         bands = measured
-        onKeepClearChanged()
+        refreshCovering(animate = true)
     }
 
     /** The message box opened or closed at the bottom of the card. */
@@ -460,12 +556,13 @@ internal class FloatingChatController(
         if (composerOpen == open) return
         composerOpen = open
         updateGripVisibility()
+        refreshCovering(animate = true)
     }
 
     /**
-     * The controls, keyboard or insets changed: the card glides to where it
-     * belongs now, in step with the controls' fade. While it moves with the
-     * player, or the viewer holds it, that waits.
+     * The keyboard, insets or controls changed: the card glides to where it
+     * belongs now (only the keyboard and insets move it) and fades for the
+     * controls. While it moves with the player, or the viewer holds it, that waits.
      */
     private fun onKeepClearChanged() {
         if (!isShown || interacting) return
@@ -474,6 +571,7 @@ internal class FloatingChatController(
             return
         }
         if (tuckedSide != null) placeTab(slideIn = false) else glide()
+        refreshCovering(animate = true)
     }
 
     /** Re-reads background, text and behavior after Aa or Settings changed them. */
@@ -606,16 +704,13 @@ internal class FloatingChatController(
     private fun target(): FloatingChatPlaced {
         val (width, height) = clampedSize()
         val free = freeBounds()
-        val placed = FloatingChatPlacement.place(layout, width, height, restBounds(), free, density, keyboard = insets.ime)
-        // While typing, the room above the keyboard matters more than the controls.
-        if (!controlsVisible || insets.ime) return placed
-        return FloatingChatPlacement.avoid(placed, free, bands.obstacles, density)
+        // The controls never move the card; it fades under them instead (refreshCovering).
+        return FloatingChatPlacement.place(layout, width, height, restBounds(), free, density, keyboard = insets.ime)
     }
 
     /**
-     * Where the card rests now, clear of the controls while they show, in
-     * host pixels; null while it is off screen or tucked. It may still be on
-     * its way there.
+     * Where the card rests now, in host pixels; null while it is off screen
+     * or tucked. It may still be on its way there.
      */
     fun restingBounds(): RectF? {
         if (!isShown || tuckedSide != null || host.width == 0 || host.height == 0) return null
@@ -633,6 +728,7 @@ internal class FloatingChatController(
         card.x = placed.x
         card.y = placed.y
         updateGrip()
+        refreshCovering(animate = false)
     }
 
     /** Springs the card to where it belongs now; a shorter fit drops its oldest (top) lines first. */
@@ -641,12 +737,13 @@ internal class FloatingChatController(
         keepClearMotion?.cancel()
         val placed = resize(target())
         animate(placed.x, placed.y, stiffness, damping, velocityX, velocityY)
+        refreshCovering(animate = true)
     }
 
     /**
-     * Glides the card to where it belongs now over the controls' own fade
-     * ([KEEP_CLEAR_MS], emphasized), with no overshoot: it makes room for the
-     * controls, keyboard or insets and comes back when they go.
+     * Glides the card to where it belongs now over [KEEP_CLEAR_MS]
+     * (emphasized), with no overshoot: it makes room for the keyboard or
+     * insets and comes back when they go.
      */
     private fun glide() {
         if (host.width == 0 || host.height == 0) return
@@ -729,7 +826,7 @@ internal class FloatingChatController(
         if (showHeader) {
             header.visibility = View.VISIBLE
             // The newest lines stay put; the oldest one leaves the header's room.
-            content.updatePadding(top = header.layoutParams.height)
+            padForHeader(header.layoutParams.height)
             if (animate) header.animate().alpha(1f).setDuration(FADE_MS).start() else header.alpha = 1f
         } else if (animate && header.isVisible) {
             // INVISIBLE afterwards: an invisible header must not catch touches.
@@ -737,13 +834,13 @@ internal class FloatingChatController(
             header.animate().alpha(0f).setDuration(FADE_MS).withEndAction {
                 if (!controlsVisible && !chromeHeld) {
                     header.visibility = View.INVISIBLE
-                    content.updatePadding(top = 0)
+                    padForHeader(0)
                 }
             }.start()
         } else {
             header.alpha = 0f
             header.visibility = View.INVISIBLE
-            content.updatePadding(top = 0)
+            padForHeader(0)
         }
         val passThrough = appearance.passThrough && !showHeader
         card.passThrough = passThrough
@@ -754,7 +851,7 @@ internal class FloatingChatController(
     }
 
     private fun updateGripVisibility() {
-        grip.visibility = if ((controlsVisible || chromeHeld) && !composerOpen) View.VISIBLE else View.INVISIBLE
+        grip.visibility = if ((controlsVisible || chromeHeld) && !composerOpen && !gripCovers) View.VISIBLE else View.INVISIBLE
     }
 
     // Card sides are physical (left or right of the screen), also in RTL.
@@ -1092,8 +1189,8 @@ internal class FloatingChatController(
         if (tucked != null) {
             tuck(tucked, velocityX)
         } else {
-            // Critically damped: the card glides to where it was let go and stops, with no bounce.
-            settle(RELEASE_STIFFNESS, RELEASE_DAMPING, velocityX, velocityY)
+            // Critically damped from rest: the card stays where it was let go, with no bounce.
+            settle(RELEASE_STIFFNESS, RELEASE_DAMPING)
             updateAccessibilityActions()
         }
     }
@@ -1272,6 +1369,8 @@ internal class FloatingChatController(
         /** Quicker than the slider's own entrance, so the slider is never covered. */
         const val DUCK_IN_MS = 120L
         const val DUCKED_ALPHA = 0.25f
+        /** A light fade while the controls show over the card, so they show through. */
+        const val COVER_ALPHA = 0.6f
         const val ENTER_SCALE = 0.96f
         /** How much the card fades by the point where a swipe down minimizes. */
         const val FOLLOW_FADE = 0.45f

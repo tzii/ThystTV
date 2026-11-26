@@ -262,6 +262,20 @@ Human QA completed:
   only the ends of the ride are tested; its feel needs device QA. Gate:
   `testDebugUnitTest` 1620/1620, `lintDebug` clean.
 
+- 2026-11-26: Maintainer feedback on the 1.7.1 candidate (`a4a37be04`): the
+  card still could not be placed freely, worst on small and very wide screens.
+  From the code: the release glide (0.1 s of velocity, up to 220dp) carried a
+  careful drop on by tens of dp, and `avoid` moved or shrank the card every
+  time the controls appeared, which on a short screen is almost everywhere.
+  Research page with a placement playground:
+  https://claude.ai/artifact/AZ9ffmXFLmd3L7DKk7GmJD. The maintainer chose
+  "stays where you drop it" with a slight fade where controls are under the
+  card. Built: no glide (velocity only decides a tuck), 8dp magnets, `avoid`
+  removed; a card over a control fades to 60%, touches on a covered control
+  pass through to it, the header moves to the bottom edge when the top one is
+  covered, and the grip hides over a control. The default size from the screen
+  share was offered and not taken up yet.
+
 ## Decisions
 
 - Decision: Keep `floating_chat_transparency` as the background opacity and
@@ -297,7 +311,15 @@ Human QA completed:
   Gemini 4 Neon. Alternatives considered: keeping anchors with a finer grid;
   shrinking the bounds by the controls' bands (the cause of the jump); scaling
   the card during the swipe (the video only translates there).
-- Decision: With the controls up, the card steps inward past the ±10 button on
+- Decision (2026-11-26, replaces stepping aside and `avoid`): the controls never
+  move the card. A card over a control fades to 60%, a touch on the covered
+  control goes to it, and the header and grip move off the controls. The
+  release keeps the exact drop spot.
+  Reason: the maintainer's choice of option A on the placement research page;
+  automatic moves made free placement feel like it fought the viewer.
+  Alternatives considered: side magnet (PiP style), a docked strip, moving only
+  up or down for the controls.
+- Superseded 2026-11-26: With the controls up, the card steps inward past the ±10 button on
   its side; during brightness, volume, seek and speed swipes it fades to 25%.
   (2026-11-23: the step aside is now the general control avoidance above.)
   Reason: the maintainer's choice after emulator QA (2026-11-22); every control
