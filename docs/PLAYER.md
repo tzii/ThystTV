@@ -258,21 +258,25 @@ stay. `FloatingChatController` owns how the card looks and moves. Keep these:
   of the free travel across and down (`xFraction`/`yFraction`, 0 = flush left or
   top, 1 = flush right or bottom) plus a size in dp, inside bounds that keep clear
   of cutouts (also while the video draws behind one), the status bar and the
-  navigation bar or keyboard. The controls never shrink those bounds. While they
-  show and the keyboard is down, a card that covers a control group
-  (`floatingChatControlBands`: top rows, bottom rows and seek bar, play/pause,
-  ±10, each its own rectangle) moves the shortest way clear, 8dp past it, in one
-  or two moves (`FloatingChatPlacement.avoid`); a card too tall to clear them
-  keeps its column and gives up its oldest lines; a card that covers nothing
-  does not move. The side (for the grip, tuck and TalkBack) is the half the card
+  navigation bar or keyboard. The controls never shrink those bounds and never
+  move the card. While they show and the keyboard is down, a card over a control
+  group (`floatingChatControlBands`: top rows, bottom rows and seek bar,
+  play/pause, ±10, each its own rectangle) fades to 60% so the controls show
+  through (`refreshCovering`), and a touch that starts on one of those groups
+  goes to the player (`FloatingChatCardView.passThroughAt`), except on the
+  card's visible header or grip. When the controls cover the card's top 48dp
+  but not its bottom, the header shows on the bottom edge (chat padded above
+  it); the grip hides while it would sit on a control or under a bottom
+  header. Mid-drag the header keeps its edge, and it only changes edge while the
+  controls show. The side (for the grip, tuck and TalkBack) is the half the card
   is on. While a brightness, volume, seek or speed slider shows, the card fades to 25%
   (`setDucked`): the arbiter claim starts it, and the feedback's hide runnable,
   or the touch's end when no slider showed, brings it back. A short screen drops
   the card's oldest (top) lines first; above the keyboard the card may go below
   its usual minimum height, and a window narrower than the card narrows it. The card's
   `layout_gravity` is `top|left`, because `x` must mean the same in RTL.
-- A release stays where the card was let go: the fling adds at most 0.1 s of
-  travel (220dp cap), any edge within 16dp pulls it flush, and it is stored as
+- A release stays exactly where the card was let go: the release velocity never
+  carries it further, an edge within 8dp pulls it flush, and it is stored as
   fractions of the clear screen. It tucks when 35% of the card is past a side,
   or on a fast (1800 dp/s) outward sideways fling from a card that started
   within 24dp of that edge; a card thrown from the middle lands flush instead.

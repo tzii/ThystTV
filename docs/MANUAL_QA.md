@@ -919,20 +919,24 @@ bright and dark video. Repeat the core rows with an RTL language.
   card. Nothing invisible at the top of the card catches taps; the chat list
   scrolls and opens message actions as before.
 - [ ] Controls shown: the header (Aa, tuck, close) and the corner grip appear.
-  A card over a control moves the shortest way clear of it, in step with the
-  controls' fade, and returns when they hide; a card in the open does not move.
-  No chat line shows under the header's buttons; the newest lines do not jump
-  when the header comes or goes.
+  The card never moves for the controls. Over a control it fades a little so
+  the control shows through, and tapping that control works through the chat;
+  it is back to full strength when they hide. A card in the open does not fade.
+  Card at the top right: the header shows on the card's bottom edge, the top
+  right buttons can be tapped through the card, and the grip stays hidden.
+  No chat line shows under the header's buttons.
 - [ ] Card at the top: drag it by its header. The controls fade as the drag
   starts, the header stays under the finger, and the card stays where it is let
   go: it does not drop and then jump up. Same for a grip resize and a pinch. A
   plain tap on the header or grip leaves the controls up.
-- [ ] Drop the card in the middle, near (not at) an edge and in each corner: it
-  stays where dropped, and only lands flush within about a finger's width of an
-  edge. The spot survives rotation, reopening and another channel.
+- [ ] Drop the card in the middle, near (not at) an edge and in each corner, on a
+  small phone and on a wide tablet or desktop window: it stays exactly where
+  dropped, even when let go mid-swipe, and only lands flush within about 8dp of
+  an edge. Tapping the video afterwards does not move it. The spot survives
+  rotation, reopening and another channel.
 - [ ] On a VoD with the card on the right, middle height, show the controls: the
-  card moves left of the +10 button, which can be tapped, and slides back when
-  the controls hide. Same with −10 on the left.
+  card stays, fades a little, and the +10 button shows through and can be
+  tapped. Same with −10 on the left, and with play/pause and the seek bar.
 - [ ] With the card open, open Quality, Speed, More and Aa: each menu draws above
   the card, and every chip and the close button can be tapped. In landscape Aa
   opens beside the card, on the video side, so each change shows on the card;
@@ -940,8 +944,8 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Brightness swipe with the card on the left, volume swipe with it on the
   right, then seek and speed swipes: the card fades back while the slider shows
   and returns as the slider fades. A tap or a chat swipe does not fade it.
-- [ ] Fling the card: it glides a short way and stops, landing flush only near an
-  edge. From an edge, fling it sideways off that edge, or drag about a third of
+- [ ] Fling the card: it stops where the finger left it. From an edge, fling it
+  sideways off that edge, or drag about a third of
   it off, or tap tuck: a tab remains. New messages
   count on the tab; tapping it brings the card back. Back gesture from that edge
   still works away from the tab.
@@ -953,8 +957,8 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Start a drag, put a second finger down and lift the first: the card follows
   the second finger without jumping. Start a drag or grip resize, then pinch:
   the pinch takes over smoothly and the controls stay up until both fingers lift.
-- [ ] Throw the card from the middle toward an edge: it lands flush with that
-  edge instead of tucking.
+- [ ] Throw the card from the middle toward an edge: it stays where it was let
+  go instead of tucking.
 - [ ] Position memory: move the chat on channel A, open channel B (starts where
   A left it), move it, return to A (A's place). Upgrading from 1.7.0 keeps a
   channel's old position near where it was.

@@ -15,7 +15,8 @@ import android.widget.FrameLayout
  * clips the chat to its corners.
  *
  * With [passThrough] set the card ignores touches, so taps and swipes reach
- * the player underneath. With [pinchEnabled] set a two-finger pinch anywhere on
+ * the player underneath; [passThroughAt] does that only for touches that
+ * start at the points it accepts (card coordinates). With [pinchEnabled] set a two-finger pinch anywhere on
  * the card resizes it instead of scrolling the chat.
  */
 class FloatingChatCardView @JvmOverloads constructor(
@@ -35,6 +36,7 @@ class FloatingChatCardView @JvmOverloads constructor(
     private var surfaceVisible = true
 
     var passThrough = false
+    var passThroughAt: ((x: Float, y: Float) -> Boolean)? = null
     var pinchEnabled = false
     var pinchListener: PinchListener? = null
     private var pinching = false
@@ -86,7 +88,7 @@ class FloatingChatCardView @JvmOverloads constructor(
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (passThrough && ev.actionMasked == MotionEvent.ACTION_DOWN) return false
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && (passThrough || passThroughAt?.invoke(ev.x, ev.y) == true)) return false
         if (pinchEnabled || pinching) {
             val wasPinching = pinching
             scaleDetector.onTouchEvent(ev)
