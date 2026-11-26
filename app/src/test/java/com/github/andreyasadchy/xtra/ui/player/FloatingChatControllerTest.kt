@@ -139,6 +139,71 @@ class FloatingChatControllerTest {
         assertNull(prefs.getString(FloatingChatLayoutStore.PREF_KEY, null))
     }
 
+    @Test fun `on a VoD the header leaves the top right buttons although a seek button clips the bottom`() {
+        // The +10 button: 60dp, 50dp in from the right edge, centred; it reaches into the card's bottom 48dp.
+        val buttonLeft = hostWidth() - 110f
+        val buttonTop = hostHeight() / 2f - 30f
+        val topRight = FloatingChatBounds(hostWidth() - 150f, 0f, hostWidth(), TOP_BAND)
+        controls = FloatingChatControls(listOf(topRight, FloatingChatBounds(buttonLeft, buttonTop, buttonLeft + 60f, buttonTop + 60f)))
+        controller.show(animate = false)
+        idle()
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        val card = binding.floatingChatRoot
+        assertTrue(buttonTop < card.y + card.height)
+        assertEquals(card.height - 48, binding.floatingChatHeader.top)
+        assertEquals(48, binding.floatingChatContainer.paddingBottom)
+    }
+
+    @Test fun `with the reply bar open the header stays on top and the buttons under it still work`() {
+        controller.show(animate = false)
+        idle()
+        controller.setComposerOpen(true)
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        val card = binding.floatingChatRoot
+        // The message box holds the bottom edge.
+        assertEquals(0, binding.floatingChatHeader.top)
+        // On the header, over the top right buttons: the player's button gets it.
+        assertFalse(tap(card, hostWidth() - 100f - card.x, 20f))
+        // On the header, clear of them: the header keeps it.
+        assertTrue(tap(card, 20f, 20f))
+    }
+
+    @Test fun `a touch on a covered control goes past the card to the player`() {
+        val reached = mutableListOf<Int>()
+        binding.slidingLayout.setOnTouchListener { _, event ->
+            reached += event.actionMasked
+            true
+        }
+        binding.floatingChatContainer.isClickable = true
+        controller.show(animate = false)
+        idle()
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        val root = binding.root
+        val time = SystemClock.uptimeMillis()
+        fun gesture(x: Float, y: Float) {
+            val events = listOf(
+                MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, x, y, 0),
+                MotionEvent.obtain(time, time + 16, MotionEvent.ACTION_MOVE, x + 2f, y, 0),
+                MotionEvent.obtain(time, time + 32, MotionEvent.ACTION_UP, x + 2f, y, 0),
+            )
+            try {
+                events.forEach(root::dispatchTouchEvent)
+            } finally {
+                events.forEach(MotionEvent::recycle)
+            }
+        }
+        // On the top right buttons, under the faded chat: the whole gesture reaches the player.
+        gesture(hostWidth() - 100f, 30f)
+        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP), reached)
+        // On the chat, clear of the controls: the card keeps it.
+        reached.clear()
+        gesture(binding.floatingChatRoot.x + 20f, 120f)
+        assertTrue(reached.isEmpty())
+    }
+
     @Test fun `a touch on a control under the card reaches the control, the header keeps its own`() {
         // Chat rows would take a touch anywhere on the card.
         binding.floatingChatContainer.isClickable = true
@@ -299,6 +364,15 @@ class FloatingChatControllerTest {
         assertEquals(MARGIN + 120f, binding.floatingChatRoot.y, 0.5f)
     }
 
+    @Test fun `a card let go while still moving stays where the finger left it`() {
+        controller.show(animate = false)
+        idle()
+        drag(binding.floatingChatPill, dx = -300f, dy = 100f, hold = false)
+        idle()
+        assertEquals(rightX() - 300f, binding.floatingChatRoot.x, 0.5f)
+        assertEquals(MARGIN + 100f, binding.floatingChatRoot.y, 0.5f)
+    }
+
     @Test fun `a cancelled drag settles and releases the controls`() {
         controller.show(animate = false)
         idle()
@@ -328,6 +402,7 @@ class FloatingChatControllerTest {
         idle()
         val header = binding.floatingChatHeader
         val close = binding.floatingChatClose
+        val card = binding.floatingChatRoot
         val startY = MARGIN
         assertEquals(startY, binding.floatingChatRoot.y, 0.5f)
         // On the close button, which fills the end of the header.
@@ -335,11 +410,13 @@ class FloatingChatControllerTest {
             header, dx = -400f, dy = 0f,
             startX = close.left + close.width / 2f, startY = close.top + close.height / 2f,
         ) {
-            // Past the touch slop: the controls fade, the header and grip stay under the finger.
+            // Past the touch slop: the controls fade, the header stays under the finger.
             assertEquals(1, dismissals)
             assertEquals(View.VISIBLE, binding.floatingChatHeader.visibility)
             assertEquals(1f, binding.floatingChatHeader.alpha, 0f)
-            assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
+            // The header is on the bottom edge here, where the grip would sit on it.
+            assertEquals(card.height - 48, binding.floatingChatHeader.top)
+            assertEquals(View.INVISIBLE, binding.floatingChatGrip.visibility)
         }
         idle()
         assertEquals(0, closeRequests)
@@ -533,6 +610,7 @@ class FloatingChatControllerTest {
         dy: Float,
         startX: Float = 10f,
         startY: Float = 10f,
+        hold: Boolean = true,
         midway: () -> Unit = {},
     ) {
         val time = SystemClock.uptimeMillis()
@@ -547,10 +625,15 @@ class FloatingChatControllerTest {
             for (step in 6..10) {
                 add(event(MotionEvent.ACTION_MOVE, step * 16L, startX + dx * step / 10, startY + dy * step / 10))
             }
-            // Robolectric's velocity tracker looks back 200 ms from the newest sample.
-            add(event(MotionEvent.ACTION_MOVE, 400, startX + dx, startY + dy))
-            add(event(MotionEvent.ACTION_MOVE, 500, startX + dx, startY + dy))
-            add(event(MotionEvent.ACTION_UP, 600, startX + dx, startY + dy))
+            if (hold) {
+                // Robolectric's velocity tracker looks back 200 ms from the newest sample.
+                add(event(MotionEvent.ACTION_MOVE, 400, startX + dx, startY + dy))
+                add(event(MotionEvent.ACTION_MOVE, 500, startX + dx, startY + dy))
+                add(event(MotionEvent.ACTION_UP, 600, startX + dx, startY + dy))
+            } else {
+                // Lifted mid-move, at full speed.
+                add(event(MotionEvent.ACTION_UP, 176, startX + dx, startY + dy))
+            }
         }
         try {
             first.forEach(view::dispatchTouchEvent)

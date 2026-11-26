@@ -144,6 +144,14 @@ internal object FloatingChatPlacement {
     fun covers(left: Float, top: Float, right: Float, bottom: Float, obstacle: FloatingChatBounds) =
         left < obstacle.right && right > obstacle.left && top < obstacle.bottom && bottom > obstacle.top
 
+    /** How much of the rectangle from ([left], [top]) to ([right], [bottom]) [obstacles] cover, in square pixels. */
+    fun coveredArea(left: Float, top: Float, right: Float, bottom: Float, obstacles: List<FloatingChatBounds>): Float =
+        obstacles.sumOf { obstacle ->
+            val width = min(right, obstacle.right) - max(left, obstacle.left)
+            val height = min(bottom, obstacle.bottom) - max(top, obstacle.top)
+            if (width > 0f && height > 0f) (width * height).toDouble() else 0.0
+        }.toFloat()
+
     /** Whether the point ([x], [y]) is on any of [obstacles]. */
     fun hits(x: Float, y: Float, obstacles: List<FloatingChatBounds>) =
         obstacles.any { x >= it.left && x < it.right && y >= it.top && y < it.bottom }

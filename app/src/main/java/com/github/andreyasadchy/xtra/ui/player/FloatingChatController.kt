@@ -151,7 +151,7 @@ internal class FloatingChatController(
      * with them, after the controls they came with have faded out.
      */
     private var chromeHeld = false
-    /** Moves the card clear of the controls, keyboard or a new screen size, in step with the controls' fade. */
+    /** Moves the card clear of the keyboard, insets or a new screen size. */
     private var keepClearMotion: ValueAnimator? = null
     /** Faded back while a brightness, volume, seek or speed slider shows. */
     private var ducked = false
@@ -160,7 +160,7 @@ internal class FloatingChatController(
      * through, and a touch on one of them goes to it.
      */
     private var covering = false
-    /** The header shows on the card's bottom edge: its top edge is under a control row. */
+    /** The header shows on the card's bottom edge: the controls cover its top edge more. */
     private var headerAtBottom = false
     /** The grip would sit on a control, so it stays hidden. */
     private var gripCovers = false
@@ -433,9 +433,9 @@ internal class FloatingChatController(
         if (visible) bands = callbacks.controlBands()
         // A card riding into the mini-player keeps its look; show() syncs it again.
         if (leaving) return
+        // The controls never move the card, so its spring or glide keeps going.
         refreshCovering(animate = true)
         syncChrome(animate = true)
-        onKeepClearChanged()
     }
 
     /**
@@ -475,22 +475,24 @@ internal class FloatingChatController(
                 val band = header.layoutParams.height.toFloat()
                 val top = placed.y
                 val end = placed.y + placed.height
-                val topCovered = obstacles.any { FloatingChatPlacement.covers(left, top, right, top + band, it) }
-                val bottomCovered = obstacles.any { FloatingChatPlacement.covers(left, end - band, right, end, it) }
-                bottom = topCovered && !bottomCovered
+                // The edge the controls cover less: the top right buttons outweigh
+                // the corner of a ±10 button clipping the bottom band.
+                val topCovered = FloatingChatPlacement.coveredArea(left, top, right, top + band, obstacles)
+                val bottomCovered = FloatingChatPlacement.coveredArea(left, end - band, right, end, obstacles)
+                bottom = topCovered > bottomCovered
             }
             if (bottom != headerAtBottom) {
                 headerAtBottom = bottom
                 applyHeaderEdge()
             }
         }
-        var gripNow = false
-        if (now && placed != null) {
+        var gripNow = headerAtBottom && (controlsVisible || chromeHeld)
+        if (!gripNow && now && placed != null) {
             val size = grip.layoutParams.width.toFloat()
             // The grip sits on the bottom corner that faces the video; it gives way to a header there.
             val gripLeft = if (layout.side == FloatingChatSide.RIGHT) placed.x else placed.x + placed.width - size
             val end = placed.y + placed.height
-            gripNow = headerAtBottom || obstacles.any { FloatingChatPlacement.covers(gripLeft, end - size, gripLeft + size, end, it) }
+            gripNow = obstacles.any { FloatingChatPlacement.covers(gripLeft, end - size, gripLeft + size, end, it) }
         }
         if (gripNow != gripCovers) {
             gripCovers = gripNow
@@ -509,12 +511,12 @@ internal class FloatingChatController(
 
     /**
      * While the controls show over the card, a touch that starts on one of
-     * them goes to it, except on the card's own header and grip, which draw on top.
+     * them goes to it, also where the card's header lies over them (the
+     * header moves off them when the other edge is clearer). The grip never
+     * sits on a control.
      */
     private fun passesToControls(x: Float, y: Float): Boolean {
         if (!covering || !controlsVisible) return false
-        if (header.isVisible && y >= header.top && y < header.bottom) return false
-        if (grip.isVisible && x >= grip.left && x < grip.right && y >= grip.top && y < grip.bottom) return false
         return FloatingChatPlacement.hits(card.x + x, card.y + y, bands.obstacles)
     }
 

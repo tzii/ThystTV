@@ -139,6 +139,13 @@ class FloatingChatPlacementTest {
         assertTrue(FloatingChatPlacement.covers(FloatingChatPlaced(627f, 12f, 224, 240), listOf(topRight)))
     }
 
+    @Test fun `covered area adds up each control's overlap`() {
+        // The default card's top 48 px band against the top right buttons, and its bottom band against +10.
+        assertEquals(138f * 38f, FloatingChatPlacement.coveredArea(764f, 12f, 988f, 60f, listOf(topRight)), 0.01f)
+        assertEquals(60f * 32f, FloatingChatPlacement.coveredArea(764f, 204f, 988f, 252f, listOf(rightButton)), 0.01f)
+        assertEquals(0f, FloatingChatPlacement.coveredArea(0f, 100f, 300f, 200f, listOf(topRight, rightButton)), 0f)
+    }
+
     @Test fun `a point hits only the controls it is on`() {
         val controls = listOf(topRight, rightButton)
         assertTrue(FloatingChatPlacement.hits(900f, 20f, controls))

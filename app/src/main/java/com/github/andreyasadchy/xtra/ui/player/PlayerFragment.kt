@@ -4821,7 +4821,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         controls.removeCallbacks(controllerHideAction)
         // A fade-in still running would make hideController() a no-op.
         if (controllerIsAnimating) controllerAnimation?.cancel()
-        if (controls.isVisible) hideController()
+        // Mid-drag is no moment for the one-time pinch hint.
+        if (controls.isVisible) hideController(pinchHint = false)
     }
 
     /**
