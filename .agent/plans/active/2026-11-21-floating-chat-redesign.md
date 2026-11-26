@@ -275,6 +275,20 @@ Human QA completed:
   pass through to it, the header moves to the bottom edge when the top one is
   covered, and the grip hides over a control. The default size from the screen
   share was offered and not taken up yet.
+- 2026-11-27: GLM 5.4 (max, OpenCode, session verified `zai-coding-plan/glm-5.4`
+  variant `max`) reviewed `638bee998..0626f6181` from the detached snapshot
+  `.private/review/fc-0626f6181`; raw output in
+  `.private/qa/2026-11-26-fc-glm54-review/`. No safety blocker. Verified and
+  fixed: (1, major) in the default spot on a VoD, +10 clipped the card's bottom
+  band, so the header stayed on Speed/Quality/More, with Aa, tuck and close over
+  them; the edge is now chosen by covered area (`coveredArea`). (2) With Reply
+  bar on, the header can't leave the top; the controls now win taps under the
+  header too. (3) Changelog and docs still described sliding off the controls.
+  (4) A controls change still restarted the card's motion through
+  `onKeepClearChanged`. (5) Tests: added routing through the root to the player
+  layer, a release while still moving, the VoD and Reply bar cases. (6) A chat
+  drag spent the one-time pinch hint. (7) The grip showed over a held bottom
+  header. (8) Stale comments. Not done: a fragment-level minimize/maximize test.
 
 ## Decisions
 
@@ -295,8 +309,8 @@ Human QA completed:
   Reason: Clear has no surface, so an immediate move would make the text vanish
   with nothing to fade. Toggling to the sidebar still moves the view at once.
   Alternatives considered: snapshot bitmap (fails on hardware emote bitmaps).
-- Decision: Tuck by drag measures the 30% overhang against the keep-clear
-  bounds, as the prototype did, not the raw screen edge.
+- Decision: Tuck by drag measures the overhang (30%, 35% since 2026-11-23)
+  against the keep-clear bounds, as the prototype did, not the raw screen edge.
 - Decision: The player's chat-bar toggle switches the Reply bar while floating.
 - Decision: A recreated player view starts with sidebar chat (floating state
   resets in `onDestroyView`), instead of a floating flag with no card.
@@ -336,8 +350,8 @@ Summary: Redesigns floating chat as a dark rounded card over video with Clear
 (text with a halo, no surface), Shade (default for untouched installs) and
 Solid looks, text size and bold options, all switched live from a new Aa
 popover without reconnecting chat. The card moves by a pill or the header
-(the controls fade while it moves), stays where it is dropped, slides just off
-any control it covers, keeps clear of the cutout, navigation bar and keyboard,
+(the controls fade while it moves), stays exactly where it is dropped, fades
+to 60% under the controls and lets taps through to them, keeps clear of the cutout, navigation bar and keyboard,
 rides into the mini-player with the video, tucks to an edge tab with an
 unread count, resizes from the inner corner or by pinch, and remembers its
 place per channel with a last-used fallback (1.7.0 positions migrate). New
@@ -352,7 +366,7 @@ review's verified findings are fixed (see the progress log).
 Human QA: `docs/MANUAL_QA.md` → "Floating chat redesign", plus the player
 safety rows (live, VoD, stream switching, minimize/restore, close/reopen, PiP,
 speed/quality, gestures).
-Risks: chat view reparenting now waits for the hide fade; control avoidance
-uses the measured control groups (none before the controls first lay out); keyboard
+Risks: chat view reparenting now waits for the hide fade; the cover fade and
+tap-through use the measured control groups (none before the controls first lay out); keyboard
 avoidance relies on window insets; Robolectric cannot show real spring or
 fade feel, so motion needs device QA.

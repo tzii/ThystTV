@@ -3504,9 +3504,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
-    private fun hideController(force: Boolean = false, immediate: Boolean = false) {
+    private fun hideController(force: Boolean = false, immediate: Boolean = false, pinchHint: Boolean = !force) {
         seekPreview?.hide()
-        if (!force) {
+        if (pinchHint) {
             maybeShowPinchHint()
         }
         if (!immediate && !controllerIsAnimating && binding.playerControls.root.isVisible) {
@@ -4813,7 +4813,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         controls.removeCallbacks(controllerHideAction)
         // A fade-in still running would make hideController() a no-op.
         if (controllerIsAnimating) controllerAnimation?.cancel()
-        if (controls.isVisible) hideController()
+        // Mid-drag is no moment for the one-time pinch hint.
+        if (controls.isVisible) hideController(pinchHint = false)
     }
 
     /**

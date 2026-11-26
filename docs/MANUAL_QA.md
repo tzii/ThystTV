@@ -922,8 +922,11 @@ bright and dark video. Repeat the core rows with an RTL language.
   The card never moves for the controls. Over a control it fades a little so
   the control shows through, and tapping that control works through the chat;
   it is back to full strength when they hide. A card in the open does not fade.
-  Card at the top right: the header shows on the card's bottom edge, the top
-  right buttons can be tapped through the card, and the grip stays hidden.
+  Card at the top right, on a live stream and on a VoD (where +10 reaches the
+  card's bottom): the header shows on the card's bottom edge, the top right
+  buttons (Speed, Quality, More) can be tapped through the card, and the grip
+  stays hidden. With Reply bar on, the header stays on top and those buttons
+  still answer taps through it.
   No chat line shows under the header's buttons.
 - [ ] Card at the top: drag it by its header. The controls fade as the drag
   starts, the header stays under the finger, and the card stays where it is let
@@ -932,7 +935,7 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Drop the card in the middle, near (not at) an edge and in each corner, on a
   small phone and on a wide tablet or desktop window: it stays exactly where
   dropped, even when let go mid-swipe, and only lands flush within about 8dp of
-  an edge. Tapping the video afterwards does not move it. The spot survives
+  an edge (or when dropped partly past it). Tapping the video afterwards does not move it. The spot survives
   rotation, reopening and another channel.
 - [ ] On a VoD with the card on the right, middle height, show the controls: the
   card stays, fades a little, and the +10 button shows through and can be

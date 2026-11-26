@@ -245,8 +245,8 @@ stay. `FloatingChatController` owns how the card looks and moves. Keep these:
   no touches itself. It lays its children out locally on the next frame, so a
   resize never re-measures the player.
 - Per-touch work only writes `x`/`y`. Grip resize is coalesced to one size change
-  per frame; release and tuck use `SpringAnimation`, and a keep-clear move glides
-  over the controls' own 250 ms fade (`glide`). Do not add layout writes or new
+  per frame; release and tuck use `SpringAnimation`, and a move for the keyboard or
+  insets glides over 250 ms (`glide`); the controls never start one. Do not add layout writes or new
   animators per `ACTION_MOVE`. A size change lays the card
   out at once, so a spring that starts in the same frame uses the new size.
 - A drag follows one finger; if it lifts while another is down, that finger takes
@@ -259,15 +259,15 @@ stay. `FloatingChatController` owns how the card looks and moves. Keep these:
   top, 1 = flush right or bottom) plus a size in dp, inside bounds that keep clear
   of cutouts (also while the video draws behind one), the status bar and the
   navigation bar or keyboard. The controls never shrink those bounds and never
-  move the card. While they show and the keyboard is down, a card over a control
+  move the card. While they show and the keyboard is closed, a card over a control
   group (`floatingChatControlBands`: top rows, bottom rows and seek bar,
   play/pause, ±10, each its own rectangle) fades to 60% so the controls show
   through (`refreshCovering`), and a touch that starts on one of those groups
-  goes to the player (`FloatingChatCardView.passThroughAt`), except on the
-  card's visible header or grip. When the controls cover the card's top 48dp
-  but not its bottom, the header shows on the bottom edge (chat padded above
-  it); the grip hides while it would sit on a control or under a bottom
-  header. Mid-drag the header keeps its edge, and it only changes edge while the
+  goes to the player (`FloatingChatCardView.passThroughAt`), also where the
+  card's header lies over it. The header shows on the bottom edge (chat padded
+  above it) when the controls cover more of the card's top 48dp than of its
+  bottom 48dp, unless the message box holds the bottom edge; the grip hides
+  while it would sit on a control or on a bottom header. Mid-drag the header keeps its edge, and it only changes edge while the
   controls show. The side (for the grip, tuck and TalkBack) is the half the card
   is on. While a brightness, volume, seek or speed slider shows, the card fades to 25%
   (`setDucked`): the arbiter claim starts it, and the feedback's hide runnable,
@@ -279,7 +279,8 @@ stay. `FloatingChatController` owns how the card looks and moves. Keep these:
   carries it further, an edge within 8dp pulls it flush, and it is stored as
   fractions of the clear screen. It tucks when 35% of the card is past a side,
   or on a fast (1800 dp/s) outward sideways fling from a card that started
-  within 24dp of that edge; a card thrown from the middle lands flush instead.
+  within 24dp of that edge; a card thrown from the middle stays where it was
+  let go. A drop partly past an edge (under 35%) comes back flush with it.
   Stored layouts still write the old side and anchor next to `x`, and entries
   written before free placement read flush with their side and anchor.
 - Layouts are stored per channel plus a last-used fallback in the single JSON
