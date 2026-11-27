@@ -31,7 +31,7 @@ internal data class FloatingChatInsets(
 /**
  * Owns floating chat card geometry, appearance, and direct touch interaction.
  * Dragging only updates card.x/card.y (zero allocations, no layout pass);
- * corner-grip and pinch resizing apply at most once per animation frame inside
+ * corner-grip resizing applies at most once per animation frame inside
  * [FloatingChatHostLayout], and preferences are written only on release.
  */
 internal class FloatingChatController(
@@ -71,10 +71,10 @@ internal class FloatingChatController(
     var isShown = false
         private set
     private var controlsVisible = false
-    private var composerOpen = false
+    /** How far the open message box reaches up from the card's bottom, or 0. */
+    private var composerHeight = 0
     private var ducked = false
     private var interacting = false
-    private var pinching = false
     private var insets = FloatingChatInsets()
     private var appearance = FloatingChatAppearance.read(prefs)
 
@@ -106,7 +106,6 @@ internal class FloatingChatController(
         appearanceButton.setOnClickListener { callbacks.onAppearanceRequested(it) }
         composeButton.setOnClickListener { callbacks.onComposeRequested() }
         closeButton.setOnClickListener { callbacks.onCloseRequested() }
-        card.pinchListener = PinchHandler()
         host.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
                 if (isShown && !interacting) {
@@ -128,7 +127,7 @@ internal class FloatingChatController(
         card.animate().cancel()
         card.isVisible = true
         syncHeader(animate = false)
-        grip.visibility = if (composerOpen) View.INVISIBLE else View.VISIBLE
+        updateGripLift()
         updateAccessibilityActions()
         if (host.width > 0 && host.height > 0) {
             placeNow()
@@ -153,8 +152,6 @@ internal class FloatingChatController(
         val wasShown = isShown
         isShown = false
         ducked = false
-        pinching = false
-        card.cancelPinch()
         dragHandler.cancel()
         resizeHandler.cancel()
         clearPendingResize()
@@ -205,10 +202,25 @@ internal class FloatingChatController(
         if (isShown && !interacting) placeNow()
     }
 
-    fun setComposerOpen(open: Boolean) {
-        if (composerOpen == open) return
-        composerOpen = open
-        grip.visibility = if (composerOpen) View.INVISIBLE else View.VISIBLE
+    /** [heightPx] is how far the open message box reaches up from the bottom of the chat, or 0 when closed. */
+    fun setComposerHeight(heightPx: Int) {
+        composerHeight = heightPx.coerceAtLeast(0)
+        updateGripLift()
+    }
+
+    /**
+     * The grip stays usable with the message box open: it sits just above the
+     * box (and its reply line) instead of covering the text field or Send. A
+     * card too short for both hides the grip until the box closes or the
+     * emote menu does.
+     */
+    private fun updateGripLift() {
+        val lift = -composerHeight.toFloat()
+        if (grip.translationY != lift) grip.translationY = lift
+        val gripHeight = grip.layoutParams.height.takeIf { it > 0 } ?: grip.height
+        val fits = composerHeight == 0 || composerHeight + gripHeight + dp(PILL_HEIGHT_DP) <= card.height
+        val visibility = if (fits) View.VISIBLE else View.INVISIBLE
+        if (grip.visibility != visibility) grip.visibility = visibility
     }
 
     fun applyAppearance() {
@@ -531,7 +543,6 @@ internal class FloatingChatController(
                 MotionEvent.ACTION_CANCEL -> if (pointerId != MotionEvent.INVALID_POINTER_ID) {
                     val didMove = moved
                     cancel()
-                    if (pinching) return true
                     endInteraction()
                     if (isShown && didMove) placeNow()
                 }
@@ -609,10 +620,6 @@ internal class FloatingChatController(
                 MotionEvent.ACTION_UP -> if (pointerId != MotionEvent.INVALID_POINTER_ID) {
                     val didResize = resized
                     cancel()
-                    if (pinching) {
-                        clearPendingResize()
-                        return true
-                    }
                     flushResize()
                     endInteraction()
                     if (isShown && didResize) commitLayout(card.layoutParams.width, card.layoutParams.height)
@@ -621,7 +628,6 @@ internal class FloatingChatController(
                     val didResize = resized
                     cancel()
                     clearPendingResize()
-                    if (pinching) return true
                     endInteraction()
                     if (isShown && didResize) placeNow()
                 }
@@ -630,59 +636,11 @@ internal class FloatingChatController(
         }
     }
 
-    private inner class PinchHandler : FloatingChatCardView.PinchListener {
-        private var startWidth = 0
-        private var startHeight = 0
-        private var pinchWidth = 0
-        private var pinchHeight = 0
-        private var centerX = 0f
-        private var centerY = 0f
-        private var resized = false
-
-        override fun onPinchStart(): Boolean {
-            if (!isShown) return false
-            // Set before FloatingChatCardView cancels any drag or grip resize under the first finger.
-            pinching = true
-            beginInteraction()
-            centerX = card.x + card.width / 2f
-            centerY = card.y + card.height / 2f
-            val (width, height) = clampedSize()
-            startWidth = width
-            startHeight = height
-            pinchWidth = width
-            pinchHeight = height
-            resized = false
-            return true
-        }
-
-        override fun onPinch(scale: Float) {
-            if (!pinching || !isShown) return
-            val (width, height) = FloatingChatPlacement.clampSize(startWidth * scale, startHeight * scale, host.width, host.height, density)
-            pinchWidth = width
-            pinchHeight = height
-            if (width != startWidth || height != startHeight) resized = true
-            val bounds = freeBounds()
-            val fittedW = min(width, bounds.width.toInt()).coerceAtLeast(1)
-            val fittedH = FloatingChatPlacement.visibleHeight(height, bounds, density, keyboard = insets.ime)
-            val x = (centerX - fittedW / 2f).coerceIn(bounds.left, max(bounds.left, bounds.right - fittedW))
-            val y = (centerY - fittedH / 2f).coerceIn(bounds.top, max(bounds.top, bounds.bottom - fittedH))
-            scheduleResize(fittedW, fittedH, x, y)
-        }
-
-        override fun onPinchEnd() {
-            if (!pinching) return
-            val didResize = resized
-            pinching = false
-            if (isShown) flushResize() else clearPendingResize()
-            endInteraction()
-            if (isShown && didResize) commitLayout(pinchWidth, pinchHeight)
-        }
-    }
-
     private fun dp(value: Float) = (value * density).roundToInt()
 
     private companion object {
         const val HEADER_HEIGHT_DP = 48f
+        const val PILL_HEIGHT_DP = 28f
         const val FADE_MS = 200L
         const val DUCK_IN_MS = 120L
         const val DUCKED_ALPHA = 0.25f

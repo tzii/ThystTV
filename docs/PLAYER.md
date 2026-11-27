@@ -246,15 +246,18 @@ stay. `FloatingChatController` owns geometry, touch handling and chrome. Keep th
   resize never re-measures the player.
 - Per-move drag work only writes `card.x`/`card.y` (zero allocations, no layout
   pass, clamped strictly to usable bounds) and stops exactly where released with
-  no spring, fling, or magnet animation. Grip and pinch resizes coalesce to at
+  no spring, fling, or magnet animation. Grip resizes coalesce to at
   most one layout pass per animation frame and write preferences only on release.
   A size change lays the card out synchronously so dimensions and coordinates
   land on the same frame.
 - Interactions never depend on player controls visibility. While the card is
   shown, a top drag handle (full-width `floatingChatPill` strip when controls
-  are hidden, or `floatingChatHeader` when controls are visible), the corner
-  resize grip (hidden only while the bottom message box is open), and two-finger
-  pinch on the card all work at any time. `FloatingChatHeaderLayout` takes over
+  are hidden, or `floatingChatHeader` when controls are visible) and the corner
+  resize grip work at any time. The card has no pinch: resizing is the grip
+  only. While the message box is open, `ChatFragment.onComposerHeightChanged`
+  reports how far the box (with its reply line) reaches up, and the grip is
+  lifted above it with `translationY` (no layout pass); it hides only while the
+  card is too short for both. `FloatingChatHeaderLayout` takes over
   a drag that starts on a header button once past touch slop, while taps still
   press the button. The header is `View.INVISIBLE` when controls are hidden so
   hidden buttons cannot catch touches; when visible, `floating_chat_container`
@@ -307,7 +310,7 @@ stay. `FloatingChatController` owns geometry, touch handling and chrome. Keep th
 
 `FloatingChatPlacementTest`, `FloatingChatLayoutStoreTest` and
 `FloatingChatAppearanceTest` cover the pure rules; `FloatingChatControllerTest`
-drives the real card, handles, pinch detector and insets. The chat transition
+drives the real card, handles and insets. The chat transition
 suites (`PlayerChatSwipeTest`, `PlayerPinchChatTest`, `PlayerFoldLayoutTest`)
 run with the controller attached.
 

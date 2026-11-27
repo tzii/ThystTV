@@ -656,7 +656,7 @@ Turn on Player settings → Gestures → Extended zoom.
 | Quality menu/selection | [ ] | [ ] | |
 | Chat-only/audio-only restore | [ ] | [ ] | |
 | Gestures: brightness/volume/seek | [ ] | [ ] | |
-| Floating chat: open/drag/resize/pinch | [ ] | [ ] | |
+| Floating chat: open/drag/resize | [ ] | [ ] | |
 | Floating chat readability over video | [ ] | [ ] | |
 | Portrait phone layout | [ ] | [ ] | |
 | Landscape phone layout | [ ] | [ ] | |
@@ -925,18 +925,17 @@ bright and dark video. Repeat the core rows with an RTL language.
   buttons. Dragging by the header (including starting on Aa or close) moves the
   card without firing the button, while a tap presses it. The corner resize grip
   stays visible and usable.
-- [ ] Resize and pinch: corner grip resizes live with controls hidden AND with
+- [ ] Resize: corner grip resizes live with controls hidden AND with
   controls shown, keeping the outer edge fixed and clamping to min/max size and
   usable bounds; flipping the card to the left side moves the grip to the
-  bottom-right corner. Two-finger pinch anywhere on the card resizes with
-  controls hidden AND shown. Both save on release; a plain tap on the grip does
-  not shrink a saved size on a short screen.
+  bottom-right corner. It saves on release; a plain tap on the grip does
+  not shrink a saved size on a short screen. Two fingers on the card do not
+  resize it (there is no card pinch).
 - [ ] Controls toggling mid-gesture: start a drag or resize, toggle controls on
   or off, and finish the gesture — it completes cleanly and saves without
   jumping or getting stuck.
 - [ ] Start a drag, put a second finger down and lift the first: the card
-  follows the second finger without jumping. Start a drag or grip resize, then
-  pinch: pinch takes over smoothly and saves on release.
+  follows the second finger without jumping.
 - [ ] With the card open, open Quality, Speed, More and Aa: each menu draws
   above the card, and every chip and close button can be tapped. In landscape Aa
   opens beside the card on the video side first so changes are visible live.
@@ -956,8 +955,9 @@ bright and dark video. Repeat the core rows with an RTL language.
   controls, while scrolled back, touching or typing.
 - [ ] Signed in on a live stream: header keyboard button opens the message box
   for one message and closes after sending or leaving it empty. Reply bar on:
-  box stays open (grip hides so it does not cover Send/Emotes; pinch still
-  resizes). Keyboard clamps the card above the keys and restores its position
+  box stays open and the grip sits just above it (and above a "Replying to"
+  line), never over the text field, Send or Emotes, and still resizes. With the
+  emote menu open on a short card the grip may hide until the menu closes. Keyboard clamps the card above the keys and restores its position
   when closed; on a short landscape phone the card shrinks to fit above the keys
   and restores when closed. Copy and Reply from message actions open the box.
   Signed out or VoD: no keyboard button.

@@ -30,7 +30,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.ConscryptMode
 import java.time.Duration
 
-/** Real card, handles and pinch detector on a 1000x500 landscape mdpi screen (1 dp = 1 px). */
+/** Real card, handles and insets on a 1000x500 landscape mdpi screen (1 dp = 1 px). */
 @RunWith(RobolectricTestRunner::class)
 @ConscryptMode(ConscryptMode.Mode.OFF)
 @Config(application = Application::class, sdk = [28], qualifiers = "w1000dp-h500dp-land-mdpi")
@@ -217,24 +217,6 @@ class FloatingChatControllerTest {
         assertEquals(140, binding.floatingChatRoot.height)
     }
 
-    @Test fun `pinch resizes card while controls are hidden and saves on release`() {
-        controller.show(animate = false)
-        idle()
-        assertEquals(View.INVISIBLE, binding.floatingChatHeader.visibility)
-        val beforeWidth = binding.floatingChatRoot.width
-        val beforeHeight = binding.floatingChatRoot.height
-
-        // Android ScaleGestureDetector requires span >= config_minScalingSpan (~170px at mdpi).
-        pinch(binding.floatingChatRoot, startSpan = 190f, endSpan = 285f)
-        idle()
-        assertTrue("expected width > $beforeWidth, got ${binding.floatingChatRoot.width}", binding.floatingChatRoot.width > beforeWidth)
-        assertTrue("expected height > $beforeHeight, got ${binding.floatingChatRoot.height}", binding.floatingChatRoot.height > beforeHeight)
-        val stored = FloatingChatLayoutStore.read(prefs.getString(FloatingChatLayoutStore.PREF_KEY, null), "c1")!!
-        assertEquals(binding.floatingChatRoot.width.toFloat(), stored.widthDp, 1f)
-        assertEquals(binding.floatingChatRoot.height.toFloat(), stored.heightDp, 1f)
-        assertEquals(listOf(true, false), holds)
-    }
-
     @Test fun `drag and resize still finish cleanly when controls toggle mid-gesture`() {
         controller.show(animate = false)
         idle()
@@ -417,13 +399,37 @@ class FloatingChatControllerTest {
         assertEquals(1f, binding.floatingChatRoot.alpha, 0.01f)
     }
 
-    @Test fun `composer open hides corner grip and closing composer restores it`() {
+    @Test fun `open message box lifts the corner grip above it and closing it lowers the grip`() {
         controller.show(animate = false)
         idle()
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
-        controller.setComposerOpen(true)
+        controller.setComposerHeight(48)
+        assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
+        assertEquals(-48f, binding.floatingChatGrip.translationY, 0.01f)
+        controller.setComposerHeight(0)
+        assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
+        assertEquals(0f, binding.floatingChatGrip.translationY, 0.01f)
+    }
+
+    @Test fun `grip lifted above an open message box still resizes the card`() {
+        controller.show(animate = false)
+        idle()
+        controller.setComposerHeight(48)
+        val beforeWidth = binding.floatingChatRoot.width
+        val beforeHeight = binding.floatingChatRoot.height
+        drag(binding.floatingChatGrip, dx = -60f, dy = 40f)
+        idle()
+        assertTrue(binding.floatingChatRoot.width > beforeWidth)
+        assertTrue(binding.floatingChatRoot.height > beforeHeight)
+        assertEquals(-48f, binding.floatingChatGrip.translationY, 0.01f)
+    }
+
+    @Test fun `grip hides while the message box leaves no room for it`() {
+        controller.show(animate = false)
+        idle()
+        controller.setComposerHeight(binding.floatingChatRoot.height - 40)
         assertEquals(View.INVISIBLE, binding.floatingChatGrip.visibility)
-        controller.setComposerOpen(false)
+        controller.setComposerHeight(48)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
     }
 
@@ -483,43 +489,6 @@ class FloatingChatControllerTest {
             rest.forEach(view::dispatchTouchEvent)
         } finally {
             (first + rest).forEach(MotionEvent::recycle)
-        }
-    }
-
-    /** Dispatches a real two-finger pinch through [view]'s ScaleGestureDetector. */
-    private fun pinch(view: View, startSpan: Float, endSpan: Float) {
-        val cx = view.width / 2f
-        val cy = view.height / 2f
-        val time = SystemClock.uptimeMillis()
-        val p0 = MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_FINGER }
-        val p1 = MotionEvent.PointerProperties().apply { id = 1; toolType = MotionEvent.TOOL_TYPE_FINGER }
-        val c0 = MotionEvent.PointerCoords()
-        val c1 = MotionEvent.PointerCoords()
-        fun twoFinger(action: Int, offset: Long, span: Float): MotionEvent {
-            c0.x = cx - span / 2f
-            c0.y = cy
-            c1.x = cx + span / 2f
-            c1.y = cy
-            return MotionEvent.obtain(
-                time, time + offset, action, 2,
-                arrayOf(p0, p1), arrayOf(c0, c1),
-                0, 0, 1f, 1f, 0, 0, 0, 0,
-            )
-        }
-        val events = buildList {
-            add(MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, cx - startSpan / 2f, cy, 0))
-            add(twoFinger(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 16, startSpan))
-            for (step in 1..6) {
-                val span = startSpan + (endSpan - startSpan) * step / 6f
-                add(twoFinger(MotionEvent.ACTION_MOVE, 16L + step * 16L, span))
-            }
-            add(twoFinger(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 128, endSpan))
-            add(MotionEvent.obtain(time, time + 144, MotionEvent.ACTION_UP, cx - endSpan / 2f, cy, 0))
-        }
-        try {
-            events.forEach(view::dispatchTouchEvent)
-        } finally {
-            events.forEach(MotionEvent::recycle)
         }
     }
 
