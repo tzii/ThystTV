@@ -19,6 +19,20 @@ import kotlinx.coroutines.launch
 
 abstract class PagedListFragment : BaseNetworkFragment(), IntegrityDialog.CallbackListener {
 
+    /**
+     * A reload the app started by itself: no refresh spinner, and the list
+     * only jumps to a new first item when it was already at the top.
+     */
+    private var quietRefresh = false
+    private var quietRefreshStarted = false
+
+    /** Reloads [adapter] in the background: like a pull to refresh, without the spinner. */
+    protected fun refreshQuietly(adapter: PagingDataAdapter<*, *>) {
+        quietRefresh = true
+        quietRefreshStarted = false
+        adapter.refresh()
+    }
+
     fun <T : Any, VH : RecyclerView.ViewHolder> setAdapter(recyclerView: RecyclerView, adapter: PagingDataAdapter<T, VH>) {
         var firstInsertion = true
         val observer = object : RecyclerView.AdapterDataObserver() {
@@ -27,7 +41,7 @@ abstract class PagedListFragment : BaseNetworkFragment(), IntegrityDialog.Callba
                     firstInsertion = false
                 } else {
                     try {
-                        if (positionStart == 0) {
+                        if (positionStart == 0 && (!quietRefresh || !recyclerView.canScrollVertically(-1))) {
                             recyclerView.scrollToPosition(0)
                         }
                     } catch (e: Exception) {
@@ -65,9 +79,17 @@ abstract class PagedListFragment : BaseNetworkFragment(), IntegrityDialog.Callba
             viewLifecycleOwner.lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     pagingAdapter.loadStateFlow.collectLatest { loadState ->
+                        if (quietRefresh) {
+                            if (loadState.refresh is LoadState.Loading) {
+                                quietRefreshStarted = true
+                            } else if (quietRefreshStarted) {
+                                quietRefresh = false
+                                quietRefreshStarted = false
+                            }
+                        }
                         progressBar.isVisible = loadState.refresh is LoadState.Loading && pagingAdapter.itemCount == 0
                         if (enableSwipeRefresh) {
-                            swipeRefresh.isRefreshing = loadState.refresh is LoadState.Loading && pagingAdapter.itemCount != 0
+                            swipeRefresh.isRefreshing = loadState.refresh is LoadState.Loading && pagingAdapter.itemCount != 0 && !quietRefresh
                         }
                         nothingHere.isVisible = loadState.refresh !is LoadState.Loading && pagingAdapter.itemCount == 0
                         if ((loadState.refresh as? LoadState.Error ?:
@@ -83,7 +105,10 @@ abstract class PagedListFragment : BaseNetworkFragment(), IntegrityDialog.Callba
             }
             if (enableSwipeRefresh) {
                 swipeRefresh.isEnabled = true
-                swipeRefresh.setOnRefreshListener { pagingAdapter.refresh() }
+                swipeRefresh.setOnRefreshListener {
+                    quietRefresh = false
+                    pagingAdapter.refresh()
+                }
             }
             if (enableScrollTopButton && requireContext().prefs().getBoolean(C.UI_SCROLLTOP, true)) {
                 recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
