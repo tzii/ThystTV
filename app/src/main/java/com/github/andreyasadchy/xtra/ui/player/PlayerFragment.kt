@@ -4579,7 +4579,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         floatingChat?.hide(animate = false)
         floatingChat = null
         floatingChatHoldsControls = false
-        chatFragment?.onComposerVisibilityChanged = null
+        chatFragment?.onComposerHeightChanged = null
         // The chat's next view starts as ordinary sidebar chat.
         chatFragment?.setOverlayStyle(null)
         chatFragment?.setFloatingReplyBar(false)
@@ -4756,7 +4756,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         floatingChat = controller
         controller.setInsets(floatingChatInsets)
         controller.onControlsVisibilityChanged(binding.playerControls.root.isVisible)
-        chatFragment?.onComposerVisibilityChanged = { open -> floatingChat?.setComposerOpen(open) }
+        chatFragment?.onComposerHeightChanged = { height -> floatingChat?.setComposerHeight(height) }
     }
 
     /** Ends a floating chat fade-out at once, so its chat view is back in the sidebar. */

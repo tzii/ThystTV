@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -107,8 +108,16 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     private var rowsPaused = false
     private var followGlide: ChatFollowGlide? = null
     private var ageFader: ChatAgeFader? = null
-    /** The message box opened or closed while the chat floats. */
-    var onComposerVisibilityChanged: ((Boolean) -> Unit)? = null
+    /**
+     * While the chat floats: how far the open message box, with its reply
+     * line, reaches up from the bottom of the chat, or 0 when it is closed.
+     */
+    var onComposerHeightChanged: ((Int) -> Unit)? = null
+        set(value) {
+            field = value
+            reportComposerHeight()
+        }
+    private val composerRect = Rect()
     /** The composer's theme colors, restored when the chat leaves the video. */
     private var composerColors: ComposerColors? = null
 
@@ -153,6 +162,9 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         applyPipChrome()
+        // The box moves when it opens, the emote menu or reply line shows, or the card resizes.
+        binding.messageView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> reportComposerHeight() }
+        binding.replyView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> reportComposerHeight() }
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.integrity.collectLatest {
@@ -999,7 +1011,22 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         binding.messageView.isVisible = show
         // A floating card is narrow: keep the text field wide when typing is possible.
         binding.channelRewards.isVisible = rewardsButtonAvailable && (overlayStyle == null || !messagingEnabled)
-        onComposerVisibilityChanged?.invoke(show && overlayStyle != null)
+        reportComposerHeight()
+    }
+
+    private fun reportComposerHeight() {
+        val listener = onComposerHeightChanged ?: return
+        val binding = _binding
+        if (binding == null || overlayStyle == null || !binding.messageView.isVisible) {
+            listener(0)
+            return
+        }
+        // Not laid out yet: its layout listener reports once it is.
+        if (binding.messageView.height == 0) return
+        val top = if (binding.replyView.isVisible && binding.replyView.height > 0) binding.replyView else binding.messageView
+        composerRect.setEmpty()
+        binding.root.offsetDescendantRectToMyCoords(top, composerRect)
+        listener((binding.root.height - composerRect.top).coerceAtLeast(0))
     }
 
     /**
