@@ -299,12 +299,15 @@
             app:tint="?attr/colorControlNormal" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- Takes taps so they don't open the message behind it (#129); nothing to activate,
+         so not a keyboard target. -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/pollLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clickable="true"
         android:focusable="false"
+        tools:ignore="KeyboardInaccessibleWidget"
         android:layout_marginStart="4dp"
         android:layout_marginTop="4dp"
         android:layout_marginEnd="4dp"
@@ -372,12 +375,15 @@
             app:tint="?attr/colorControlNormal" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- Takes taps so they don't open the message behind it (#129); nothing to activate,
+         so not a keyboard target. -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/predictionLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clickable="true"
         android:focusable="false"
+        tools:ignore="KeyboardInaccessibleWidget"
         android:layout_marginStart="4dp"
         android:layout_marginTop="4dp"
         android:layout_marginEnd="4dp"
