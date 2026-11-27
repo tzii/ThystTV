@@ -346,8 +346,28 @@ Human QA completed:
   finger lifted before slop could hijack a second finger's chat scroll (also in
   `FloatingChatHeaderLayout`), a grip inside the band on a keyboard-trimmed card
   dragged instead of resizing, `hide()` left a pending band touch, and a band
-  tap over no child returned false on UP. Tests cover each and fail without
-  the fix.
+  tap over no child returned false on UP. The first two have tests that fail
+  without the fix; the other two were fixed by inspection, and GLM's review
+  (below) added their tests.
+- 2026-11-27: GLM 5.4 (OpenCode, `zai-coding-plan/glm-5.4`, variant max,
+  verified with `session export`) reviewed `49f60d7b9`; no blockers. Verified
+  and fixed: with the controls shown the header overlaid the top 48dp of chat
+  and took every touch there, so a poll/prediction/raid close button or the top
+  line could not be tapped (`3233dbaa0` padded the chat below the header). Now
+  the band grows to the header while it shows, the header passes a DOWN that no
+  button takes to the chat, and the header buttons are band exclusions (a slow
+  press still clicks). The band is also the card's system gesture exclusion
+  rect, so a flush side card drags instead of going back. Added tests for a
+  band drag over no chat child (dispatched through the host, so it fails
+  without the `inBand` return), `hide()` with a pending band touch, idles before
+  the no-hold asserts, and fixed the pill drawable comment and QA wording.
+  Accepted: a pinned card's close button under the header's close (same corner)
+  still closes floating chat while the controls show; a band press held past
+  3/4 of the long-press timeout grabs instead of tapping (the trade-off for
+  beating the row tooltip); a chat scroll at the bottom gesture edge can still
+  go home. The header, band-over-nothing and gesture-exclusion tests each
+  fail against a mutation of their fix; the `hide()` test only pins the band
+  reset, since `DragHandler` already refuses a DOWN while the card is hidden.
 
 ## Decisions
 

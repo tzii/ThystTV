@@ -921,17 +921,26 @@ bright and dark video. Repeat the core rows with an RTL language.
   short), and stays at the exact drop spot with no snap or bounce. Dragged to
   the top, chat text reaches the top edge of the screen with no dead band. The
   chat fills the card under the band: a tap there still opens the top chat
-  line's message actions and closes a poll, prediction or raid card; the pill
-  does not cross the status strip text. Pressing and holding the band, then
-  dragging, moves the card without popping a chat line's tooltip. In a busy
-  chat that is still scrolling, a drag from the band moves the card every time. Two fingers on the card (strip plus grip)
-  move or resize it as one gesture, never both. Resizing a left-side card with
+  line's message actions and closes a poll, prediction or raid card; the faint
+  pill bar may lie over the status strip text but stays readable. Pressing and
+  holding the band, then dragging, moves the card without popping a chat line's
+  tooltip. In a busy chat that is still scrolling, a drag from the band moves
+  the card every time. Two fingers on the card (band plus grip) move or resize
+  it as one gesture, never both. Resizing a left-side card with
   a second finger handed over does not jump.
 - [ ] Controls shown: the top header (optional compose, Aa, close) appears
   over the top of the chat without moving, fading or hiding the card, and the
   chat does not shift when the controls show or hide. Dragging by the header (including starting on Aa or close) moves the
-  card without firing the button, while a tap presses it. The corner resize grip
-  stays visible and usable.
+  card without firing the button, while a tap presses it, also a slow one. A tap
+  on the header's empty part reaches the chat under it (the top line's actions,
+  a raid card). Known trade-off: a poll, prediction or raid card's close button
+  sits under the header's close, so while the controls show that spot closes
+  floating chat; with the controls hidden it closes the card. The corner resize
+  grip stays visible and usable.
+- [ ] Gesture navigation: with the card flush against the left or right edge,
+  a drag that starts on its top band (or header) right at the edge moves the
+  card instead of going back. A chat scroll lower down at the edge may still
+  trigger back, like any app.
 - [ ] Resize: corner grip resizes live with controls hidden AND with
   controls shown, keeping the outer edge fixed and clamping to min/max size and
   usable bounds; flipping the card to the left side moves the grip to the
