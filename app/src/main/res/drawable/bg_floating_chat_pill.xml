@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A quiet 24 x 3dp handle centred in the card-wide 28dp drag strip. -->
+<!-- A quiet 24 x 3dp handle on the top rim of the card's 28dp drag band, clear of the
+     status strip or chat line under it. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:width="24dp"
         android:height="3dp"
-        android:gravity="center">
+        android:gravity="top|center_horizontal"
+        android:top="5dp">
         <shape android:shape="rectangle">
             <corners android:radius="2dp" />
             <solid android:color="#38FFFFFF" />

@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
@@ -68,7 +69,7 @@ class FloatingChatControllerTest {
         assertEquals(224, binding.floatingChatRoot.width)
         assertEquals(240, binding.floatingChatRoot.height)
         assertEquals(rightX(), binding.floatingChatRoot.x, 0.5f)
-        assertEquals(MARGIN, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(0f, binding.floatingChatRoot.y, 0.5f)
         assertEquals(View.VISIBLE, binding.floatingChatPill.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
         assertEquals(View.INVISIBLE, binding.floatingChatHeader.visibility)
@@ -81,13 +82,15 @@ class FloatingChatControllerTest {
         controller.onControlsVisibilityChanged(true)
         idle()
         assertEquals(rightX(), card.x, 0f)
-        assertEquals(MARGIN, card.y, 0f)
+        assertEquals(0f, card.y, 0f)
         assertEquals(1f, card.alpha, 0f)
         assertEquals(View.VISIBLE, binding.floatingChatHeader.visibility)
         assertEquals(1f, binding.floatingChatHeader.alpha, 0f)
         assertEquals(View.INVISIBLE, binding.floatingChatPill.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
-        assertEquals(48, binding.floatingChatContainer.paddingTop)
+        // The header overlays the chat, so toggling the controls never shifts it.
+        assertEquals(0, binding.floatingChatContainer.paddingTop)
+        assertEquals(0, binding.floatingChatRoot.dragBandHeight)
 
         controller.onControlsVisibilityChanged(false)
         idle()
@@ -95,11 +98,131 @@ class FloatingChatControllerTest {
         assertEquals(View.INVISIBLE, binding.floatingChatHeader.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatPill.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
-        // Chat starts below the 28dp drag strip, so the strip covers no chat line.
-        assertEquals(28, binding.floatingChatContainer.paddingTop)
+        // The chat fills the card to its top edge; the pill only marks the drag band over it.
+        assertEquals(0, binding.floatingChatContainer.paddingTop)
+        assertEquals(28, binding.floatingChatRoot.dragBandHeight)
         assertEquals(1f, card.alpha, 0f)
         assertEquals(rightX(), card.x, 0f)
-        assertEquals(MARGIN, card.y, 0f)
+        assertEquals(0f, card.y, 0f)
+    }
+
+    @Test fun `a tap on the drag band reaches the chat under it and leaves the card in place`() {
+        controller.show(animate = false)
+        idle()
+        val chat = addChatLine()
+        val card = binding.floatingChatRoot
+        tap(card, x = 100f, y = 10f)
+        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP), chat.actions)
+        assertEquals(rightX(), card.x, 0f)
+        assertEquals(0f, card.y, 0f)
+        assertTrue(holds.isEmpty())
+    }
+
+    @Test fun `a drag from the band moves the card even when the chat under it vetoes interception`() {
+        controller.show(animate = false)
+        idle()
+        // Like a chat list that is still scrolling: it takes the touch and asks parents not to intercept.
+        val chat = addChatLine(disallowIntercept = true)
+        drag(binding.floatingChatRoot, dx = -200f, dy = 120f, startX = 100f, startY = 10f)
+        assertEquals(rightX() - 200f, binding.floatingChatRoot.x, 0.5f)
+        assertEquals(120f, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(MotionEvent.ACTION_DOWN, chat.actions.first())
+        assertEquals(MotionEvent.ACTION_CANCEL, chat.actions.last())
+        assertEquals(listOf(true, false), holds)
+    }
+
+    @Test fun `a drag below the band scrolls the chat and leaves the card in place`() {
+        controller.show(animate = false)
+        idle()
+        val chat = addChatLine(top = 40)
+        drag(binding.floatingChatRoot, dx = -200f, dy = 120f, startX = 100f, startY = 50f)
+        assertEquals(rightX(), binding.floatingChatRoot.x, 0f)
+        assertEquals(0f, binding.floatingChatRoot.y, 0f)
+        assertEquals(MotionEvent.ACTION_UP, chat.actions.last())
+        assertTrue(holds.isEmpty())
+    }
+
+    @Test fun `with controls shown the header over the chat drags the card and the band is off`() {
+        controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        val underHeader = addChatLine()
+        drag(binding.floatingChatRoot, dx = -200f, dy = 120f, startX = 100f, startY = 10f)
+        assertEquals(rightX() - 200f, binding.floatingChatRoot.x, 0.5f)
+        assertTrue(underHeader.actions.isEmpty())
+
+        // Below the 48dp header a drag scrolls the chat, even inside what is the band while controls hide.
+        val belowHeader = addChatLine(top = 50)
+        val x = binding.floatingChatRoot.x
+        drag(binding.floatingChatRoot, dx = 0f, dy = 120f, startX = 100f, startY = 60f)
+        assertEquals(x, binding.floatingChatRoot.x, 0f)
+        assertEquals(MotionEvent.ACTION_UP, belowHeader.actions.last())
+    }
+
+    @Test fun `holding still on the band grabs the card before the chat's long-press`() {
+        controller.show(animate = false)
+        idle()
+        val chat = addChatLine()
+        val card = binding.floatingChatRoot
+        val time = SystemClock.uptimeMillis()
+        val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, 100f, 10f, 0)
+        card.dispatchTouchEvent(down)
+        down.recycle()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ViewConfiguration.getLongPressTimeout() - 50L))
+        // The chat row lost the touch before its long-press could show a tooltip.
+        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_CANCEL), chat.actions)
+        assertEquals(listOf(true), holds)
+
+        val move = MotionEvent.obtain(time, time + 500, MotionEvent.ACTION_MOVE, 60f, 70f, 0)
+        val up = MotionEvent.obtain(time, time + 516, MotionEvent.ACTION_UP, 60f, 70f, 0)
+        card.dispatchTouchEvent(move)
+        card.dispatchTouchEvent(up)
+        move.recycle()
+        up.recycle()
+        assertEquals(rightX() - 40f, card.x, 0.5f)
+        assertEquals(60f, card.y, 0.5f)
+        assertEquals(listOf(true, false), holds)
+    }
+
+    @Test fun `a second finger keeps scrolling the chat after the band finger lifts unmoved`() {
+        controller.show(animate = false)
+        idle()
+        val chat = addChatLine()
+        val card = binding.floatingChatRoot
+        val time = SystemClock.uptimeMillis()
+        fun props(vararg ids: Int) = ids.map { id -> MotionEvent.PointerProperties().apply { this.id = id } }.toTypedArray()
+        fun coords(vararg points: Pair<Float, Float>) = points.map { (x, y) -> MotionEvent.PointerCoords().apply { this.x = x; this.y = y } }.toTypedArray()
+        val events = listOf(
+            MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, 1, props(0), coords(100f to 10f), 0, 0, 1f, 1f, 0, 0, 0, 0),
+            MotionEvent.obtain(time, time + 16, MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, props(0, 1), coords(100f to 10f, 100f to 30f), 0, 0, 1f, 1f, 0, 0, 0, 0),
+            MotionEvent.obtain(time, time + 32, MotionEvent.ACTION_POINTER_UP, 2, props(0, 1), coords(100f to 10f, 100f to 30f), 0, 0, 1f, 1f, 0, 0, 0, 0),
+            MotionEvent.obtain(time, time + 48, MotionEvent.ACTION_MOVE, 1, props(1), coords(100f to 90f), 0, 0, 1f, 1f, 0, 0, 0, 0),
+            MotionEvent.obtain(time, time + 64, MotionEvent.ACTION_UP, 1, props(1), coords(100f to 90f), 0, 0, 1f, 1f, 0, 0, 0, 0),
+        )
+        events.forEach { card.dispatchTouchEvent(it); it.recycle() }
+        assertEquals(rightX(), card.x, 0f)
+        assertEquals(0f, card.y, 0f)
+        assertTrue(holds.isEmpty())
+        assertEquals(MotionEvent.ACTION_UP, chat.actions.last())
+        assertFalse(MotionEvent.ACTION_CANCEL in chat.actions)
+    }
+
+    @Test fun `a grip inside the band on a short card still resizes`() {
+        controller.show(animate = false)
+        idle()
+        // A keyboard leaves 60 px: the 48 px grip at the bottom reaches into the 28 px band.
+        controller.setInsets(FloatingChatInsets(bottom = 440, ime = true))
+        idle()
+        val card = binding.floatingChatRoot
+        val grip = binding.floatingChatGrip
+        assertEquals(60, card.height)
+        assertEquals(View.VISIBLE, grip.visibility)
+        val gripY = grip.top + grip.translationY + 5f
+        assertTrue(gripY < 28f)
+        drag(card, dx = -50f, dy = 0f, startX = grip.left + grip.width / 2f, startY = gripY)
+        idle()
+        assertEquals(274, card.width)
+        assertEquals(hostWidth(), card.x + card.width, 0.5f)
     }
 
     @Test fun `drag clamps on all four sides including insets and stays exactly where released`() {
@@ -107,20 +230,20 @@ class FloatingChatControllerTest {
         controller.show(animate = false)
         idle()
         val card = binding.floatingChatRoot
-        val minX = 30f + MARGIN
-        val minY = 16f + MARGIN
-        val maxX = hostWidth() - 20f - MARGIN - card.width
-        val maxY = hostHeight() - 40f - MARGIN - card.height
+        val minX = 30f
+        val minY = 16f
+        val maxX = hostWidth() - 20f - card.width
+        val maxY = hostHeight() - 40f - card.height
 
         // Left & top clamp
-        drag(binding.floatingChatPill, dx = -2000f, dy = -2000f)
+        drag(binding.floatingChatRoot, dx = -2000f, dy = -2000f)
         assertEquals(minX, card.x, 0.5f)
         assertEquals(minY, card.y, 0.5f)
         // Grip moved to bottom-right on the left half of the screen.
         assertEquals(Gravity.BOTTOM or Gravity.RIGHT, (binding.floatingChatGrip.layoutParams as FrameLayout.LayoutParams).gravity)
 
         // Right & bottom clamp
-        drag(binding.floatingChatPill, dx = 2000f, dy = 2000f)
+        drag(binding.floatingChatRoot, dx = 2000f, dy = 2000f)
         assertEquals(maxX, card.x, 0.5f)
         assertEquals(maxY, card.y, 0.5f)
         assertEquals(Gravity.BOTTOM or Gravity.LEFT, (binding.floatingChatGrip.layoutParams as FrameLayout.LayoutParams).gravity)
@@ -128,7 +251,7 @@ class FloatingChatControllerTest {
         // Mid-screen drop (including 4 px from an edge): stays at the exact release pixel with no animation or magnet.
         val dropX = minX + 4f
         val dropY = minY + 75f
-        drag(binding.floatingChatPill, dx = dropX - card.x, dy = dropY - card.y)
+        drag(binding.floatingChatRoot, dx = dropX - card.x, dy = dropY - card.y)
         assertEquals(dropX, card.x, 0.5f)
         assertEquals(dropY, card.y, 0.5f)
         idle()
@@ -151,7 +274,7 @@ class FloatingChatControllerTest {
         assertEquals(0, closeRequests)
         assertEquals(listOf(true, false), holds)
         assertEquals(rightX() - 300f, binding.floatingChatRoot.x, 0.5f)
-        assertEquals(MARGIN + 80f, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(80f, binding.floatingChatRoot.y, 0.5f)
 
         close.performClick()
         assertEquals(1, closeRequests)
@@ -165,8 +288,8 @@ class FloatingChatControllerTest {
         idle()
         assertEquals(274, binding.floatingChatRoot.width)
         assertEquals(300, binding.floatingChatRoot.height)
-        assertEquals(hostWidth() - MARGIN, binding.floatingChatRoot.x + 274f, 0.5f)
-        assertEquals(MARGIN, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(hostWidth(), binding.floatingChatRoot.x + 274f, 0.5f)
+        assertEquals(0f, binding.floatingChatRoot.y, 0.5f)
 
         // Controls shown: resize continues to work identically and persists.
         controller.onControlsVisibilityChanged(true)
@@ -183,13 +306,13 @@ class FloatingChatControllerTest {
     @Test fun `resize clamps to min and max bounds and handles ACTION_CANCEL`() {
         controller.show(animate = false)
         idle()
-        // Try to grow way past usable bounds: clamped to max width share and bottom margin.
+        // Try to grow way past usable bounds: clamped to max width share and the bottom edge.
         drag(binding.floatingChatGrip, dx = -1200f, dy = 1200f)
         idle()
         assertEquals((hostWidth() * FloatingChatPlacement.MAX_WIDTH_SHARE).toInt(), binding.floatingChatRoot.width)
-        assertEquals((hostHeight() - 2 * MARGIN).toInt(), binding.floatingChatRoot.height)
-        assertTrue(binding.floatingChatRoot.x >= MARGIN)
-        assertTrue(binding.floatingChatRoot.y + binding.floatingChatRoot.height <= hostHeight() - MARGIN)
+        assertEquals(hostHeight().toInt(), binding.floatingChatRoot.height)
+        assertTrue(binding.floatingChatRoot.x >= 0f)
+        assertTrue(binding.floatingChatRoot.y + binding.floatingChatRoot.height <= hostHeight())
 
         // Shrink below minimum: clamped to 170x140 dp.
         drag(binding.floatingChatGrip, dx = 1000f, dy = -1000f)
@@ -222,13 +345,13 @@ class FloatingChatControllerTest {
         controller.show(animate = false)
         idle()
 
-        // Drag on pill while controls turn on mid-drag.
-        drag(binding.floatingChatPill, dx = -250f, dy = 90f) {
+        // Drag the top band while controls turn on mid-drag.
+        drag(binding.floatingChatRoot, dx = -250f, dy = 90f) {
             controller.onControlsVisibilityChanged(true)
             idle()
         }
         assertEquals(rightX() - 250f, binding.floatingChatRoot.x, 0.5f)
-        assertEquals(MARGIN + 90f, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(90f, binding.floatingChatRoot.y, 0.5f)
         assertEquals(listOf(true, false), holds)
 
         // Drag on header across into the left half while controls turn off mid-drag.
@@ -260,7 +383,7 @@ class FloatingChatControllerTest {
     @Test fun `minimize hides at once and maximize restores saved position with fade`() {
         controller.show(animate = false)
         idle()
-        drag(binding.floatingChatPill, dx = -260f, dy = 110f)
+        drag(binding.floatingChatRoot, dx = -260f, dy = 110f)
         val savedX = binding.floatingChatRoot.x
         val savedY = binding.floatingChatRoot.y
         onScreen.clear()
@@ -309,7 +432,7 @@ class FloatingChatControllerTest {
     @Test fun `rotation or window resize re-places from saved fractions and clamps`() {
         controller.show(animate = false)
         idle()
-        drag(binding.floatingChatPill, dx = -100f, dy = 200f)
+        drag(binding.floatingChatRoot, dx = -100f, dy = 200f)
 
         // Shrink host to simulate rotation or split-screen window resize.
         binding.floatingChatHost.measure(
@@ -318,21 +441,21 @@ class FloatingChatControllerTest {
         )
         binding.floatingChatHost.layout(0, 0, 520, 300)
         val card = binding.floatingChatRoot
-        assertTrue(card.x >= MARGIN)
-        assertTrue(card.x + card.width <= 520f - MARGIN + 0.5f)
-        assertTrue(card.y >= MARGIN)
-        assertTrue(card.y + card.height <= 300f - MARGIN + 0.5f)
+        assertTrue(card.x >= 0f)
+        assertTrue(card.x + card.width <= 520f + 0.5f)
+        assertTrue(card.y >= 0f)
+        assertTrue(card.y + card.height <= 300f + 0.5f)
     }
 
     @Test fun `keyboard inset clamps card above keyboard and restores position when closed`() {
         controller.show(animate = false)
         idle()
-        drag(binding.floatingChatPill, dx = 0f, dy = 220f)
+        drag(binding.floatingChatRoot, dx = 0f, dy = 220f)
         val bottomY = binding.floatingChatRoot.y
 
         controller.setInsets(FloatingChatInsets(bottom = 300, ime = true))
         val card = binding.floatingChatRoot
-        assertTrue(card.y + card.height <= hostHeight() - 300f - MARGIN + 0.5f)
+        assertTrue(card.y + card.height <= hostHeight() - 300f + 0.5f)
 
         controller.setInsets(FloatingChatInsets())
         assertEquals(bottomY, card.y, 0.5f)
@@ -342,7 +465,7 @@ class FloatingChatControllerTest {
     @Test fun `width-only resize with the keyboard up keeps the saved height and spot`() {
         controller.show(animate = false)
         idle()
-        drag(binding.floatingChatPill, dx = 0f, dy = 220f)
+        drag(binding.floatingChatRoot, dx = 0f, dy = 220f)
         val bottomY = binding.floatingChatRoot.y
         controller.setInsets(FloatingChatInsets(bottom = 300, ime = true))
         idle()
@@ -390,7 +513,8 @@ class FloatingChatControllerTest {
         migrated.show(animate = false)
         idle()
         assertFalse(prefs.contains("floating_chat_x_legacy"))
-        assertEquals(MARGIN, binding.floatingChatRoot.x, 0.5f)
+        // 1.7.0 had no edge margin either, so the old pixel spot carries over exactly.
+        assertEquals(12f, binding.floatingChatRoot.x, 0.5f)
         assertEquals(200f, binding.floatingChatRoot.y, 0.5f)
         assertEquals(260, binding.floatingChatRoot.width)
         assertEquals(220, binding.floatingChatRoot.height)
@@ -401,7 +525,7 @@ class FloatingChatControllerTest {
         val first = createController()
         first.show(animate = false)
         idle()
-        drag(binding.floatingChatPill, dx = -320f, dy = 100f)
+        drag(binding.floatingChatRoot, dx = -320f, dy = 100f)
         val c1X = binding.floatingChatRoot.x
         val c1Y = binding.floatingChatRoot.y
         first.hide(animate = false)
@@ -418,7 +542,7 @@ class FloatingChatControllerTest {
         val backToLegacy = createController()
         backToLegacy.show(animate = false)
         idle()
-        assertEquals(MARGIN, binding.floatingChatRoot.x, 0.5f)
+        assertEquals(12f, binding.floatingChatRoot.x, 0.5f)
         assertEquals(260, binding.floatingChatRoot.width)
     }
 
@@ -477,7 +601,6 @@ class FloatingChatControllerTest {
         host = binding.floatingChatHost,
         card = binding.floatingChatRoot,
         header = binding.floatingChatHeader,
-        content = binding.floatingChatContainer,
         pill = binding.floatingChatPill,
         grip = binding.floatingChatGrip,
         composeButton = binding.floatingChatCompose,
@@ -532,15 +655,47 @@ class FloatingChatControllerTest {
         }
     }
 
+    private class ChatLine(context: android.content.Context, private val disallowIntercept: Boolean) : View(context) {
+        val actions = mutableListOf<Int>()
+
+        @android.annotation.SuppressLint("ClickableViewAccessibility")
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            actions += event.actionMasked
+            if (disallowIntercept && event.actionMasked == MotionEvent.ACTION_DOWN) parent.requestDisallowInterceptTouchEvent(true)
+            return true
+        }
+    }
+
+    /** A touch-hungry chat row across the card, [top] px below the card's top edge. */
+    private fun addChatLine(top: Int = 0, disallowIntercept: Boolean = false): ChatLine {
+        val line = ChatLine(binding.root.context, disallowIntercept)
+        binding.floatingChatContainer.addView(
+            line,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 40).apply { topMargin = top },
+        )
+        idle()
+        return line
+    }
+
+    private fun tap(view: View, x: Float, y: Float) {
+        val time = SystemClock.uptimeMillis()
+        val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, x, y, 0)
+        val up = MotionEvent.obtain(time, time + 50, MotionEvent.ACTION_UP, x, y, 0)
+        try {
+            view.dispatchTouchEvent(down)
+            view.dispatchTouchEvent(up)
+        } finally {
+            down.recycle()
+            up.recycle()
+        }
+    }
+
     private fun hostWidth() = binding.floatingChatHost.width.toFloat()
     private fun hostHeight() = binding.floatingChatHost.height.toFloat()
-    private fun rightX() = hostWidth() - MARGIN - 224f
+    private fun rightX() = hostWidth() - 224f
 
     private fun idle() {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1000))
     }
 
-    private companion object {
-        const val MARGIN = 12f
-    }
 }

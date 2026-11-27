@@ -13,7 +13,6 @@ import androidx.core.content.edit
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
-import androidx.core.view.updatePadding
 import com.github.andreyasadchy.xtra.R
 import kotlin.math.max
 import kotlin.math.min
@@ -38,7 +37,6 @@ internal class FloatingChatController(
     private val host: FloatingChatHostLayout,
     private val card: FloatingChatCardView,
     private val header: FloatingChatHeaderLayout,
-    private val content: View,
     private val pill: View,
     private val grip: View,
     private val composeButton: View,
@@ -59,7 +57,6 @@ internal class FloatingChatController(
 
     private val density = host.resources.displayMetrics.density
     private val tablet = host.resources.configuration.smallestScreenWidthDp >= 600
-    private val marginPx = FloatingChatPlacement.MARGIN_DP * density
     private val location = IntArray(2)
 
     private var layout = FloatingChatPlacement.defaultLayout(tablet)
@@ -100,7 +97,9 @@ internal class FloatingChatController(
     private val resizeHandler = ResizeHandler()
 
     init {
-        pill.setOnTouchListener(dragHandler)
+        card.dragListener = dragHandler
+        // A touch on the grip always resizes, even where a short card puts it inside the drag band.
+        card.dragBandExclusion = grip
         header.dragListener = dragHandler
         grip.setOnTouchListener(resizeHandler)
         appearanceButton.setOnClickListener { callbacks.onAppearanceRequested(it) }
@@ -153,6 +152,8 @@ internal class FloatingChatController(
         isShown = false
         ducked = false
         dragHandler.cancel()
+        card.cancelDrag()
+        card.dragBandHeight = 0
         resizeHandler.cancel()
         clearPendingResize()
         endInteraction()
@@ -294,16 +295,16 @@ internal class FloatingChatController(
         prefs.edit { putString(FloatingChatLayoutStore.PREF_KEY, FloatingChatLayoutStore.write(document, callbacks.channelId(), layout)) }
     }
 
-    private fun freeLeft() = insets.left + marginPx
-    private fun freeTop() = topOverlap() + marginPx
-    private fun freeRight() = max(freeLeft(), host.width - insets.right - marginPx)
-    private fun freeBottom() = max(freeTop(), host.height - bottomOverlap() - marginPx)
+    private fun freeLeft() = insets.left.toFloat()
+    private fun freeTop() = topOverlap().toFloat()
+    private fun freeRight() = max(freeLeft(), (host.width - insets.right).toFloat())
+    private fun freeBottom() = max(freeTop(), (host.height - bottomOverlap()).toFloat())
 
     private fun restBounds() =
-        FloatingChatPlacement.bounds(host.width, host.height, density, insets.left, insets.right, topOverlap())
+        FloatingChatPlacement.bounds(host.width, host.height, insets.left, insets.right, topOverlap())
 
     private fun freeBounds() =
-        FloatingChatPlacement.bounds(host.width, host.height, density, insets.left, insets.right, topOverlap(), bottomOverlap())
+        FloatingChatPlacement.bounds(host.width, host.height, insets.left, insets.right, topOverlap(), bottomOverlap())
 
     private fun topOverlap(): Int =
         if (insets.top <= 0 || !host.isAttachedToWindow) 0 else (insets.top - hostTopInWindow()).coerceAtLeast(0)
@@ -378,30 +379,38 @@ internal class FloatingChatController(
     private fun syncHeader(animate: Boolean) {
         header.animate().cancel()
         composeButton.isVisible = callbacks.canCompose() && !appearance.replyBar
-        val headerHeight = header.layoutParams.height.takeIf { it > 0 } ?: dp(HEADER_HEIGHT_DP)
+        // The header overlays the chat like the player controls do, on its own gradient
+        // scrim, so showing or hiding the controls never shifts the chat.
         if (controlsVisible) {
             header.visibility = View.VISIBLE
             pill.visibility = View.INVISIBLE
-            content.updatePadding(top = headerHeight)
+            card.dragBandHeight = 0
             if (animate) header.animate().alpha(1f).setDuration(FADE_MS).start() else header.alpha = 1f
         } else if (animate && header.isVisible) {
             header.animate().alpha(0f).setDuration(FADE_MS).withEndAction {
                 if (!controlsVisible) {
                     // INVISIBLE so hidden header buttons never intercept touches.
                     header.visibility = View.INVISIBLE
-                    pill.visibility = View.VISIBLE
-                    content.updatePadding(top = pillHeight())
+                    showDragBand()
                     updateGripLift()
                 }
             }.start()
         } else {
             header.alpha = 0f
             header.visibility = View.INVISIBLE
-            pill.visibility = View.VISIBLE
-            // Chat starts below the strip, so it never covers a chat line or a card's close button.
-            content.updatePadding(top = pillHeight())
+            showDragBand()
         }
         updateGripLift()
+    }
+
+    /**
+     * The chat fills the card up to its top edge, so the card can sit flush
+     * with the top of the screen. The pill only marks the card's drag band,
+     * which lets taps through to the chat under it.
+     */
+    private fun showDragBand() {
+        pill.visibility = View.VISIBLE
+        card.dragBandHeight = pillHeight()
     }
 
     private fun pillHeight() = pill.layoutParams.height.takeIf { it > 0 } ?: dp(PILL_HEIGHT_DP)

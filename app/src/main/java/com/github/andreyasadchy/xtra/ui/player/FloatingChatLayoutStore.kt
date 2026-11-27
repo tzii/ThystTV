@@ -83,7 +83,7 @@ internal object FloatingChatLayoutStore {
         if (x < 0f || y < 0f || parentWidth <= 0 || parentHeight <= 0 || density <= 0f) return null
         val width = if (widthPx > 0) widthPx else (fallback.widthDp * density).toInt()
         val height = if (heightPx > 0) heightPx else (fallback.heightDp * density).toInt()
-        val bounds = FloatingChatPlacement.bounds(parentWidth, parentHeight, density)
+        val bounds = FloatingChatPlacement.bounds(parentWidth, parentHeight)
         val travelX = max(0f, bounds.width - width)
         val travelY = max(0f, bounds.height - height)
         return FloatingChatLayout(

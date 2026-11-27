@@ -197,14 +197,14 @@
                     app:tint="@android:color/white" />
             </com.github.andreyasadchy.xtra.ui.player.FloatingChatHeaderLayout>
 
-            <!-- Top drag strip while the header is hidden; bg_floating_chat_pill draws a centered 24x3dp bar. -->
+            <!-- Marks the top drag band while the header is hidden (bg_floating_chat_pill draws a 24x3dp bar on its top rim).
+                 Visual only: FloatingChatCardView runs the band, so the chat fills the card under it and taps reach the chat. -->
             <View
                 android:id="@+id/floatingChatPill"
                 android:layout_width="match_parent"
                 android:layout_height="28dp"
                 android:layout_gravity="top"
                 android:background="@drawable/bg_floating_chat_pill"
-                android:contentDescription="@string/floating_chat_drag"
                 android:importantForAccessibility="no" />
 
             <!-- Always-available corner resize grip on the corner facing the video. -->

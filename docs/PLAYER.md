@@ -255,16 +255,26 @@ stay. `FloatingChatController` owns geometry, touch handling and chrome. Keep th
   A size change lays the card out synchronously so dimensions and coordinates
   land on the same frame.
 - Interactions never depend on player controls visibility. While the card is
-  shown, a top drag handle (full-width `floatingChatPill` strip when controls
-  are hidden, or `floatingChatHeader` when controls are visible) and the corner
-  resize grip work at any time. The card has no pinch: resizing is the grip
+  shown, a top drag handle (the 28dp drag band, marked by `floatingChatPill`,
+  when controls are hidden, or `floatingChatHeader` when controls are visible)
+  and the corner resize grip work at any time. The card has no pinch: resizing is the grip
   only. While the message box is open, `ChatFragment.onComposerHeightChanged`
   reports how far the box (with its reply line) reaches up, and the grip is
   lifted above it with `translationY` (no layout pass); it hides only while the
-  card is too short for the box, the grip and the top bar (strip or header).
+  card is too short for the box, the grip and the top bar (band or header).
   Hiding the reply line doesn't move the box, so `ChatFragment` reports the new
-  height itself. Chat content is padded below the strip (28dp) or the header
-  (48dp), so neither covers a chat line or a poll/prediction/raid close button.
+  height itself. Nothing reserves space at the top: the chat fills the card, so
+  a card at the top of the screen shows chat right up to the edge. The drag band
+  is run by `FloatingChatCardView.dispatchTouchEvent`, not by the pill (which is
+  visual only): a touch in the band still goes to the chat, so a tap opens the
+  top chat line or closes a poll/prediction/raid card; past touch slop the card
+  cancels the chat's gesture and drags. Holding still in the band grabs the card
+  at 3/4 of the long-press timeout, before a chat row's long-press tooltip. It
+  uses `dispatchTouchEvent` because a chat list that is still scrolling calls
+  `requestDisallowInterceptTouchEvent` on touch down, which would veto an
+  `onInterceptTouchEvent` drag. The band follows the first finger only; a touch
+  on the resize grip always resizes, even where a short card puts the grip in
+  the band.
   `FloatingChatCardView` disables motion-event splitting, so a second finger
   joins the first handle's gesture; pointer offsets are scaled back by the
   view's scale because the left-side grip is mirrored (`scaleX = -1`). A grip
@@ -272,8 +282,9 @@ stay. `FloatingChatController` owns geometry, touch handling and chrome. Keep th
   and the saved vertical spot. `FloatingChatHeaderLayout` takes over
   a drag that starts on a header button once past touch slop, while taps still
   press the button. The header is `View.INVISIBLE` when controls are hidden so
-  hidden buttons cannot catch touches; when visible, `floating_chat_container`
-  is padded below it. `holdControls` keeps player controls from auto-hiding
+  hidden buttons cannot catch touches; when visible, it overlays the chat on its
+  own gradient scrim like the player controls, so toggling the controls never
+  shifts the chat. `holdControls` keeps player controls from auto-hiding
   mid-gesture.
 - `FloatingChatPlacement` is pure. The card rests wherever it is dropped, stored
   as fractions of free travel (`xFraction`/`yFraction`, 0 = left/top, 1 = right/bottom)
@@ -994,7 +1005,8 @@ At minimum, player work should request human verification for:
 - lifecycle callbacks apply to an old fragment
 - quality menu shows raw numeric HLS variants
 - floating chat is unreadable in light mode or on bright video
-- the floating chat header catches touches while the controls are hidden, or the top drag strip / resize grip stop working when controls hide
+- the floating chat header catches touches while the controls are hidden, or the top drag band / resize grip stop working when controls hide
+- floating chat reserves a dead band at the top again (it should reach the screen edge), or the drag band swallows taps on the top chat line
 - floating chat leaves the screen on drag/resize/rotation, stays visible in PiP or after minimize, or comes back empty
 
 ## PR Expectations For Player Changes
