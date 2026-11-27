@@ -257,7 +257,15 @@ stay. `FloatingChatController` owns geometry, touch handling and chrome. Keep th
   only. While the message box is open, `ChatFragment.onComposerHeightChanged`
   reports how far the box (with its reply line) reaches up, and the grip is
   lifted above it with `translationY` (no layout pass); it hides only while the
-  card is too short for both. `FloatingChatHeaderLayout` takes over
+  card is too short for the box, the grip and the top bar (strip or header).
+  Hiding the reply line doesn't move the box, so `ChatFragment` reports the new
+  height itself. Chat content is padded below the strip (28dp) or the header
+  (48dp), so neither covers a chat line or a poll/prediction/raid close button.
+  `FloatingChatCardView` disables motion-event splitting, so a second finger
+  joins the first handle's gesture; pointer offsets are scaled back by the
+  view's scale because the left-side grip is mirrored (`scaleX = -1`). A grip
+  resize with the keyboard up keeps the saved height (if only the width changed)
+  and the saved vertical spot. `FloatingChatHeaderLayout` takes over
   a drag that starts on a header button once past touch slop, while taps still
   press the button. The header is `View.INVISIBLE` when controls are hidden so
   hidden buttons cannot catch touches; when visible, `floating_chat_container`

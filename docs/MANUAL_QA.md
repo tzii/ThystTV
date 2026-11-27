@@ -918,8 +918,11 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Controls hidden: the top drag strip (pill) and corner resize grip are both
   visible and work immediately. Drag moves the card 1:1 under the finger, clamps
   inside all four usable edges (never leaves the screen), and stays at the exact
-  drop spot with no snap or bounce. Nothing invisible at the top catches taps;
-  the chat list scrolls and opens message actions as before.
+  drop spot with no snap or bounce. Chat starts below the strip: the top chat
+  line opens its message actions, and the close buttons of a poll, prediction or
+  raid card at the top of chat work. Two fingers on the card (strip plus grip)
+  move or resize it as one gesture, never both. Resizing a left-side card with
+  a second finger handed over does not jump.
 - [ ] Controls shown: the top header (optional compose, Aa, close) appears
   without moving, fading or hiding the card; no chat line sits under the header
   buttons. Dragging by the header (including starting on Aa or close) moves the
@@ -956,7 +959,9 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Signed in on a live stream: header keyboard button opens the message box
   for one message and closes after sending or leaving it empty. Reply bar on:
   box stays open and the grip sits just above it (and above a "Replying to"
-  line), never over the text field, Send or Emotes, and still resizes. With the
+  line), never over the text field, Send or Emotes, and still resizes. Closing
+  or sending a reply lowers the grip back onto the box. Widening the card with
+  the keyboard up keeps its saved height and spot once the keyboard closes. With the
   emote menu open on a short card the grip may hide until the menu closes. Keyboard clamps the card above the keys and restores its position
   when closed; on a short landscape phone the card shrinks to fit above the keys
   and restores when closed. Copy and Reply from message actions open the box.

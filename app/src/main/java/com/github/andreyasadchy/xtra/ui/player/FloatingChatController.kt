@@ -218,7 +218,8 @@ internal class FloatingChatController(
         val lift = -composerHeight.toFloat()
         if (grip.translationY != lift) grip.translationY = lift
         val gripHeight = grip.layoutParams.height.takeIf { it > 0 } ?: grip.height
-        val fits = composerHeight == 0 || composerHeight + gripHeight + dp(PILL_HEIGHT_DP) <= card.height
+        val topBar = if (controlsVisible) header.layoutParams.height.takeIf { it > 0 } ?: dp(HEADER_HEIGHT_DP) else pillHeight()
+        val fits = composerHeight == 0 || composerHeight + gripHeight + topBar <= card.height
         val visibility = if (fits) View.VISIBLE else View.INVISIBLE
         if (grip.visibility != visibility) grip.visibility = visibility
     }
@@ -349,6 +350,7 @@ internal class FloatingChatController(
             )
             card.layout(card.left, card.top, card.left + width, card.top + height)
         }
+        updateGripLift()
     }
 
     private fun scheduleResize(width: Int, height: Int, x: Float, y: Float) {
@@ -388,16 +390,21 @@ internal class FloatingChatController(
                     // INVISIBLE so hidden header buttons never intercept touches.
                     header.visibility = View.INVISIBLE
                     pill.visibility = View.VISIBLE
-                    content.updatePadding(top = 0)
+                    content.updatePadding(top = pillHeight())
+                    updateGripLift()
                 }
             }.start()
         } else {
             header.alpha = 0f
             header.visibility = View.INVISIBLE
             pill.visibility = View.VISIBLE
-            content.updatePadding(top = 0)
+            // Chat starts below the strip, so it never covers a chat line or a card's close button.
+            content.updatePadding(top = pillHeight())
         }
+        updateGripLift()
     }
+
+    private fun pillHeight() = pill.layoutParams.height.takeIf { it > 0 } ?: dp(PILL_HEIGHT_DP)
 
     // Sides are physical left/right on screen, also in RTL.
     @SuppressLint("RtlHardcoded")
@@ -461,7 +468,8 @@ internal class FloatingChatController(
         }
     }
 
-    private fun commitLayout(newWidth: Int = 0, newHeight: Int = 0) {
+    private fun commitLayout(newWidth: Int = 0, newHeight: Int = 0, keepY: Boolean = false) {
+        val savedY = layout.yFraction
         val resized = newWidth > 0 && newHeight > 0
         if (resized) {
             widthPx = newWidth
@@ -478,15 +486,16 @@ internal class FloatingChatController(
             density = density,
             stored = base,
             keyboard = insets.ime,
-        )
+        ).let { if (keepY) it.copy(yFraction = savedY) else it }
         save()
         if (resized) placeNow() else updateGrip()
         updateAccessibilityActions()
     }
 
-    // getRawX(int) needs API 29; every pointer in an event shares the same screen offset.
-    private fun rawX(event: MotionEvent, index: Int) = event.getX(index) + event.rawX - event.x
-    private fun rawY(event: MotionEvent, index: Int) = event.getY(index) + event.rawY - event.y
+    // getRawX(int) needs API 29. Pointer offsets are in the view's space, so scale them back:
+    // the grip is mirrored with scaleX = -1 on a left-side card.
+    private fun rawX(view: View, event: MotionEvent, index: Int) = (event.getX(index) - event.x) * view.scaleX + event.rawX
+    private fun rawY(view: View, event: MotionEvent, index: Int) = (event.getY(index) - event.y) * view.scaleY + event.rawY
 
     private inner class DragHandler : View.OnTouchListener {
         private var pointerId = MotionEvent.INVALID_POINTER_ID
@@ -508,13 +517,13 @@ internal class FloatingChatController(
                     if (!isShown) return false
                     beginInteraction()
                     pointerId = event.getPointerId(0)
-                    anchor(event, 0)
+                    anchor(view, event, 0)
                     moved = false
                 }
                 MotionEvent.ACTION_POINTER_UP -> if (pointerId != MotionEvent.INVALID_POINTER_ID && event.getPointerId(event.actionIndex) == pointerId) {
                     val next = if (event.actionIndex == 0) 1 else 0
                     pointerId = event.getPointerId(next)
-                    anchor(event, next)
+                    anchor(view, event, next)
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val index = if (pointerId == MotionEvent.INVALID_POINTER_ID) -1 else event.findPointerIndex(pointerId)
@@ -526,8 +535,8 @@ internal class FloatingChatController(
                     }
                     val minX = freeLeft()
                     val minY = freeTop()
-                    val newX = (startX + rawX(event, index) - downX).coerceIn(minX, max(minX, freeRight() - card.width))
-                    val newY = (startY + rawY(event, index) - downY).coerceIn(minY, max(minY, freeBottom() - card.height))
+                    val newX = (startX + rawX(view, event, index) - downX).coerceIn(minX, max(minX, freeRight() - card.width))
+                    val newY = (startY + rawY(view, event, index) - downY).coerceIn(minY, max(minY, freeBottom() - card.height))
                     if (newX != card.x || newY != card.y) {
                         card.x = newX
                         card.y = newY
@@ -550,9 +559,9 @@ internal class FloatingChatController(
             return true
         }
 
-        private fun anchor(event: MotionEvent, index: Int) {
-            downX = rawX(event, index)
-            downY = rawY(event, index)
+        private fun anchor(view: View, event: MotionEvent, index: Int) {
+            downX = rawX(view, event, index)
+            downY = rawY(view, event, index)
             startX = card.x
             startY = card.y
         }
@@ -567,6 +576,8 @@ internal class FloatingChatController(
         private var startSide = FloatingChatSide.RIGHT
         private var fixedEdge = 0f
         private var resized = false
+        /** The finger changed the height, not just the width. */
+        private var heightChanged = false
 
         fun cancel() {
             pointerId = MotionEvent.INVALID_POINTER_ID
@@ -581,8 +592,9 @@ internal class FloatingChatController(
                     beginInteraction()
                     pointerId = event.getPointerId(0)
                     resized = false
-                    downX = rawX(event, 0)
-                    downY = rawY(event, 0)
+                    heightChanged = false
+                    downX = rawX(view, event, 0)
+                    downY = rawY(view, event, 0)
                     startWidth = card.width
                     startHeight = card.height
                     startSide = layout.side
@@ -591,8 +603,8 @@ internal class FloatingChatController(
                 MotionEvent.ACTION_POINTER_UP -> if (pointerId != MotionEvent.INVALID_POINTER_ID && event.getPointerId(event.actionIndex) == pointerId) {
                     val next = if (event.actionIndex == 0) 1 else 0
                     pointerId = event.getPointerId(next)
-                    downX = rawX(event, next)
-                    downY = rawY(event, next)
+                    downX = rawX(view, event, next)
+                    downY = rawY(view, event, next)
                     startWidth = card.width
                     startHeight = card.height
                 }
@@ -607,7 +619,7 @@ internal class FloatingChatController(
                     }
                     val (width, height) = FloatingChatPlacement.resize(
                         startWidth, startHeight,
-                        rawX(event, index) - downX, rawY(event, index) - downY,
+                        rawX(view, event, index) - downX, rawY(view, event, index) - downY,
                         startSide, host.width, host.height, density,
                     )
                     val roomWidth = (if (startSide == FloatingChatSide.RIGHT) fixedEdge - freeLeft() else freeRight() - fixedEdge).toInt().coerceAtLeast(1)
@@ -615,14 +627,17 @@ internal class FloatingChatController(
                     val w = min(width, roomWidth).coerceAtLeast(1)
                     val h = min(height, roomHeight).coerceAtLeast(1)
                     if (w != startWidth || h != startHeight) resized = true
+                    if (h != startHeight) heightChanged = true
                     scheduleResize(w, h, if (startSide == FloatingChatSide.RIGHT) fixedEdge - w else fixedEdge, card.y)
                 }
                 MotionEvent.ACTION_UP -> if (pointerId != MotionEvent.INVALID_POINTER_ID) {
                     val didResize = resized
+                    val keepHeight = !heightChanged
                     cancel()
                     flushResize()
                     endInteraction()
-                    if (isShown && didResize) commitLayout(card.layoutParams.width, card.layoutParams.height)
+                    // A card trimmed above the keyboard is shorter than its saved height: keep that height.
+                    if (isShown && didResize) commitLayout(card.layoutParams.width, if (keepHeight) heightPx else card.layoutParams.height, keepY = insets.ime)
                 }
                 MotionEvent.ACTION_CANCEL -> if (pointerId != MotionEvent.INVALID_POINTER_ID) {
                     val didResize = resized
