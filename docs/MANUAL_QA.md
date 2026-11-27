@@ -915,17 +915,21 @@ bright and dark video. Repeat the core rows with an RTL language.
   video, emotes included. Text size and Bold apply to existing lines.
 - [ ] Settings → Chat: the opacity slider, text size, Bold, Fade old messages
   and Reply bar change an open floating chat live after returning to the player.
-- [ ] Controls hidden: the top drag strip (pill) and corner resize grip are both
-  visible and work immediately. Drag moves the card 1:1 under the finger, clamps
-  inside all four usable edges (never leaves the screen), and stays at the exact
-  drop spot with no snap or bounce. Chat starts below the strip: the top chat
-  line opens its message actions, and the close buttons of a poll, prediction or
-  raid card at the top of chat work. Two fingers on the card (strip plus grip)
+- [ ] Controls hidden: the pill and corner resize grip are both visible and
+  work immediately. Drag from the top band moves the card 1:1 under the finger,
+  goes flush against all four usable edges (never leaves the screen, never stops
+  short), and stays at the exact drop spot with no snap or bounce. Dragged to
+  the top, chat text reaches the top edge of the screen with no dead band. The
+  chat fills the card under the band: a tap there still opens the top chat
+  line's message actions and closes a poll, prediction or raid card; the pill
+  does not cross the status strip text. Pressing and holding the band, then
+  dragging, moves the card without popping a chat line's tooltip. In a busy
+  chat that is still scrolling, a drag from the band moves the card every time. Two fingers on the card (strip plus grip)
   move or resize it as one gesture, never both. Resizing a left-side card with
   a second finger handed over does not jump.
 - [ ] Controls shown: the top header (optional compose, Aa, close) appears
-  without moving, fading or hiding the card; no chat line sits under the header
-  buttons. Dragging by the header (including starting on Aa or close) moves the
+  over the top of the chat without moving, fading or hiding the card, and the
+  chat does not shift when the controls show or hide. Dragging by the header (including starting on Aa or close) moves the
   card without firing the button, while a tap presses it. The corner resize grip
   stays visible and usable.
 - [ ] Resize: corner grip resizes live with controls hidden AND with

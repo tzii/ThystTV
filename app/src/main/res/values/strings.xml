@@ -799,7 +799,6 @@
     <string name="floating_chat_button" translatable="false">Floating chat button</string>
     <string name="floating_chat_enabled" translatable="false">Enable floating chat</string>
     <string name="floating_chat_enabled_summary" translatable="false">Allow floating chat mode when double-tapping video</string>
-    <string name="floating_chat_drag" translatable="false">Drag to move chat</string>
     <string name="floating_chat_resize" translatable="false">Drag to resize chat</string>
     <string name="floating_chat" translatable="false">Floating chat</string>
     <string name="floating_chat_type" translatable="false">Type a message</string>

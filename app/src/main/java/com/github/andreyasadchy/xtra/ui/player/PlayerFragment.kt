@@ -4718,7 +4718,6 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             host = binding.floatingChatHost,
             card = binding.floatingChatRoot,
             header = binding.floatingChatHeader,
-            content = binding.floatingChatContainer,
             pill = binding.floatingChatPill,
             grip = binding.floatingChatGrip,
             composeButton = binding.floatingChatCompose,

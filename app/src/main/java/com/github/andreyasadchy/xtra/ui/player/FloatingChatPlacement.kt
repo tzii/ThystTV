@@ -31,7 +31,6 @@ internal data class FloatingChatBounds(val left: Float, val top: Float, val righ
 internal data class FloatingChatPlaced(val x: Float, val y: Float, val width: Int, val height: Int)
 
 internal object FloatingChatPlacement {
-    const val MARGIN_DP = 12f
     const val MIN_WIDTH_DP = 170f
     const val MIN_HEIGHT_DP = 140f
     const val MAX_WIDTH_SHARE = 0.55f
@@ -45,24 +44,25 @@ internal object FloatingChatPlacement {
         heightDp = if (tablet) 380f else 240f,
     )
 
-    /** Host bounds minus margin, side cutouts/insets, and top/bottom system bar or IME bands. */
+    /**
+     * Host bounds minus side cutouts/insets and top/bottom system bar or IME
+     * bands. No margin: the card may sit flush against any edge.
+     */
     fun bounds(
         parentWidth: Int,
         parentHeight: Int,
-        density: Float,
         safeLeft: Int = 0,
         safeRight: Int = 0,
         keepClearTop: Int = 0,
         keepClearBottom: Int = 0,
     ): FloatingChatBounds {
-        val margin = MARGIN_DP * density
-        val left = safeLeft + margin
-        val top = keepClearTop + margin
+        val left = safeLeft.toFloat()
+        val top = keepClearTop.toFloat()
         return FloatingChatBounds(
             left = left,
             top = top,
-            right = max(left, parentWidth - safeRight - margin),
-            bottom = max(top, parentHeight - keepClearBottom - margin),
+            right = max(left, (parentWidth - safeRight).toFloat()),
+            bottom = max(top, (parentHeight - keepClearBottom).toFloat()),
         )
     }
 
@@ -132,7 +132,7 @@ internal object FloatingChatPlacement {
         val minWidth = MIN_WIDTH_DP * density
         val minHeight = MIN_HEIGHT_DP * density
         val maxWidth = max(minWidth, parentWidth * MAX_WIDTH_SHARE)
-        val maxHeight = max(minHeight, parentHeight - 2 * MARGIN_DP * density)
+        val maxHeight = max(minHeight, parentHeight.toFloat())
         return widthPx.coerceIn(minWidth, maxWidth).roundToInt() to heightPx.coerceIn(minHeight, maxHeight).roundToInt()
     }
 

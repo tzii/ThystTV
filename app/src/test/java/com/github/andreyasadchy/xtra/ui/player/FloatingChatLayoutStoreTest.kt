@@ -84,18 +84,18 @@ class FloatingChatLayoutStoreTest {
     }
 
     @Test fun `a 1_7_0 pixel position converts to the same spot`() {
-        // 1000x500 px at density 2: the old card sat near the top right.
-        val top = FloatingChatLayoutStore.fromLegacy(x = 600f, y = 30f, widthPx = 400, heightPx = 480, parentWidth = 1000, parentHeight = 500, density = 2f, fallback = fallback)!!
+        // 1000x500 px at density 2: the old card sat in the top right corner.
+        val top = FloatingChatLayoutStore.fromLegacy(x = 600f, y = 0f, widthPx = 400, heightPx = 480, parentWidth = 1000, parentHeight = 500, density = 2f, fallback = fallback)!!
         assertEquals(FloatingChatLayout(1f, 0f, 200f, 240f), top)
 
         val bottomLeft = FloatingChatLayoutStore.fromLegacy(x = 0f, y = 400f, widthPx = 300, heightPx = 100, parentWidth = 1000, parentHeight = 500, density = 1f, fallback = fallback)!!
         assertEquals(0f, bottomLeft.xFraction, 0f)
         assertEquals(1f, bottomLeft.yFraction, 0f)
 
-        // Mid-screen stays mid-screen: 388 of 752 px across, 138 of 236 px down.
+        // Mid-screen stays mid-screen: 400 of 776 px across, 150 of 260 px down (1.7.0 had no edge margin).
         val middle = FloatingChatLayoutStore.fromLegacy(x = 400f, y = 150f, widthPx = 224, heightPx = 240, parentWidth = 1000, parentHeight = 500, density = 1f, fallback = fallback)!!
-        assertEquals(388f / 752f, middle.xFraction, 0.0001f)
-        assertEquals(138f / 236f, middle.yFraction, 0.0001f)
+        assertEquals(400f / 776f, middle.xFraction, 0.0001f)
+        assertEquals(150f / 260f, middle.yFraction, 0.0001f)
     }
 
     @Test fun `a missing 1_7_0 position or size falls back`() {

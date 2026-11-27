@@ -23,6 +23,7 @@ class FloatingChatHeaderLayout @JvmOverloads constructor(
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var down: MotionEvent? = null
+    private var downPointerId = MotionEvent.INVALID_POINTER_ID
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         val listener = dragListener ?: return false
@@ -30,10 +31,21 @@ class FloatingChatHeaderLayout @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 clearDown()
                 down = MotionEvent.obtain(ev)
+                downPointerId = ev.getPointerId(0)
             }
+            // The first finger lifted before it moved: no drag from this touch.
+            MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == downPointerId) clearDown()
             MotionEvent.ACTION_MOVE -> {
                 val start = down ?: return false
-                if (hypot(ev.rawX - start.rawX, ev.rawY - start.rawY) > touchSlop) {
+                val index = ev.findPointerIndex(downPointerId)
+                if (index < 0) {
+                    clearDown()
+                    return false
+                }
+                // getRawX(int) needs API 29; the header is never scaled.
+                val rawX = ev.getX(index) - ev.x + ev.rawX
+                val rawY = ev.getY(index) - ev.y + ev.rawY
+                if (hypot(rawX - start.rawX, rawY - start.rawY) > touchSlop) {
                     down = null
                     // The button under the finger gets a cancel; the drag starts where the touch did.
                     val claimed = listener.onTouch(this, start)
@@ -57,6 +69,7 @@ class FloatingChatHeaderLayout @JvmOverloads constructor(
     private fun clearDown() {
         down?.recycle()
         down = null
+        downPointerId = MotionEvent.INVALID_POINTER_ID
     }
 
     override fun onDetachedFromWindow() {

@@ -332,6 +332,22 @@ Human QA completed:
   code stays as it was. #128 and #129 findings were fixed on their own branches.
   Emulator (fold, landscape, live): the prediction card sits below the strip
   and its close button works.
+- 2026-11-27: Phone QA of prerelease `debug-patch171-09613daf8`: everything
+  works, but the card can't reach the top of the screen; the strip padding
+  from `15c61bd73` plus the 12dp edge margin left ~40dp of dead band. The
+  maintainer wants the card placeable anywhere, so moving the handle to the
+  bottom (1.7.0) was ruled out. Fix: the chat fills the card; the 28dp top band
+  is run by `FloatingChatCardView.dispatchTouchEvent` with tap-through (past
+  slop it cancels the chat and drags; a hold grabs before the chat's
+  long-press); no edge margin (1.7.0 had none, so legacy positions now convert
+  exactly); the header overlays the chat instead of padding it; the pill bar
+  sits on the band's top rim. Gemini 4 Neon (antigravity, xhigh) reached the
+  same design independently and reviewed the diff; verified and fixed: a band
+  finger lifted before slop could hijack a second finger's chat scroll (also in
+  `FloatingChatHeaderLayout`), a grip inside the band on a keyboard-trimmed card
+  dragged instead of resizing, `hide()` left a pending band touch, and a band
+  tap over no child returned false on UP. Tests cover each and fail without
+  the fix.
 
 ## Decisions
 
