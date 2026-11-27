@@ -138,14 +138,6 @@
 
         <SwitchPreferenceCompat
             android:defaultValue="false"
-            android:key="floating_chat_pass_through"
-            android:summary="@string/floating_chat_pass_through_summary"
-            android:title="@string/floating_chat_pass_through"
-            app:iconSpaceReserved="false"
-            app:singleLineTitle="false" />
-
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
             android:key="floating_chat_reply_bar"
             android:summary="@string/floating_chat_reply_bar_summary"
             android:title="@string/floating_chat_reply_bar"

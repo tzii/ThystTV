@@ -76,7 +76,6 @@ internal class FloatingChatPopupBinder(
 
         addSwitch(R.string.floating_chat_fade_old, C.FLOATING_CHAT_FADE_OLD, appearance.fadeOldMessages)
         addSwitch(R.string.floating_chat_bold_text, C.FLOATING_CHAT_BOLD_TEXT, appearance.boldText)
-        addSwitch(R.string.floating_chat_pass_through, C.FLOATING_CHAT_PASS_THROUGH, appearance.passThrough)
         if (canCompose) {
             addSwitch(R.string.floating_chat_reply_bar, C.FLOATING_CHAT_REPLY_BAR, appearance.replyBar)
         }

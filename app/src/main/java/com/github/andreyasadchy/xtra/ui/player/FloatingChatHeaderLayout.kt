@@ -38,6 +38,7 @@ class FloatingChatHeaderLayout @JvmOverloads constructor(
                     // The button under the finger gets a cancel; the drag starts where the touch did.
                     val claimed = listener.onTouch(this, start)
                     start.recycle()
+                    if (claimed) listener.onTouch(this, ev)
                     return claimed
                 }
             }

@@ -11,13 +11,8 @@ import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
 
 /**
- * The floating chat card: a rounded, theme-tinted surface over the video that
- * clips the chat to its corners.
- *
- * With [passThrough] set the card ignores touches, so taps and swipes reach
- * the player underneath; [passThroughAt] does that only for touches that
- * start where it returns true (card coordinates). With [pinchEnabled] set a two-finger pinch anywhere on
- * the card resizes it instead of scrolling the chat.
+ * Rounded, theme-tinted floating chat card that clips chat content to its
+ * corners and supports two-finger pinch-to-resize at any time.
  */
 class FloatingChatCardView @JvmOverloads constructor(
     context: Context,
@@ -25,7 +20,7 @@ class FloatingChatCardView @JvmOverloads constructor(
 ) : FrameLayout(context, attrs) {
 
     interface PinchListener {
-        fun onPinchStart()
+        fun onPinchStart(): Boolean
         fun onPinch(scale: Float)
         fun onPinchEnd()
     }
@@ -35,9 +30,6 @@ class FloatingChatCardView @JvmOverloads constructor(
     private val surface = GradientDrawable().apply { cornerRadius = radius }
     private var surfaceVisible = true
 
-    var passThrough = false
-    var passThroughAt: ((x: Float, y: Float) -> Boolean)? = null
-    var pinchEnabled = false
     var pinchListener: PinchListener? = null
     private var pinching = false
 
@@ -45,10 +37,10 @@ class FloatingChatCardView @JvmOverloads constructor(
         private var startSpan = 0f
 
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-            if (!pinchEnabled) return false
+            val listener = pinchListener ?: return false
+            if (!listener.onPinchStart()) return false
             startSpan = detector.currentSpan.coerceAtLeast(1f)
             pinching = true
-            pinchListener?.onPinchStart()
             return true
         }
 
@@ -87,14 +79,18 @@ class FloatingChatCardView @JvmOverloads constructor(
         invalidateOutline()
     }
 
+    /** Clears active pinch tracking when the card is hidden mid-gesture. */
+    fun cancelPinch() {
+        pinching = false
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN && (passThrough || passThroughAt?.invoke(ev.x, ev.y) == true)) return false
-        if (pinchEnabled || pinching) {
+        if (pinchListener != null || pinching) {
             val wasPinching = pinching
             scaleDetector.onTouchEvent(ev)
             if (pinching) {
                 if (!wasPinching) {
-                    // The chat list may already be scrolling with the first finger.
+                    // The chat list, drag or grip resize may already own the first finger.
                     val cancel = MotionEvent.obtain(ev).apply { action = MotionEvent.ACTION_CANCEL }
                     super.dispatchTouchEvent(cancel)
                     cancel.recycle()

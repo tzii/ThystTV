@@ -86,21 +86,16 @@ internal object FloatingChatLayoutStore {
         val bounds = FloatingChatPlacement.bounds(parentWidth, parentHeight, density)
         val travelX = max(0f, bounds.width - width)
         val travelY = max(0f, bounds.height - height)
-        val magnet = FloatingChatPlacement.MAGNET_DP * density
         return FloatingChatLayout(
-            xFraction = share(x - bounds.left, travelX, magnet),
-            yFraction = share(y - bounds.top, travelY, magnet),
+            xFraction = share(x - bounds.left, travelX),
+            yFraction = share(y - bounds.top, travelY),
             widthDp = width / density,
             heightDp = height / density,
         )
     }
 
-    /** [offset] as a share of [travel], flush with either end within [magnet]. */
-    private fun share(offset: Float, travel: Float, magnet: Float): Float = when {
-        travel <= 0f || offset <= magnet -> 0f
-        travel - offset <= magnet -> 1f
-        else -> (offset / travel).coerceIn(0f, 1f)
-    }
+    private fun share(offset: Float, travel: Float): Float =
+        if (travel <= 0f) 0f else (offset / travel).coerceIn(0f, 1f)
 
     private fun parse(document: String?): Document? {
         if (document.isNullOrBlank()) return null
