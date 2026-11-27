@@ -317,6 +317,21 @@ Human QA completed:
     saved spot. Replaced `FloatingChatPlacementTest` and
     `FloatingChatControllerTest`, and updated `docs/PLAYER.md`,
     `docs/MANUAL_QA.md`, and `CHANGELOG.md`.
+- 2026-11-27: Reviews of the 1.7.1 debug build `9a64609d0` (Gemini 4 Neon,
+  antigravity, thought level xhigh; GLM 5.4 max via OpenCode, session model
+  verified). Raw output in `.private/qa/2026-11-27-171-reviews/`. Verified and
+  fixed in `15c61bd73`: the full-width drag strip covered the top chat line and
+  the poll/prediction/raid close buttons (chat now starts below the strip); the
+  lifted grip reserved only the strip, not the 48dp header; closing or sending
+  a reply didn't re-report the composer height; motion splitting let the strip
+  and grip run at once, and a second finger on the mirrored grip read mirrored
+  offsets; a width-only resize with the keyboard up saved the trimmed height
+  and spot; stale pinch comments. Rejected: GLM's "the hide fade ends inside
+  `start()` with animations off, leaving `exitFade` stale". `ValueAnimator` ends
+  on the next frame, and a regression test passed without the reorder, so the
+  code stays as it was. #128 and #129 findings were fixed on their own branches.
+  Emulator (fold, landscape, live): the prediction card sits below the strip
+  and its close button works.
 
 ## Decisions
 
@@ -406,7 +421,7 @@ recreating chat.
 Tests: `FloatingChatPlacementTest`, `FloatingChatLayoutStoreTest`,
 `FloatingChatAppearanceTest`, `FloatingChatControllerTest`; the chat transition
 suites run with the controller attached. `assembleDebug`, `testDebugUnitTest`
-(1,608 tests / 175 suites) and `lintDebug` (0 errors) pass.
+(1,639 tests on `integrate/1.7.1` with #128 and #129) and `lintDebug` (0 errors) pass.
 Human QA: `docs/MANUAL_QA.md` → "Floating chat redesign", plus the player
 safety rows (live, VoD, stream switching, minimize/restore, close/reopen, PiP,
 speed/quality, gestures, rotation, keyboard/Reply bar).
