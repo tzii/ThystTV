@@ -59,7 +59,9 @@ checked on a device yet.
   the list reloads by itself. With no followed streams live, "Nothing here" stays put
   through a reload (no spinner flash).
 - [ ] Chat poll and prediction cards (#129): tapping the card's text or options opens no
-  message menu and selects nothing behind it; the card's close button still works.
+  message menu and selects nothing behind it; the card's close button still works. The same
+  for the room status banner shown for a few seconds on joining (slow mode, followers-only).
+  With TalkBack on, the cards don't announce "double tap to activate".
 - [ ] Regression pass: live/VoD playback, stream switching, minimize/restore, close/reopen,
   PiP/background, speed/quality, gestures and floating chat.
 
