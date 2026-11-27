@@ -27,6 +27,7 @@ import com.github.andreyasadchy.xtra.ui.common.StreamsAdapter
 import com.github.andreyasadchy.xtra.ui.common.StreamsCompactAdapter
 import com.github.andreyasadchy.xtra.ui.top.TopStreamsFragmentDirections
 import com.github.andreyasadchy.xtra.util.C
+import com.github.andreyasadchy.xtra.util.isNetworkAvailable
 import com.github.andreyasadchy.xtra.util.prefs
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -43,6 +44,8 @@ class FollowedStreamsFragment : PagedListFragment(), Scrollable {
     private lateinit var pagingAdapter: PagingDataAdapter<Stream, out RecyclerView.ViewHolder>
     /** When the list last finished loading (elapsed realtime). */
     private var loadedAt = SystemClock.elapsedRealtime()
+    /** When the timer last fired, so a skipped or failed reload waits a whole interval too. */
+    private var attemptedAt = 0L
     private var loading = false
     /** The last load failed (offline, or an integrity check): wait for a pull or a retry instead. */
     private var failed = false
@@ -93,12 +96,15 @@ class FollowedStreamsFragment : PagedListFragment(), Scrollable {
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 pagingAdapter.loadStateFlow.distinctUntilChangedBy { it.refresh }.collect { loadState ->
+                    val wasLoading = loading
                     loading = loadState.refresh is LoadState.Loading
                     when (loadState.refresh) {
                         is LoadState.Error -> failed = true
                         is LoadState.NotLoading -> {
                             failed = false
-                            loadedAt = SystemClock.elapsedRealtime()
+                            // Only a load that just finished: the flow repeats its last state to every
+                            // new collector, so coming back on screen must not count as a fresh load.
+                            if (wasLoading) loadedAt = SystemClock.elapsedRealtime()
                         }
                         is LoadState.Loading -> Unit
                     }
@@ -110,10 +116,10 @@ class FollowedStreamsFragment : PagedListFragment(), Scrollable {
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while (true) {
-                    delay(FollowedStreamsAutoRefresh.delayUntilDue(loadedAt, SystemClock.elapsedRealtime()))
-                    if (!loading && !failed) refreshQuietly(pagingAdapter)
-                    // Counts from now even if the reload fails, so an offline list doesn't retry in a loop.
-                    loadedAt = SystemClock.elapsedRealtime()
+                    delay(FollowedStreamsAutoRefresh.delayUntilDue(maxOf(loadedAt, attemptedAt), SystemClock.elapsedRealtime()))
+                    attemptedAt = SystemClock.elapsedRealtime()
+                    // Offline, a reload comes back empty and would wipe the list: wait for the network.
+                    if (!loading && !failed && requireContext().isNetworkAvailable) refreshQuietly(pagingAdapter)
                 }
             }
         }
@@ -124,12 +130,16 @@ class FollowedStreamsFragment : PagedListFragment(), Scrollable {
     }
 
     override fun onNetworkRestored() {
-        pagingAdapter.retry()
+        when {
+            failed -> pagingAdapter.retry()
+            // A load while offline came back empty rather than failing, so retry() does nothing.
+            !loading -> refreshQuietly(pagingAdapter)
+        }
     }
 
     override fun onIntegrityDialogCallback(callback: String?) {
         if (callback == "refresh") {
-            pagingAdapter.refresh()
+            refresh(pagingAdapter)
         }
     }
 

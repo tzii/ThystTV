@@ -33,6 +33,13 @@ abstract class PagedListFragment : BaseNetworkFragment(), IntegrityDialog.Callba
         adapter.refresh()
     }
 
+    /** Reloads [adapter] like a pull to refresh, ending any quiet reload. */
+    protected fun refresh(adapter: PagingDataAdapter<*, *>) {
+        quietRefresh = false
+        quietRefreshStarted = false
+        adapter.refresh()
+    }
+
     fun <T : Any, VH : RecyclerView.ViewHolder> setAdapter(recyclerView: RecyclerView, adapter: PagingDataAdapter<T, VH>) {
         var firstInsertion = true
         val observer = object : RecyclerView.AdapterDataObserver() {
@@ -78,36 +85,42 @@ abstract class PagedListFragment : BaseNetworkFragment(), IntegrityDialog.Callba
         with(binding) {
             viewLifecycleOwner.lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    pagingAdapter.loadStateFlow.collectLatest { loadState ->
-                        if (quietRefresh) {
-                            if (loadState.refresh is LoadState.Loading) {
-                                quietRefreshStarted = true
-                            } else if (quietRefreshStarted) {
-                                quietRefresh = false
-                                quietRefreshStarted = false
+                    try {
+                        pagingAdapter.loadStateFlow.collectLatest { loadState ->
+                            if (quietRefresh) {
+                                if (loadState.refresh is LoadState.Loading) {
+                                    quietRefreshStarted = true
+                                } else if (quietRefreshStarted) {
+                                    quietRefresh = false
+                                    quietRefreshStarted = false
+                                }
+                            }
+                            progressBar.isVisible = loadState.refresh is LoadState.Loading && pagingAdapter.itemCount == 0 && !quietRefresh
+                            if (enableSwipeRefresh) {
+                                swipeRefresh.isRefreshing = loadState.refresh is LoadState.Loading && pagingAdapter.itemCount != 0 && !quietRefresh
+                            }
+                            // A quiet reload of an empty list keeps "Nothing here" instead of flashing a spinner.
+                            nothingHere.isVisible = (loadState.refresh !is LoadState.Loading || quietRefresh) && pagingAdapter.itemCount == 0
+                            if ((loadState.refresh as? LoadState.Error ?:
+                                loadState.append as? LoadState.Error ?:
+                                loadState.prepend as? LoadState.Error)?.error?.message == "failed integrity check" &&
+                                requireContext().prefs().getBoolean(C.ENABLE_INTEGRITY, false) &&
+                                requireContext().prefs().getBoolean(C.USE_WEBVIEW_INTEGRITY, true)
+                            ) {
+                                IntegrityDialog.show(childFragmentManager, "refresh")
                             }
                         }
-                        progressBar.isVisible = loadState.refresh is LoadState.Loading && pagingAdapter.itemCount == 0
-                        if (enableSwipeRefresh) {
-                            swipeRefresh.isRefreshing = loadState.refresh is LoadState.Loading && pagingAdapter.itemCount != 0 && !quietRefresh
-                        }
-                        nothingHere.isVisible = loadState.refresh !is LoadState.Loading && pagingAdapter.itemCount == 0
-                        if ((loadState.refresh as? LoadState.Error ?:
-                            loadState.append as? LoadState.Error ?:
-                            loadState.prepend as? LoadState.Error)?.error?.message == "failed integrity check" &&
-                            requireContext().prefs().getBoolean(C.ENABLE_INTEGRITY, false) &&
-                            requireContext().prefs().getBoolean(C.USE_WEBVIEW_INTEGRITY, true)
-                        ) {
-                            IntegrityDialog.show(childFragmentManager, "refresh")
-                        }
+                    } finally {
+                        // Stopped before the quiet reload was seen to start or end: later reloads are not quiet.
+                        quietRefresh = false
+                        quietRefreshStarted = false
                     }
                 }
             }
             if (enableSwipeRefresh) {
                 swipeRefresh.isEnabled = true
                 swipeRefresh.setOnRefreshListener {
-                    quietRefresh = false
-                    pagingAdapter.refresh()
+                    refresh(pagingAdapter)
                 }
             }
             if (enableScrollTopButton && requireContext().prefs().getBoolean(C.UI_SCROLLTOP, true)) {
