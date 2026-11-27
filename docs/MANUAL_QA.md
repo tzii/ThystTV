@@ -55,7 +55,9 @@ checked on a device yet.
   minutes its card leaves the list without a pull to refresh and without a spinner. Scroll
   down, wait: the list doesn't jump to the top. Switch to another app or tab for a few
   minutes and come back: the list reloads at once. Pull to refresh still shows the spinner.
-  In airplane mode the list keeps its streams and doesn't retry in a loop.
+  In airplane mode the list keeps its streams and doesn't retry in a loop; turn it off and
+  the list reloads by itself. With no followed streams live, "Nothing here" stays put
+  through a reload (no spinner flash).
 - [ ] Chat poll and prediction cards (#129): tapping the card's text or options opens no
   message menu and selects nothing behind it; the card's close button still works.
 - [ ] Regression pass: live/VoD playback, stream switching, minimize/restore, close/reopen,
