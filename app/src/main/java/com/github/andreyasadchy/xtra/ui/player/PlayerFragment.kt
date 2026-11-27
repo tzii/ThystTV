@@ -3496,9 +3496,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
-    private fun hideController(force: Boolean = false, immediate: Boolean = false) {
+    private fun hideController(force: Boolean = false, immediate: Boolean = false, pinchHint: Boolean = !force) {
         seekPreview?.hide()
-        if (!force) {
+        if (pinchHint) {
             maybeShowPinchHint()
         }
         if (!immediate && !controllerIsAnimating && binding.playerControls.root.isVisible) {
