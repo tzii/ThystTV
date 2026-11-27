@@ -4916,7 +4916,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         chatFragment?.setOverlayStyle(if (toFloating) appearance?.overlayStyle() else null)
         chatFragment?.setFloatingReplyBar(toFloating && appearance?.replyBar == true)
         chatFragment?.setFloatingReveal(binding.playerControls.root.isVisible)
-        // A card hidden while tucked paused its rows; the sidebar never pauses them.
+        // A hidden card paused its rows; the sidebar never pauses them.
         if (!toFloating) chatFragment?.setRowAnimationsPaused(false)
     }
 

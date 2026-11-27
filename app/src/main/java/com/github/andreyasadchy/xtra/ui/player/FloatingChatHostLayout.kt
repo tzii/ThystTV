@@ -7,7 +7,7 @@ import android.widget.FrameLayout
 /**
  * Full-screen, touch-transparent layer that holds the floating chat card.
  *
- * The card resizes live while the viewer drags its corner or pinches. Its size
+ * The card resizes live while the viewer drags its corner grip. Its size
  * never changes this host's own size, so the host lays its children out locally
  * on the next frame instead of re-measuring the player's root layout.
  */

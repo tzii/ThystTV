@@ -1082,6 +1082,8 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
             editText.clearFocus()
             toggleEmoteMenu(false)
             replyView.visibility = View.GONE
+            // The box doesn't move when the reply line above it goes, so no layout callback reports it.
+            reportComposerHeight()
             send.setOnClickListener { sendMessage() }
             if (floatingReplyActive) {
                 floatingReplyActive = false
@@ -1152,6 +1154,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                 }
                 replyClose.setOnClickListener {
                     replyView.visibility = View.GONE
+                    reportComposerHeight()
                     if (floatingReplyActive && editText.text.isBlank()) {
                         floatingReplyActive = false
                         updateComposerVisibility()

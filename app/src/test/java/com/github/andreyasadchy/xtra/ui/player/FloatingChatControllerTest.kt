@@ -95,7 +95,8 @@ class FloatingChatControllerTest {
         assertEquals(View.INVISIBLE, binding.floatingChatHeader.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatPill.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
-        assertEquals(0, binding.floatingChatContainer.paddingTop)
+        // Chat starts below the 28dp drag strip, so the strip covers no chat line.
+        assertEquals(28, binding.floatingChatContainer.paddingTop)
         assertEquals(1f, card.alpha, 0f)
         assertEquals(rightX(), card.x, 0f)
         assertEquals(MARGIN, card.y, 0f)
@@ -336,6 +337,45 @@ class FloatingChatControllerTest {
         controller.setInsets(FloatingChatInsets())
         assertEquals(bottomY, card.y, 0.5f)
         assertEquals(240, card.height)
+    }
+
+    @Test fun `width-only resize with the keyboard up keeps the saved height and spot`() {
+        controller.show(animate = false)
+        idle()
+        drag(binding.floatingChatPill, dx = 0f, dy = 220f)
+        val bottomY = binding.floatingChatRoot.y
+        controller.setInsets(FloatingChatInsets(bottom = 300, ime = true))
+        idle()
+        val card = binding.floatingChatRoot
+        assertTrue(card.height < 240)
+
+        drag(binding.floatingChatGrip, dx = -40f, dy = 0f)
+        idle()
+        assertEquals(264, card.width)
+
+        controller.setInsets(FloatingChatInsets())
+        idle()
+        assertEquals(240, card.height)
+        assertEquals(bottomY, card.y, 0.5f)
+        val stored = FloatingChatLayoutStore.read(prefs.getString(FloatingChatLayoutStore.PREF_KEY, null), "c1")!!
+        assertEquals(264f, stored.widthDp, 0.5f)
+        assertEquals(240f, stored.heightDp, 0.5f)
+    }
+
+    @Test fun `lifted grip reserves the header while the controls show`() {
+        controller.show(animate = false)
+        idle()
+        val card = binding.floatingChatRoot
+        // Fits under the 28dp strip, but not under the 48dp header.
+        val lift = card.height - 48 - 28 - 10
+        controller.setComposerHeight(lift)
+        assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        assertEquals(View.INVISIBLE, binding.floatingChatGrip.visibility)
+        controller.onControlsVisibilityChanged(false)
+        idle()
+        assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
     }
 
     @Test fun `legacy 1_7_0 prefs migrate once and per-channel layout falls back to last used`() {

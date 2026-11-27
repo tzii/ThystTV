@@ -23,6 +23,9 @@ class FloatingChatCardView @JvmOverloads constructor(
     private var surfaceVisible = true
 
     init {
+        // One gesture at a time: a second finger joins the first one's handle (drag strip,
+        // header or grip) instead of starting a second drag or resize on another child.
+        isMotionEventSplittingEnabled = false
         background = surface
         clipToOutline = true
         outlineProvider = object : ViewOutlineProvider() {

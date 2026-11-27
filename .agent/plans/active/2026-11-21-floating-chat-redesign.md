@@ -118,8 +118,8 @@ Human QA required:
 - [ ] Drag by top pill strip (controls hidden) and by header (controls shown,
       including starting on a header button): 1:1 under finger, clamps on all
       four usable edges, stays at exact drop spot with no animation/snap.
-- [ ] Resize from the inner corner grip (both sides) and pinch anywhere on the
-      card, both with controls hidden and with controls shown; clamps to min/max
+- [ ] Resize from the inner corner grip (both sides; no card pinch since v2),
+      both with controls hidden and with controls shown; clamps to min/max
       and usable area; size remembered per channel with last-used fallback.
 - [ ] Controls show/hide: never moves, fades or hides the card; toggling
       controls mid-drag or mid-resize finishes cleanly.
@@ -309,8 +309,9 @@ Human QA completed:
     (`passThroughAt`, `FloatingChatControls`, `headerAtBottom`, `gripCovers`),
     `FLOATING_CHAT_PASS_THROUGH`, minimize ride/swipe-follow
     (`FloatingChatHostPose`), `chromeHeld`, and pinch-hint coupling.
-  - Drag (full-width top pill strip or top header), corner resize grip, and
-    two-finger pinch now work at any time regardless of controls visibility;
+  - Drag (full-width top pill strip or top header) and the corner resize grip
+    work at any time regardless of controls visibility (card pinch was removed
+    in `19b563c1a`);
     drag moves 1:1 with zero allocations per move and stays clamped inside
     usable bounds; minimize hides immediately and maximize fades back in at the
     saved spot. Replaced `FloatingChatPlacementTest` and
@@ -372,7 +373,7 @@ Human QA completed:
   in floating and sidebar chat.
 - Decision (2026-11-27, supersedes tuck, springs/magnets, control covering/pass-through,
   and minimize ride): simplify floating chat interaction to direct 1:1 clamped
-  drag and always-available corner grip + pinch resize, fully decoupled from
+  drag and always-available corner grip resize, fully decoupled from
   player controls visibility, with immediate hide on minimize and short fade on
   maximize; remove tuck/edge tab, `androidx.dynamicanimation` springs, edge
   magnets, controls covering/tap-through, `FLOATING_CHAT_PASS_THROUGH`, and
@@ -393,7 +394,7 @@ Summary: Redesigns floating chat as a dark rounded card over video with Clear
 Solid looks, text size and bold options, all switched live from a new Aa
 popover without reconnecting chat. Interaction stays direct and predictable like
 1.7.0: drag 1:1 from the full-width top pill strip or top header, resize live
-from the always-available inner corner grip or by two-finger pinch at any time
+from the always-available inner corner grip at any time
 regardless of controls visibility, clamped inside cutouts, system bars and the
 keyboard, staying exactly where dropped with no springs/tuck/magnets. Player
 controls never move, fade or hide the card (gesture sliders fade it to 25% while
@@ -410,5 +411,5 @@ Human QA: `docs/MANUAL_QA.md` → "Floating chat redesign", plus the player
 safety rows (live, VoD, stream switching, minimize/restore, close/reopen, PiP,
 speed/quality, gestures, rotation, keyboard/Reply bar).
 Risks: chat view reparenting waits for the short hide fade; keyboard avoidance
-relies on device window insets; corner grip hides while the bottom Reply bar is
-open (pinch still resizes); touch feel and animations need physical phone QA.
+relies on device window insets; with the Reply bar open the corner grip sits
+above the message box (`19b563c1a`); touch feel and animations need physical phone QA.

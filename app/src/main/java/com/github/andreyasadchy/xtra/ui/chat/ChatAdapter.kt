@@ -79,7 +79,7 @@ class ChatAdapter(
     /** Set while the list floats over video; null on an app surface. */
     var overlayStyle: ChatOverlayStyle? = null
         private set
-    /** Animated emotes stay still while the floating chat is hidden or tucked away. */
+    /** Animated emotes stay still while the floating chat is hidden. */
     var animationsPaused = false
         private set
     private val useDarkOverlay get() = overlayStyle != null
