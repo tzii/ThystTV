@@ -37,7 +37,6 @@ internal data class FloatingChatAppearance(
     val boldText: Boolean,
     val textSize: FloatingChatTextSize,
     val fadeOldMessages: Boolean,
-    val passThrough: Boolean,
     val replyBar: Boolean,
 ) {
     val background get() = FloatingChatBackground.fromOpacity(opacity)
@@ -65,7 +64,6 @@ internal data class FloatingChatAppearance(
             boldText = prefs.getBoolean(C.FLOATING_CHAT_BOLD_TEXT, false),
             textSize = FloatingChatTextSize.fromValue(prefs.getString(C.FLOATING_CHAT_TEXT_SIZE, null)),
             fadeOldMessages = prefs.getBoolean(C.FLOATING_CHAT_FADE_OLD, false),
-            passThrough = prefs.getBoolean(C.FLOATING_CHAT_PASS_THROUGH, false),
             replyBar = prefs.getBoolean(C.FLOATING_CHAT_REPLY_BAR, false),
         )
     }

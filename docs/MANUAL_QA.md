@@ -695,7 +695,7 @@ Turn on Player settings → Gestures → Extended zoom.
 | Quality menu/selection | [ ] | [ ] | |
 | Chat-only/audio-only restore | [ ] | [ ] | |
 | Gestures: brightness/volume/seek | [ ] | [ ] | |
-| Floating chat: open/drag/resize/tuck | [ ] | [ ] | |
+| Floating chat: open/drag/resize/pinch | [ ] | [ ] | |
 | Floating chat readability over video | [ ] | [ ] | |
 | Portrait phone layout | [ ] | [ ] | |
 | Landscape phone layout | [ ] | [ ] | |
@@ -952,100 +952,69 @@ bright and dark video. Repeat the core rows with an RTL language.
 - [ ] Aa: Clear, Shade and Solid switch at once without reconnecting chat
   (history stays). Clear shows only text; it stays readable on white and busy
   video, emotes included. Text size and Bold apply to existing lines.
-- [ ] Settings → Chat: the opacity slider, text size and the new switches change
-  an open floating chat live after returning to the player.
-- [ ] Controls hidden: only the small top handle shows; dragging it moves the
-  card. Nothing invisible at the top of the card catches taps; the chat list
-  scrolls and opens message actions as before.
-- [ ] Controls shown: the header (Aa, tuck, close) and the corner grip appear.
-  The card never moves for the controls. Over a control it fades a little so
-  the control shows through, and tapping that control works through the chat;
-  it is back to full strength when they hide. A card in the open does not fade.
-  Card at the top right, on a live stream and on a VoD (where +10 reaches the
-  card's bottom): the header shows on the card's bottom edge, the top right
-  buttons (Speed, Quality, More) can be tapped through the card, and the grip
-  stays hidden. With Reply bar on, the header stays on top and those buttons
-  still answer taps through it.
-  No chat line shows under the header's buttons.
-- [ ] Card at the top: drag it by its header. The controls fade as the drag
-  starts, the header stays under the finger, and the card stays where it is let
-  go: it does not drop and then jump up. Same for a grip resize and a pinch. A
-  plain tap on the header or grip leaves the controls up.
-- [ ] Drop the card in the middle, near (not at) an edge and in each corner, on a
-  small phone and on a wide tablet or desktop window: it stays exactly where
-  dropped, even when let go mid-swipe, and only lands flush within about 8dp of
-  an edge (or when dropped partly past it). Tapping the video afterwards does not move it. The spot survives
-  rotation, reopening and another channel.
-- [ ] On a VoD with the card on the right, middle height, show the controls: the
-  card stays, fades a little, and the +10 button shows through and can be
-  tapped. Same with −10 on the left, and with play/pause and the seek bar.
-- [ ] With the card open, open Quality, Speed, More and Aa: each menu draws above
-  the card, and every chip and the close button can be tapped. In landscape Aa
-  opens beside the card, on the video side, so each change shows on the card;
-  with the card on the left it opens to its right.
-- [ ] Brightness swipe with the card on the left, volume swipe with it on the
-  right, then seek and speed swipes: the card fades back while the slider shows
-  and returns as the slider fades. A tap or a chat swipe does not fade it.
-- [ ] Fling the card: it stops where the finger left it. From an edge, fling it
-  sideways off that edge, or drag about a third of
-  it off, or tap tuck: a tab remains. New messages
-  count on the tab; tapping it brings the card back. Back gesture from that edge
-  still works away from the tab.
-- [ ] Resize from the grip on either side and by pinching; the outer edge stays
-  put, the size is kept after rotation and reopening. Tapping the grip on a
-  short window does not shrink the stored size.
-- [ ] At the smallest width, drag the card by its header starting on Aa, tuck or
-  close: it moves and the button does not fire; a plain tap still does.
-- [ ] Start a drag, put a second finger down and lift the first: the card follows
-  the second finger without jumping. Start a drag or grip resize, then pinch:
-  the pinch takes over smoothly and the controls stay up until both fingers lift.
-- [ ] Throw the card from the middle toward an edge: it stays where it was let
-  go instead of tucking.
-- [ ] Position memory: move the chat on channel A, open channel B (starts where
-  A left it), move it, return to A (A's place). Upgrading from 1.7.0 keeps a
-  channel's old position near where it was.
-- [ ] Camera cutout on either side, three-button navigation, and a short window
-  (split screen): the card stays clear and loses its oldest lines first. Repeat
-  the cutout check with video drawn behind the cutout: no chat text under it.
-- [ ] RTL language: the card, tab and grip land on the side they were dragged to
-  and do not jump when resized.
+- [ ] Settings → Chat: the opacity slider, text size, Bold, Fade old messages
+  and Reply bar change an open floating chat live after returning to the player.
+- [ ] Controls hidden: the top drag strip (pill) and corner resize grip are both
+  visible and work immediately. Drag moves the card 1:1 under the finger, clamps
+  inside all four usable edges (never leaves the screen), and stays at the exact
+  drop spot with no snap or bounce. Nothing invisible at the top catches taps;
+  the chat list scrolls and opens message actions as before.
+- [ ] Controls shown: the top header (optional compose, Aa, close) appears
+  without moving, fading or hiding the card; no chat line sits under the header
+  buttons. Dragging by the header (including starting on Aa or close) moves the
+  card without firing the button, while a tap presses it. The corner resize grip
+  stays visible and usable.
+- [ ] Resize and pinch: corner grip resizes live with controls hidden AND with
+  controls shown, keeping the outer edge fixed and clamping to min/max size and
+  usable bounds; flipping the card to the left side moves the grip to the
+  bottom-right corner. Two-finger pinch anywhere on the card resizes with
+  controls hidden AND shown. Both save on release; a plain tap on the grip does
+  not shrink a saved size on a short screen.
+- [ ] Controls toggling mid-gesture: start a drag or resize, toggle controls on
+  or off, and finish the gesture — it completes cleanly and saves without
+  jumping or getting stuck.
+- [ ] Start a drag, put a second finger down and lift the first: the card
+  follows the second finger without jumping. Start a drag or grip resize, then
+  pinch: pinch takes over smoothly and saves on release.
+- [ ] With the card open, open Quality, Speed, More and Aa: each menu draws
+  above the card, and every chip and close button can be tapped. In landscape Aa
+  opens beside the card on the video side first so changes are visible live.
+- [ ] Brightness, volume, seek and speed swipes: the card fades back to 25%
+  while the gesture slider shows and returns when it clears. A tap or chat swipe
+  does not fade it.
+- [ ] Position memory: move and resize chat on channel A, open channel B (starts
+  where A left it), move it, return to A (A's place). Upgrading from 1.7.0
+  migrates a channel's old pixel position cleanly once.
+- [ ] Rotation, split-screen resize, camera cutout on either side (including
+  draw-behind-cutouts) and three-button navigation: the card re-places from
+  saved fractions and stays clamped inside the usable area; short screens trim
+  oldest lines first.
+- [ ] RTL language: dragging, resizing, grip placement and saved position match
+  the physical side of the screen and do not jump when resized.
 - [ ] Fade old messages on: lines fade after 10 seconds and return with the
   controls, while scrolled back, touching or typing.
-- [ ] Pass touches to video on: with the controls hidden, taps and swipes on the
-  chat reach the player (controls, double tap, seek); with controls up, the
-  header still works.
-- [ ] Signed in on a live stream: the header keyboard button opens the message
-  box for one message and it closes after sending or leaving it empty. Reply bar
-  on: the box stays. The keyboard pushes the card up. Reply from a message's
-  actions opens the box too. Signed out or VoD: no keyboard button.
-- [ ] On a short phone in landscape, open the keyboard: the card shrinks to the
-  room above it and stays usable; closing the keyboard drops focus and restores
-  the size. Copy a message from its actions: the box opens with the text.
-- [ ] Light app theme: the message box, its hint, icons and reply preview read as
-  white on the dark card; names keep readable colours on the card. The grip hides
-  while the box is open.
+- [ ] Signed in on a live stream: header keyboard button opens the message box
+  for one message and closes after sending or leaving it empty. Reply bar on:
+  box stays open (grip hides so it does not cover Send/Emotes; pinch still
+  resizes). Keyboard clamps the card above the keys and restores its position
+  when closed; on a short landscape phone the card shrinks to fit above the keys
+  and restores when closed. Copy and Reply from message actions open the box.
+  Signed out or VoD: no keyboard button.
+- [ ] Light app theme: the message box, its hint, icons and reply preview read
+  as white on the dark card; names keep readable colours on the card.
 - [ ] More menu while floating: the chat bar item shows and toggles the Reply
   bar; "Hide chat" (if enabled in Settings) hides the floating card.
 - [ ] Hide the floating chat and, during its fade, switch to the sidebar, rotate
-  to portrait or enter PiP: the sidebar shows its chat, never an empty panel.
-- [ ] Tucked with animated emotes arriving: new lines' emotes stay still until
-  the card is back, then animate.
+  to portrait, minimize or enter PiP: the sidebar shows its chat, never an empty
+  panel, and no stale card remains.
 - [ ] Clear: painted names (gradient and image paints) are outlined like the
   other text and show no box; emotes draw once, without a dark double. Painted
-  names in the message and reply dialogs look as before.
-- [ ] TalkBack: the card offers move left/right, larger/smaller and tuck; the
-  tab reads "Show chat" with the new-message count.
-- [ ] Swipe the player down slowly with the card shown: the card moves down with
-  the video and fades a little. Let go early: both go back up together. Swipe
-  past the minimize point: the card shrinks into the mini player with the video
-  and is gone before it lands; no jump, no flash of the card elsewhere when the
-  controls and status bar change. Tap the mini player: the card grows back out
-  of the video to its place. Repeat with the card tucked, with the controls up,
-  with a header drag just finished, and minimize by Back and the minimize
-  button. Maximize again during the minimize: the card comes back and stays.
-- [ ] Enter and leave PiP, minimize and restore, rotate to portrait and back,
-  close and reopen, switch streams: the card hides and returns with its chat, no
-  empty card, no duplicate chat, no stale card over the mini player.
+  names in message and reply dialogs look as before.
+- [ ] TalkBack: the card offers move left/right, larger and smaller actions.
+- [ ] Minimize / restore, PiP, portrait, close / reopen, stream switching:
+  minimize hides the card immediately and maximize fades it back in at its saved
+  place; PiP hides and restores it; portrait docks it to sidebar; no empty card,
+  duplicate chat, or stale card over the mini-player.
 - [ ] Sidebar ↔ floating ↔ hidden by double tap, chat button and swipe; pinch
   during a double tap still restores the previous mode. Tabletop docks the chat
   and floats it again after unfolding.

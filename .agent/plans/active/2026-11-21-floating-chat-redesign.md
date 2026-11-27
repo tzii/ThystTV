@@ -103,12 +103,11 @@ asked for the build; work stays on an unpushed branch until they ask to commit.
 
 ## Verification
 
-Automated checks:
+Automated checks (v2 simplification on `feat/floating-chat-v2`, 2026-11-27):
 
 - [x] `./gradlew assembleDebug`
-- [x] `./gradlew test` (only `testDebugUnitTest` exists): 1601 passed after the
-      review fixes; see the progress log for the earlier combined-run OOM.
-- [x] `./gradlew lintDebug`: no errors; no new warnings in changed lines.
+- [x] `./gradlew testDebugUnitTest`: 1,608 passed across 175 suites (0 failures, 0 errors, 0 skipped).
+- [x] `./gradlew lintDebug`: 0 errors, 339 pre-existing warnings (0 warnings in floating chat files or `fragment_player.xml`).
 
 Human QA required:
 
@@ -116,24 +115,25 @@ Human QA required:
       every line readable, no box, names and emotes crisp.
 - [ ] Shade (fresh install default) and Solid; Aa changes apply live with no
       reconnect or lost scroll position.
-- [ ] Drag by pill and by header; fling to each side; corner magnets; release
-      mid-screen stays put; tuck by fast sideways fling and by dragging 30% past
-      the edge; tab shows unread count; tap tab restores; back gesture at the
-      tab edge still works elsewhere.
-- [ ] Resize from the inner corner (both sides), pinch with controls up; card
-      never leaves the screen; size remembered per channel and for a new channel.
-- [ ] Controls show/hide: card slides off the top and bottom bars; short phone
-      drops oldest lines rather than covering the seek bar; cutout side.
+- [ ] Drag by top pill strip (controls hidden) and by header (controls shown,
+      including starting on a header button): 1:1 under finger, clamps on all
+      four usable edges, stays at exact drop spot with no animation/snap.
+- [ ] Resize from the inner corner grip (both sides) and pinch anywhere on the
+      card, both with controls hidden and with controls shown; clamps to min/max
+      and usable area; size remembered per channel with last-used fallback.
+- [ ] Controls show/hide: never moves, fades or hides the card; toggling
+      controls mid-drag or mid-resize finishes cleanly.
 - [ ] Fade old messages: rows fade after 10 s, reappear with controls and when
       scrolled back; new lines glide in; scroll back stops following.
-- [ ] Pass touches to video: taps and gestures reach the player while controls
-      are hidden; card is interactive again while controls are up.
 - [ ] Reply bar on (logged in, live): compose, emote menu, send; keyboard
-      pushes the card up; message-dialog Reply works with the bar off.
-- [ ] Player safety: live and VoD playback, stream switching, minimize/restore,
-      close/reopen, PiP (card hidden in PiP, back after), speed/quality,
-      gestures, double-tap chat cycle, swipe chat, fold postures, portrait.
-- [ ] TalkBack: actions to move, resize, tuck and restore.
+      clamps the card above the keys and restores when closed; message-dialog
+      Reply works with the bar off.
+- [ ] Player safety: live and VoD playback, stream switching, minimize/restore
+      (immediate hide on minimize, short fade on maximize), close/reopen, PiP
+      (card hidden in PiP, back after), speed/quality, gestures (25% duck fade
+      during sliders), double-tap chat cycle, swipe chat, fold postures,
+      portrait, rotation and cutout/system-bar insets.
+- [ ] TalkBack: actions to move left/right and make larger/smaller.
 
 Human QA completed:
 
@@ -290,6 +290,33 @@ Human QA completed:
   drag spent the one-time pinch hint. (7) The grip showed over a held bottom
   header. (8) Stale comments. Not done: a fragment-level minimize/maximize test.
 
+- 2026-11-27: Phone QA by the maintainer found the redesigned controller
+  unreliable ("works half the time", card occasionally disappears or refuses to
+  resize). Root causes: the resize grip was gated on `controlsVisible ||
+  chromeHeld` and further hidden by `gripCovers` in the default top-right spot;
+  pinch required the header; dragging 35% past an edge or flinging tucked the
+  card into `View.INVISIBLE` with only a small edge tab; and ~2,300 lines with
+  13+ interdependent state flags and springs could desync. Rewrote the
+  controller and placement cleanly on `feat/floating-chat-v2`:
+  - Kept the card look, Aa popover (`placeBeside`), `FloatingChatAppearance`
+    (Clear/Shade/Solid, bold, text size, Fade old messages, Reply bar), chat
+    rendering (`ChatAgeFader`, `ChatFollowGlide`, `ChatMessageTextView` double
+    halo, name paint spans), per-channel `FloatingChatLayoutStore` + 1.7.0
+    migration, cutout/system-bar/IME clamping, 1.7.0 lifecycle/reparenting bug
+    fixes, and the lightweight 25% `setDucked` alpha fade during gesture sliders.
+  - Removed tuck and edge tab, `androidx.dynamicanimation` springs/flings/velocity,
+    edge magnets, release glide, controls avoidance/covering fade/tap-through
+    (`passThroughAt`, `FloatingChatControls`, `headerAtBottom`, `gripCovers`),
+    `FLOATING_CHAT_PASS_THROUGH`, minimize ride/swipe-follow
+    (`FloatingChatHostPose`), `chromeHeld`, and pinch-hint coupling.
+  - Drag (full-width top pill strip or top header), corner resize grip, and
+    two-finger pinch now work at any time regardless of controls visibility;
+    drag moves 1:1 with zero allocations per move and stays clamped inside
+    usable bounds; minimize hides immediately and maximize fades back in at the
+    saved spot. Replaced `FloatingChatPlacementTest` and
+    `FloatingChatControllerTest`, and updated `docs/PLAYER.md`,
+    `docs/MANUAL_QA.md`, and `CHANGELOG.md`.
+
 ## Decisions
 
 - Decision: Keep `floating_chat_transparency` as the background opacity and
@@ -343,30 +370,45 @@ Human QA completed:
 - Decision: Overlay name colours get their own caches in the light app theme.
   Trade-off: a user without a Twitch colour may get a different random colour
   in floating and sidebar chat.
+- Decision (2026-11-27, supersedes tuck, springs/magnets, control covering/pass-through,
+  and minimize ride): simplify floating chat interaction to direct 1:1 clamped
+  drag and always-available corner grip + pinch resize, fully decoupled from
+  player controls visibility, with immediate hide on minimize and short fade on
+  maximize; remove tuck/edge tab, `androidx.dynamicanimation` springs, edge
+  magnets, controls covering/tap-through, `FLOATING_CHAT_PASS_THROUGH`, and
+  minimize-ride host transforms.
+  Reason: phone testing showed the multi-flag controls-coupled interaction model
+  felt flaky (card disappearing via accidental tuck, grip/pinch unavailable when
+  controls hid or overlapped top-right buttons). Direct 1:1 clamped behaviour
+  matches 1.7.0's reliability while keeping the new visual polish, appearance
+  options, per-channel memory, and lifecycle fixes.
+  Alternatives considered: patching individual flags (`gripCovers`, `pinchEnabled`,
+  tuck threshold) inside the 1,388-line controller (leaves complex flag coupling
+  and future desync risk).
 
 ## Final PR summary draft
 
 Summary: Redesigns floating chat as a dark rounded card over video with Clear
 (text with a halo, no surface), Shade (default for untouched installs) and
 Solid looks, text size and bold options, all switched live from a new Aa
-popover without reconnecting chat. The card moves by a pill or the header
-(the controls fade while it moves), stays exactly where it is dropped, fades
-to 60% under the controls and lets taps through to them, keeps clear of the cutout, navigation bar and keyboard,
-rides into the mini-player with the video, tucks to an edge tab with an
-unread count, resizes from the inner corner or by pinch, and remembers its
-place per channel with a last-used fallback (1.7.0 positions migrate). New
-options: Fade old messages, Pass touches to video, Reply bar. Fixes the
-invisible drag bar catching taps, the card covering PiP, and the contrast
-toggle recreating chat.
-Tests: new `FloatingChatPlacementTest`, `FloatingChatLayoutStoreTest`,
-`FloatingChatAppearanceTest`, `FloatingChatControllerTest`; the chat
-transition suites run with the controller attached. `assembleDebug`,
-`testDebugUnitTest` (1620) and `lintDebug` pass. An independent Gemini 4 Neon
-review's verified findings are fixed (see the progress log).
+popover without reconnecting chat. Interaction stays direct and predictable like
+1.7.0: drag 1:1 from the full-width top pill strip or top header, resize live
+from the always-available inner corner grip or by two-finger pinch at any time
+regardless of controls visibility, clamped inside cutouts, system bars and the
+keyboard, staying exactly where dropped with no springs/tuck/magnets. Player
+controls never move, fade or hide the card (gesture sliders fade it to 25% while
+shown); minimize hides immediately and maximize fades it back in. Position and
+size are remembered per channel with a last-used fallback (1.7.0 positions
+migrate). New options: Fade old messages and Reply bar. Fixes the invisible
+drag bar catching taps, the card covering PiP, and the contrast toggle
+recreating chat.
+Tests: `FloatingChatPlacementTest`, `FloatingChatLayoutStoreTest`,
+`FloatingChatAppearanceTest`, `FloatingChatControllerTest`; the chat transition
+suites run with the controller attached. `assembleDebug`, `testDebugUnitTest`
+(1,608 tests / 175 suites) and `lintDebug` (0 errors) pass.
 Human QA: `docs/MANUAL_QA.md` → "Floating chat redesign", plus the player
 safety rows (live, VoD, stream switching, minimize/restore, close/reopen, PiP,
-speed/quality, gestures).
-Risks: chat view reparenting now waits for the hide fade; the cover fade and
-tap-through use the measured control groups (none before the controls first lay out); keyboard
-avoidance relies on window insets; Robolectric cannot show real spring or
-fade feel, so motion needs device QA.
+speed/quality, gestures, rotation, keyboard/Reply bar).
+Risks: chat view reparenting waits for the short hide fade; keyboard avoidance
+relies on device window insets; corner grip hides while the bottom Reply bar is
+open (pinch still resizes); touch feel and animations need physical phone QA.

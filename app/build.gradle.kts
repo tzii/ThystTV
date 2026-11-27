@@ -106,7 +106,6 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.constraintlayout)
     implementation(libs.coordinatorlayout)
-    implementation(libs.dynamicanimation)
     implementation(libs.core.ktx)
     implementation(libs.fragment.ktx)
     implementation(libs.lifecycle.viewmodel)

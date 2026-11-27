@@ -805,10 +805,7 @@
     <string name="floating_chat" translatable="false">Floating chat</string>
     <string name="floating_chat_type" translatable="false">Type a message</string>
     <string name="floating_chat_appearance" translatable="false">Chat appearance</string>
-    <string name="floating_chat_tuck" translatable="false">Tuck chat to the edge</string>
     <string name="floating_chat_close" translatable="false">Close chat</string>
-    <string name="floating_chat_show" translatable="false">Show chat</string>
-    <string name="floating_chat_show_unread" translatable="false">Show chat. New messages: %1$d</string>
     <string name="floating_chat_move_left" translatable="false">Move chat to the left</string>
     <string name="floating_chat_move_right" translatable="false">Move chat to the right</string>
     <string name="floating_chat_larger" translatable="false">Make chat larger</string>
@@ -824,8 +821,6 @@
     <string name="floating_chat_bold_text" translatable="false">Bold text</string>
     <string name="floating_chat_fade_old" translatable="false">Fade old messages</string>
     <string name="floating_chat_fade_old_summary" translatable="false">Messages fade 10 seconds after they arrive and come back with the player controls</string>
-    <string name="floating_chat_pass_through" translatable="false">Pass touches to video</string>
-    <string name="floating_chat_pass_through_summary" translatable="false">While the player controls are hidden, taps and swipes on the chat reach the video</string>
     <string name="floating_chat_reply_bar" translatable="false">Reply bar</string>
     <string name="floating_chat_reply_bar_summary" translatable="false">Keep a message box at the bottom of floating chat</string>
     <string name="store_recent_searches">Store recent searches</string>

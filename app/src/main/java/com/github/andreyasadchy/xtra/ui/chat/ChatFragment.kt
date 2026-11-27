@@ -107,8 +107,6 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
     private var rowsPaused = false
     private var followGlide: ChatFollowGlide? = null
     private var ageFader: ChatAgeFader? = null
-    /** New live messages, so a tucked floating chat can count them. */
-    var onMessagesAppended: ((Int) -> Unit)? = null
     /** The message box opened or closed while the chat floats. */
     var onComposerVisibilityChanged: ((Boolean) -> Unit)? = null
     /** The composer's theme colors, restored when the chat leaves the video. */
@@ -730,7 +728,6 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         var anchorShift = 0
         var anchorValid = anchor != null
         var added = false
-        var appended = 0
         changes.forEach { change ->
             when (change) {
                 is ChatMessageStore.Change.Appended -> {
@@ -740,7 +737,6 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
                     adapter.notifyItemRangeInserted(change.insertedAt, change.messages.size)
                     ageFader?.onAppended(change.removedFromHead, change.messages.size)
                     anchorShift -= change.removedFromHead
-                    appended += change.messages.size
                     change.messages.forEach { message ->
                         messageDialog?.newMessage(message)
                         replyDialog?.newMessage(message)
@@ -763,7 +759,6 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
             }
         }
         ageFader?.sync(adapter.itemCount)
-        if (appended > 0) onMessagesAppended?.invoke(appended)
         if (added && (pipMode || (!isChatTouched && binding.btnDown.isGone)) && adapter.itemCount > 0) {
             if (anchor != null && anchorValid && anchor.first + anchorShift >= 0) {
                 glide.expect(anchor.first + anchorShift, anchor.second)
@@ -947,7 +942,7 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
         }
     }
 
-    /** Animated emotes and the message glide rest while the floating chat is hidden or tucked. */
+    /** Animated emotes and the message glide rest while the floating chat is hidden. */
     fun setRowAnimationsPaused(paused: Boolean) {
         rowsPaused = paused
         val binding = _binding ?: return

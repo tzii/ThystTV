@@ -261,7 +261,6 @@ object C {
     const val FLOATING_CHAT_BOLD_TEXT = "floating_chat_bold_text"
     const val FLOATING_CHAT_TEXT_SIZE = "floating_chat_text_size"
     const val FLOATING_CHAT_FADE_OLD = "floating_chat_fade_old"
-    const val FLOATING_CHAT_PASS_THROUGH = "floating_chat_pass_through"
     const val FLOATING_CHAT_REPLY_BAR = "floating_chat_reply_bar"
     const val FLOATING_CHAT_ENABLED = "floating_chat_enabled"
     const val TOKEN_XDEVICEID = "token_xdeviceid"

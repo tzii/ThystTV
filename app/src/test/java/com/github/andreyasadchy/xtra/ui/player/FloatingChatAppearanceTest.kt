@@ -64,7 +64,6 @@ class FloatingChatAppearanceTest {
         boldText = boldText,
         textSize = textSize,
         fadeOldMessages = fadeOld,
-        passThrough = false,
         replyBar = false,
     )
 }
