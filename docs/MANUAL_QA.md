@@ -51,6 +51,13 @@ checked on a device yet.
   resumes; the controls stay hidden (the floating chat card stays put). Pause, the end of
   the VoD and a playback error still bring the controls up. A tap during a stall still
   shows them and they hide again after 3 s.
+- [ ] Following > Live (#128): leave it open while a followed stream ends; within about two
+  minutes its card leaves the list without a pull to refresh and without a spinner. Scroll
+  down, wait: the list doesn't jump to the top. Switch to another app or tab for a few
+  minutes and come back: the list reloads at once. Pull to refresh still shows the spinner.
+  In airplane mode the list keeps its streams and doesn't retry in a loop.
+- [ ] Chat poll and prediction cards (#129): tapping the card's text or options opens no
+  message menu and selects nothing behind it; the card's close button still works.
 - [ ] Regression pass: live/VoD playback, stream switching, minimize/restore, close/reopen,
   PiP/background, speed/quality, gestures and floating chat.
 
