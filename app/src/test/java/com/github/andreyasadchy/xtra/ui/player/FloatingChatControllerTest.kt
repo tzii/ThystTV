@@ -88,9 +88,9 @@ class FloatingChatControllerTest {
         assertEquals(1f, binding.floatingChatHeader.alpha, 0f)
         assertEquals(View.INVISIBLE, binding.floatingChatPill.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
-        // The header overlays the chat, so toggling the controls never shifts it.
+        // The header overlays the chat, so toggling the controls never shifts it; the band covers the header.
         assertEquals(0, binding.floatingChatContainer.paddingTop)
-        assertEquals(0, binding.floatingChatRoot.dragBandHeight)
+        assertEquals(48, binding.floatingChatRoot.dragBandHeight)
 
         controller.onControlsVisibilityChanged(false)
         idle()
@@ -112,10 +112,22 @@ class FloatingChatControllerTest {
         val chat = addChatLine()
         val card = binding.floatingChatRoot
         tap(card, x = 100f, y = 10f)
+        idle()
         assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP), chat.actions)
         assertEquals(rightX(), card.x, 0f)
         assertEquals(0f, card.y, 0f)
         assertTrue(holds.isEmpty())
+    }
+
+    @Test fun `a drag from the band moves the card where nothing under it takes touches`() {
+        controller.show(animate = false)
+        idle()
+        // No chat row under the band: the card must still claim the DOWN, or its parent
+        // stops sending it the gesture. Dispatched through the host to prove that.
+        drag(binding.floatingChatHost, dx = -200f, dy = 120f, startX = rightX() + 100f, startY = 10f)
+        assertEquals(rightX() - 200f, binding.floatingChatRoot.x, 0.5f)
+        assertEquals(120f, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(listOf(true, false), holds)
     }
 
     @Test fun `a drag from the band moves the card even when the chat under it vetoes interception`() {
@@ -142,21 +154,99 @@ class FloatingChatControllerTest {
         assertTrue(holds.isEmpty())
     }
 
-    @Test fun `with controls shown the header over the chat drags the card and the band is off`() {
+    @Test fun `with controls shown a tap between the header buttons reaches the chat under the header`() {
+        controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        // Like a poll card's close button on the top chat line.
+        val underHeader = addChatLine()
+        val card = binding.floatingChatRoot
+        tap(card, x = 30f, y = 20f)
+        idle()
+        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP), underHeader.actions)
+        assertEquals(rightX(), card.x, 0f)
+        assertEquals(0, closeRequests)
+        assertTrue(holds.isEmpty())
+
+        // A drag from the same spot moves the card and cancels the chat's touch.
+        underHeader.actions.clear()
+        drag(card, dx = -200f, dy = 120f, startX = 30f, startY = 20f)
+        assertEquals(rightX() - 200f, card.x, 0.5f)
+        assertEquals(120f, card.y, 0.5f)
+        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_CANCEL), underHeader.actions.take(2))
+        assertEquals(listOf(true, false), holds)
+
+        // Below the 48dp header a drag scrolls the chat, even inside what is the band while controls hide.
+        val belowHeader = addChatLine(top = 50)
+        val x = card.x
+        drag(card, dx = 0f, dy = 120f, startX = 100f, startY = 60f)
+        assertEquals(x, card.x, 0f)
+        assertEquals(MotionEvent.ACTION_UP, belowHeader.actions.last())
+    }
+
+    @Test fun `with controls shown the header buttons keep their taps and drags over the chat`() {
         controller.show(animate = false)
         controller.onControlsVisibilityChanged(true)
         idle()
         val underHeader = addChatLine()
-        drag(binding.floatingChatRoot, dx = -200f, dy = 120f, startX = 100f, startY = 10f)
-        assertEquals(rightX() - 200f, binding.floatingChatRoot.x, 0.5f)
+        val card = binding.floatingChatRoot
+        val close = binding.floatingChatClose
+        val header = binding.floatingChatHeader
+        val closeX = header.left + close.left + close.width / 2f
+        val closeY = header.top + close.top + close.height / 2f
+        tap(card, closeX, closeY)
+        idle()
+        assertEquals(1, closeRequests)
         assertTrue(underHeader.actions.isEmpty())
+        assertTrue(holds.isEmpty())
 
-        // Below the 48dp header a drag scrolls the chat, even inside what is the band while controls hide.
-        val belowHeader = addChatLine(top = 50)
-        val x = binding.floatingChatRoot.x
-        drag(binding.floatingChatRoot, dx = 0f, dy = 120f, startX = 100f, startY = 60f)
-        assertEquals(x, binding.floatingChatRoot.x, 0f)
-        assertEquals(MotionEvent.ACTION_UP, belowHeader.actions.last())
+        // A slow press on a button is still a tap: the band's hold-to-grab leaves the buttons alone.
+        val time = SystemClock.uptimeMillis()
+        val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, closeX, closeY, 0)
+        card.dispatchTouchEvent(down)
+        down.recycle()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ViewConfiguration.getLongPressTimeout() - 50L))
+        val up = MotionEvent.obtain(time, time + ViewConfiguration.getLongPressTimeout() - 50L, MotionEvent.ACTION_UP, closeX, closeY, 0)
+        card.dispatchTouchEvent(up)
+        up.recycle()
+        idle()
+        assertEquals(2, closeRequests)
+        assertTrue(holds.isEmpty())
+
+        drag(card, dx = -300f, dy = 80f, startX = closeX, startY = closeY)
+        assertEquals(2, closeRequests)
+        assertEquals(rightX() - 300f, card.x, 0.5f)
+        assertEquals(80f, card.y, 0.5f)
+        assertEquals(listOf(true, false), holds)
+        assertTrue(underHeader.actions.isEmpty())
+    }
+
+    @Test fun `hiding the card drops a pending band touch and turns the band off`() {
+        controller.show(animate = false)
+        idle()
+        val card = binding.floatingChatRoot
+        val time = SystemClock.uptimeMillis()
+        val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, 100f, 10f, 0)
+        card.dispatchTouchEvent(down)
+        down.recycle()
+        controller.hide(animate = false)
+        idle()
+        assertEquals(0, card.dragBandHeight)
+        assertTrue(holds.isEmpty())
+    }
+
+    @Config(sdk = [34])
+    @Test fun `the drag band is kept clear of the system back gesture`() {
+        controller.show(animate = false)
+        idle()
+        val card = binding.floatingChatRoot
+        assertEquals(listOf(android.graphics.Rect(0, 0, 224, 28)), card.systemGestureExclusionRects)
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        assertEquals(listOf(android.graphics.Rect(0, 0, 224, 48)), card.systemGestureExclusionRects)
+        controller.hide(animate = false)
+        idle()
+        assertTrue(card.systemGestureExclusionRects.isEmpty())
     }
 
     @Test fun `holding still on the band grabs the card before the chat's long-press`() {
@@ -200,6 +290,7 @@ class FloatingChatControllerTest {
             MotionEvent.obtain(time, time + 64, MotionEvent.ACTION_UP, 1, props(1), coords(100f to 90f), 0, 0, 1f, 1f, 0, 0, 0, 0),
         )
         events.forEach { card.dispatchTouchEvent(it); it.recycle() }
+        idle()
         assertEquals(rightX(), card.x, 0f)
         assertEquals(0f, card.y, 0f)
         assertTrue(holds.isEmpty())
@@ -354,11 +445,11 @@ class FloatingChatControllerTest {
         assertEquals(90f, binding.floatingChatRoot.y, 0.5f)
         assertEquals(listOf(true, false), holds)
 
-        // Drag on header across into the left half while controls turn off mid-drag.
+        // Drag between the header buttons across into the left half while controls turn off mid-drag.
         holds.clear()
         val afterFirstX = binding.floatingChatRoot.x
         val afterFirstY = binding.floatingChatRoot.y
-        drag(binding.floatingChatHeader, dx = -200f, dy = 40f) {
+        drag(binding.floatingChatRoot, dx = -200f, dy = 40f) {
             controller.onControlsVisibilityChanged(false)
             idle()
         }

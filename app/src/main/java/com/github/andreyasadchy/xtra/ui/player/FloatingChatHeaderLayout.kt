@@ -13,6 +13,10 @@ import kotlin.math.hypot
  * starts on a button moves the card too: once the finger passes the touch
  * slop the header takes the gesture from the button and hands it, from its
  * first touch, to [dragListener]. A tap still reaches the button.
+ *
+ * A touch between the buttons is not the header's: it falls through to the
+ * chat under the header's scrim, and the card's drag band (which covers the
+ * header while it shows) moves the card once it becomes a drag.
  */
 class FloatingChatHeaderLayout @JvmOverloads constructor(
     context: Context,
@@ -62,6 +66,8 @@ class FloatingChatHeaderLayout @JvmOverloads constructor(
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val listener = dragListener ?: return super.onTouchEvent(event)
+        // Only reached for a DOWN that no button took: leave it to the chat underneath.
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) return false
         if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) clearDown()
         return listener.onTouch(this, event)
     }

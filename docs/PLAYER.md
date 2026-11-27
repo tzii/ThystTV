@@ -284,8 +284,14 @@ stay. `FloatingChatController` owns geometry, touch handling and chrome. Keep th
   press the button. The header is `View.INVISIBLE` when controls are hidden so
   hidden buttons cannot catch touches; when visible, it overlays the chat on its
   own gradient scrim like the player controls, so toggling the controls never
-  shifts the chat. `holdControls` keeps player controls from auto-hiding
-  mid-gesture.
+  shifts the chat. While it shows, the drag band grows to the header's 48dp and
+  the header returns false for a DOWN that no button takes, so a tap between
+  the buttons reaches the chat under the scrim and a drag there is the band's.
+  The header buttons are excluded from the band (like the grip), so a slow press
+  still clicks and a drag from a button stays the header's. The band rect is
+  also set as the card's system gesture exclusion, so a card flush with a side
+  edge drags instead of triggering back. `holdControls` keeps player controls
+  from auto-hiding mid-gesture.
 - `FloatingChatPlacement` is pure. The card rests wherever it is dropped, stored
   as fractions of free travel (`xFraction`/`yFraction`, 0 = left/top, 1 = right/bottom)
   plus width/height in dp, inside bounds that clear display cutouts (even when
@@ -1007,6 +1013,7 @@ At minimum, player work should request human verification for:
 - floating chat is unreadable in light mode or on bright video
 - the floating chat header catches touches while the controls are hidden, or the top drag band / resize grip stop working when controls hide
 - floating chat reserves a dead band at the top again (it should reach the screen edge), or the drag band swallows taps on the top chat line
+- with the controls shown, the floating chat header swallows taps between its buttons instead of passing them to the chat under it
 - floating chat leaves the screen on drag/resize/rotation, stays visible in PiP or after minimize, or comes back empty
 
 ## PR Expectations For Player Changes

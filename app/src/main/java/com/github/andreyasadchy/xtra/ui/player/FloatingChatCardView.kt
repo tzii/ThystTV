@@ -2,6 +2,7 @@ package com.github.andreyasadchy.xtra.ui.player
 
 import android.content.Context
 import android.graphics.Outline
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.SystemClock
 import android.util.AttributeSet
@@ -10,6 +11,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
+import androidx.core.view.ViewCompat
 import kotlin.math.hypot
 
 /**
@@ -23,7 +25,8 @@ import kotlin.math.hypot
  * [dragListener]. Holding still there grabs the card just before the chat's own
  * long-press would fire. This runs in [dispatchTouchEvent], not
  * onInterceptTouchEvent, so a chat list that is still scrolling cannot veto the
- * drag with requestDisallowInterceptTouchEvent.
+ * drag with requestDisallowInterceptTouchEvent. The band is also kept clear of
+ * the system back gesture, so a card flush with a side edge still drags from it.
  */
 class FloatingChatCardView @JvmOverloads constructor(
     context: Context,
@@ -36,10 +39,18 @@ class FloatingChatCardView @JvmOverloads constructor(
     private var surfaceVisible = true
 
     var dragListener: OnTouchListener? = null
-    /** Height of the top drag band in pixels, 0 while the header handles drags. */
+    /** Height of the top drag band in pixels, 0 while the card is hidden. */
     var dragBandHeight = 0
-    /** A child that keeps its own touches inside the band, such as the resize grip on a short card. */
-    var dragBandExclusion: View? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            updateGestureExclusion()
+        }
+    /**
+     * Descendants that keep their own touches inside the band while they are
+     * visible: the resize grip on a short card and the header buttons.
+     */
+    var dragBandExclusions: List<View> = emptyList()
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     /** Before the chat's own long-press (a row's tooltip) fires, a still finger grabs the card. */
@@ -157,12 +168,30 @@ class FloatingChatCardView @JvmOverloads constructor(
         bandPointerId = MotionEvent.INVALID_POINTER_ID
     }
 
-    private fun inExclusion(ev: MotionEvent): Boolean {
-        val view = dragBandExclusion ?: return false
-        if (view.visibility != VISIBLE) return false
-        val left = view.left + view.translationX
-        val top = view.top + view.translationY
-        return ev.x >= left && ev.x < left + view.width && ev.y >= top && ev.y < top + view.height
+    private fun inExclusion(ev: MotionEvent) = dragBandExclusions.any { hits(it, ev.x, ev.y) }
+
+    /** Whether [view], a visible descendant, is under ([x], [y]) in this card's coordinates. */
+    private fun hits(view: View, x: Float, y: Float): Boolean {
+        var left = 0f
+        var top = 0f
+        var current = view
+        while (current !== this) {
+            if (current.visibility != VISIBLE) return false
+            left += current.left + current.translationX
+            top += current.top + current.translationY
+            current = current.parent as? View ?: return false
+        }
+        return x >= left && x < left + view.width && y >= top && y < top + view.height
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        updateGestureExclusion()
+    }
+
+    private fun updateGestureExclusion() {
+        val rects = if (dragBandHeight > 0 && width > 0) listOf(Rect(0, 0, width, dragBandHeight)) else emptyList()
+        ViewCompat.setSystemGestureExclusionRects(this, rects)
     }
 
     override fun onDetachedFromWindow() {
