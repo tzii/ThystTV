@@ -146,6 +146,9 @@ class ChatFragment : BaseNetworkFragment(), MessageClickedDialog.OnButtonClickLi
             }
         }
         with(binding) {
+            listOf(chatStatus, pollLayout, predictionLayout).forEach {
+                ViewCompat.setAccessibilityDelegate(it, TapShieldAccessibility)
+            }
             if (!requireContext().prefs().getBoolean(C.CHAT_DISABLE, false)) {
                 val args = requireArguments()
                 val channelId = args.getString(KEY_CHANNEL_ID)
