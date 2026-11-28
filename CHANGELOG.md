@@ -4,6 +4,17 @@ All notable changes to ThystTV should be documented here.
 
 ## [Unreleased]
 
+### Changed
+- Floating chat is redesigned. It sits on a rounded card that stays dark over video in every theme, and its new Aa button switches between Clear (only the text, outlined so it stays readable on any picture), Shade and Solid, three text sizes and bold text, without reconnecting chat. The Settings slider still sets any opacity in between; a chat whose opacity was never changed now starts on Shade.
+- Move floating chat directly by its top drag strip (or by its header while the player controls show) and resize it at any time from the corner grip, whether the player controls are shown or hidden. The card moves 1:1 under your finger, stays clamped inside cutouts, system bars and the keyboard, stays exactly where you drop it, and is never moved or hidden by the player controls. Position and size are remembered per channel with a last-used fallback, and positions saved by 1.7.0 carry over. With the message box open, the grip sits just above it.
+- New floating chat options in Aa and Settings → Chat: Fade old messages (lines fade 10 seconds after they arrive and come back with the controls) and Reply bar (a message box that stays open). Without the reply bar, the header's keyboard button opens the box for one message. New messages slide in instead of jumping.
+
+### Fixed
+- Floating chat no longer catches taps with an invisible drag bar along its top while the player controls are hidden.
+- Floating chat hides in picture-in-picture instead of covering the small video, and comes back afterwards.
+- Changing floating chat's look no longer reconnects chat or clears its history.
+- Hide chat in the player's More menu now hides floating chat too, instead of leaving the card on screen.
+
 ## [1.7.0] - 2026-11-21
 
 ### Changed

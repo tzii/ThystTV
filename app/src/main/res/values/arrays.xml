@@ -415,4 +415,15 @@
         <item>chat_only</item>
     </string-array>
 
+    <string-array name="floatingChatTextSizeEntries" translatable="false">
+        <item>@string/floating_chat_text_small</item>
+        <item>@string/floating_chat_text_medium</item>
+        <item>@string/floating_chat_text_large</item>
+    </string-array>
+    <string-array name="floatingChatTextSizeValues" translatable="false">
+        <item>s</item>
+        <item>m</item>
+        <item>l</item>
+    </string-array>
+
 </resources>

@@ -3,9 +3,9 @@ package com.github.andreyasadchy.xtra.util.chat
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Animatable
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
+import android.os.SystemClock
 import android.text.SpannableStringBuilder
 import android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
 import android.text.TextPaint
@@ -681,7 +681,8 @@ object ChatAdapterUtils {
         }
     }
 
-    fun loadImages(itemView: View, bind: (SpannableStringBuilder) -> Unit, images: List<Image>, imagePaint: NamePaint?, userName: String?, userNameStartIndex: Int?, backgroundColor: Int, builder: SpannableStringBuilder, translated: Boolean, emoteSize: Int, badgeSize: Int, emoteQuality: String, animateGifs: Boolean, enableOverlayEmotes: Boolean, chatMessage: ChatMessage, savedColors: HashMap<String, Int>, useReadableColors: Boolean, isLightTheme: Boolean, showLanguageDownloadDialog: (ChatMessage, String) -> Unit, hideErrors: Boolean) {
+    /** [startAnimations] is asked once an animated image loads; a row whose animations are paused leaves it still. */
+    fun loadImages(itemView: View, bind: (SpannableStringBuilder) -> Unit, images: List<Image>, imagePaint: NamePaint?, userName: String?, userNameStartIndex: Int?, builder: SpannableStringBuilder, translated: Boolean, emoteSize: Int, badgeSize: Int, emoteQuality: String, animateGifs: Boolean, enableOverlayEmotes: Boolean, chatMessage: ChatMessage, savedColors: HashMap<String, Int>, useReadableColors: Boolean, isLightTheme: Boolean, showLanguageDownloadDialog: (ChatMessage, String) -> Unit, hideErrors: Boolean, startAnimations: () -> Boolean = { true }) {
         if (imagePaint != null) {
             itemView.context.imageLoader.enqueue(
                 ImageRequest.Builder(itemView.context).apply {
@@ -703,18 +704,16 @@ object ChatAdapterUtils {
                                         }
 
                                         override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                                            itemView.postDelayed(what, `when`)
+                                            itemView.postDelayed(what, (`when` - SystemClock.uptimeMillis()).coerceAtLeast(0L))
                                         }
                                     }
-                                    (result as Animatable).start()
+                                    if (startAnimations()) (result as Animatable).start()
                                 }
                                 try {
                                     builder.setSpan(
                                         NamePaintImageSpan(
                                             userName!!,
                                             imagePaint.shadows,
-                                            (itemView.background as? ColorDrawable)?.color,
-                                            backgroundColor,
                                             result
                                         ),
                                         userNameStartIndex!!,
@@ -758,14 +757,14 @@ object ChatAdapterUtils {
                         }
 
                         override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                            itemView.postDelayed(what, `when`)
+                            itemView.postDelayed(what, (`when` - SystemClock.uptimeMillis()).coerceAtLeast(0L))
                         }
                     }
-                    (result as Animatable).start()
+                    if (startAnimations()) (result as Animatable).start()
                 }
                 if (image.overlayEmote != null) {
                     val drawables = arrayOf(result)
-                    nextOverlayEmote(drawables, image.overlayEmote!!, image, itemView, bind, builder, translated, emoteSize, emoteQuality, animateGifs, enableOverlayEmotes, chatMessage, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, hideErrors)
+                    nextOverlayEmote(drawables, image.overlayEmote!!, image, itemView, bind, builder, translated, emoteSize, emoteQuality, animateGifs, enableOverlayEmotes, chatMessage, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, hideErrors, startAnimations)
                 } else {
                     builder.setSpan(CenteredImageSpan(result), image.start, image.end, SPAN_EXCLUSIVE_EXCLUSIVE)
                     if (!translated && chatMessage.translatedMessage != null) {
@@ -777,7 +776,7 @@ object ChatAdapterUtils {
         }
     }
 
-    private fun nextOverlayEmote(drawables: Array<Drawable>, image: Image, bottomImage: Image, itemView: View, bind: (SpannableStringBuilder) -> Unit, builder: SpannableStringBuilder, translated: Boolean, emoteSize: Int, emoteQuality: String, animateGifs: Boolean, enableOverlayEmotes: Boolean, chatMessage: ChatMessage, savedColors: HashMap<String, Int>, useReadableColors: Boolean, isLightTheme: Boolean, showLanguageDownloadDialog: (ChatMessage, String) -> Unit, hideErrors: Boolean) {
+    private fun nextOverlayEmote(drawables: Array<Drawable>, image: Image, bottomImage: Image, itemView: View, bind: (SpannableStringBuilder) -> Unit, builder: SpannableStringBuilder, translated: Boolean, emoteSize: Int, emoteQuality: String, animateGifs: Boolean, enableOverlayEmotes: Boolean, chatMessage: ChatMessage, savedColors: HashMap<String, Int>, useReadableColors: Boolean, isLightTheme: Boolean, showLanguageDownloadDialog: (ChatMessage, String) -> Unit, hideErrors: Boolean, startAnimations: () -> Boolean) {
         loadImage(itemView, image, emoteQuality) { result ->
             val widthRatio = result.intrinsicWidth.toFloat() / result.intrinsicHeight.toFloat()
             val size = if (widthRatio == 1f) {
@@ -797,14 +796,14 @@ object ChatAdapterUtils {
                     }
 
                     override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-                        itemView.postDelayed(what, `when`)
+                        itemView.postDelayed(what, (`when` - SystemClock.uptimeMillis()).coerceAtLeast(0L))
                     }
                 }
-                (result as Animatable).start()
+                if (startAnimations()) (result as Animatable).start()
             }
             val array = drawables.plus(result)
             if (image.overlayEmote != null) {
-                nextOverlayEmote(array, image.overlayEmote!!, bottomImage, itemView, bind, builder, translated, emoteSize, emoteQuality, animateGifs, enableOverlayEmotes, chatMessage, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, hideErrors)
+                nextOverlayEmote(array, image.overlayEmote!!, bottomImage, itemView, bind, builder, translated, emoteSize, emoteQuality, animateGifs, enableOverlayEmotes, chatMessage, savedColors, useReadableColors, isLightTheme, showLanguageDownloadDialog, hideErrors, startAnimations)
             } else {
                 val layer = LayerDrawable(array)
                 val width = array.maxOf { it.bounds.right }

@@ -276,6 +276,7 @@ class PlayerFoldLayoutTest {
             Mockito.doReturn(chatView).`when`(chat).view
             ReflectionHelpers.setField(fragment, "chatFragment", chat)
             binding.chatFragmentContainer.addView(chatView)
+            ReflectionHelpers.callInstanceMethod<Unit>(fragment, "setupFloatingChat")
             if (portrait) {
                 ReflectionHelpers.setField(fragment, "isPortrait", true)
                 binding.playerLayout.isPortrait = true

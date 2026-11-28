@@ -1,12 +1,14 @@
 package com.github.andreyasadchy.xtra.ui.view
 
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.text.style.ReplacementSpan
+import androidx.core.graphics.ColorUtils
 import com.github.andreyasadchy.xtra.model.chat.NamePaint
 import kotlin.math.max
 import kotlin.math.min
@@ -35,6 +37,15 @@ class NamePaintSpan(
 
     override fun draw(canvas: Canvas, text: CharSequence?, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
         val yOffset = y.toFloat()
+        val pass = ChatHaloPass.current
+        if (pass != ChatHaloPass.NONE) {
+            // A Clear row outlines the name like its other text; the paint goes on top.
+            val color = paint.color
+            paint.color = ColorUtils.setAlphaComponent(Color.BLACK, Color.alpha(color))
+            canvas.drawText(name, x, yOffset, paint)
+            paint.color = color
+            if (pass == ChatHaloPass.SOFT) return
+        }
         shadows?.forEach {
             paint.setShadowLayer(it.radius, it.xOffset, it.yOffset, it.color)
             canvas.drawText(name, x, yOffset, paint)

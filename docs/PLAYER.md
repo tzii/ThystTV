@@ -102,6 +102,9 @@ and uses the normal default factory. This also covers local playback with Cast o
   as before.
 - Quality, Speed, Stream volume, and More share one player-owned popup host; only one
   can be attached at a time, and teardown/minimize/PiP must remove it with the player view.
+  The host's root carries `elevation="24dp"` so open menus draw above the floating chat
+  host (10dp). `<include>` ignores `android:elevation`, so it must stay on the included
+  root (`PlayerPopupContentTest` checks the order).
 
 ## Mini-player geometry
 
@@ -229,6 +232,116 @@ not relayout.
 drives the real fragment geometry and chat transitions with a simulated hinge.
 Hinge timing and real postures still need the device matrix in `MANUAL_QA.md`.
 
+## Floating chat
+
+`PlayerFragment` decides when floating chat is on (`isFloatingChatEnabled`) and
+moves the one `ChatFragment` view between `chatFragmentContainer` and
+`floating_chat_container` (`reparentChatView`), so the connection and history
+stay. `FloatingChatController` owns geometry, touch handling and chrome. Keep these:
+
+- One chat fragment, never recreated to change the look. `ChatFragment.setOverlayStyle`
+  rebinds rows in place; `null` puts the ordinary sidebar look back.
+- `FloatingChatHostLayout` is a full-screen sibling of `slidingLayout` that takes
+  no touches itself. It lays its children out locally on the next frame, so a
+  resize never re-measures the player.
+- Per-move drag work only writes `card.x`/`card.y` (zero allocations, no layout
+  pass, clamped strictly to usable bounds) and stops exactly where released with
+  no spring, fling, or magnet animation. Grip resizes coalesce to at
+  most one layout pass per animation frame and write preferences only on release.
+  A size change lays the card out synchronously so dimensions and coordinates
+  land on the same frame.
+- Moving never depends on player controls visibility: while the card is
+  shown, a top drag handle (the 28dp drag band, marked by `floatingChatPill`,
+  when controls are hidden, or `floatingChatHeader` when controls are visible)
+  works at any time. The corner resize grip shows with the header, so only
+  while the controls do (the maintainer's call after phone QA: it should not
+  sit on the video); it fades with the header, and a resize already under way
+  keeps its touch target if the controls hide. The card has no pinch: resizing
+  is the grip only. While the message box is open, `ChatFragment.onComposerHeightChanged`
+  reports how far the box (with its reply line) reaches up, and the grip is
+  lifted above it with `translationY` (no layout pass); it hides only while the
+  card is too short for the box, the grip and the top bar (band or header).
+  Hiding the reply line doesn't move the box, so `ChatFragment` reports the new
+  height itself. Nothing reserves space at the top: the chat fills the card, so
+  a card at the top of the screen shows chat right up to the edge. The drag band
+  is run by `FloatingChatCardView.dispatchTouchEvent`, not by the pill (which is
+  visual only): a touch in the band still goes to the chat, so a tap opens the
+  top chat line or closes a poll/prediction/raid card; past touch slop the card
+  cancels the chat's gesture and drags. Holding still in the band grabs the card
+  at 3/4 of the long-press timeout, before a chat row's long-press tooltip. It
+  uses `dispatchTouchEvent` because a chat list that is still scrolling calls
+  `requestDisallowInterceptTouchEvent` on touch down, which would veto an
+  `onInterceptTouchEvent` drag. The band follows the first finger only; a touch
+  on the resize grip always resizes, even where a short card puts the grip in
+  the band.
+  `FloatingChatCardView` disables motion-event splitting, so a second finger
+  joins the first handle's gesture; pointer offsets are scaled back by the
+  view's scale because the left-side grip is mirrored (`scaleX = -1`). A grip
+  resize with the keyboard up keeps the saved height (if only the width changed)
+  and the saved vertical spot. `FloatingChatHeaderLayout` takes over
+  a drag that starts on a header button once past touch slop, while taps still
+  press the button. The header is `View.INVISIBLE` when controls are hidden so
+  hidden buttons cannot catch touches; when visible, it overlays the chat on its
+  own gradient scrim like the player controls, so toggling the controls never
+  shifts the chat. While it shows, the drag band grows to the header's 48dp and
+  the header returns false for a DOWN that no button takes, so a tap between
+  the buttons reaches the chat under the scrim and a drag there is the band's.
+  The header buttons are excluded from the band (like the grip), so a slow press
+  still clicks and a drag from a button stays the header's. The band rect is
+  also set as the card's system gesture exclusion, so a card flush with a side
+  edge drags instead of triggering back. `holdControls` keeps player controls
+  from auto-hiding mid-gesture.
+- `FloatingChatPlacement` is pure. The card rests wherever it is dropped, stored
+  as fractions of free travel (`xFraction`/`yFraction`, 0 = left/top, 1 = right/bottom)
+  plus width/height in dp, inside bounds that clear display cutouts (even when
+  video draws behind one), system bars and the keyboard (IME). Player controls
+  never move, fade or hide the card. While a brightness, volume, seek or speed
+  gesture slider shows, `setDucked` fades the card to 25% and restores it when
+  the slider clears. A short screen trims height above a minimum floor; above
+  the keyboard the card fits whatever room remains so the composer stays visible;
+  a narrow window trims width. `layout_gravity` is `top|left` so `x` means the
+  same physical side in RTL.
+- Layouts are stored per channel with a last-used fallback in the JSON
+  preference `floating_chat_layouts` (`FloatingChatLayoutStore`, 50 channels).
+  1.7.0 `floating_chat_x/y/w/h_<channel>` pixel keys migrate once and are removed.
+  Stored layouts retain compatible `side` and `anchor` fields alongside `x`.
+- The Aa popover opens beside the card's resting bounds on the video side first
+  (`PlayerPopupPolicy.placeBeside`), falling back to trigger placement where
+  neither side fits.
+- `FloatingChatAppearance` maps `floating_chat_transparency`: under 20 is Clear
+  (no surface; `ChatMessageTextView` draws a double halo around the text), under
+  80 Shade, otherwise Solid. Aa writes 0, 55 or 92; untouched installs default to
+  55. Appearance changes from Aa or Settings apply live via the preference
+  listener and restyle rows in place with `ChatAdapter.PAYLOAD_STYLE`.
+- Clear draws each row twice (soft shadow, then tight outline). `ChatHaloPass`
+  tells spans which pass is running: emotes and badges draw only in the second,
+  and painted names draw the outline under their paint. Image name paints draw
+  through glyphs (`saveLayer` + `DST_IN`), never as an opaque box.
+- Over video, readable name colours use separate dark-surface caches even in the
+  light app theme. The message box uses the card's dark surface with white text
+  and icons; the emote menu keeps the app surface.
+- Minimize, PiP and portrait hide the card immediately (`hide(animate = false)`).
+  Maximize shows it again at its saved place with a short fade (`show(animate = true)`);
+  exiting PiP restores it directly. Rotation or window resize re-places from the
+  saved fractions and clamps into the new bounds. While the card is hidden,
+  animated emotes and the message glide pause, including rows bound while paused.
+  Fade old messages (`ChatAgeFader`) wakes when the next row reaches 10 seconds.
+- `hideFloatingChat` fades the card with its lines and reparents in the end
+  callback, which reads the current mode so an intervening show/hide wins.
+  Showing the sidebar, portrait, minimize and PiP cancel any running hide fade
+  immediately (`finishFloatingChatHide` / `hide(animate = false)`). "Hide chat"
+  from the More menu hides floating chat too.
+- `onDestroyView` resets the chat back to ordinary sidebar style and turns off
+  the floating reply bar so the next view starts cleanly.
+- New lines glide in (`ChatFollowGlide`) only over video, outside PiP and with
+  system animations on.
+
+`FloatingChatPlacementTest`, `FloatingChatLayoutStoreTest` and
+`FloatingChatAppearanceTest` cover the pure rules; `FloatingChatControllerTest`
+drives the real card, handles and insets. The chat transition
+suites (`PlayerChatSwipeTest`, `PlayerPinchChatTest`, `PlayerFoldLayoutTest`)
+run with the controller attached.
+
 ## Android TV remote input
 
 TV login exposes “Sign in with your phone”, explaining that some account features
@@ -305,7 +418,7 @@ Update this list as the code evolves.
 - Quality chip column counts are derived from measured bold label widths so labels such
   as "1080p60" never truncate; do not return to fixed 4-column grids with silent clipping.
 - VoD and live menus may legitimately differ. Do not add chat-only to VoD unless the data/model supports it.
-- Floating chat should use a dark translucent video-overlay palette in both app themes; background opacity remains user-controlled.
+- Floating chat should use a dark video-overlay palette in both app themes; background opacity remains user-controlled, and Clear (no surface) must stay readable through the text halo.
 - Stats/player overlay controls need compact and landscape checks because label clipping and stacked graph labels have happened before.
 - Any view adapter tied to fragments can leak destroyed views. Clear listeners/adapters in `onDestroyView()` when changing RecyclerView or fragment lifecycles.
 
@@ -887,6 +1000,11 @@ At minimum, player work should request human verification for:
 - lifecycle callbacks apply to an old fragment
 - quality menu shows raw numeric HLS variants
 - floating chat is unreadable in light mode or on bright video
+- the floating chat header catches touches while the controls are hidden, or the top drag band stops working when controls hide
+- the floating chat resize grip shows on the video while the controls are hidden, or a resize breaks when the controls hide mid-gesture
+- floating chat reserves a dead band at the top again (it should reach the screen edge), or the drag band swallows taps on the top chat line
+- with the controls shown, the floating chat header swallows taps between its buttons instead of passing them to the chat under it
+- floating chat leaves the screen on drag/resize/rotation, stays visible in PiP or after minimize, or comes back empty
 
 ## PR Expectations For Player Changes
 

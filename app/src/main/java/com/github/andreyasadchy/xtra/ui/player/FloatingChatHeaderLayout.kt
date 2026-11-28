@@ -1,0 +1,85 @@
+package com.github.andreyasadchy.xtra.ui.player
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.util.AttributeSet
+import android.view.MotionEvent
+import android.view.ViewConfiguration
+import android.widget.LinearLayout
+import kotlin.math.hypot
+
+/**
+ * The floating chat header. Its buttons fill a narrow card, so a drag that
+ * starts on a button moves the card too: once the finger passes the touch
+ * slop the header takes the gesture from the button and hands it, from its
+ * first touch, to [dragListener]. A tap still reaches the button.
+ *
+ * A touch between the buttons is not the header's: it falls through to the
+ * chat under the header's scrim, and the card's drag band (which covers the
+ * header while it shows) moves the card once it becomes a drag.
+ */
+class FloatingChatHeaderLayout @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+) : LinearLayout(context, attrs) {
+
+    var dragListener: OnTouchListener? = null
+
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var down: MotionEvent? = null
+    private var downPointerId = MotionEvent.INVALID_POINTER_ID
+
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        val listener = dragListener ?: return false
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                clearDown()
+                down = MotionEvent.obtain(ev)
+                downPointerId = ev.getPointerId(0)
+            }
+            // The first finger lifted before it moved: no drag from this touch.
+            MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == downPointerId) clearDown()
+            MotionEvent.ACTION_MOVE -> {
+                val start = down ?: return false
+                val index = ev.findPointerIndex(downPointerId)
+                if (index < 0) {
+                    clearDown()
+                    return false
+                }
+                // getRawX(int) needs API 29; the header is never scaled.
+                val rawX = ev.getX(index) - ev.x + ev.rawX
+                val rawY = ev.getY(index) - ev.y + ev.rawY
+                if (hypot(rawX - start.rawX, rawY - start.rawY) > touchSlop) {
+                    down = null
+                    // The button under the finger gets a cancel; the drag starts where the touch did.
+                    val claimed = listener.onTouch(this, start)
+                    start.recycle()
+                    if (claimed) listener.onTouch(this, ev)
+                    return claimed
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> clearDown()
+        }
+        return false
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val listener = dragListener ?: return super.onTouchEvent(event)
+        // Only reached for a DOWN that no button took: leave it to the chat underneath.
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) return false
+        if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) clearDown()
+        return listener.onTouch(this, event)
+    }
+
+    private fun clearDown() {
+        down?.recycle()
+        down = null
+        downPointerId = MotionEvent.INVALID_POINTER_ID
+    }
+
+    override fun onDetachedFromWindow() {
+        clearDown()
+        super.onDetachedFromWindow()
+    }
+}

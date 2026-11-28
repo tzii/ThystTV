@@ -52,7 +52,6 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.OptIn
 import androidx.core.content.edit
-import androidx.core.graphics.ColorUtils
 import androidx.core.os.bundleOf
 import androidx.core.net.toUri
 import androidx.core.os.BundleCompat
@@ -82,6 +81,7 @@ import com.github.andreyasadchy.xtra.R
 import com.github.andreyasadchy.xtra.databinding.DialogClipCreatedBinding
 import com.github.andreyasadchy.xtra.databinding.DialogClipOptionsBinding
 import com.github.andreyasadchy.xtra.databinding.FragmentPlayerBinding
+import com.github.andreyasadchy.xtra.databinding.LayoutFloatingChatPopupBinding
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerMorePopupBinding
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerQualityPopupBinding
 import com.github.andreyasadchy.xtra.databinding.LayoutPlayerSpeedPopupBinding
@@ -143,6 +143,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     private var _binding: FragmentPlayerBinding? = null
     private val systemUiListener = PlayerSystemUiListener()
     private val hideGestureRunnable = Runnable {
+        // Floating chat comes back while the slider fades out.
+        floatingChat?.setDucked(false)
         _binding?.playerLayout?.findViewById<View>(R.id.gestureFeedback)?.let { feedback ->
             feedback.animate().cancel()
             if (feedback.isVisible) {
@@ -225,7 +227,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     protected var controllerAutoHide = true
     private var controllerHideOnTouch = true
     private val controllerHideAction = Runnable {
-        if (view != null && activePlayerPopup == null) hideController()
+        if (view != null && activePlayerPopup == null && !floatingChatHoldsControls) hideController()
     }
     private var controllerIsAnimating = false
     private var controllerAnimation: ViewPropertyAnimator? = null
@@ -299,13 +301,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         val foldDockedFloating: Boolean,
     )
     private var doubleTapChatSnapshot: ChatModeSnapshot? = null
-    private var dX = 0f
-    private var dY = 0f
-    private var initialWidth = 0
-    private var initialHeight = 0
-    private var initialTouchX = 0f
-    private var initialTouchY = 0f
-    private var isResizing = false
+    private var floatingChat: FloatingChatController? = null
+    /** The floating chat is being moved, sized or styled; the controls stay up until it ends. */
+    private var floatingChatHoldsControls = false
+    private var activeFloatingChatPopupBinder: FloatingChatPopupBinder? = null
+    /** Last insets, kept for a floating chat created after they arrived. */
+    private var floatingChatInsets = FloatingChatInsets()
 
     private val backPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
@@ -864,6 +865,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         controllerIsAnimating = false
         binding.playerControls.root.alpha = 1f
         binding.playerControls.root.visibility = View.VISIBLE
+        notifyFloatingChatControls(visible = true)
         updateChatButtonIcon()
         showController(force = true)
         focusTvController()
@@ -1177,7 +1179,19 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                         }
                     }
                 }
-                applyChatInsets(insets.bottom, windowInsets.isVisible(WindowInsetsCompat.Type.ime()))
+                val imeVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime())
+                applyChatInsets(insets.bottom, imeVisible)
+                // The floating chat host is not padded; it keeps clear of the same edges itself.
+                // Video may draw behind a cutout, but chat text never hides behind one.
+                val cutout = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
+                floatingChatInsets = FloatingChatInsets(
+                    left = maxOf(slidingLayout.paddingLeft, insets.left, cutout.left),
+                    right = maxOf(slidingLayout.paddingRight, insets.right, cutout.right),
+                    top = max(insets.top, cutout.top),
+                    bottom = insets.bottom,
+                    ime = imeVisible,
+                )
+                floatingChat?.setInsets(floatingChatInsets)
                 // Capture system gesture insets for edge detection
                 gestureInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures())
                 WindowInsetsCompat.CONSUMED
@@ -1541,6 +1555,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 resetPinchTracking()
                                 upAction(event)
                             }
+                            // A slider brings floating chat back as it fades out
+                            // (hideGestureRunnable); a swipe that showed none does it here.
+                            if (playerLayout.findViewById<View>(R.id.gestureFeedback)?.isVisible != true) {
+                                floatingChat?.setDucked(false)
+                            }
                         }
                     }
                 }
@@ -1749,6 +1768,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                                 if (isKeyboardShown) {
                                     isKeyboardShown = false
                                     chatLayout.clearFocus()
+                                    // A floating chat's message box lives in the card, not the sidebar.
+                                    floatingChatRoot.clearFocus()
                                     if (!isPortrait) {
                                         if (foldLayout == null) {
                                             chatLayout.updateLayoutParams { width = chatWidthLandscape }
@@ -2082,13 +2103,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             if (currentChatFragment != null) {
                 chatFragment = currentChatFragment
             } else {
-                val fragment = createChatFragment(false)
+                val fragment = createChatFragment()
                 if (fragment != null) {
                     childFragmentManager.beginTransaction().replace(R.id.chatFragmentContainer, fragment).commit()
                 }
                 chatFragment = fragment
             }
-            setupFloatingChatInteraction()
+            setupFloatingChat()
         }
     }
 
@@ -2098,9 +2119,11 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 // Hide floating chat in portrait mode
                 if (isFloatingChatEnabled) {
                     isFloatingChatEnabled = false
-                    floatingChatRoot.visibility = View.GONE
+                    floatingChat?.hide(animate = false)
                     // Reparent chat view back to sidebar (don't recreate fragment)
                     reparentChatView(toFloating = false)
+                } else {
+                    finishFloatingChatHide()
                 }
                 systemUiListener.detach()
                 showStatusBar()
@@ -2164,6 +2187,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 }
                 if (isMaximized) {
                     hideStatusBar()
+                    // Leaving picture-in-picture: the floating chat comes back where it was.
+                    if (isFloatingChatEnabled && floatingChat?.isShown == false && !isInPipMode()) {
+                        floatingChat?.show(animate = false)
+                    }
                     val showSidebarChat = PlayerChatModeHelper.shouldShowSidebarChat(isChatOpen, isFloatingChatEnabled)
                     val chatWidth = if (showSidebarChat) chatWidthLandscape else 0
                     playerLayout.updateLayoutParams<FrameLayout.LayoutParams> {
@@ -2432,6 +2459,36 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         activeMorePopupBinder = binder
     }
 
+    /** The floating chat's Aa panel: background, text size and behavior, applied live. */
+    private fun showFloatingChatPopup(trigger: View) {
+        if (!isMaximized || !isFloatingChatEnabled) return
+        val panelWidth = PlayerPopupPolicy.panelWidthPx(
+            binding.playerLayout.width,
+            resources.displayMetrics.density,
+        )
+        if (panelWidth <= 0) return
+        val popupBinding = LayoutFloatingChatPopupBinding.inflate(
+            layoutInflater,
+            binding.playerPopupHost.playerPopupPanelContainer,
+            false,
+        )
+        val binder = FloatingChatPopupBinder(
+            context = requireContext(),
+            binding = popupBinding,
+            prefs = prefs,
+            canCompose = chatFragment?.canCompose() == true,
+            onChanged = ::applyFloatingChatAppearance,
+            onDismissRequested = { hidePlayerPopup() },
+        ).also { it.bind() }
+        showPlayerPopup(
+            type = PlayerPopupType.FLOATING_CHAT,
+            trigger = trigger,
+            content = popupBinding.root,
+            panelWidth = panelWidth,
+        )
+        activeFloatingChatPopupBinder = binder
+    }
+
     private fun showPlayerPopup(
         type: PlayerPopupType,
         trigger: View,
@@ -2454,7 +2511,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         activePlayerPopup = type
         activePopupTrigger = trigger
         // TalkBack should traverse the popup, not the obscured video/chat.
-        popupBackgroundAccessibility = listOf(binding.slidingLayout, binding.floatingChatRoot).map { background ->
+        popupBackgroundAccessibility = listOf(binding.slidingLayout, binding.floatingChatHost).map { background ->
             val previousMode = background.importantForAccessibility
             background.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             background to previousMode
@@ -2584,16 +2641,30 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         val insets = popupSurfaceInsets()
         val isRtl = surface.layoutDirection == View.LAYOUT_DIRECTION_RTL
         val anchor = popupAnchorRect ?: popupTriggerRect(trigger)?.also { popupAnchorRect = it }
+        val card = if (activePlayerPopup == PlayerPopupType.FLOATING_CHAT) floatingChatCardRect() else null
         // Measure the card at the final width, never the constrained viewport.
-        fun place(height: Int) = PlayerPopupPolicy.place(
-            surfaceWidthPx = surface.width,
-            surfaceHeightPx = surface.height,
-            measuredPanelHeightPx = height,
-            density = resources.displayMetrics.density,
-            insets = insets,
-            trigger = anchor,
-            isRtl = isRtl,
-        )
+        fun place(height: Int) = if (card != null) {
+            PlayerPopupPolicy.placeBeside(
+                surfaceWidthPx = surface.width,
+                surfaceHeightPx = surface.height,
+                measuredPanelHeightPx = height,
+                density = resources.displayMetrics.density,
+                card = card,
+                insets = insets,
+                trigger = anchor,
+                isRtl = isRtl,
+            )
+        } else {
+            PlayerPopupPolicy.place(
+                surfaceWidthPx = surface.width,
+                surfaceHeightPx = surface.height,
+                measuredPanelHeightPx = height,
+                density = resources.displayMetrics.density,
+                insets = insets,
+                trigger = anchor,
+                isRtl = isRtl,
+            )
+        }
         val content = container.getChildAt(0)
         content.measure(
             View.MeasureSpec.makeMeasureSpec(place(0).width, View.MeasureSpec.EXACTLY),
@@ -2644,6 +2715,23 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         container.layoutParams = params
     }
 
+    /** Where the floating chat card rests, in popup-surface pixels, so its Aa popover can sit beside it. */
+    private fun floatingChatCardRect(): PlayerPopupPolicy.Rect? {
+        val bounds = floatingChat?.restingBounds() ?: return null
+        val surfaceLocation = IntArray(2)
+        val hostLocation = IntArray(2)
+        binding.playerPopupHost.root.getLocationInWindow(surfaceLocation)
+        binding.floatingChatHost.getLocationInWindow(hostLocation)
+        val dx = hostLocation[0] - surfaceLocation[0]
+        val dy = hostLocation[1] - surfaceLocation[1]
+        return PlayerPopupPolicy.Rect(
+            bounds.left.roundToInt() + dx,
+            bounds.top.roundToInt() + dy,
+            bounds.right.roundToInt() + dx,
+            bounds.bottom.roundToInt() + dy,
+        )
+    }
+
     private fun popupTriggerRect(trigger: View): PlayerPopupPolicy.Rect? {
         if (!trigger.isAttachedToWindow || trigger.width <= 0 || trigger.height <= 0) return null
         val playerLocation = IntArray(2)
@@ -2677,6 +2765,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             activeVolumePopupBinder = null
             activeMorePopupBinder?.dispose()
             activeMorePopupBinder = null
+            activeFloatingChatPopupBinder?.dispose()
+            activeFloatingChatPopupBinder = null
             activePopupLayoutListener?.let(host.root::removeOnLayoutChangeListener)
             activePopupLayoutListener = null
             activePopupTriggerLayoutListener?.let { listener ->
@@ -2788,6 +2878,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     fun toggleChatBar() {
+        if (isFloatingChatEnabled) {
+            // Floating chat keeps its own message box option.
+            val enabled = !prefs.getBoolean(C.FLOATING_CHAT_REPLY_BAR, false)
+            prefs.edit { putBoolean(C.FLOATING_CHAT_REPLY_BAR, enabled) }
+            applyFloatingChatAppearance()
+            return
+        }
         with(binding) {
             requireView().findViewById<LinearLayout>(R.id.messageView)?.let {
                 if (it.isVisible) {
@@ -2807,8 +2904,14 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     fun hideChat() {
-        isChatOpen = false
-        hideChatLayout()
+        if (isFloatingChatEnabled) {
+            // The viewer picked a chat mode, so unfolding should not restore floating chat.
+            foldDockedFloatingChat = false
+            hideFloatingChat()
+        } else {
+            isChatOpen = false
+            hideChatLayout()
+        }
         if (requireContext().prefs().getBoolean(C.PLAYER_CHATTOGGLE, true)) {
             binding.playerControls.toggleChat.apply {
                 visibility = View.VISIBLE
@@ -2849,7 +2952,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         updateFoldLayout()
     }
 
+    /** The message bar the More menu toggles: the floating chat's Reply bar while it floats. */
+    fun isChatBarShown() = if (isFloatingChatEnabled) {
+        prefs.getBoolean(C.FLOATING_CHAT_REPLY_BAR, false)
+    } else {
+        prefs.getBoolean(C.KEY_CHAT_BAR_VISIBLE, true)
+    }
+
     private fun showChatLayout() {
+        // A floating chat still fading out hands its view to the sidebar now, not after the fade.
+        finishFloatingChatHide()
         with(binding) {
             playerLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                 width = ViewGroup.LayoutParams.MATCH_PARENT
@@ -2926,8 +3038,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         if (layout is PlayerFoldLayout.Tabletop && isFloatingChatEnabled) {
             // Floating chat would cover the video pane; dock it below the hinge instead.
             isFloatingChatEnabled = false
-            binding.floatingChatRoot.animate().cancel()
-            binding.floatingChatRoot.visibility = View.GONE
+            floatingChat?.hide(animate = false)
             reparentChatView(toFloating = false)
             isChatOpen = true
             binding.chatLayout.visibility = View.VISIBLE
@@ -3363,10 +3474,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                     )
                     start()
                 }
-                // Also show floating chat controls if floating chat is active
-                if (isFloatingChatEnabled) {
-                    binding.dragHandleZone.animate().alpha(1f).setDuration(250).start()
-                }
+                notifyFloatingChatControls(visible = true)
             } else {
                 binding.playerControls.root.removeCallbacks(controllerHideAction)
                 if (controllerAutoHide && controllerHideOnTouch && !binding.playerControls.progressBar.isPressed) {
@@ -3380,10 +3488,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 binding.playerControls.root.alpha = 1f
                 binding.playerControls.root.visibility = View.VISIBLE
                 updateChatButtonIcon()
-                // Also show floating chat controls if floating chat is active
-                if (isFloatingChatEnabled) {
-                    binding.dragHandleZone.alpha = 1f
-                }
+                notifyFloatingChatControls(visible = true)
                 if (controllerAutoHide && controllerHideOnTouch && !binding.playerControls.progressBar.isPressed) {
                     binding.playerControls.root.postDelayed(controllerHideAction, 3000)
                 }
@@ -3391,9 +3496,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
-    private fun hideController(force: Boolean = false, immediate: Boolean = false) {
+    private fun hideController(force: Boolean = false, immediate: Boolean = false, pinchHint: Boolean = !force) {
         seekPreview?.hide()
-        if (!force) {
+        if (pinchHint) {
             maybeShowPinchHint()
         }
         if (!immediate && !controllerIsAnimating && binding.playerControls.root.isVisible) {
@@ -3417,19 +3522,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 )
                 start()
             }
-            // Also hide floating chat controls if floating chat is active
-            if (isFloatingChatEnabled) {
-                binding.dragHandleZone.animate().alpha(0f).setDuration(250).start()
-            }
+            notifyFloatingChatControls(visible = false)
         } else {
             if (force) {
                 controllerAnimation?.cancel()
                 binding.playerControls.root.alpha = 0f
                 binding.playerControls.root.visibility = View.GONE
-                // Also hide floating chat controls if floating chat is active
-                if (isFloatingChatEnabled) {
-                    binding.dragHandleZone.alpha = 0f
-                }
+                notifyFloatingChatControls(visible = false)
             }
         }
     }
@@ -3595,6 +3694,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             }
             if (key == C.SPOILER_SHIELD_RULES || key == C.SPOILER_SHIELD_HIDE_TITLES || key == null) {
                 refreshPlayerTitleProtection()
+            }
+            if (key in FLOATING_CHAT_APPEARANCE_KEYS || key == null) {
+                applyFloatingChatAppearance()
             }
         }.also { prefs.registerOnSharedPreferenceChangeListener(it) }
         // Zoom is available from API 24 and must also update on devices without PiP.
@@ -3960,6 +4062,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 controllerAnimation?.cancel()
                 binding.playerControls.root.alpha = 0f
                 binding.playerControls.root.visibility = View.GONE
+                notifyFloatingChatControls(visible = false)
+                // The window is too small for a card over the video; it returns on exit.
+                // A card still fading out from an earlier hide finishes now.
+                floatingChat?.hide(animate = false)
                 // player dialog, including the gesture guide (only its button marks it seen)
                 (childFragmentManager.findFragmentByTag("closeOnPip") as? DialogFragment)?.dismiss()
                 // player chat message dialog
@@ -4020,10 +4126,8 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             // Restore original brightness when minimizing
             restoreBrightness()
             hidePlayerPopup(restoreFocus = false, animate = false)
-            // Hide floating chat when minimizing - it should only appear in fullscreen
-            if (isFloatingChatEnabled) {
-                floatingChatRoot.visibility = View.GONE
-            }
+            // Hide floating chat at once when minimizing — it only appears in full-screen.
+            floatingChat?.hide(animate = false)
             if (videoType == STREAM && chatFragment?.emoteMenuIsVisible() == true) {
                 chatFragment?.toggleBackPressedCallback(false)
             }
@@ -4117,7 +4221,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 hideStatusBar()
                 // Show floating chat again if it was enabled
                 if (isFloatingChatEnabled) {
-                    floatingChatRoot.visibility = View.VISIBLE
+                    // Already showing (a repeated maximize) keeps its place instead of fading in again.
+                    if (floatingChat?.isShown == false) {
+                        floatingChat?.show(animate = true)
+                    }
                     chatLayout.visibility = View.GONE
                     playerLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                         marginEnd = 0
@@ -4458,6 +4565,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         liveRewindDialog?.dismiss()
         clipDialog?.dismiss()
         doubleTapChatSnapshot = null
+        // A new view starts with sidebar chat; the chat fragment's view is already gone.
+        // Clear the mode first, so hiding the card does not leave the surviving chat paused.
+        isFloatingChatEnabled = false
+        floatingChat?.hide(animate = false)
+        floatingChat = null
+        floatingChatHoldsControls = false
+        chatFragment?.onComposerHeightChanged = null
+        // The chat's next view starts as ordinary sidebar chat.
+        chatFragment?.setOverlayStyle(null)
+        chatFragment?.setFloatingReplyBar(false)
         systemUiListener.detach()
         finalizePinchSurface()
         hidePlayerPopup(restoreFocus = false, animate = false)
@@ -4482,6 +4599,20 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     companion object {
+        /** Swipes whose slider floating chat fades back for. */
+        private val FLOATING_CHAT_DUCKING_OWNERS = setOf(
+            PlayerGestureArbiter.Owner.BRIGHTNESS,
+            PlayerGestureArbiter.Owner.DEVICE_VOLUME,
+            PlayerGestureArbiter.Owner.SEEK,
+            PlayerGestureArbiter.Owner.PLAYBACK_SPEED,
+        )
+        private val FLOATING_CHAT_APPEARANCE_KEYS = setOf(
+            C.FLOATING_CHAT_TRANSPARENCY,
+            C.FLOATING_CHAT_TEXT_SIZE,
+            C.FLOATING_CHAT_BOLD_TEXT,
+            C.FLOATING_CHAT_FADE_OLD,
+            C.FLOATING_CHAT_REPLY_BAR,
+        )
         private val TV_NAVIGATION_KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
@@ -4545,7 +4676,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         protected const val KEY_IGNORE_SAVED_POSITION = "ignoreSavedPosition"
     }
 
-    private fun createChatFragment(isFloating: Boolean): ChatFragment? {
+    private fun createChatFragment(): ChatFragment? {
         val fragment = when (videoType) {
             STREAM -> ChatFragment.newInstance(
                 requireArguments().getString(KEY_CHANNEL_ID),
@@ -4578,92 +4709,77 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             )
             else -> null
         }
-        fragment?.arguments?.putBoolean("isFloatingMode", isFloating)
         return fragment
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun setupFloatingChatInteraction() {
-        with(binding) {
-            floatingChatRoot.doOnLayout {
-                if (isFloatingChatEnabled) restoreFloatingChatPosition()
-            }
-
-            dragHandleZone.setOnTouchListener { _, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        dX = floatingChatRoot.x - event.rawX
-                        dY = floatingChatRoot.y - event.rawY
-                        true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        // Direct property assignment is more efficient than animate() with duration 0
-                        val parent = floatingChatRoot.parent as? View
-                        val parentWidth = parent?.width ?: 0
-                        val parentHeight = parent?.height ?: 0
-                        val viewWidth = floatingChatRoot.width
-                        val viewHeight = floatingChatRoot.height
-
-                        val newX = (event.rawX + dX).coerceIn(0f, (parentWidth - viewWidth).coerceAtLeast(0).toFloat())
-                        val newY = (event.rawY + dY).coerceIn(0f, (parentHeight - viewHeight).coerceAtLeast(0).toFloat())
-
-                        floatingChatRoot.x = newX
-                        floatingChatRoot.y = newY
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        saveFloatingChatPosition()
-                        true
-                    }
-                    else -> false
+    private fun setupFloatingChat() {
+        val binding = binding
+        val controller = FloatingChatController(
+            host = binding.floatingChatHost,
+            card = binding.floatingChatRoot,
+            header = binding.floatingChatHeader,
+            pill = binding.floatingChatPill,
+            grip = binding.floatingChatGrip,
+            composeButton = binding.floatingChatCompose,
+            appearanceButton = binding.floatingChatAppearance,
+            closeButton = binding.floatingChatClose,
+            prefs = prefs,
+            callbacks = object : FloatingChatController.Callbacks {
+                override fun channelId() = arguments?.getString(KEY_CHANNEL_ID)
+                override fun holdControls(hold: Boolean) = holdControlsForFloatingChat(hold)
+                override fun canCompose() = chatFragment?.canCompose() == true
+                override fun onAppearanceRequested(trigger: View) = showFloatingChatPopup(trigger)
+                override fun onComposeRequested() {
+                    chatFragment?.openFloatingComposer()
                 }
-            }
-
-            resizeHandleZone.setOnTouchListener { _, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        initialWidth = floatingChatRoot.width
-                        initialHeight = floatingChatRoot.height
-                        initialTouchX = event.rawX
-                        initialTouchY = event.rawY
-                        isResizing = true
-                        true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        if (isResizing) {
-                            val deltaX = event.rawX - initialTouchX
-                            val deltaY = event.rawY - initialTouchY
-                            
-                            // DPI-aware min/max constraints
-                            val density = resources.displayMetrics.density
-                            val minSizePx = (150 * density).toInt() // 150dp minimum
-                            val parent = floatingChatRoot.parent as? View
-                            val maxWidthPx = ((parent?.width ?: 800) * 0.6).toInt() // 60% max width
-                            val maxHeightPx = ((parent?.height ?: 600) * 0.8).toInt() // 80% max height
-                            
-                            val newWidth = (initialWidth + deltaX).toInt().coerceIn(minSizePx, maxWidthPx)
-                            val newHeight = (initialHeight + deltaY).toInt().coerceIn(minSizePx, maxHeightPx)
-                            
-                            // Update size - top-left corner stays fixed, bottom-right follows finger
-                            floatingChatRoot.updateLayoutParams {
-                                width = newWidth
-                                height = newHeight
-                            }
-                        }
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        isResizing = false
-                        saveFloatingChatPosition()
-                        true
-                    }
-                    else -> false
+                override fun onCloseRequested() {
+                    // The viewer picked a chat mode, so unfolding should not restore floating chat.
+                    foldDockedFloatingChat = false
+                    hideFloatingChat()
+                    updateChatButtonIcon()
                 }
-            }
+                override fun onCardOnScreenChanged(onScreen: Boolean) {
+                    // While hidden, animated emotes and the message glide pause; sidebar chat never does.
+                    chatFragment?.setRowAnimationsPaused(isFloatingChatEnabled && !onScreen)
+                }
+            },
+        )
+        floatingChat = controller
+        controller.setInsets(floatingChatInsets)
+        controller.onControlsVisibilityChanged(binding.playerControls.root.isVisible)
+        chatFragment?.onComposerHeightChanged = { height -> floatingChat?.setComposerHeight(height) }
+    }
 
-            highVisibilityToggle.setOnClickListener {
-                toggleHighVisibility()
-            }
+    /** Ends a floating chat fade-out at once, so its chat view is back in the sidebar. */
+    private fun finishFloatingChatHide() {
+        if (!isFloatingChatEnabled) floatingChat?.hide(animate = false)
+    }
+
+    /** The floating chat shows its header buttons and brings faded lines back with the player controls. */
+    private fun notifyFloatingChatControls(visible: Boolean) {
+        floatingChat?.onControlsVisibilityChanged(visible)
+        chatFragment?.setFloatingReveal(visible)
+    }
+
+    private fun holdControlsForFloatingChat(hold: Boolean) {
+        val binding = _binding ?: return
+        floatingChatHoldsControls = hold
+        val controls = binding.playerControls.root
+        controls.removeCallbacks(controllerHideAction)
+        if (!hold && controls.isVisible && activePlayerPopup == null && controllerAutoHide && controllerHideOnTouch) {
+            controls.postDelayed(controllerHideAction, 3000)
+        }
+    }
+
+    /** Applies Aa or Settings changes to the card and the chat rows without reconnecting. */
+    private fun applyFloatingChatAppearance() {
+        if (_binding == null) return
+        val controller = floatingChat ?: return
+        controller.applyAppearance()
+        if (isFloatingChatEnabled) {
+            val appearance = controller.currentAppearance()
+            chatFragment?.setOverlayStyle(appearance.overlayStyle())
+            chatFragment?.setFloatingReplyBar(appearance.replyBar)
         }
     }
 
@@ -4707,9 +4823,18 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
 
     private fun hideFloatingChat() {
         isFloatingChatEnabled = false
-        binding.floatingChatRoot.visibility = View.GONE
-        // Move chat view back to sidebar container (reparent, don't recreate)
-        reparentChatView(toFloating = false)
+        // The lines fade out with the card, then the view moves back to the
+        // hidden sidebar (reparent, don't recreate). Whatever mode is current
+        // when the fade ends decides where the view goes.
+        val controller = floatingChat
+        if (controller != null && controller.isShown) {
+            controller.hide(animate = true) {
+                if (_binding != null) reparentChatView(toFloating = isFloatingChatEnabled)
+            }
+        } else {
+            controller?.hide(animate = false)
+            reparentChatView(toFloating = false)
+        }
         isChatOpen = false
         hideChatLayout()
         prefs.edit { putBoolean(C.KEY_CHAT_OPENED, false) }
@@ -4721,9 +4846,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         isChatOpen = snapshot.isOpen
         isFloatingChatEnabled = snapshot.isFloating
         foldDockedFloatingChat = snapshot.foldDockedFloating
-        binding.floatingChatRoot.animate().cancel()
-        binding.floatingChatRoot.alpha = 1f
-        binding.floatingChatRoot.visibility = if (isFloatingChatEnabled) View.VISIBLE else View.GONE
+        if (isFloatingChatEnabled) floatingChat?.show(animate = false) else floatingChat?.hide(animate = false)
         reparentChatView(toFloating = isFloatingChatEnabled)
         if (isChatOpen && !isFloatingChatEnabled) showChatLayout() else hideChatLayout()
         prefs.edit {
@@ -4747,23 +4870,12 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             binding.playerLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                 marginEnd = 0
             }
-            // Show with fade-in animation
-            binding.floatingChatRoot.alpha = 0f
-            binding.floatingChatRoot.visibility = View.VISIBLE
-            binding.floatingChatRoot.animate().alpha(1f).setDuration(200).start()
-            // Start with drag handle hidden (synced with player controls)
-            binding.dragHandleZone.alpha = if (binding.playerControls.root.isVisible) 1f else 0f
-            restoreFloatingChatPosition()
-            // Floating chat overlays video, so keep the surface dark in every app theme.
-            val transparency = prefs.getInt(C.FLOATING_CHAT_TRANSPARENCY, 0)
-            val alpha = (transparency * 255 / 100).coerceIn(0, 255)
-            binding.floatingChatContainer.setBackgroundColor(ColorUtils.setAlphaComponent(Color.BLACK, alpha))
+            floatingChat?.show(animate = true)
             // A book split sized the video for sidebar chat; floating chat gives it the whole screen.
             updateFoldLayout()
         } else {
-            // Hide with fade-out animation
-            binding.floatingChatRoot.animate().alpha(0f).setDuration(200)
-                .withEndAction { binding.floatingChatRoot.visibility = View.GONE }.start()
+            // The chat already moved to the sidebar; fading the empty card would only flash.
+            floatingChat?.hide(animate = false)
             // Restore sidebar chat with proper layout
             isChatOpen = true
             showChatLayout()
@@ -4790,83 +4902,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             currentParent.removeView(chatView)
             targetContainer.addView(chatView)
         }
-        // Update high visibility mode - should only apply to floating chat
-        chatFragment?.updateHighVisibility(toFloating)
-    }
-
-    private fun saveFloatingChatPosition() {
-        val channelId = requireArguments().getString(KEY_CHANNEL_ID) ?: return
-        with(binding.floatingChatRoot) {
-            prefs.edit {
-                putFloat("floating_chat_x_$channelId", x)
-                putFloat("floating_chat_y_$channelId", y)
-                putInt("floating_chat_w_$channelId", width)
-                putInt("floating_chat_h_$channelId", height)
-            }
-        }
-    }
-
-    private fun restoreFloatingChatPosition() {
-        val channelId = requireArguments().getString(KEY_CHANNEL_ID) ?: return
-        val x = prefs.getFloat("floating_chat_x_$channelId", -1f)
-        val y = prefs.getFloat("floating_chat_y_$channelId", -1f)
-        val w = prefs.getInt("floating_chat_w_$channelId", -1)
-        val h = prefs.getInt("floating_chat_h_$channelId", -1)
-
-        // DPI-aware default sizing - larger for tablets
-        val density = resources.displayMetrics.density
-        val screenWidthDp = resources.configuration.screenWidthDp
-        val isTablet = resources.configuration.smallestScreenWidthDp >= 600
-        val defaultWidthDp = if (isTablet) 300 else 200
-        val defaultHeightDp = if (isTablet) 400 else 280
-        val defaultWidthPx = (defaultWidthDp * density).toInt()
-        val defaultHeightPx = (defaultHeightDp * density).toInt()
-
-        // Apply saved size or use defaults
-        binding.floatingChatRoot.updateLayoutParams {
-            width = if (w != -1) w else defaultWidthPx
-            height = if (h != -1) h else defaultHeightPx
-        }
-
-        binding.floatingChatRoot.doOnLayout {
-            val parent = binding.floatingChatRoot.parent as? View ?: return@doOnLayout
-            val parentWidth = parent.width
-            val parentHeight = parent.height
-            val chatWidth = binding.floatingChatRoot.width
-            val chatHeight = binding.floatingChatRoot.height
-
-            if (x != -1f && y != -1f) {
-                // Clamp position to keep chat within screen bounds
-                val clampedX = x.coerceIn(0f, (parentWidth - chatWidth).coerceAtLeast(0).toFloat())
-                val clampedY = y.coerceIn(0f, (parentHeight - chatHeight).coerceAtLeast(0).toFloat())
-                binding.floatingChatRoot.x = clampedX
-                binding.floatingChatRoot.y = clampedY
-            } else {
-                // Default position: top-right corner with some margin
-                val marginPx = (16 * density).toInt()
-                binding.floatingChatRoot.x = (parentWidth - chatWidth - marginPx).coerceAtLeast(0).toFloat()
-                binding.floatingChatRoot.y = marginPx.toFloat()
-            }
-        }
-    }
-
-    private fun toggleHighVisibility() {
-        val current = prefs.getBoolean(C.FLOATING_CHAT_HIGH_VISIBILITY, true)
-        prefs.edit { putBoolean(C.FLOATING_CHAT_HIGH_VISIBILITY, !current) }
-
-        // NOTE: High visibility mode requires fragment recreation because it affects
-        // the chat adapter's rendering. This is an intentional trade-off - the user
-        // explicitly toggled this setting, so a brief reconnection is acceptable.
-        // For normal floating chat toggle (sidebar <-> floating), we use view reparenting
-        // to preserve the chat connection.
-        if (isFloatingChatEnabled && chatFragment != null) {
-            childFragmentManager.beginTransaction().remove(chatFragment!!).commitNow()
-            val fragment = createChatFragment(true)
-            if (fragment != null) {
-                childFragmentManager.beginTransaction().replace(R.id.floating_chat_container, fragment).commitNow()
-                chatFragment = fragment
-            }
-        }
+        // Over video the chat takes the floating look; in the sidebar it is ordinary app chat.
+        val appearance = floatingChat?.currentAppearance()
+        chatFragment?.setOverlayStyle(if (toFloating) appearance?.overlayStyle() else null)
+        chatFragment?.setFloatingReplyBar(toFloating && appearance?.replyBar == true)
+        chatFragment?.setFloatingReveal(binding.playerControls.root.isVisible)
+        // A hidden card paused its rows; the sidebar never pauses them.
+        if (!toFloating) chatFragment?.setRowAnimationsPaused(false)
     }
 
     // PlayerGestureCallback implementation
@@ -4898,7 +4940,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
     }
 
     override fun claimSingleFingerGesture(owner: PlayerGestureArbiter.Owner): Boolean {
-        return gestureArbiter.tryClaimSingleFinger(owner)
+        val claimed = gestureArbiter.tryClaimSingleFinger(owner)
+        // Floating chat fades back while a slider shows, so a card on that edge never hides it.
+        if (claimed && owner in FLOATING_CHAT_DUCKING_OWNERS) floatingChat?.setDucked(true)
+        return claimed
     }
 
     private fun edgeExclusion(): PlayerEdgeExclusion {

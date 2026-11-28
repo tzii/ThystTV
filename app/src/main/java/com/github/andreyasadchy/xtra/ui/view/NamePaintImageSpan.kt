@@ -1,23 +1,28 @@
 package com.github.andreyasadchy.xtra.ui.view
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.drawable.Drawable
 import android.text.style.ReplacementSpan
+import androidx.core.graphics.ColorUtils
 import com.github.andreyasadchy.xtra.model.chat.NamePaint
 import kotlin.math.ceil
-import kotlin.math.max
 
+/**
+ * A name painted with an image: the image shows through the name's glyphs
+ * only, so whatever is behind the row (an app surface, a highlight, or video)
+ * stays visible around them.
+ */
 class NamePaintImageSpan(
     private val name: String,
     private val shadows: List<NamePaint.Shadow>?,
-    var backgroundColor: Int?,
-    private val bottomBackgroundColor: Int,
     val drawable: Drawable,
 ) : ReplacementSpan() {
+
+    private val maskPaint = Paint()
 
     override fun getSize(paint: Paint, text: CharSequence?, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
         if (fm != null) {
@@ -32,6 +37,16 @@ class NamePaintImageSpan(
     }
 
     override fun draw(canvas: Canvas, text: CharSequence?, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
+        val yOffset = y.toFloat()
+        val pass = ChatHaloPass.current
+        if (pass != ChatHaloPass.NONE) {
+            // A Clear row outlines the name like its other text; the paint goes on top.
+            val color = paint.color
+            paint.color = ColorUtils.setAlphaComponent(Color.BLACK, Color.alpha(color))
+            canvas.drawText(name, x, yOffset, paint)
+            paint.color = color
+            if (pass == ChatHaloPass.SOFT) return
+        }
         val xOffset = x.toInt()
         val width = paint.measureText(name).toInt()
         val height = bottom - top
@@ -61,28 +76,25 @@ class NamePaintImageSpan(
                 fullHeight = top + drawableHeight
             }
         }
+        shadows?.forEach {
+            paint.setShadowLayer(it.radius, it.xOffset, it.yOffset, it.color)
+            canvas.drawText(name, x, yOffset, paint)
+        }
+        paint.clearShadowLayer()
+        if (fullWidth <= xOffset || fullHeight <= top) return
+        // Draw the image in its own layer, then keep it only where the glyphs are.
+        val layer = canvas.saveLayer(xOffset.toFloat(), top.toFloat(), fullWidth.toFloat(), fullHeight.toFloat(), null)
         drawable.setBounds(xOffset, top, fullWidth, fullHeight)
         drawable.draw(canvas)
-        val maskBitmap = Bitmap.createBitmap(max(fullWidth - xOffset, 0), max(fullHeight - top, 0), Bitmap.Config.ARGB_8888)
-        val maskCanvas = Canvas(maskBitmap)
-        val maskPaint = Paint(paint)
+        maskPaint.set(paint)
         maskPaint.style = Paint.Style.FILL
-        maskPaint.color = bottomBackgroundColor
-        maskCanvas.drawPaint(maskPaint)
-        backgroundColor?.let {
-            maskPaint.color = it
-            maskCanvas.drawPaint(maskPaint)
-        }
-        maskPaint.color = paint.color
-        val yOffset = y.toFloat() - top
-        shadows?.forEach {
-            maskPaint.setShadowLayer(it.radius, it.xOffset, it.yOffset, it.color)
-            maskCanvas.drawText(name, 0f, yOffset, maskPaint)
-        }
-        maskPaint.clearShadowLayer()
-        maskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC)
-        maskPaint.alpha = 0
-        maskCanvas.drawText(name, 0f, yOffset, maskPaint)
-        canvas.drawBitmap(maskBitmap, xOffset.toFloat(), top.toFloat(), paint)
+        maskPaint.color = Color.BLACK
+        maskPaint.xfermode = KEEP_UNDER_GLYPHS
+        canvas.drawText(name, x, yOffset, maskPaint)
+        canvas.restoreToCount(layer)
+    }
+
+    private companion object {
+        val KEEP_UNDER_GLYPHS = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
     }
 }

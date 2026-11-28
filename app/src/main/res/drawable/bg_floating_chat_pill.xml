@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A quiet 24 x 3dp handle on the top rim of the card's 28dp drag band. The chat runs
+     under the band, so the faint bar lies over the top line or status strip. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="24dp"
+        android:height="3dp"
+        android:gravity="top|center_horizontal"
+        android:top="5dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="2dp" />
+            <solid android:color="#38FFFFFF" />
+        </shape>
+    </item>
+</layer-list>
