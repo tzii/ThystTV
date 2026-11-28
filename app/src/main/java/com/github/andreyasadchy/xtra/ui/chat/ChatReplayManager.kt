@@ -133,7 +133,7 @@ class ChatReplayManager(
                             return@launch
                         }
                     }
-                    val comments = response.data!!.video.comments
+                    val comments = response.data!!.video!!.comments
                     val messages = comments.edges.mapNotNull { comment ->
                         comment.node.let { item ->
                             item.message?.let { message ->
