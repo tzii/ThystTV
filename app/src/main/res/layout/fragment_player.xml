@@ -207,7 +207,7 @@
                 android:background="@drawable/bg_floating_chat_pill"
                 android:importantForAccessibility="no" />
 
-            <!-- Always-available corner resize grip on the corner facing the video. -->
+            <!-- Corner resize grip on the corner facing the video, shown with the header (player controls). -->
             <ImageView
                 android:id="@+id/floatingChatGrip"
                 android:layout_width="48dp"

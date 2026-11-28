@@ -250,11 +250,14 @@ stay. `FloatingChatController` owns geometry, touch handling and chrome. Keep th
   most one layout pass per animation frame and write preferences only on release.
   A size change lays the card out synchronously so dimensions and coordinates
   land on the same frame.
-- Interactions never depend on player controls visibility. While the card is
+- Moving never depends on player controls visibility: while the card is
   shown, a top drag handle (the 28dp drag band, marked by `floatingChatPill`,
   when controls are hidden, or `floatingChatHeader` when controls are visible)
-  and the corner resize grip work at any time. The card has no pinch: resizing is the grip
-  only. While the message box is open, `ChatFragment.onComposerHeightChanged`
+  works at any time. The corner resize grip shows with the header, so only
+  while the controls do (the maintainer's call after phone QA: it should not
+  sit on the video); it fades with the header, and a resize already under way
+  keeps its touch target if the controls hide. The card has no pinch: resizing
+  is the grip only. While the message box is open, `ChatFragment.onComposerHeightChanged`
   reports how far the box (with its reply line) reaches up, and the grip is
   lifted above it with `translationY` (no layout pass); it hides only while the
   card is too short for the box, the grip and the top bar (band or header).
@@ -997,7 +1000,8 @@ At minimum, player work should request human verification for:
 - lifecycle callbacks apply to an old fragment
 - quality menu shows raw numeric HLS variants
 - floating chat is unreadable in light mode or on bright video
-- the floating chat header catches touches while the controls are hidden, or the top drag band / resize grip stop working when controls hide
+- the floating chat header catches touches while the controls are hidden, or the top drag band stops working when controls hide
+- the floating chat resize grip shows on the video while the controls are hidden, or a resize breaks when the controls hide mid-gesture
 - floating chat reserves a dead band at the top again (it should reach the screen edge), or the drag band swallows taps on the top chat line
 - with the controls shown, the floating chat header swallows taps between its buttons instead of passing them to the chat under it
 - floating chat leaves the screen on drag/resize/rotation, stays visible in PiP or after minimize, or comes back empty
