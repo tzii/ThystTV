@@ -221,8 +221,24 @@ class PlayerGestureArbiterTest {
     fun `removing a third pointer does not finish an owned two-finger pinch`() {
         assertTrue(pinchClaim())
         assertFalse(arbiter.onPointerRemoved(2))
+        assertFalse(arbiter.onPointerRemoved(2, liftedPinchPointer = false))
         assertEquals(Owner.PINCH_DISPLAY_MODE, arbiter.owner)
         assertFalse(arbiter.isSingleFingerSuppressed)
+    }
+
+    @Test
+    fun `lifting a pinch finger while a third stays down finishes the pinch once`() {
+        assertTrue(pinchClaim())
+        assertFalse(arbiter.onPointerAdded(3))
+
+        assertTrue(arbiter.onPointerRemoved(2, liftedPinchPointer = true))
+        assertTrue(arbiter.isSingleFingerSuppressed)
+        assertFalse(arbiter.tryClaimSingleFinger(Owner.SEEK))
+
+        // The other pinch finger lifting later must not finish it a second time.
+        assertFalse(arbiter.onPointerRemoved(1, liftedPinchPointer = true))
+        assertTrue(arbiter.isSingleFingerSuppressed)
+        assertFalse(arbiter.onPointerAdded(2))
     }
 
     @Test

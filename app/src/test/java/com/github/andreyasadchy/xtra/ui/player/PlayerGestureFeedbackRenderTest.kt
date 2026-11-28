@@ -507,6 +507,25 @@ class PlayerGestureFeedbackRenderTest {
         assertEquals(308, slider.width)
     }
 
+    @Test fun `a player too short for the seek caption drops it instead of clipping it`() {
+        // Issue #121: a tiny freeform or desktop window. The caption needs 82 dp
+        // below the overlay's top padding; these players have less room.
+        val (surface, feedback) = createSurface()
+        val slider = feedback.findViewById<PlayerGestureSliderView>(R.id.feedbackSlider)
+        for (height in listOf(110, 94, 93, 90, 80, 64)) {
+            presentReading(surface, feedback, PlayerGestureFeedbackKind.SEEK, 720, height, seekForward)
+            assertOnlyShown(feedback, R.id.feedbackSlider)
+            val caption = slider.captionBounds()
+            // 12 px of top padding plus the 82 px slider with its caption band.
+            assertEquals("caption shown at $height px", height >= 94, caption != null)
+            assertEquals(if (height >= 94) 82 else 52, slider.height)
+            if (caption != null) {
+                assertTrue("caption inside a $height px player", feedback.top + slider.top + caption.bottom <= height.toFloat())
+                assertTrue("caption inside the slider at $height px", caption.bottom <= slider.height)
+            }
+        }
+    }
+
     @Test fun `top slider drops in from above and clears after hiding`() {
         val (surface, feedback) = createSurface()
         PlayerSurfacePolicy.presentFeedback(
