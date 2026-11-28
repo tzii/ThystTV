@@ -2067,15 +2067,22 @@ class ChatViewModel @Inject constructor(
                             }.takeIf { !it.errors.isNullOrEmpty() }?.toString()
                         } else {
                             if (!helixHeaders[C.HEADER_TOKEN].isNullOrBlank()) {
-                                val targetId = helixRepository.getUsers(
-                                    networkLibrary = networkLibrary,
-                                    headers = helixHeaders,
-                                    logins = listOf(splits[1])
-                                ).data.firstOrNull()?.id
-                                helixRepository.banUser(networkLibrary, helixHeaders, channelId, accountId, targetId,
-                                    duration = if (splits.size >= 3) splits[2] else "600",
-                                    reason = if (splits.size >= 4) splits[3] else null
-                                )
+                                // Helix bans permanently when the duration is missing, so an
+                                // unreadable duration must stop here instead of being dropped.
+                                val durationSeconds = ChatTimeoutDuration.seconds(splits.getOrNull(2))
+                                if (durationSeconds == null) {
+                                    applicationContext.getString(R.string.chat_timeout_invalid_duration)
+                                } else {
+                                    val targetId = helixRepository.getUsers(
+                                        networkLibrary = networkLibrary,
+                                        headers = helixHeaders,
+                                        logins = listOf(splits[1])
+                                    ).data.firstOrNull()?.id
+                                    helixRepository.banUser(networkLibrary, helixHeaders, channelId, accountId, targetId,
+                                        duration = durationSeconds,
+                                        reason = if (splits.size >= 4) splits[3] else null
+                                    )
+                                }
                             } else null
                         }?.let {
                             onMessage(ChatMessage(systemMsg = it))

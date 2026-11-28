@@ -1496,11 +1496,16 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                             }
                         }
                         MotionEvent.ACTION_POINTER_UP -> {
-                            val pinchEnded = gestureArbiter.onPointerRemoved(event.pointerCount - 1)
+                            val liftedPointerId = event.getPointerId(event.actionIndex)
+                            val pinchEnded = gestureArbiter.onPointerRemoved(
+                                remainingPointerCount = event.pointerCount - 1,
+                                liftedPinchPointer = liftedPointerId == pinchPointerId1 || liftedPointerId == pinchPointerId2,
+                            )
                             if (pinchEnded && pinchAnchorSpan > 0f) {
                                 // A pinch ends when either of its two fingers
-                                // lifts. The remaining finger stays suppressed
-                                // by the arbiter until the sequence's final UP.
+                                // lifts, even while a third finger stays down.
+                                // The remaining fingers stay suppressed by the
+                                // arbiter until the sequence's final UP.
                                 finishPinch(cancelled = false)
                                 resetPinchTracking()
                             }
@@ -3391,9 +3396,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
     }
 
-    private fun hideController(force: Boolean = false, immediate: Boolean = false) {
+    private fun hideController(force: Boolean = false, immediate: Boolean = false, pinchHint: Boolean = !force) {
         seekPreview?.hide()
-        if (!force) {
+        if (pinchHint) {
             maybeShowPinchHint()
         }
         if (!immediate && !controllerIsAnimating && binding.playerControls.root.isVisible) {
@@ -5068,6 +5073,13 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
         }
         controllerTapDetector?.onTouchEvent(cancelEvent)
         cancelEvent.recycle()
+        // The pinch slider sits under the controls and their scrim, like the
+        // seek and speed sliders, which only start while the controls are
+        // hidden. Fade the controls out so the pinch reads clearly (#121).
+        if (binding.playerControls.root.isVisible) {
+            binding.playerControls.root.removeCallbacks(controllerHideAction)
+            hideController(pinchHint = false)
+        }
     }
 
     private fun updatePinch(event: MotionEvent) {
