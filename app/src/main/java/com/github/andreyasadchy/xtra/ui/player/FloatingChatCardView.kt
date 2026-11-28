@@ -51,6 +51,9 @@ class FloatingChatCardView @JvmOverloads constructor(
      * visible: the resize grip on a short card and the header buttons.
      */
     var dragBandExclusions: List<View> = emptyList()
+    /** The rects last handed to the system as gesture exclusions (a no-op below API 29). */
+    var bandGestureExclusion: List<Rect> = emptyList()
+        private set
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     /** Before the chat's own long-press (a row's tooltip) fires, a still finger grabs the card. */
@@ -191,6 +194,7 @@ class FloatingChatCardView @JvmOverloads constructor(
 
     private fun updateGestureExclusion() {
         val rects = if (dragBandHeight > 0 && width > 0) listOf(Rect(0, 0, width, dragBandHeight)) else emptyList()
+        bandGestureExclusion = rects
         ViewCompat.setSystemGestureExclusionRects(this, rects)
     }
 
