@@ -48,6 +48,7 @@ import com.github.andreyasadchy.xtra.util.prefs
 import dagger.Lazy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.joinAll
@@ -809,6 +810,17 @@ class VideoDownloadWorker @AssistedInject constructor(
     }
 
     private suspend fun startChatJob(path: String) {
+        try {
+            downloadChat(path)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // The video part is unaffected. Chat stays incomplete, so doWork() ends the download
+            // as pending and it can be resumed, instead of failing and leaving it "Downloading".
+        }
+    }
+
+    private suspend fun downloadChat(path: String) {
         if (offlineVideo.downloadChat && offlineVideo.chatProgress < offlineVideo.maxChatProgress) {
             val window = ChatDownloadWindow.of(offlineVideo.videoId, offlineVideo.sourceStartPosition, offlineVideo.duration)
             if (window == null) {
@@ -1054,7 +1066,18 @@ class VideoDownloadWorker @AssistedInject constructor(
                             val messageObjects = response.jsonObject["data"]?.jsonObject?.get("video")?.jsonObject?.get("comments")?.jsonObject?.get("edges")?.jsonArray?.mapNotNull {
                                 it.jsonObject["node"]?.jsonObject
                             } ?: emptyList()
-                            val data = json.decodeFromJsonElement<VideoMessagesResponse>(response).data!!.video.comments
+                            val decoded = json.decodeFromJsonElement<VideoMessagesResponse>(response)
+                            val data = decoded.data?.video?.comments
+                            if (data == null) {
+                                // A request that failed outright stays an error, so the chat can
+                                // be resumed later. A missing video means the VoD was deleted
+                                // after the download was queued: keep the chat saved so far.
+                                check(decoded.data != null && decoded.errors.isNullOrEmpty()) { "Chat page failed: ${decoded.errors}" }
+                                if (cursor == null && resumed) {
+                                    writer.beginObject().also { position += 1 }
+                                }
+                                break
+                            }
                             val comments = if (cursor == null && resumed) {
                                 writer.beginObject().also { position += 1 }
                                 val list = mutableListOf<JsonObject>()
