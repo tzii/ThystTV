@@ -69,6 +69,11 @@ both font sizes. Tests explicitly resolve layout direction for detached preview 
 These check Android layout/rendering, not real player playback, device window placement,
 or animation smoothness. Human checks below remain required.
 
+The unit test JVM gets a 1 GB heap (`app/build.gradle.kts`). The suites load Robolectric
+sandboxes for API 23, 24, 28, 34 and 35 in one JVM, and Gradle's 512 MB default ran out
+on CI. An `OutOfMemoryError` in a small, unrelated test means the heap is short again,
+not that the test is broken.
+
 PiP correction coverage includes wide/sidebar/tall video-only 16:9 policy,
 actual window-listener detachment before fragment view destruction, and restored
 chat auto-follow flags with composer/reply drafts preserved. Focused cases use
