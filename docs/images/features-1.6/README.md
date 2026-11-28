@@ -23,8 +23,9 @@ receiver, physical TV or folding interaction is demonstrated here.
 Public 1.6 settings organization is shown. The pending dedicated Spoilers screen
 belongs to PR #106 and is not represented as a shipped 1.6 change.
 
-The README and site's older 1.3 sample-data controls/Stats and pre-1.3 floating-chat
-footage keep their original provenance labels and files.
+The README and site's older 1.3 sample-data controls/Stats keep their original
+provenance labels and files. The pre-1.3 floating-chat footage was later replaced
+by the 1.7 captures in [`../features-1.7/`](../features-1.7/README.md).
 
 ## File checksums
 

@@ -28,7 +28,8 @@ assert.match(html, /Local stats and watch-history insights/i);
 assert.match(html, /AGPL-3\.0/i);
 assert.match(html, /Playback speed/i);
 assert.match(html, /Video quality/i);
-assert.match(html, /demo recorded before 1\.3/i);
+assert.match(html, /recorded on a ThystTV 1\.7\.1 test build/i);
+assert.doesNotMatch(allFrontDoorText, /images\/readme\/floating-chat|recorded before 1\.3[^.]*floating|floating[^.]*recorded before 1\.3/i);
 assert.match(html, /Native 1\.3 layout preview with sample data/i);
 
 for (const phrase of ["Download and install", "Verify the APK", "GNU Affero General Public License", "Xtra", "not affiliated with Twitch or Amazon"]) {
@@ -63,7 +64,7 @@ assert.match(html, /class="icon-button motion-toggle"/);
 assert.match(html, /<dialog[^>]*aria-labelledby="demo-title"/);
 assert.match(html, /<video controls playsinline preload="none"/);
 assert.doesNotMatch(html, /<video[^>]*\bautoplay\b/);
-assert.match(html, /href="images\/readme\/floating-chat\.mp4" data-demo/);
+assert.match(html, /href="images\/features-1\.7\/floating-chat\.mp4" data-demo/);
 assert.match(css, /html:not\(\.js-ready\) \.feature-panel\[hidden\]/);
 assert.match(css, /@media \(max-width: 480px\)/);
 
@@ -124,57 +125,32 @@ test("saved pause and system reduced motion independently suppress motion", () =
   assert.equal(initializePreferences({ reduced: true, stored: { "thysttv-motion": "running" } }).motion, "paused");
 });
 
-const liveFloatingChatVideoUrl =
-  "https://github.com/user-attachments/assets/99d97579-3340-4200-8aa7-3cae0414560e";
 const floatingChatSectionMatch = readme.match(
   /^## Floating chat\r?\n[\s\S]*?(?=^## |(?![\s\S]))/m
 );
 assert.ok(floatingChatSectionMatch, "README should include a ## Floating chat section");
 
 const floatingChatSection = floatingChatSectionMatch[0].replace(/\r\n/g, "\n");
-const centeredDownloadFallback = `<p align="center">
-  <a href="docs/images/readme/floating-chat.mp4">Download the floating chat demo video</a>
-</p>`;
-const expectedPresentationBlock = `<p align="center">
-  <img src="docs/images/readme/floating-chat.png" alt="Full-screen playback with floating chat overlay" width="760">
-</p>
-
-${liveFloatingChatVideoUrl}
-
-${centeredDownloadFallback}`;
-
-assert.match(
-  floatingChatSection,
-  /^https:\/\/github\.com\/user-attachments\/assets\/99d97579-3340-4200-8aa7-3cae0414560e$/m,
-  "Floating chat section should include the exact live GitHub video URL"
-);
-assert.strictEqual(
-  countOccurrences(readme, liveFloatingChatVideoUrl),
-  1,
-  "README should include the exact live GitHub video URL exactly once"
+const floatingChatVideo = "docs/images/features-1.7/floating-chat.mp4";
+assert.ok(
+  floatingChatSection.includes(
+    `<a href="${floatingChatVideo}"><img src="docs/cropped/watch-player.webp" alt="Full-screen playback with the floating chat card on the right of the picture" width="760"></a>`
+  ),
+  "Floating chat preview should open the demo video"
 );
 assert.ok(
-  floatingChatSection.includes(expectedPresentationBlock),
-  "Floating chat media should form one contiguous preview, live video, and download block"
+  floatingChatSection.includes(`<p align="center">
+  <a href="${floatingChatVideo}">Watch the floating chat demo (MP4, silent)</a> · <a href="docs/images/features-1.7/README.md">Capture details</a>
+</p>`),
+  "Floating chat section should keep a centered link to the demo video"
 );
-assert.strictEqual(
-  countOccurrences(floatingChatSection, "docs/images/readme/floating-chat.png"),
-  1,
-  "Floating chat section should include the PNG preview path exactly once"
-);
-assert.strictEqual(
-  countOccurrences(floatingChatSection, "docs/images/readme/floating-chat.mp4"),
-  1,
-  "Floating chat section should include the MP4 fallback path exactly once"
-);
-assert.ok(
-  floatingChatSection.includes(centeredDownloadFallback),
-  "Floating chat section should retain the centered download fallback"
-);
-assert.doesNotMatch(
-  readme,
-  /<a href="docs\/images\/readme\/floating-chat\.mp4">Watch the floating chat demo video<\/a>/,
-  "README should remove the old watch-video fallback label"
-);
+assert.strictEqual(countOccurrences(floatingChatSection, floatingChatVideo), 2);
+for (const look of ["clear", "appearance", "solid"]) {
+  assert.ok(floatingChatSection.includes(`docs/images/features-1.7/floating-chat-${look}.webp`), "missing look: " + look);
+}
+// Every README image and link into docs/ resolves.
+for (const match of readme.matchAll(/\b(?:src|href)="(docs\/[^"]+)"/g)) {
+  assert.ok(fs.existsSync(path.join(repoRoot, match[1])), "missing README resource: " + match[1]);
+}
 
 console.log("Static site smoke checks passed.");
