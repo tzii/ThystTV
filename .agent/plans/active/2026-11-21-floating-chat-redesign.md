@@ -368,6 +368,16 @@ Human QA completed:
   go home. The header, band-over-nothing and gesture-exclusion tests each
   fail against a mutation of their fix; the `hide()` test only pins the band
   reset, since `DragHandler` already refuses a DOWN while the card is hidden.
+- 2026-11-28: CI on `cf4830542` ran out of memory in `UpdateInstallIntentsTest`:
+  the gesture-exclusion test ran at SDK 34, loading a second Robolectric SDK
+  into the JVM (#130 lacks #133's larger test heap). `371890053` checks the
+  rects the card hands to `ViewCompat` at SDK 28 instead.
+- 2026-11-28: Phone QA of `debug-patch171-a214a2c07`: everything works, but the
+  maintainer wants the resize grip only while the player buttons show, not on
+  the video. The grip now shows with the header (fades with it); with the
+  controls hidden the card only moves. A resize under way keeps going if the
+  controls hide. Tests drag the grip through the card, so an invisible grip
+  really takes no touch; removing the header condition fails four of them.
 
 ## Decisions
 

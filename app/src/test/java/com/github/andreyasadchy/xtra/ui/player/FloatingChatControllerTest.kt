@@ -62,7 +62,7 @@ class FloatingChatControllerTest {
         activity.pause().stop().destroy()
     }
 
-    @Test fun `card opens top right with pill and resize grip visible while controls are hidden`() {
+    @Test fun `card opens top right with the pill and no resize grip while controls are hidden`() {
         controller.show(animate = false)
         idle()
         assertEquals(View.VISIBLE, binding.floatingChatRoot.visibility)
@@ -71,11 +71,12 @@ class FloatingChatControllerTest {
         assertEquals(rightX(), binding.floatingChatRoot.x, 0.5f)
         assertEquals(0f, binding.floatingChatRoot.y, 0.5f)
         assertEquals(View.VISIBLE, binding.floatingChatPill.visibility)
-        assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
+        // The grip only shows with the player controls, so it never sits on the video.
+        assertEquals(View.INVISIBLE, binding.floatingChatGrip.visibility)
         assertEquals(View.INVISIBLE, binding.floatingChatHeader.visibility)
     }
 
-    @Test fun `controls show header buttons without moving, fading or hiding card or grip`() {
+    @Test fun `controls show header buttons and grip without moving or fading the card`() {
         controller.show(animate = false)
         idle()
         val card = binding.floatingChatRoot
@@ -88,16 +89,18 @@ class FloatingChatControllerTest {
         assertEquals(1f, binding.floatingChatHeader.alpha, 0f)
         assertEquals(View.INVISIBLE, binding.floatingChatPill.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
+        assertEquals(1f, binding.floatingChatGrip.alpha, 0f)
         // The header overlays the chat, so toggling the controls never shifts it; the band covers the header.
         assertEquals(0, binding.floatingChatContainer.paddingTop)
         assertEquals(48, binding.floatingChatRoot.dragBandHeight)
 
         controller.onControlsVisibilityChanged(false)
         idle()
-        // An invisible header never takes touches; pill and grip stay ready.
+        // An invisible header never takes touches; the grip fades out with it and the pill stays ready.
         assertEquals(View.INVISIBLE, binding.floatingChatHeader.visibility)
         assertEquals(View.VISIBLE, binding.floatingChatPill.visibility)
-        assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
+        assertEquals(View.INVISIBLE, binding.floatingChatGrip.visibility)
+        assertEquals(0f, binding.floatingChatGrip.alpha, 0f)
         // The chat fills the card to its top edge; the pill only marks the drag band over it.
         assertEquals(0, binding.floatingChatContainer.paddingTop)
         assertEquals(28, binding.floatingChatRoot.dragBandHeight)
@@ -300,8 +303,9 @@ class FloatingChatControllerTest {
 
     @Test fun `a grip inside the band on a short card still resizes`() {
         controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
         idle()
-        // A keyboard leaves 60 px: the 48 px grip at the bottom reaches into the 28 px band.
+        // A keyboard leaves 60 px: the 48 px grip at the bottom reaches into the 48 px header band.
         controller.setInsets(FloatingChatInsets(bottom = 440, ime = true))
         idle()
         val card = binding.floatingChatRoot
@@ -309,7 +313,7 @@ class FloatingChatControllerTest {
         assertEquals(60, card.height)
         assertEquals(View.VISIBLE, grip.visibility)
         val gripY = grip.top + grip.translationY + 5f
-        assertTrue(gripY < 28f)
+        assertTrue(gripY < 48f)
         drag(card, dx = -50f, dy = 0f, startX = grip.left + grip.width / 2f, startY = gripY)
         idle()
         assertEquals(274, card.width)
@@ -371,24 +375,34 @@ class FloatingChatControllerTest {
         assertEquals(1, closeRequests)
     }
 
-    @Test fun `resize from corner grip works with controls hidden and with controls shown`() {
+    @Test fun `the corner grip resizes while the controls show and is not there while they hide`() {
         controller.show(animate = false)
         idle()
-        // Controls hidden: bottom-left grip grows card leftward & downward, keeping right edge fixed.
-        drag(binding.floatingChatGrip, dx = -50f, dy = 60f)
+        val card = binding.floatingChatRoot
+        // Controls hidden: a drag from the corner where the grip sits neither resizes nor moves the card.
+        val (hiddenX, hiddenY) = gripPoint()
+        drag(card, dx = -50f, dy = 60f, startX = hiddenX, startY = hiddenY)
         idle()
-        assertEquals(274, binding.floatingChatRoot.width)
-        assertEquals(300, binding.floatingChatRoot.height)
-        assertEquals(hostWidth(), binding.floatingChatRoot.x + 274f, 0.5f)
-        assertEquals(0f, binding.floatingChatRoot.y, 0.5f)
+        assertEquals(224, card.width)
+        assertEquals(240, card.height)
+        assertEquals(rightX(), card.x, 0f)
 
-        // Controls shown: resize continues to work identically and persists.
+        // Controls shown: the bottom-left grip grows the card leftward and downward, keeping the right edge fixed.
         controller.onControlsVisibilityChanged(true)
         idle()
-        drag(binding.floatingChatGrip, dx = 30f, dy = -40f)
+        val (x1, y1) = gripPoint()
+        drag(card, dx = -50f, dy = 60f, startX = x1, startY = y1)
         idle()
-        assertEquals(244, binding.floatingChatRoot.width)
-        assertEquals(260, binding.floatingChatRoot.height)
+        assertEquals(274, card.width)
+        assertEquals(300, card.height)
+        assertEquals(hostWidth(), card.x + 274f, 0.5f)
+        assertEquals(0f, card.y, 0.5f)
+
+        val (x2, y2) = gripPoint()
+        drag(card, dx = 30f, dy = -40f, startX = x2, startY = y2)
+        idle()
+        assertEquals(244, card.width)
+        assertEquals(260, card.height)
         val stored = FloatingChatLayoutStore.read(prefs.getString(FloatingChatLayoutStore.PREF_KEY, null), "c1")!!
         assertEquals(244f, stored.widthDp, 0.5f)
         assertEquals(260f, stored.heightDp, 0.5f)
@@ -396,6 +410,7 @@ class FloatingChatControllerTest {
 
     @Test fun `resize clamps to min and max bounds and handles ACTION_CANCEL`() {
         controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
         idle()
         // Try to grow way past usable bounds: clamped to max width share and the bottom edge.
         drag(binding.floatingChatGrip, dx = -1200f, dy = 1200f)
@@ -457,13 +472,16 @@ class FloatingChatControllerTest {
         assertEquals(afterFirstY + 40f, binding.floatingChatRoot.y, 0.5f)
         assertEquals(listOf(true, false), holds)
 
-        // Now on the left half (bottom-right grip): resize rightward while controls toggle on and off mid-resize.
+        // Now on the left half (bottom-right grip): a resize keeps going when the controls,
+        // and with them the grip, fade out mid-resize.
         holds.clear()
-        drag(binding.floatingChatGrip, dx = 50f, dy = 40f) {
-            controller.onControlsVisibilityChanged(true)
-            idle()
+        controller.onControlsVisibilityChanged(true)
+        idle()
+        val (gripX, gripY) = gripPoint()
+        drag(binding.floatingChatRoot, dx = 50f, dy = 40f, startX = gripX, startY = gripY) {
             controller.onControlsVisibilityChanged(false)
             idle()
+            assertEquals(View.INVISIBLE, binding.floatingChatGrip.visibility)
         }
         idle()
         assertEquals(274, binding.floatingChatRoot.width)
@@ -555,6 +573,7 @@ class FloatingChatControllerTest {
 
     @Test fun `width-only resize with the keyboard up keeps the saved height and spot`() {
         controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
         idle()
         drag(binding.floatingChatRoot, dx = 0f, dy = 220f)
         val bottomY = binding.floatingChatRoot.y
@@ -576,19 +595,15 @@ class FloatingChatControllerTest {
         assertEquals(240f, stored.heightDp, 0.5f)
     }
 
-    @Test fun `lifted grip reserves the header while the controls show`() {
+    @Test fun `lifted grip reserves the header`() {
         controller.show(animate = false)
-        idle()
-        val card = binding.floatingChatRoot
-        // Fits under the 28dp strip, but not under the 48dp header.
-        val lift = card.height - 48 - 28 - 10
-        controller.setComposerHeight(lift)
-        assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
         controller.onControlsVisibilityChanged(true)
         idle()
+        val card = binding.floatingChatRoot
+        // Room for the box and the grip under the 28dp band, but not under the 48dp header.
+        controller.setComposerHeight(card.height - 48 - 28 - 10)
         assertEquals(View.INVISIBLE, binding.floatingChatGrip.visibility)
-        controller.onControlsVisibilityChanged(false)
-        idle()
+        controller.setComposerHeight(card.height - 48 - 48 - 10)
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
     }
 
@@ -656,6 +671,7 @@ class FloatingChatControllerTest {
 
     @Test fun `open message box lifts the corner grip above it and closing it lowers the grip`() {
         controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
         idle()
         assertEquals(View.VISIBLE, binding.floatingChatGrip.visibility)
         controller.setComposerHeight(48)
@@ -668,6 +684,7 @@ class FloatingChatControllerTest {
 
     @Test fun `grip lifted above an open message box still resizes the card`() {
         controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
         idle()
         controller.setComposerHeight(48)
         val beforeWidth = binding.floatingChatRoot.width
@@ -681,6 +698,7 @@ class FloatingChatControllerTest {
 
     @Test fun `grip hides while the message box leaves no room for it`() {
         controller.show(animate = false)
+        controller.onControlsVisibilityChanged(true)
         idle()
         controller.setComposerHeight(binding.floatingChatRoot.height - 40)
         assertEquals(View.INVISIBLE, binding.floatingChatGrip.visibility)
@@ -779,6 +797,12 @@ class FloatingChatControllerTest {
             down.recycle()
             up.recycle()
         }
+    }
+
+    /** The middle of the resize grip in the card's coordinates, lift included. */
+    private fun gripPoint(): Pair<Float, Float> {
+        val grip = binding.floatingChatGrip
+        return grip.left + grip.width / 2f to grip.top + grip.translationY + grip.height / 2f
     }
 
     private fun hostWidth() = binding.floatingChatHost.width.toFloat()

@@ -98,8 +98,8 @@ internal class FloatingChatController(
 
     init {
         card.dragListener = dragHandler
-        // A touch on the grip always resizes, even where a short card puts it inside the drag band,
-        // and the header buttons handle their own taps and drags.
+        // A touch on the grip (shown with the header) always resizes, even where a short card puts
+        // it inside the drag band, and the header buttons handle their own taps and drags.
         card.dragBandExclusions = listOf(grip, composeButton, appearanceButton, closeButton)
         header.dragListener = dragHandler
         grip.setOnTouchListener(resizeHandler)
@@ -211,18 +211,19 @@ internal class FloatingChatController(
     }
 
     /**
-     * The grip stays usable with the message box open: it sits just above the
-     * box (and its reply line) instead of covering the text field or Send. A
-     * card too short for both hides the grip until the box closes or the
-     * emote menu does.
+     * The grip shows with the header, so only while the player controls do: it
+     * fades in and out with it and stays off the video otherwise. It stays
+     * usable with the message box open: it sits just above the box (and its
+     * reply line) instead of covering the text field or Send. A card too short
+     * for both hides the grip until the box closes or the emote menu does.
      */
     private fun updateGripLift() {
         val lift = -composerHeight.toFloat()
         if (grip.translationY != lift) grip.translationY = lift
         val gripHeight = grip.layoutParams.height.takeIf { it > 0 } ?: grip.height
-        val topBar = if (controlsVisible) headerHeight() else pillHeight()
-        val fits = composerHeight == 0 || composerHeight + gripHeight + topBar <= card.height
-        val visibility = if (fits) View.VISIBLE else View.INVISIBLE
+        val fits = composerHeight == 0 || composerHeight + gripHeight + headerHeight() <= card.height
+        // A resize that started while the controls showed keeps its touch target until it ends.
+        val visibility = if (header.isVisible && fits) View.VISIBLE else View.INVISIBLE
         if (grip.visibility != visibility) grip.visibility = visibility
     }
 
@@ -379,6 +380,7 @@ internal class FloatingChatController(
 
     private fun syncHeader(animate: Boolean) {
         header.animate().cancel()
+        grip.animate().cancel()
         composeButton.isVisible = callbacks.canCompose() && !appearance.replyBar
         // The header overlays the chat like the player controls do, on its own gradient
         // scrim, so showing or hiding the controls never shifts the chat. The drag band
@@ -387,8 +389,15 @@ internal class FloatingChatController(
             header.visibility = View.VISIBLE
             pill.visibility = View.INVISIBLE
             card.dragBandHeight = headerHeight()
-            if (animate) header.animate().alpha(1f).setDuration(FADE_MS).start() else header.alpha = 1f
+            if (animate) {
+                header.animate().alpha(1f).setDuration(FADE_MS).start()
+                grip.animate().alpha(1f).setDuration(FADE_MS).start()
+            } else {
+                header.alpha = 1f
+                grip.alpha = 1f
+            }
         } else if (animate && header.isVisible) {
+            grip.animate().alpha(0f).setDuration(FADE_MS).start()
             header.animate().alpha(0f).setDuration(FADE_MS).withEndAction {
                 if (!controlsVisible) {
                     // INVISIBLE so hidden header buttons never intercept touches.
@@ -399,6 +408,7 @@ internal class FloatingChatController(
             }.start()
         } else {
             header.alpha = 0f
+            grip.alpha = 0f
             header.visibility = View.INVISIBLE
             showDragBand()
         }
