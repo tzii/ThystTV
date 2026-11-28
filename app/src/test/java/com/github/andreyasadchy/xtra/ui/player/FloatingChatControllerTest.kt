@@ -235,18 +235,18 @@ class FloatingChatControllerTest {
         assertTrue(holds.isEmpty())
     }
 
-    @Config(sdk = [34])
+    // Asserts what the card hands to ViewCompat: a second Robolectric SDK (29+) in this JVM runs CI out of memory.
     @Test fun `the drag band is kept clear of the system back gesture`() {
         controller.show(animate = false)
         idle()
         val card = binding.floatingChatRoot
-        assertEquals(listOf(android.graphics.Rect(0, 0, 224, 28)), card.systemGestureExclusionRects)
+        assertEquals(listOf(android.graphics.Rect(0, 0, 224, 28)), card.bandGestureExclusion)
         controller.onControlsVisibilityChanged(true)
         idle()
-        assertEquals(listOf(android.graphics.Rect(0, 0, 224, 48)), card.systemGestureExclusionRects)
+        assertEquals(listOf(android.graphics.Rect(0, 0, 224, 48)), card.bandGestureExclusion)
         controller.hide(animate = false)
         idle()
-        assertTrue(card.systemGestureExclusionRects.isEmpty())
+        assertTrue(card.bandGestureExclusion.isEmpty())
     }
 
     @Test fun `holding still on the band grabs the card before the chat's long-press`() {
