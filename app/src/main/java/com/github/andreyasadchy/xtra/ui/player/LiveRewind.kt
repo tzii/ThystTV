@@ -59,6 +59,18 @@ internal object LiveRewind {
         return if (rewindMs == null) 0 else (edge - rewindMs.coerceAtLeast(DURATION_QUANTUM_MS)).coerceAtLeast(0)
     }
 
+    /**
+     * Where the player starts a rewind. The recording of a broadcast that is
+     * still going and the local buffer are both growing (EVENT) playlists, which
+     * Media3 plays as live. Its MaskingMediaSource reads a start position of
+     * exactly 0 as "the default position" and puts a live window's default, the
+     * live edge, in its place, so "from the beginning" played the last half
+     * minute. One millisecond in is still the beginning.
+     */
+    fun startPosition(positionMs: Long): Long = positionMs.coerceAtLeast(MIN_START_POSITION_MS)
+
+    const val MIN_START_POSITION_MS = 1L
+
     /** Twitch archives report their total; otherwise sum the listed segments. */
     fun mediaPlaylistDurationMs(body: String?): Long? {
         if (body?.trimStart()?.startsWith("#EXTM3U") != true) return null

@@ -3757,7 +3757,7 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 requireArguments().remove(LiveRewind.PLAYLIST)
                 requireArguments().putBoolean(KEY_IGNORE_SAVED_POSITION, false)
                 requireArguments().putLong(KEY_OFFSET, -1L)
-                viewModel.playbackPosition = requireArguments().getLong(LiveRewind.POSITION)
+                viewModel.playbackPosition = LiveRewind.startPosition(requireArguments().getLong(LiveRewind.POSITION))
                 try {
                     startVideo(preparedUrl, viewModel.playbackPosition, true)
                 } catch (error: CancellationException) {
@@ -3868,6 +3868,9 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
             handleLocalReplayEnded()
             return
         }
+        // A rewind restarted after process death or a lost source comes back here, not through
+        // the handoff, and may still be asked for 0 (no saved position).
+        val startPosition = if (liveRewindOrigin() != null) playbackPosition?.let(LiveRewind::startPosition) else playbackPosition
         if (skipAccessToken && !requireArguments().getString(KEY_VIDEO_ANIMATED_PREVIEW).isNullOrBlank()) {
             requireArguments().getString(KEY_VIDEO_ANIMATED_PREVIEW)?.let { preview ->
                 val urls = TwitchApiHelper.getVideoUrlsFromPreview(preview, requireArguments().getString(KEY_VIDEO_TYPE), viewModel.backupQualities)
@@ -3887,10 +3890,10 @@ abstract class PlayerFragment : BaseNetworkFragment(), RadioButtonDialogFragment
                 viewModel.quality = viewModel.qualities?.firstOrNull()
                 viewModel.quality?.url
             }?.let { url ->
-                startVideo(url, playbackPosition, false)
+                startVideo(url, startPosition, false)
             }
         } else {
-            viewModel.playbackPosition = playbackPosition
+            viewModel.playbackPosition = startPosition
             viewModel.loadVideo(
                 networkLibrary = requireContext().prefs().getString(C.NETWORK_LIBRARY, "OkHttp"),
                 gqlHeaders = TwitchApiHelper.getGQLHeaders(requireContext(), requireContext().prefs().getBoolean(C.TOKEN_INCLUDE_TOKEN_VIDEO, true)),
