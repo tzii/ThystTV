@@ -15,6 +15,56 @@ Agents should mark **Required** when a human should test an area. Mark **Complet
 
 ## Checklist
 
+### 1.7.1 fixes
+
+Required for the integration debug build of the 1.7.1 fix branches. None of these has been
+checked on a device yet.
+
+- [ ] Chat `/timeout` while signed in with the Helix (API) login: `/timeout <user> 10m`,
+  `/timeout <user> 300`, `/timeout <user>` (10 minutes) and `/timeout <user> 1w` time the
+  user out for that long, not a ban; `/timeout <user> soon` and `/timeout <user> 3w` show
+  the invalid-duration notice and change nothing. Use a channel you moderate and a test
+  account; `/untimeout` afterwards.
+- [ ] Clip download with **Download chat** on finishes as Downloaded; a clip whose VoD is
+  gone downloads without replay chat. Turn networking off during the chat step: the
+  download ends as paused (Pending) and resumes, never stuck at Downloading.
+- [ ] Settings backup and restore: back up, change several settings, restore only the
+  settings `.xml`, then change any setting and reopen Settings; the restored values stay.
+  Restore settings and database together in either pick order: both are restored and
+  the app restarts once. Picking another `.xml` file (not a settings backup) changes nothing.
+- [ ] Landscape VoD: start a pinch while the controls show; they fade out and the Fit/Fill
+  slider reads clearly. Three-finger pinch: lift one of the first two fingers while the
+  third stays down; the pinch commits and nothing else starts until all fingers lift.
+- [ ] Seek in a very short freeform/desktop window (shorter than about 94 dp): the slider
+  shows without a clipped caption; a normal window still shows the caption.
+- [ ] German UI (Settings → Language → Deutsch): main tabs, sort/period dialog, downloads,
+  player and chat strings read naturally and none are cut off at 100% and 200% font size.
+- [ ] On a live stream with a recording, Rewind live stream → Watch from beginning: playback
+  starts at 0:00 of the recording, not near its end. Watch last 3 minutes still starts
+  about three minutes before the edge. With Settings → Player → "Save positions of watched videos" off,
+  background the app during that playback, simulate process death
+  (`adb shell am kill <package>`) and return to it: it resumes at the start, not the edge.
+- [ ] On a live stream with no recording and the local rewind buffer on (and enough free
+  storage), Watch from beginning starts at the oldest saved moment, not near live.
+- [ ] Player ⋮ → Display mode: the dialog's button reads Cancel and closes it unchanged.
+- [ ] VoD with the controls hidden: throttle or drop the network until it rebuffers and
+  resumes; the controls stay hidden (the floating chat card stays put). Pause, the end of
+  the VoD and a playback error still bring the controls up. A tap during a stall still
+  shows them and they hide again after 3 s.
+- [ ] Following > Live (#128): leave it open while a followed stream ends; within about two
+  minutes its card leaves the list without a pull to refresh and without a spinner. Scroll
+  down, wait: the list doesn't jump to the top. Switch to another app or tab for a few
+  minutes and come back: the list reloads at once. Pull to refresh still shows the spinner.
+  In airplane mode the list keeps its streams and doesn't retry in a loop; turn it off and
+  the list reloads by itself. With no followed streams live, "Nothing here" stays put
+  through a reload (no spinner flash).
+- [ ] Chat poll and prediction cards (#129): tapping the card's text or options opens no
+  message menu and selects nothing behind it; the card's close button still works. The same
+  for the room status banner shown for a few seconds on joining (slow mode, followers-only).
+  With TalkBack on, the cards don't announce "double tap to activate".
+- [ ] Regression pass: live/VoD playback, stream switching, minimize/restore, close/reopen,
+  PiP/background, speed/quality, gestures and floating chat.
+
 ### 1.7.0 signed release candidate
 
 On November 21 the maintainer tested the combined debug build (`debug-cutoutedge-a90fc3dc9`)
