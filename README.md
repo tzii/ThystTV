@@ -74,7 +74,7 @@ Native captures on an Android 16 emulator: the player from a 1.7.1 test build ([
 
 ## Floating chat
 
-Floating chat keeps chat on screen during full-screen playback, so the video doesn't have to shrink into a split layout. In 1.7.1 it is a rounded card: throw it to either side, drag it up or down, resize it, or tuck it into an edge tab that counts new messages. Each channel remembers its spot. Pick Clear, Shade or Solid from **Aa**; menus open above the card, it steps aside from the seek buttons and fades back during gesture sliders.
+Floating chat keeps chat on screen during full-screen playback, so the video doesn't have to shrink into a split layout. In 1.7.1 it is a rounded card: drag it by the thin bar at its top to anywhere on screen, right up to the edges, and resize it from the corner grip while the player controls show. Each channel remembers its size and spot. Pick Clear, Shade or Solid from **Aa**; menus open above the card, and it fades back during gesture sliders.
 
 <p align="center">
   <a href="docs/images/features-1.7/floating-chat.mp4"><img src="docs/cropped/watch-player.webp" alt="Full-screen playback with the floating chat card on the right of the picture" width="760"></a>
@@ -122,7 +122,7 @@ Floating chat keeps chat on screen during full-screen playback, so the video doe
 
 ### Chat and notifications
 
-- Floating chat over full-screen video in Clear, Shade or Solid: move, resize or tuck it to the edge, with a spot remembered per channel; third-party emotes and chat replay remain available.
+- Floating chat over full-screen video in Clear, Shade or Solid: drag it anywhere and resize it from the corner, with its size and spot remembered per channel; third-party emotes and chat replay remain available.
 - Redeem custom Channel Points rewards after an explicit confirmation.
 - Live notifications respect per-channel settings and avoid repeat alerts.
 - Poll and prediction timers account for time spent asleep, and event cards survive chat screen rebuilds.
