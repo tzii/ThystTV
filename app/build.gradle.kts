@@ -70,7 +70,12 @@ android {
         buildConfig = true
         viewBinding = true
     }
-    testOptions.unitTests.isIncludeAndroidResources = true
+    testOptions.unitTests {
+        isIncludeAndroidResources = true
+        // The unit tests load Robolectric sandboxes for five SDK levels in one JVM, which no
+        // longer fits Gradle's 512 MB default test heap (an OutOfMemoryError on CI).
+        all { it.maxHeapSize = "1g" }
+    }
     androidResources {
         generateLocaleConfig = true
     }
