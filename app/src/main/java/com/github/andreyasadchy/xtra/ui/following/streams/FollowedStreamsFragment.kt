@@ -1,6 +1,7 @@
 package com.github.andreyasadchy.xtra.ui.following.streams
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +15,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.paging.LoadState
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.github.andreyasadchy.xtra.R
@@ -25,9 +27,12 @@ import com.github.andreyasadchy.xtra.ui.common.StreamsAdapter
 import com.github.andreyasadchy.xtra.ui.common.StreamsCompactAdapter
 import com.github.andreyasadchy.xtra.ui.top.TopStreamsFragmentDirections
 import com.github.andreyasadchy.xtra.util.C
+import com.github.andreyasadchy.xtra.util.isNetworkAvailable
 import com.github.andreyasadchy.xtra.util.prefs
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -37,6 +42,13 @@ class FollowedStreamsFragment : PagedListFragment(), Scrollable {
     private val binding get() = _binding!!
     private val viewModel: FollowedStreamsViewModel by viewModels()
     private lateinit var pagingAdapter: PagingDataAdapter<Stream, out RecyclerView.ViewHolder>
+    /** When the list last finished loading (elapsed realtime). */
+    private var loadedAt = SystemClock.elapsedRealtime()
+    /** When the timer last fired, so a skipped or failed reload waits a whole interval too. */
+    private var attemptedAt = 0L
+    private var loading = false
+    /** The last load failed (offline, or an integrity check): wait for a pull or a retry instead. */
+    private var failed = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = CommonRecyclerViewLayoutBinding.inflate(inflater, container, false)
@@ -81,6 +93,36 @@ class FollowedStreamsFragment : PagedListFragment(), Scrollable {
             }
         }
         initializeAdapter(binding, pagingAdapter, enableScrollTopButton = false)
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                pagingAdapter.loadStateFlow.distinctUntilChangedBy { it.refresh }.collect { loadState ->
+                    val wasLoading = loading
+                    loading = loadState.refresh is LoadState.Loading
+                    when (loadState.refresh) {
+                        is LoadState.Error -> failed = true
+                        is LoadState.NotLoading -> {
+                            failed = false
+                            // Only a load that just finished: the flow repeats its last state to every
+                            // new collector, so coming back on screen must not count as a fresh load.
+                            if (wasLoading) loadedAt = SystemClock.elapsedRealtime()
+                        }
+                        is LoadState.Loading -> Unit
+                    }
+                }
+            }
+        }
+        // Streams that ended leave the list by themselves while it is on screen (#128).
+        // RESUMED: the Following pager keeps its other tabs only STARTED.
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (true) {
+                    delay(FollowedStreamsAutoRefresh.delayUntilDue(maxOf(loadedAt, attemptedAt), SystemClock.elapsedRealtime()))
+                    attemptedAt = SystemClock.elapsedRealtime()
+                    // Offline, a reload comes back empty and would wipe the list: wait for the network.
+                    if (!loading && !failed && requireContext().isNetworkAvailable) refreshQuietly(pagingAdapter)
+                }
+            }
+        }
     }
 
     override fun scrollToTop() {
@@ -88,12 +130,16 @@ class FollowedStreamsFragment : PagedListFragment(), Scrollable {
     }
 
     override fun onNetworkRestored() {
-        pagingAdapter.retry()
+        when {
+            failed -> pagingAdapter.retry()
+            // A load while offline came back empty rather than failing, so retry() does nothing.
+            !loading -> refreshQuietly(pagingAdapter)
+        }
     }
 
     override fun onIntegrityDialogCallback(callback: String?) {
         if (callback == "refresh") {
-            pagingAdapter.refresh()
+            refresh(pagingAdapter)
         }
     }
 
